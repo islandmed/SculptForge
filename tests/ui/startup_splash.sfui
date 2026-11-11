@@ -5,6 +5,8 @@ run new_sphere subdivisions=2
 expect_value startup_splash_enabled == 0
 expect_value startup_splash_open == 0
 expect_value main_window_hidden == 0
+# #192: the splash must never leave its own GL context current (a real splash needs a window system: the invariant is asserted here)
+expect_value gl_context_current == 1
 expect_value startup_splash_pref == 1
 
 click "Preferences##palette.preferences"

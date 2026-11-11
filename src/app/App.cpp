@@ -268,6 +268,12 @@ bool App::init(const AppOptions& options) {
         SDL_Log("Missing OpenGL function: %s", missing);
         return false;
     }
+    if (!gl::GetString(GL_VERSION)) makeMainContextCurrent(true); // (#192: "OpenGL (null)" - nothing was current; one more try)
+    if (!gl::GetString(GL_VERSION)) {
+        startError_ = "The graphics driver has no current OpenGL context at start-up (try SF_STARTUP_SPLASH=0).";
+        SDL_Log("%s", startError_.c_str());
+        return false;
+    }
     SDL_Log("OpenGL %s on %s", reinterpret_cast<const char*>(gl::GetString(GL_VERSION)),
             reinterpret_cast<const char*>(gl::GetString(GL_RENDERER)));
 
@@ -442,10 +448,21 @@ void App::shutdown() {
     SDL_Quit();
 }
 
+// The splash window system may leave another context current (#192): the main window's goes back after every splash step.
+// `force`: SDL remembers which context it made current and skips a repeat, so after the splash's window opened or closed (its
+// accelerated surface may have bound and released a context behind SDL's back) detach first, then bind again.
+void App::makeMainContextCurrent(bool force) {
+    if (!window_ || !glContext_) return;
+    if (!force && SDL_GL_GetCurrentContext() == glContext_) return;
+    if (force) SDL_GL_MakeCurrent(window_, nullptr);
+    if (!SDL_GL_MakeCurrent(window_, glContext_)) SDL_Log("Could not make the OpenGL context current after the splash: %s", SDL_GetError());
+}
+
 void App::splashCheckpoint() {
     if (!splashEnabled_) return;
     if (splash_) {
         splash_->pump();
+        makeMainContextCurrent();
         return;
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
@@ -458,6 +475,7 @@ void App::splashCheckpoint() {
         SDL_Log("Start-up splash shown after %.0f ms", ms);
     } else
         SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
+    makeMainContextCurrent(true);
 }
 
 void App::revealMainWindow() {
@@ -480,7 +498,9 @@ void App::revealMainWindow() {
 std::string App::splashVersionLine() { return std::string(tr("Version")) + " " + appVersionLabel(); }
 
 void App::closeSplash() {
+    const bool wasOpen = splash_ != nullptr;
     splash_.reset();
+    if (wasOpen) makeMainContextCurrent(true);
 }
 
 void App::glWindowAttributes() {
