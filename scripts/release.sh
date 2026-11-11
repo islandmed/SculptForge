@@ -25,7 +25,7 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew omarchy replies status (--stage: bump stage)
+# Steps: bump check ci tag release site aur brew omarchy replies social status (--stage: bump stage)
 # bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
 # promoting: only checks main already has it); check then verifies everything the later steps need, so a release
 # either stops in seconds before the tag or runs through to the end.
@@ -52,7 +52,7 @@ AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal add
 AUR_FLAG=${AUR_FLAG:-$HOME/Work/.sf/aur-publish}
 AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
 OMARCHY_PR=1800
-STEPS=(bump check ci tag release site aur brew omarchy replies status)
+STEPS=(bump check ci tag release site aur brew omarchy replies social status)
 
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
@@ -952,6 +952,14 @@ step_replies() {
     python3 tools/release/reply_drafts.py "$V" "$work/section" "$REPO" "$T" > "$out" 2> "$work/drafts" ||
         die "couldn't write the reply drafts" "python3 tools/release/reply_drafts.py --self-test"
     ok "$(cat "$work/drafts") in $out: sfmonitor posts these (it reads them first)"
+}
+
+# One approved bust-card post for X/Bluesky/Facebook/Instagram the same hour, handed to the "input" session (~/Work/.sf/social/lockstep.py reads
+# website/latest.json, which the site step wrote). Never blocks a release: no script, an error or no card line only prints a note.
+step_social() {
+    local ls=$HOME/Work/.sf/social/lockstep.py
+    [ -f "$ls" ] || { ok "no social lockstep script here; skipped"; return; }
+    python3 "$ls" "$V" website/latest.json || true
 }
 
 step_status() {
