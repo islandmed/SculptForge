@@ -14,6 +14,20 @@ your saved style is kept.
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
 key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See [Customizing the interface](interface.md#customizing-the-interface).
 
+### Two keys in a row
+
+An action can also take two different keys one after the other, like <kbd>A</kbd> then <kbd>S</kbd>, which
+gives you many more keys to bind. In **Edit > Preferences > Hotkeys** click the small **>>** button at the right of
+the action's key, then press the first key and the second. The sequence is added to the action's other keys, and a
+sequence another action already uses asks first (Replace / Cancel), like any key. <kbd>Backspace</kbd> in that box
+removes the action's two-key shortcuts and leaves its single keys.
+
+- The second key must come within half a second of the first.
+- It has to be a different key: the same key twice is not a sequence.
+- If the first key is bound on its own, it still works: it waits that half second, and runs by itself when no second
+  key follows. A first key with no shortcut of its own does nothing alone.
+- Either key can carry <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd>.
+
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
 <kbd>Alt</kbd>. Single-letter shortcuts don't fire while you type in a text field.
 

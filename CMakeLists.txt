@@ -1078,6 +1078,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
     sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
     sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
+    sculptforge_ui_test(key_sequence_1440 key_sequence --size 1440x900)
+    sculptforge_ui_test(key_sequence_2880 key_sequence --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

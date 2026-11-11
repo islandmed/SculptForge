@@ -632,6 +632,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollQRemesh();
         pollSplatTrain();
         pollSculptable();
+        tickKeySequence(dt);
         updateCameraAspect();
         updateSpaceMouse(dt);
         updateKeyNav(dt);
@@ -984,6 +985,7 @@ bool App::wantsFrames(double now) const {
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
+           actions_.sequenceWaiting() || // a first key waiting for its second, then for its own action (Actions.cpp)
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
@@ -1355,6 +1357,7 @@ int App::run() {
             continue;
         }
         if (measuring) cpuFrameStart = processCpuSeconds();
+        tickKeySequence(dt);
         updateCameraAspect();
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
@@ -1754,6 +1757,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
         keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
+        actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
@@ -1774,6 +1778,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_AXIS:
     case SDL_EVENT_PEN_BUTTON_DOWN:
     case SDL_EVENT_PEN_BUTTON_UP:
+        if (e.type == SDL_EVENT_PEN_DOWN) actions_.flushSequence(); // the pen starts a stroke: a first key waiting runs alone now
         handlePenEvent(e);
         break;
     case SDL_EVENT_FINGER_DOWN:
@@ -1793,6 +1798,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        actions_.flushSequence(); // a click is not the second key: the first key runs alone before it
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
