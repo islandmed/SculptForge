@@ -1743,6 +1743,16 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         requestQuit();
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_DID_ENTER_BACKGROUND:
+        // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
+        // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
+        autosaveRevision_ = ~uint64_t(0);
+        tickProject(0.0f);
+        autosavePrefs(true);
+        break;
+#endif
     case SDL_EVENT_JOYSTICK_ADDED:
     case SDL_EVENT_JOYSTICK_REMOVED:
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
