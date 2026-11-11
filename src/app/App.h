@@ -2397,6 +2397,7 @@ private:
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
     bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    void backUpUiConfigOnce();
     static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
     std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
     bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_

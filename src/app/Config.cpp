@@ -1050,7 +1050,19 @@ void App::saveWindowState() const {
 
 std::string App::uiConfigPath() const { return configDir_.empty() ? std::string() : configDir_ + "ui.json"; }
 
+// The first write of a session keeps what ui.json held (the saved layout, a file that didn't read, --reset-layout's
+// dropped layout) as ui.prev.json: a start never costs the layout Save Layout kept.
+void App::backUpUiConfigOnce() {
+    std::error_code ec;
+    const std::string path = uiConfigPath();
+    if (uiConfigBackedUp_ || path.empty() || !std::filesystem::is_regular_file(fsPath(path), ec)) return;
+    uiConfigBackedUp_ = true;
+    std::filesystem::copy_file(fsPath(path), fsPath(configDir_ + "ui.prev.json"),
+                               std::filesystem::copy_options::overwrite_existing, ec);
+}
+
 bool App::writeUiConfig(const std::string& path, std::string& err) {
+    if (path == uiConfigPath()) backUpUiConfigOnce();
     Json j = Json::object();
     j.set("version", 1.0);
     j.set("layout", toJson(layout_));
@@ -1064,14 +1076,6 @@ bool App::writeUiConfig(const std::string& path, std::string& err) {
 // after they change, with the layout as Save Layout last kept it (storedLayout_; none yet: the standard one).
 bool App::writeJsonAtomic(const std::string& path, const Json& j, std::string& err) {
     std::error_code ec;
-    // The first write of a session keeps what ui.json held (the saved layout, a file that didn't read, --reset-layout's
-    // dropped layout) as ui.prev.json: a start never costs the layout Save Layout kept.
-    if (!uiConfigBackedUp_ && path == uiConfigPath() && std::filesystem::is_regular_file(fsPath(path), ec)) {
-        uiConfigBackedUp_ = true;
-        std::filesystem::copy_file(fsPath(path), fsPath(configDir_ + "ui.prev.json"),
-                                   std::filesystem::copy_options::overwrite_existing, ec);
-        ec.clear();
-    }
     const std::string tmp = path + ".tmp";
     {
         std::ofstream f(fsPath(tmp), std::ios::binary | std::ios::trunc);
@@ -1098,6 +1102,7 @@ std::string App::prefsKey() const {
 }
 
 bool App::saveUiPrefs(std::string& err) {
+    backUpUiConfigOnce();
     Json j = Json::object();
     j.set("version", 1.0);
     if (storedLayout_.isObject()) j.set("layout", storedLayout_);
