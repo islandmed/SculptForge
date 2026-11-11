@@ -400,6 +400,20 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
+    // The Shift / Ctrl brush (Shift+click / Ctrl+click a tile, ModifierBrush.cpp): a small badge in the top right.
+    if (type >= 0 && app.fontTiny_) {
+        float y = p0.y + 1.0f * s;
+        for (ModifierSlot slot : {ModifierSlot::Shift, ModifierSlot::Ctrl}) {
+            if (app.modifierBrushes().brush(slot) != type) continue;
+            ImFont* f = app.fontTiny_;
+            const char* text = modifierSlotName(slot);
+            const ImVec2 ts = f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, text);
+            const ImVec2 b1(p1.x - 1.0f * s, y + ts.y + 1.0f * s), b0(b1.x - ts.x - 4.0f * s, y);
+            dl->AddRectFilled(b0, b1, theme::u32(theme::accent, alpha), theme::rounding(3.0f * s));
+            dl->AddText(f, f->FontSize, ImVec2(b0.x + 2.0f * s, b0.y + 0.5f * s), theme::u32(theme::textOnAccent, alpha), text);
+            y = b1.y + 1.0f * s;
+        }
+    }
     if (leftShelf) {
         if (!fitCaption(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha), label) &&
             hovered)
@@ -3352,6 +3366,22 @@ void App::drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon
 
 void App::drawBrushTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
+    // A Ctrl brush (Ctrl+click on a shelf brush, ModifierBrush.cpp) shows while Ctrl is held; a click opens the mask
+    // brushes, and picking one makes Ctrl mask again.
+    if (heldBrush() == HeldBrush::Mask && heldSlot() == ModifierSlot::Ctrl) {
+        const int ctrlBrush = uiPrefs_.modifierBrushes.ctrl;
+        ImVec2 a, b;
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, brushLabel(BrushType(ctrlBrush)), s, a, b);
+        if (ImTextureID tex = thumbs_.brush(ctrlBrush)) {
+            squareIn(a, b, 2.0f * s);
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
+        }
+        if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
+        ui::HelpText("Brush", "B", "Ctrl held: the Ctrl brush (Ctrl+click a brush on the bottom shelf sets it). Click to pick "
+                     "a mask brush instead, and Ctrl masks again.", "Left shelf");
+        return;
+    }
     // Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;

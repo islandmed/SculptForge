@@ -183,6 +183,10 @@ public:
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
     ThumbnailCache& thumbnails() { return thumbs_; }
+    // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
+    // (true) instead of the main one (ModifierBrush.cpp).
+    bool modifierBrushClick(int type);
+    const ModifierBrushes& modifierBrushes() const { return uiPrefs_.modifierBrushes; }
     void shutdown();
     // The warm UI test server (sculptforge --ui-serve, UiServe.cpp): every App it makes draws in this one hidden
     // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
@@ -217,6 +221,14 @@ private:
 
     bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
+    // The Shift and Ctrl brushes (core/ModifierBrush.h, ModifierBrush.cpp): Shift+click / Ctrl+click a brush tile.
+    ModifierSlot heldSlot() const; // the rebound slot the keyboard's keys held now pick (None: the usual meanings)
+    void setModifierBrush(ModifierSlot slot, int type); // -1: back to Smooth / the mask
+    float& heldIntensity(); // the Intensity the next stroke (or the one going on) uses: what the U slider sets
+    std::string heldIntensityName(); // "Intensity", "Smooth Intensity", "Trim Intensity (Shift)"
+    float strokeStrength() const; // the stroke's Intensity outside Smooth: the main one or its slot's
+    ModifierSlot strokeSlot_ = ModifierSlot::None; // the slot the stroke going on began with
+    void registerModifierBrushCommands(); // set_modifier_brush, brush.shift_reset, brush.ctrl_reset
     void beginStroke(float x, float y, const RayHit& hit);
     // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
     // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
@@ -2714,8 +2726,8 @@ private:
     // sculpt Intensity.
     float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
     // What the running stroke sculpts with: Smooth's own Intensity when it smooths (Shift held at the press, #180),
-    // else the brush's. Every stroke type reads this, none reads strength_ itself.
-    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_; }
+    // else the brush's (the Shift / Ctrl brush's own, ModifierBrush.cpp). Every stroke type reads this, none reads strength_ itself.
+    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strokeStrength(); }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu

@@ -1945,8 +1945,10 @@ void App::updateMouseCursor() {
 BrushType App::activeBrush() const {
     // classic convention: holding Shift temporarily switches to Smooth.
     // The pen's eraser end can be set to smooth too (Preferences > Tablet).
-    const bool smooth = (inputMods() & SDL_KMOD_SHIFT) || (erasing() && eraserAction() == PenAction::Smooth);
-    return smooth ? BrushType::Smooth : brush_;
+    if (erasing() && eraserAction() == PenAction::Smooth) return BrushType::Smooth;
+    // Shift+click / Ctrl+click on a shelf brush rebinds Shift / Ctrl (ModifierBrush.cpp).
+    if (const ModifierSlot slot = heldSlot(); slot != ModifierSlot::None) return BrushType(uiPrefs_.modifierBrushes.brush(slot));
+    return (inputMods() & SDL_KMOD_SHIFT) ? BrushType::Smooth : brush_;
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
@@ -2054,7 +2056,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             }
         }
         RayHit hit;
-        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl; // (a Ctrl brush sculpts)
         if (!insertType_.empty() && !maskMod && previewLod_ < 0 && pick(x, y, hit)) { // Append > Insert (#34)
             drag_ = Drag::Insert;
             insertAt_ = hit.position;
@@ -2453,6 +2455,7 @@ glm::vec3 App::alongNormalTarget(float x, float y) const {
 void App::beginStroke(float x, float y, const RayHit& hit) {
     refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
+    strokeSlot_ = heldSlot(); // a Shift / Ctrl brush: its own Intensity (ModifierBrush.cpp)
     strokeAlongNormal_ = false;
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
@@ -2587,8 +2590,8 @@ void App::strokeTo(float x, float y) {
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
-    if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
-        !(inputMods() & SDL_KMOD_SHIFT)) {
+    if (alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
+                              (inputMods() & SDL_KMOD_SHIFT) != 0)) {
         strokeAltSmooth_ = true;
         status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
@@ -4800,7 +4803,7 @@ void App::drawBrushCursor() {
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
                                                 : invertToggle_ != (((mod & SDL_KMOD_ALT) != 0) ||
                                                                     (erasing() && eraserAction() == PenAction::Invert));
-    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl;
     if (masking && drag_ != Drag::Stroke && maskShape_ != SelectShape::Pen) { // MaskLasso / MaskRect: a crosshair
         const float arm = 8.0f * uiScale_;
         dl->AddLine(ImVec2(c.x - arm, c.y), ImVec2(c.x + arm, c.y), IM_COL32(230, 230, 230, 220), 1.5f);

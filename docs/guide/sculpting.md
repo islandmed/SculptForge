@@ -235,10 +235,30 @@ a million vertices takes about 10 ms, and about 16 ms with Connected only.
 | Hold | Effect |
 |---|---|
 | <kbd>Alt</kbd> | Inverts the brush for this stroke (see the table of brushes). For Move, Tendril, Elastic Tendril and KelvinGrab, which have nothing to invert, it moves the surface along the normal instead (below). |
-| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity. With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
+| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity (or uses your [Shift brush](#shift-and-ctrl-brushes)). With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
 | <kbd>Shift</kbd> (after the stroke started) | Draws a straight line from where you pressed <kbd>Shift</kbd>, snapped to 45 degree steps on screen. Let go of <kbd>Shift</kbd> to carry on freehand. |
-| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). |
+| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). With a [Ctrl brush](#shift-and-ctrl-brushes) set, <kbd>Ctrl</kbd> on the model sculpts with it instead. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> | Visibility gestures: isolate, hide and show face groups. See [Face Groups and visibility](face-groups.md). |
+
+### Shift and Ctrl brushes
+
+Holding <kbd>Shift</kbd> smooths and holding <kbd>Ctrl</kbd> masks, but either key can hold another brush, so you
+can switch between two or three brushes without leaving the one you are working with:
+
+- **Shift+click** a brush on the bottom shelf (or in the brush picker) and holding <kbd>Shift</kbd> sculpts with it,
+  for example Trim or Flatten. The status line says **Shift brush: Trim** and the tile gets a small **Shift** badge.
+  Your main brush stays as it was.
+- **Ctrl+click** a brush on the bottom shelf and holding <kbd>Ctrl</kbd> on the model sculpts with it instead of
+  masking (badge **Ctrl**). <kbd>Ctrl</kbd>+<kbd>Alt</kbd> still erases the mask, <kbd>Ctrl</kbd> beside the model
+  still draws the mask rectangle, and <kbd>Ctrl</kbd>+<kbd>Shift</kbd> keeps the visibility gestures.
+- Each key's brush keeps its own Intensity, as Smooth does: hold the key and the Intensity slider (or
+  <kbd>U</kbd>) shows and sets it, for example **Trim Intensity (Shift)**.
+- **Going back**: Shift+click Smooth, or **Reset Shift brush (Smooth)** in the command palette. For Ctrl, pick a
+  mask brush with <kbd>Ctrl</kbd> held (the left shelf's brush tile or <kbd>Ctrl</kbd>+<kbd>B</kbd>), or **Reset Ctrl
+  brush (Mask)**. Smooth on <kbd>Shift</kbd> works exactly as before, alternate smooth included.
+- The Paint brush keeps <kbd>Shift</kbd>'s smooth and <kbd>Ctrl</kbd>'s mask, and a pen button or eraser set to
+  Smooth still smooths. Only built-in brushes can be bound for now (not custom brushes).
+- The choice is kept in the preferences. Scripts: `set_modifier_brush shift=trim ctrl=flatten` (`default` goes back).
 
 ### Along the normal
 

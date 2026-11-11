@@ -61,6 +61,7 @@ add_library(sculptforge_core STATIC
   src/core/HardwareTier.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/ModifierBrush.cpp
   src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
@@ -459,6 +460,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/BrushSettingsUi.cpp
+    src/app/ModifierBrush.cpp
     src/app/PanelVdm.cpp
     src/app/PanelKelvinlet.cpp
     src/app/PanelCloth.cpp
@@ -1113,6 +1115,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A free Space that returns no model / switched Text to 3D off (tests/ui/generate_space_refused.sfui).
     sculptforge_ui_test(generate_space_refused_1440 generate_space_refused --size 1440x900)
     sculptforge_ui_test(generate_space_refused_2880 generate_space_refused --size 2880x1800)
+    sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
+    sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px

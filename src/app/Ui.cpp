@@ -321,6 +321,9 @@ void HelpAction(App& app, const char* actionId) {
     g_help.command = a->command;
     g_help.disabled = a->enabled && !a->enabled();
     g_help.description = tr(a->description);
+    if (brushTypeOfAction(a->id) >= 0) // (ModifierBrush.cpp)
+        g_help.description += std::string(" ") + tr("Shift+click: hold Shift to use it instead of Smooth. Ctrl+click: hold "
+                                                     "Ctrl to use it instead of the mask.");
     if (const Command* c = a->command.empty() ? nullptr : app.commands().find(a->command)) {
         if (g_help.description.empty()) g_help.description = tr(c->description);
         g_help.params = c->params;
@@ -727,6 +730,8 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
         if (!customize && moved < 4.0f) app.beginShortcutCapture(id);
         return false;
     }
+    // Shift+click / Ctrl+click a brush: it becomes the Shift / Ctrl brush, the main one stays (ModifierBrush.cpp).
+    if (const int type = brushTypeOfAction(id); type >= 0 && app.modifierBrushClick(type)) return true;
     if (run) run();
     return true;
 }
