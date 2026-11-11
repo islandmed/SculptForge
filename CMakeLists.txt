@@ -1102,6 +1102,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Smooth Peaks (tests/ui/smooth_peaks.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(smooth_peaks_1440 smooth_peaks --size 1440x900)
     sculptforge_ui_test(smooth_peaks_2880 smooth_peaks --size 2880x1800)
+    sculptforge_ui_test(key_sequence_1440 key_sequence --size 1440x900)
+    sculptforge_ui_test(key_sequence_2880 key_sequence --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

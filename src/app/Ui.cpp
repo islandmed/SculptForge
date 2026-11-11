@@ -341,10 +341,14 @@ float KeycapsWidth(const std::string& chord) {
         const std::string part = chord.substr(start, at == std::string::npos ? std::string::npos : at - start);
         if (!firstChord) w += ImGui::CalcTextSize("/").x + 2 * gap;
         firstChord = false;
-        const auto keys = chordKeys(part);
-        for (size_t i = 0; i < keys.size(); ++i) {
-            if (i) w += ImGui::CalcTextSize("+").x + 2 * gap;
-            w += ImGui::CalcTextSize(keys[i].c_str()).x + 2 * pad;
+        const auto steps = shortcutSteps(part); // "A then S": two chords with a dim "then" between
+        for (size_t step = 0; step < steps.size(); ++step) {
+            if (step) w += ImGui::CalcTextSize("then").x + 2 * gap;
+            const auto keys = chordKeys(steps[step]);
+            for (size_t i = 0; i < keys.size(); ++i) {
+                if (i) w += ImGui::CalcTextSize("+").x + 2 * gap;
+                w += ImGui::CalcTextSize(keys[i].c_str()).x + 2 * pad;
+            }
         }
         if (at == std::string::npos) break;
         start = at + 3;
@@ -368,15 +372,19 @@ float KeycapsAt(ImDrawList* dl, ImVec2 p, const std::string& chord) {
         const std::string part = chord.substr(start, at == std::string::npos ? std::string::npos : at - start);
         if (!firstChord) dimText("/");
         firstChord = false;
-        const auto keys = chordKeys(part);
-        for (size_t i = 0; i < keys.size(); ++i) {
-            if (i) dimText("+");
-            const ImVec2 ts = ImGui::CalcTextSize(keys[i].c_str());
-            const ImVec2 a = p, b(p.x + ts.x + 2 * pad, p.y + h);
-            dl->AddRectFilled(a, b, lookColor(IM_COL32(0x2c, 0x2c, 0x30, 0xff), theme::frame), theme::rounding(3.0f * s));
-            dl->AddRect(a, b, lookColor(IM_COL32(0x4a, 0x4a, 0x50, 0xff), theme::tileBorder), theme::rounding(3.0f * s));
-            dl->AddText(ImVec2(a.x + pad, a.y + 1.0f * s), color::accent, keys[i].c_str());
-            p.x = b.x;
+        const auto steps = shortcutSteps(part);
+        for (size_t step = 0; step < steps.size(); ++step) {
+            if (step) dimText("then");
+            const auto keys = chordKeys(steps[step]);
+            for (size_t i = 0; i < keys.size(); ++i) {
+                if (i) dimText("+");
+                const ImVec2 ts = ImGui::CalcTextSize(keys[i].c_str());
+                const ImVec2 a = p, b(p.x + ts.x + 2 * pad, p.y + h);
+                dl->AddRectFilled(a, b, lookColor(IM_COL32(0x2c, 0x2c, 0x30, 0xff), theme::frame), theme::rounding(3.0f * s));
+                dl->AddRect(a, b, lookColor(IM_COL32(0x4a, 0x4a, 0x50, 0xff), theme::tileBorder), theme::rounding(3.0f * s));
+                dl->AddText(ImVec2(a.x + pad, a.y + 1.0f * s), color::accent, keys[i].c_str());
+                p.x = b.x;
+            }
         }
         if (at == std::string::npos) break;
         start = at + 3;

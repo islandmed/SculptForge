@@ -2420,8 +2420,13 @@ public:
     const CommandRegistry& commands() const { return commands_; }
     ImFont* helpTitleFont() const { return fontHelpTitle_ ? fontHelpTitle_ : ImGui::GetFont(); }
     ImFont* consoleFont() const { return fontConsole_ ? fontConsole_ : ImGui::GetFont(); }
-    // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys).
-    void beginShortcutCapture(const std::string& actionId);
+    // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys). SEQUENCE: the
+    // next two different keys, one after the other, are added as a two-key shortcut ("A then S", Hotkeys' second button).
+    void beginShortcutCapture(const std::string& actionId, bool sequence = false);
+    const std::string& captureFirstKey() const { return captureFirst_; }
+    bool capturingSequence() const { return !capturingShortcut_.empty() && captureSequence_; }
+    // Once a frame in both frame loops: a first key that was waiting for its second runs alone when the time is up.
+    void tickKeySequence(float dt);
     const std::string& capturingShortcut() const { return capturingShortcut_; }
     // A pressed key that another action already uses waits here for Replace or Cancel (a popup by the button).
     bool shortcutConflictOpen() const { return !conflict_.actionId.empty(); }
@@ -2532,8 +2537,11 @@ private:
     CommandPalette palette_;
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
+    bool captureSequence_ = false;    // ...for two keys in a row (added to its other keys)
+    std::string captureFirst_;        // the first key of that sequence, once pressed
     struct ShortcutConflict {
         std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
+        bool keepOthers = false;              // a sequence is added to the action's keys, not instead of them
     } conflict_;
     ImVec4 shortcutAnchor_{};           // the button the capture began from (min x, y, max x, y); zero: unknown
     bool conflictPopupOpened_ = false;  // OpenPopup was called for the open conflict
