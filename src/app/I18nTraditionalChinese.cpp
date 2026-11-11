@@ -2435,10 +2435,16 @@ constexpr Entry kTraditionalChinese[] = {
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
     {"Members get betas early.", "會員可搶先取得 Beta 版。"},
     {"Become a member", "成為會員"},
+    {"Featured creator", "精選創作者"},
+    {"Hide this video.", "隱藏此影片。"},
+    {"Opens the video in your browser.", "在瀏覽器中開啟影片。"},
+    {"Watch", "觀看"},
+    {"by", "作者"},
     {"Once a day at startup, download a small file from the SculptForge website that names the newest version, and "
-     "show a banner when there is a newer one. Nothing about you or your computer is sent.",
-     "每天啟動時一次，從 SculptForge 網站下載一個標示最新版本的小檔案，有較新版本時顯示橫幅。不會傳送任何關於你或你電"
-     "腦的資訊。"},
+     "show a banner when there is a newer one. The welcome window's Featured creator card comes with it (off with this switch). "
+     "Nothing about you or your computer is sent.",
+     "每天啟動時一次，從 SculptForge 網站下載一個標示最新版本的小檔案，有較新版本時顯示橫幅。歡迎視窗中的「精選創作者」"
+     "卡片也隨它而來（關閉此開關即可關閉）。不會傳送任何關於你或你電腦的資訊。"},
     {"Update channel", "更新頻道"},
     {"Stable", "穩定版"},
     {"Preview (betas)", "預覽（Beta 版）"},

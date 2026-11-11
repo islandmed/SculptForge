@@ -2435,10 +2435,16 @@ constexpr Entry kSimplifiedChinese[] = {
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
     {"Members get betas early.", "会员可抢先获取 Beta 版。"},
     {"Become a member", "成为会员"},
+    {"Featured creator", "特色创作者"},
+    {"Hide this video.", "隐藏此视频。"},
+    {"Opens the video in your browser.", "在浏览器中打开视频。"},
+    {"Watch", "观看"},
+    {"by", "作者"},
     {"Once a day at startup, download a small file from the SculptForge website that names the newest version, and "
-     "show a banner when there is a newer one. Nothing about you or your computer is sent.",
-     "每天启动时一次，从 SculptForge 网站下载一个标记最新版本的小文件，有较新版本时显示横幅。不会发送任何关于你或你电"
-     "脑的信息。"},
+     "show a banner when there is a newer one. The welcome window's Featured creator card comes with it (off with this switch). "
+     "Nothing about you or your computer is sent.",
+     "每天启动时一次，从 SculptForge 网站下载一个标记最新版本的小文件，有较新版本时显示横幅。欢迎窗口中的“特色创作者”"
+     "卡片也随它而来（关闭此开关即可关闭）。不会发送任何关于你或你电脑的信息。"},
     {"Update channel", "更新通道"},
     {"Stable", "稳定版"},
     {"Preview (betas)", "预览（Beta 版）"},

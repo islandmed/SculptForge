@@ -119,6 +119,9 @@ void App::initProject() {
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
         applyUpdatePolicy();
+        featuredLaunch_ = uint64_t(std::clamp(prefs["featured_launch"].asNumber(0), 0.0, 1e12));
+        for (const Json& h : prefs["featured_hidden"].items())
+            if (h.isString() && featuredHidden_.size() < 64) featuredHidden_.push_back(h.asString());
         // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
         // 0.11.1 are honoured as they were: a member said so.)
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
@@ -193,6 +196,8 @@ void App::initProject() {
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     // (the starts milestone: counted on this computer only, never sent)
     if (!supportCardTestMode()) supportCardPrefs_.starts = std::min(supportCardPrefs_.starts + 1, 100000000);
+    ++featuredLaunch_; // (the featured creator card moves on a start: core/Featured.h)
+    loadFeaturedCache();
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
     // The full membership card on the first start (Support.h); after an update, the small card's moment; then a
@@ -239,6 +244,12 @@ void App::saveProjectPrefs() {
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
     prefs.set("update_checked_at", double(updateCheckedAt_));
+    prefs.set("featured_launch", double(featuredLaunch_));
+    if (!featuredHidden_.empty()) {
+        Json hidden = Json::array();
+        for (const std::string& h : featuredHidden_) hidden.push(h);
+        prefs.set("featured_hidden", std::move(hidden));
+    }
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
     prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
@@ -891,24 +902,16 @@ void App::startUpdateCheck(bool manual) {
     // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
     const std::shared_ptr<MemberAuth> member =
         memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
-    std::thread([job, source, fallback, channel, member] {
+    // The featured creator card's feed rides along on the public feed only (never a studio's own channel).
+    const bool featuredToo = !studioMode().active && policy::current().updateFeed.empty() && policy::current().updateMirror.empty();
+    const std::string featuredDir = prefDir_;
+    std::thread([job, source, fallback, channel, member, featuredToo, featuredDir] {
         std::string body;
         // A URL or a local file (a studio's mirror on a share; UI tests).
-        auto fetch = [&](const std::string& from) {
-            job->error.clear();
-            if (from.rfind("https://", 0) == 0 || from.rfind("http://", 0) == 0) {
-                ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
-                if (r.status == 200) body = r.body;
-                else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
-            } else {
-                std::ifstream f(fsPath(from), std::ios::binary);
-                if (f) body.assign(std::istreambuf_iterator<char>(f), {});
-                else job->error = "can't read " + from;
-            }
-            return job->error.empty();
-        };
+        auto fetch = [&](const std::string& from) { return readFeedText(from, body, job->error); };
         if (!fetch(source) && !fallback.empty()) fetch(fallback);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
+        if (featuredToo && !featuredDir.empty()) fetchFeatured(*job, source, fallback, featuredDir);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;
     }).detach();
@@ -925,6 +928,7 @@ void App::pollUpdateCheck() {
     } else if (!job->memberError.empty()) {
         memberStatus_ = "Couldn't check member builds: " + job->memberError;
     }
+    applyFeaturedJob(*job); // (the featured creator card: kept, or gone when the site can't be reached)
     if (!job->ok) {
         updateStatus_ = "Couldn't check for updates: " + job->error;
         if (job->manual) status_ = updateStatus_;
@@ -1022,7 +1026,8 @@ void App::drawUpdatesSection() {
     if (checkLocked) ui::ManagedBadge();
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
-                 "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
+                 "version, and show a banner when there is a newer one. The welcome window's Featured creator card "
+                 "comes with it (off with this switch). Nothing about you or your computer is sent.",
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;

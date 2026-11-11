@@ -2735,10 +2735,17 @@ constexpr Entry kSpanish[] = {
      "Intercambia las expresiones izquierda y derecha (y el giro de la cabeza), si el personaje guiña el ojo "
      "equivocado."},
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
+    {"Featured creator", "Creador destacado"},
+    {"Hide this video.", "Ocultar este vídeo."},
+    {"Opens the video in your browser.", "Abre el vídeo en tu navegador."},
+    {"Watch", "Ver"},
+    {"by", "de"},
     {"Once a day at startup, download a small file from the SculptForge website that names the newest version, and "
-     "show a banner when there is a newer one. Nothing about you or your computer is sent.",
+     "show a banner when there is a newer one. The welcome window's Featured creator card comes with it (off with this switch). "
+     "Nothing about you or your computer is sent.",
      "Una vez al día al iniciar, descarga del sitio web de SculptForge un archivo pequeño que nombra la versión más "
-     "nueva, y muestra un aviso cuando hay una más nueva. No se envía nada sobre ti ni sobre tu equipo."},
+     "nueva, y muestra un aviso cuando hay una más nueva. La tarjeta de Creador destacado de la ventana de bienvenida "
+     "llega con él (se apaga con este interruptor). No se envía nada sobre ti ni sobre tu equipo."},
     {"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
     {"Preview (betas)", "Vista previa (betas)"},

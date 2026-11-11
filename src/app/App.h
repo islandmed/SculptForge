@@ -57,6 +57,7 @@
 #include "core/SelfUpdate.h"
 #include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
+#include "core/Featured.h"
 #include "core/ViewCapture.h"
 #include "core/Voxel.h"
 #include "core/WhatsNew.h"
@@ -1809,7 +1810,28 @@ private:
         std::string error;
         std::string memberError;   // the member check's problem (the public check may still have worked)
         bool memberSignedOut = false; // the sign-in ran out or was revoked: signed out
+        bool featuredTried = false, featuredOk = false; // the featured creator feed (PanelFeatured.cpp)
+        std::vector<FeaturedItem> featured;
     };
+    // The welcome window's featured creator card (PanelFeatured.cpp, core/Featured.h): the kept featured.json and
+    // thumbnails, refreshed by the daily update check; one entry a start; the x hides a video for good.
+    static bool readFeedText(const std::string& from, std::string& body, std::string& error);
+    static void fetchFeatured(UpdateJob& job, const std::string& source, const std::string& fallback, const std::string& dir);
+    void applyFeaturedJob(const UpdateJob& job);
+    void loadFeaturedCache();
+    void pickFeaturedCard();
+    const FeaturedItem* featuredCard() const; // what is shown, nullptr when nothing is
+    void watchFeatured();
+    void hideFeatured();
+    unsigned featuredTexture(const FeaturedItem& it);
+    void drawFeaturedCard();
+    std::vector<FeaturedItem> featured_;
+    int featuredShown_ = -1;
+    std::vector<std::string> featuredHidden_; // links of the videos the x hid
+    uint64_t featuredLaunch_ = 0;             // starts so far: each start shows the next entry
+    unsigned featuredTex_ = 0;
+    std::string featuredTexFor_;
+    int featuredWatchRequests_ = 0;           // UI tests: Watch clicks (never opens a browser there)
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
     static const char* appPrerelease();     // "beta.1" in a beta build, else ""
