@@ -36,8 +36,14 @@ else()
   message(STATUS "Fetching SDL3")
   sf_fetch_declare(SDL3 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   # Static: release packages then need no separate SDL library (zlib licence allows this).
-  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-  set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  # Android: shared, as SDLActivity loads libSDL3.so itself (its JNI_OnLoad) before libmain.so.
+  if(ANDROID)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+  else()
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  endif()
   set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
   set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
   # SDL 3.4 needs the XTest headers for X11 unless told not to; nothing here uses XTest, and the build machines
