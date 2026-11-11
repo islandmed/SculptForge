@@ -1,13 +1,13 @@
 {
-  "version": "0.12.5",
+  "version": "0.12.6",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Rgb lays colour on Sub strokes too, for every brush and stroke type",
-    "Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)",
-    "Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)",
-    "Thread counts above 16 set in Preferences > Performance apply at the next start (#184)",
-    "A startup splash shows the bust and version while SculptForge starts"
+    "Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)",
+    "Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)",
+    "Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)",
+    "Drape a garment on a body in Tool > Garments, with a steadier cloth rest",
+    "Save Visible Parts As and a Mask colour preference"
   ],
   "support": {
     "founding": {
