@@ -1,11 +1,11 @@
 {
-  "version": "0.12.3",
+  "version": "0.12.4",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "The interface starts in your language (Spanish, Traditional or Simplified Chinese)",
-    "Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)",
-    "The welcome has a Language row with all four languages, each in its own script"
+    "Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)",
+    "Pan and zoom from the keyboard: Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held",
+    "Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)"
   ],
   "support": {
     "founding": {
