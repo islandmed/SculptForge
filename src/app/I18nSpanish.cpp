@@ -2179,6 +2179,18 @@ constexpr Entry kSpanish[] = {
      "gira a lo largo del trazo. Desactivado, Drag Stamp solo fija el tamaño y el sello conserva el giro de Ángulo. "
      "Slide Stamp nunca gira mientras lo deslizas."},
     {"Angle jitter", "Variación de ángulo"},
+    {"Add to alpha pool", "Añadir al grupo de alfas"},
+    {"Alpha pool", "Grupo de alfas"},
+    {"Alpha pool: empty", "Grupo de alfas: vacío"},
+    {"Each dab and each Drag Stamp takes one of these alphas at random, ahead of the brush's own alpha. Clear puts the brush's own alpha back. Kept until you quit.", "Cada toque y cada Drag Stamp toma uno de estos alfas al azar, antes que el alfa propio del pincel. Borrar devuelve el alfa del pincel. Se conserva hasta que cierres la aplicación."},
+    {"Make each dab bigger or smaller by a random amount, up to this many percent either way: wood grain, pores and chips that are never the same size twice.", "Hace cada toque más grande o más pequeño en una cantidad aleatoria, hasta este porcentaje en cualquier sentido: vetas de madera, poros y astillas que nunca tienen el mismo tamaño dos veces."},
+    {"Move each dab off the cursor by a random amount, up to this many percent of the brush radius, so a line of stamps does not sit in a tidy row.", "Aparta cada toque del cursor en una cantidad aleatoria, hasta este porcentaje del radio del pincel, para que una línea de sellos no quede en una fila ordenada."},
+    {"Position jitter", "Variación de posición"},
+    {"Position jitter %.0f%%", "Variación de posición %.0f%%"},
+    {"Right-click an alpha in the Library or the alpha list and pick Add to alpha pool, or right-click a folder of images and pick Use folder as alpha pool. Then every dab takes one of them at random, so scanned planks or pores never repeat. Tile does not apply to pool alphas.", "Haz clic derecho en un alfa de la Biblioteca o de la lista de alfas y elige Añadir al grupo de alfas, o haz clic derecho en una carpeta de imágenes y elige Usar carpeta como grupo de alfas. Cada toque tomará uno al azar, así que las tablas escaneadas o los poros nunca se repiten. El mosaico no se aplica a los alfas del grupo."},
+    {"Scale jitter", "Variación de escala"},
+    {"Scale jitter %.0f%%", "Variación de escala %.0f%%"},
+    {"Use folder as alpha pool", "Usar carpeta como grupo de alfas"},
     {"Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, rock and noise "
      "alphas.",
      "Gira cada toque un ángulo aleatorio, hasta estos grados a cada lado: rompe las repeticiones en alphas de piel, "

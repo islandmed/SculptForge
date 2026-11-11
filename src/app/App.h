@@ -421,12 +421,13 @@ private:
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
-        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Scale / Position jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
         const BrushRecipe* recipe = nullptr;
         const BrushAlpha* alpha = nullptr;
+        std::shared_ptr<const AlphaPool> pool; // the alphas each dab picks from (alphaPool_; null: just `alpha`)
         Stencil stencil; // (a copy: its image is shared and never changes, so the solver thread can read it)
         const VectorDisplacement* vdm = nullptr;
         std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
@@ -998,6 +999,11 @@ private:
     AlphaOptions alphaOptions_;
     AlphaRake alphaRake_;
     uint32_t alphaSeed_ = 1;
+    // The alpha pool (Alpha palette > Pool; session only): each dab, and each Drag Stamp, takes one of its alphas at random.
+    // The seed starts from the stroke's number, so a stroke draws the same on every replay and no two look alike.
+    std::shared_ptr<const AlphaPool> alphaPool_;
+    uint32_t alphaStrokeSerial_ = 0;
+    std::shared_ptr<const BrushAlpha> stampAlpha_; // this Drag Stamp's pick from the pool (null: the brush's alpha)
     // Drag Stamp / Slide Stamp (#136): Angle jitter's turn for this stroke's one stamp, from a seed that carries on
     // from stroke to stroke (each stamp gets its own turn).
     float stampJitter_ = 0.0f;
@@ -2723,7 +2729,9 @@ private:
     void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)
     void registerPenPressureCommand(); // brush_pen_pressure (#122)
     void syncAlphaTile();     // the brush's Tile onto the current alpha
-    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76) and brush_alpha_pool
+    void registerAlphaPoolCommand();    // brush_alpha_pool
+    void drawAlphaPool();               // the Alpha palette's Pool row (PanelBrushes.cpp)
     std::string brushSettingsPath() const;
     BrushSettingsStore brushSettings_;
     std::string brushSettingsKey_; // the brush the live values belong to

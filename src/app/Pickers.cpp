@@ -1034,6 +1034,13 @@ void drawAlphaGrid(App& app, GridMode mode) {
         }
         quickInfo(tex, glyph, e.name, e.help, e.path);
         ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
+        if (ImGui::BeginPopupContextItem(("##alphapoolmenu" + id).c_str())) { // the alpha pool (core/AlphaOptions.h)
+            ImGui::TextDisabled("%s", e.name.c_str());
+            if (ImGui::MenuItem(tr("Add to alpha pool")))
+                app.runCommand("brush_alpha_pool", e.kind == Entry::Kind::Builtin ? Args{{"name", e.name}}
+                                                                                   : Args{{"path", e.path}});
+            ImGui::EndPopup();
+        }
     }
     if (order.empty()) ImGui::TextDisabled(tr("No alpha matches \"%s\""), filter);
     ImGui::Dummy(ImVec2(0, 2));
