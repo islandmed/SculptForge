@@ -480,6 +480,9 @@ const char* brushTypeDescription(int type) {
     case BrushType::Cloth:
         return "Moves the surface like fabric: drag to pull it along and it folds where it bunches up; Push presses it "
                "in, Settle lets it sag and drape over other Parts. Mode and fabric in Brush > Cloth; the mask pins it.";
+    case BrushType::SmoothPeaks:
+        return "Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the "
+               "hollows alone. Hold Shift with any brush for the plain smooth.";
     default:
         return "";
     }

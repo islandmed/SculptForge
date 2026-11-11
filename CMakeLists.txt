@@ -1077,6 +1077,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Crisp Flatten's chamfer, grazing views and Brush Lab options (tests/ui/crisp_flatten.sfui), at 1440 px and 2880 px.
     sculptforge_ui_test(crisp_flatten_1440 crisp_flatten --size 1440x900)
     sculptforge_ui_test(crisp_flatten_2880 crisp_flatten --size 2880x1800)
+    # Smooth Peaks (tests/ui/smooth_peaks.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(smooth_peaks_1440 smooth_peaks --size 1440x900)
+    sculptforge_ui_test(smooth_peaks_2880 smooth_peaks --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

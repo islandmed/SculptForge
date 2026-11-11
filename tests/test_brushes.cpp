@@ -235,6 +235,43 @@ TEST(layer_brush_raises_constant_height_without_stacking) {
     CHECK(std::abs(d.mesh.positions[c].y - height) < 1e-5f);
 }
 
+TEST(smooth_peaks_lowers_only_the_high_points) {
+    // A bump and a pit on a plane: Smooth Peaks wears the bump down and leaves the pit's floor where it was,
+    // where plain Smooth fills the pit.
+    const auto bumpy = [] {
+        Document d = planeDoc();
+        DabParams bump = dabAt(glm::vec3(0.3f, 0, 0), 0.2f, 1.0f);
+        stroke(d, BrushType::Standard, bump, kNoSymmetry, 3);
+        DabParams pit = dabAt(glm::vec3(-0.3f, 0, 0), 0.2f, 1.0f);
+        pit.invert = true;
+        stroke(d, BrushType::Standard, pit, kNoSymmetry, 3);
+        return d;
+    };
+    Document d = bumpy();
+    uint32_t top = 0, floor = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        if (d.mesh.positions[v].y > d.mesh.positions[top].y) top = v;
+        if (d.mesh.positions[v].y < d.mesh.positions[floor].y) floor = v;
+    }
+    CHECK(d.mesh.positions[top].y > 0.005f && d.mesh.positions[floor].y < -0.005f);
+    const auto before = d.mesh.positions;
+
+    Document plain = bumpy();
+    stroke(plain, BrushType::Smooth, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
+    CHECK(plain.mesh.positions[floor].y > before[floor].y * 0.95f); // (Smooth fills the pit)
+
+    stroke(d, BrushType::SmoothPeaks, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 12);
+    CHECK(d.mesh.positions[top].y < 0.85f * before[top].y);
+    CHECK(glm::distance(d.mesh.positions[floor], before[floor]) < 1e-5f);
+    float maxUp = 0.0f;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) maxUp = std::max(maxUp, moved(d, before, v).y);
+    CHECK(maxUp < 1e-5f); // nothing rises
+    CHECK(std::string(brushName(BrushType::SmoothPeaks)) == "SmoothPeaks");
+    CHECK(std::string(brushLabel(BrushType::SmoothPeaks)) == "Smooth Peaks");
+    BrushType t{};
+    CHECK(brushFromName("smooth peaks", t) && t == BrushType::SmoothPeaks);
+}
+
 TEST(nudge_slides_along_the_surface) {
     Document d = planeDoc();
     const auto before = d.mesh.positions;

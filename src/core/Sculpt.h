@@ -45,6 +45,7 @@ enum class BrushType {
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
+    SmoothPeaks, // Smooth that only lowers the points above the local average along their normal; hollows stay
     Count
 };
 
