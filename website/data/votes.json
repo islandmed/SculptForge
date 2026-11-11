@@ -239,6 +239,16 @@
      "shipped": ""
     },
     {
+     "slug": "make-symmetric-choose-the-side-to-keep",
+     "anchor": "vote-make-symmetric-choose-the-side-to-keep",
+     "title": "Make Symmetric: choose the side to keep",
+     "line": "Pick which half is kept and mirrored (now it keeps the +X side), so you can work on either side.",
+     "where": "Tool > Geometry > Symmetry",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "confirm-before-destructive-remesh",
      "anchor": "vote-confirm-before-destructive-remesh",
      "title": "Confirm before destructive remesh",
@@ -331,6 +341,16 @@
      "title": "Node-based sculpting",
      "line": "Build a model as a chain of nodes (mesh, remesh, mask, sculpt, mirror, merge, export) instead of destructive edits, so any step can be changed later.",
      "where": "New node graph view",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "gizmo-free-move-handles",
+     "anchor": "vote-gizmo-free-move-handles",
+     "title": "Gizmo free-move handles",
+     "line": "Four small handles on the Gizmo (All) to drag a Part in any direction on screen, not only along an axis, without losing symmetry.",
+     "where": "Gizmo panel",
      "votes": 0,
      "status": "open",
      "shipped": ""
@@ -784,5 +804,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T08:37:56Z"
+ "updated": "2026-11-11T10:37:51Z"
 }
