@@ -113,7 +113,7 @@ click "Console/Copy session as script"
 expect_clipboard "remesh resolution=64"
 expect_clipboard "subdivide"
 
-# Save Layout writes ui.json; Reset Layout and Shortcuts resets; Revert to Saved Layout brings the layout back (shortcuts save themselves).
+# Save Layout writes ui.json; Reset Layout and Shortcuts resets; Revert to Saved Layout brings it back.
 click "Console/Clear console"
 expect_no_text "> remesh"
 key f3
@@ -134,6 +134,8 @@ type "##Command palette" "revert to saved"
 key enter
 expect_status "Saved layout restored"
 expect_value console_open == 1
+key ctrl+k
+expect_value wireframe == 1
 
 # The console's close button; then the console key opens it again.
 click "Console/###console_close"

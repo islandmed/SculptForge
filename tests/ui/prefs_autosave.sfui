@@ -1,5 +1,5 @@
 # Preferences save themselves (#117): every change reaches ui.json a moment later, with no command to run; the
-# layout too (Save Layout only marks what Revert returns to). An older ui.json whose keymap names the old save command's id (config.store) loads as before.
+# layout waits for Save Layout. An older ui.json whose keymap names the old save command's id (config.store) loads as before.
 run ui_look look=classic layout=classic        # the classic palette bar: Preferences is a palette
 run new_sphere
 
@@ -17,10 +17,19 @@ expect_value timeline_top == 0
 expect_shortcut ui.focal_popup O / I
 expect_shortcut ui.strength_popup U
 
-# The layout saves itself too (tests/ui/layout_autosave.sfui): a tray closed is still closed after a restart.
+# The layout is not saved by itself: a tray closed comes back open after a restart; Save Layout keeps it.
 expect_value right_tray_open == 1
 click "##rightdivider"
 expect_value right_tray_open == 0
+restart
+wait 0.2
+expect_value right_tray_open == 1
+click "##rightdivider"
+expect_value right_tray_open == 0
+key f3
+type "##Command palette" "save layout"
+key enter
+expect_status "Layout saved"
 restart
 wait 0.2
 expect_value right_tray_open == 0
@@ -38,7 +47,7 @@ shot palette
 # Preferences > Saving & Layouts: Customize Shelves, Save Layout, Revert / Reset, Export / Import, and the note.
 click "Preferences##palette.preferences"
 click "Saving & Layouts##preferences.config"
-expect_text "Preferences, shortcuts and the layout save themselves"
+expect_text "Preferences and shortcuts save themselves"
 expect "Save Layout##config.save_layout"
 shot preferences-config
 key escape

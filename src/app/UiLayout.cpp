@@ -114,27 +114,6 @@ bool shelfEmpty(const std::vector<std::string>& items) {
     return std::all_of(items.begin(), items.end(), [](const std::string& id) { return id == "sep" || id == "row"; });
 }
 
-UiLayoutPair layoutsFromUiJson(const Json& ui) {
-    UiLayoutPair p;
-    if (!ui.isObject()) return p;
-    if (ui["layout"].isObject()) p.current = ui["layout"];
-    if (ui.has("layoutSaved")) p.saved = ui["layoutSaved"].isObject() ? ui["layoutSaved"] : Json();
-    else p.saved = p.current; // before the autosave: the one layout was the saved one
-    return p;
-}
-
-void layoutsToUiJson(Json& ui, const Json& current, const Json& saved) {
-    if (current.isObject()) ui.set("layout", current);
-    ui.set("layoutSaved", saved.isObject() ? saved : Json());
-}
-
-Json toAutosaveJson(UiLayout l) {
-    l.consoleOpen = false;
-    l.libraryOpen = false;
-    l.customize = false;
-    return toJson(l);
-}
-
 bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     if (!j.isObject()) {
         error = "The UI configuration is not a JSON object";

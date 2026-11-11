@@ -242,7 +242,8 @@ constexpr Entry kSpanish[] = {
     {"Verts %s   Tris %s   Part %s (%d/%d)   Layer %s%s%s", "Vért. %s   Tris %s   Pieza %s (%d/%d)   Capa %s%s%s"},
     {"Customize: Ctrl+Alt+drag to move or remove items", "Personalizar: Ctrl+Alt+arrastrar para mover o quitar elementos"},
     {"Customize off", "Personalizar desactivado"},
-    {"Standard layout and shortcuts restored", "Diseño y atajos estándar restaurados"},
+    {"Standard layout and shortcuts restored - Save Layout keeps the layout",
+     "Diseño y atajos estándar restaurados: Guardar diseño conserva el diseño"},
     {"Saved layout restored", "Diseño guardado restaurado"},
     {"No saved layout yet - Save Layout first", "Aún no hay un diseño guardado: usa Guardar diseño primero"},
     {"Layout saved", "Diseño guardado"},
@@ -727,9 +728,9 @@ constexpr Entry kSpanish[] = {
      "Vuelve a los estantes, bandejas y paneles incluidos, con todos los paneles en la ventana principal. Los atajos y las preferencias se conservan. Siempre funciona, sea cual sea el estado del diseño (un diseño inutilizable: inicia con --reset-layout)."},
     {"Import Interface", "Importar interfaz"},
     {"Export Interface", "Exportar interfaz"},
-    {"Preferences, shortcuts and the layout save themselves. Save Layout sets the layout Revert to Saved Layout returns to.",
-     "Las preferencias, los atajos y el diseño se guardan solos. Guardar diseño fija el diseño al que vuelve Revertir "
-     "al diseño guardado."},
+    {"Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them.",
+     "Las preferencias y los atajos se guardan solos. Los cambios del diseño duran hasta que salgas; Guardar diseño "
+     "los conserva."},
 
     // --- Preferences > Interface ---
     {"Language", "Idioma"},
@@ -1551,15 +1552,18 @@ constexpr Entry kSpanish[] = {
      "grabadora de macros)."},
     {"Empty the console log (the session script is kept).",
      "Vacía el registro de la consola (el script de la sesión se conserva)."},
-    {"Make the current layout (shelves, trays, open palettes) the one Revert to Saved Layout returns to. The layout, preferences and shortcuts also save themselves.",
-     "Hace del diseño actual (estantes, bandejas, paletas abiertas) el que recupera Revertir al diseño guardado. El diseño, las preferencias y los atajos también se guardan solos."},
+    {"Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
+     "themselves.",
+     "Conserva el diseño actual (estantes, bandejas, paletas abiertas) para próximas sesiones. Las preferencias y "
+     "los atajos se guardan solos."},
     {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
      "Escribe ahora las preferencias y los atajos en el disco. No hace falta: se guardan solos un momento después de "
      "cada cambio."},
-    {"Go back to the built-in layout, shortcuts and radial menus. They save themselves; Revert to Saved Layout still returns to the layout Save Layout kept.",
-     "Vuelve al diseño, los atajos y los menús radiales de fábrica. Se guardan solos; Revertir al diseño guardado sigue volviendo al diseño que conservó Guardar diseño."},
-    {"Go back to the layout the last Save Layout kept (the layout in use saves itself, so this is the way back to it).",
-     "Vuelve al diseño que conservó el último Guardar diseño (el diseño en uso se guarda solo, así que este es el camino de vuelta)."},
+    {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
+     "the layout.",
+     "Vuelve al diseño, los atajos y los menús radiales de fábrica. Los atajos se guardan solos; Guardar diseño "
+     "conserva el diseño."},
+    {"Go back to the layout the last Save Layout kept.", "Vuelve al diseño que conservó el último Guardar diseño."},
     {"Load a layout and shortcuts file someone shared (or you saved with Export Interface).",
      "Carga un archivo de diseño y atajos que alguien compartió (o que guardaste con Exportar interfaz)."},
     {"Save the layout, shortcuts and interface preferences to a file you can share.",

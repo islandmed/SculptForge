@@ -1331,8 +1331,9 @@ constexpr Entry kTraditionalChinese[] = {
      "將本次工作階段執行過的所有命令以指令碼形式放到剪貼簿，可直接重播（巨集錄製器）。"},
     {"Empty the console log (the session script is kept).", "清空主控台記錄（保留工作階段指令碼）。"},
     {"Save Layout", "儲存版面配置"},
-    {"Make the current layout (shelves, trays, open palettes) the one Revert to Saved Layout returns to. The layout, preferences and shortcuts also save themselves.",
-     "將目前的版面配置（工具列、工具匣、開啟的調色盤）設為「還原為已儲存的版面配置」所回到的版面配置。版面配置、偏好設定與快速鍵也會自動儲存。"},
+    {"Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
+     "themselves.",
+     "保留目前的版面配置（工具列、工具匣、開啟的調色盤）供之後的工作階段使用。偏好設定與快速鍵會自動儲存。"},
     {"Save Preferences Now", "立即儲存偏好設定"},
     {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
      "立即將偏好設定與快速鍵寫入磁碟。通常不需要：每次變更後它們會在片刻後自動儲存。"},
@@ -1341,11 +1342,11 @@ constexpr Entry kTraditionalChinese[] = {
     {"Put back on the shelf: ", "放回工具架: "},
     {"Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).",
      "回到內建的工具架、工具匣與面板，所有面板都回到主視窗。快速鍵與偏好設定保留。無論版面配置處於什麼狀態都能使用（版面配置無法使用時：以 --reset-layout 啟動）。"},
-    {"Go back to the built-in layout, shortcuts and radial menus. They save themselves; Revert to Saved Layout still returns to the layout Save Layout kept.",
-     "回到內建的版面配置、快速鍵與放射選單。它們會自動儲存；「還原為已儲存的版面配置」仍會回到「儲存版面配置」所保留的版面配置。"},
+    {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
+     "the layout.",
+     "回到內建的版面配置、快速鍵與圓餅選單。快速鍵會自動儲存；「儲存版面配置」會保留版面配置。"},
     {"Revert to Saved Layout", "還原為已儲存的版面配置"},
-    {"Go back to the layout the last Save Layout kept (the layout in use saves itself, so this is the way back to it).",
-     "回到上一次「儲存版面配置」所保留的版面配置（使用中的版面配置會自動儲存，所以這是回到它的方法）。"},
+    {"Go back to the layout the last Save Layout kept.", "回到上一次「儲存版面配置」所保留的版面配置。"},
     {"Import Interface...", "匯入界面..."},
     {"Load a layout and shortcuts file someone shared (or you saved with Export Interface).",
      "載入別人分享（或你用「匯出界面」儲存）的版面配置與快速鍵檔案。"},
@@ -1359,8 +1360,8 @@ constexpr Entry kTraditionalChinese[] = {
      "SculptForge 在 3D 視圖上顯示的簡短提示（已開啟的模式、工具的下一步）。關閉會全部隱藏；每則提示也各有「不再顯示"
      "」。"},
     {"Customize Shelves", "自訂工具列"},
-    {"Preferences, shortcuts and the layout save themselves. Save Layout sets the layout Revert to Saved Layout returns to.",
-     "偏好設定、快速鍵與版面配置都會自動儲存。「儲存版面配置」會設定「還原到已儲存的版面配置」所回到的版面配置。"},
+    {"Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them.",
+     "偏好設定與快速鍵會自動儲存。版面配置的變更會持續到你結束程式為止；「儲存版面配置」會保留它們。"},
     {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, Clay "
      "Block...) stay as they are.",
      "選單、調色盤、工具列與訊息所使用的語言。筆刷與工具名稱（Quad Remesh、Forge Spheres、Clay Block...）保持原樣。"},

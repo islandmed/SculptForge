@@ -66,18 +66,6 @@ Json toJson(const UiLayout& layout);
 // stored) comes from standardLayout(shellLayout): the SculptForge layout's shelves for a SculptForge-layout file.
 bool fromJson(const Json& j, UiLayout& layout, std::string& error, int shellLayout = 0);
 
-// ui.json keeps two layouts: "layout", the one in use (written by itself a moment after every layout edit and at
-// quit), and "layoutSaved", the one the last Save Layout kept (what Revert to Saved Layout returns to). A file
-// from before the autosave has only "layout": it is both. "layoutSaved": null is a file where Save Layout never ran.
-struct UiLayoutPair {
-    Json current; // null: the file has no layout
-    Json saved;   // null: no Save Layout yet
-};
-UiLayoutPair layoutsFromUiJson(const Json& ui);
-void layoutsToUiJson(Json& ui, const Json& current, const Json& saved);
-// The layout as autosaved: what a session opens by itself (console, Library, Customize Shelves) stays shut.
-Json toAutosaveJson(UiLayout layout);
-
 // A panel in a window of its own (docs/design/detach-panels.md): "palette.<id>", "guide" or "controls", and where
 // its window was (desktop coordinates, logical px; placed false: the window system chose, e.g. Wayland). Kept in
 // <user data>/panels.json, never in ui.json: one desk's monitor coordinates don't travel with a shared interface.
