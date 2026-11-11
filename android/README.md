@@ -7,10 +7,10 @@ fingers, undoes, and saves and opens projects. A tablet layout of its own comes 
 ## Build
 
 ```sh
-scripts/android-build.sh                 # build-android/SculptForge-X.Y.Z-android-test.apk (arm64-v8a)
+scripts/android-build.sh                 # build-android/SculptForge-X.Y.Z-android-arm64-v8a-test.apk
 scripts/android-build.sh --debug         # with debug info in the native code (ndk-stack)
 scripts/android-build.sh --unsigned      # for scripts/android-sign.sh
-scripts/android-build.sh --abi x86_64    # for the emulator
+scripts/android-build.sh --abi x86_64    # Intel/AMD Chromebooks and the emulator
 ```
 
 It needs the Android SDK (`ANDROID_HOME`, platform 35 and build-tools), an NDK, Java 17, CMake, Ninja and Gradle;
@@ -18,6 +18,25 @@ GitHub's Ubuntu runners have them all, and `.github/workflows/android.yml` build
 the Android side. What it does: CMake with the NDK's toolchain builds the app as `libmain.so` (with `SDL3` beside it),
 then the Gradle project here wraps it with SDL's Java activity (copied from the SDL release the build fetched, so the
 two always match).
+
+## Devices we test on
+
+The big tablet makers, their pens and their graphics, so every family is covered by at least one tester:
+
+| Maker (families) | Pen | Graphics | Notes |
+|---|---|---|---|
+| Samsung (Galaxy Tab S, Tab S FE, Tab A) | S Pen (EMR: hover, side button, no eraser end) | Adreno (Snapdragon), Xclipse/Mali (Exynos) | DeX desktop mode: windows, keyboard and mouse, density changes |
+| Lenovo (Tab P, Tab M, Yoga Tab, Legion Tab) | Precision Pen (AES / USI) | Mali/PowerVR (MediaTek), Adreno | budget Tab M models are the floor tier |
+| Xiaomi / Redmi (Pad) | Focus / Smart Pen | Adreno, Mali (MediaTek) | HyperOS kills background apps fast: the background save matters |
+| OnePlus / OPPO / Realme (Pad) | Stylo | Mali/Immortalis (MediaTek), Adreno | |
+| Google (Pixel Tablet) | USI 2.0 pens | Mali (Tensor) | stock Android: the reference |
+| Amazon (Fire HD, Fire Max) | none (fingers) | Mali | Fire OS: no Google Play, sideload works; the lowest memory |
+| Honor / Huawei (Pad, MatePad on Android/EMUI) | Magic-Pencil / M-Pencil | Mali, Maleoon | HarmonyOS NEXT can't run APKs |
+| Chromebooks (Intel/AMD and ARM) | USI pens | Intel/AMD (x86_64 APK), Mali/Adreno | free-form windows, keyboard and trackpad |
+
+Every pen arrives as Android's stylus input (pressure, tilt where the pen has it, hover where it has it, the side
+button); a pen without an eraser end (S Pen) erases with its side button once the tablet layout maps it. All of them
+need OpenGL ES 3.2, which every tablet of these families since about 2018 has.
 
 ## How the desktop code runs here
 

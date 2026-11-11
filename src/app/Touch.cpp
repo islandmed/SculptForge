@@ -48,6 +48,7 @@ void App::touchEvent(const SDL_Event& e) {
         ++penDiag_.penTouchEvents;
         return;
     }
+    if (e.type == SDL_EVENT_FINGER_DOWN && palmGuard()) return; // a palm (palmGuard): never part of a gesture
     if (e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED) {
         touch_.up(f.fingerID);
         if (touch_.fingers() == 0) {
@@ -122,6 +123,28 @@ void App::touchApply(const TwoFingerStep& step) {
         orbitStarted_ = false;
     }
     if (!touchDirect_ && (touchTwisting_ || std::abs(touchZoomSum_) > kTouchPinchStart)) touchPinching_ = true;
+}
+
+bool App::palmGuard() const {
+#ifdef __ANDROID__
+    return penInRange_ || now() < penNearUntil_;
+#else
+    return false; // (desktop touch screens with pens: once the Android one has testers' approval)
+#endif
+}
+
+// A palm's touch: its mouse events never reach the canvas or the UI (App::event asks first), press to release.
+bool App::palmMouseEvent(const SDL_Event& e) {
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.which == SDL_TOUCH_MOUSEID && palmGuard()) touchPalm_ = true;
+    if (touchPalm_ && (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_MOTION ||
+                       e.type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+        const SDL_MouseID which = e.type == SDL_EVENT_MOUSE_MOTION ? e.motion.which : e.button.which;
+        if (which == SDL_TOUCH_MOUSEID) {
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) touchPalm_ = false;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool App::touchMouseEvent(const SDL_Event& e) {

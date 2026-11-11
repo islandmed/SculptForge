@@ -1,5 +1,5 @@
 ---
-added: **Android (early, members first)**: SculptForge builds for Android tablets and phones (arm64, Android 9 or
+added: **Android (early, members first)**: SculptForge builds for Android tablets, phones and Chromebooks (arm64 and x86_64, Android 9 or
   later, OpenGL ES 3.2) as a sideloaded APK. Sculpt with a finger or a stylus with pressure, navigate with two fingers
   (pan, pinch to zoom, twist to roll), undo, save to the app's Projects folder and open any file through the system's
   document picker. The desktop layout for now; a tablet layout of its own comes next (android/README.md).
@@ -14,7 +14,13 @@ testers:
     finds it and the sculpt is as it was.
   - File > Open: the system picker opens; pick a .sfproj or .obj from Downloads; it opens.
   - Rotate the tablet and switch apps and back: no crash, the sculpt is still there.
-  - Report: device model, Android version, and what felt slow (strokes per second, orbit smoothness).
+  - Samsung with DeX (or a Chromebook): open it in a window, resize it, move it to the external monitor; the UI
+    rescales and nothing is lost. Keyboard shortcuts and the mouse work as on the desktop.
+  - Pen check per maker: hover shows the brush circle before touching; the side button does not draw; S Pen, USI,
+    Lenovo, Xiaomi and Honor pens all give pressure. Fingers resting on the screen while drawing leave no dabs (note it
+    if they do: that's the next fix).
+  - Amazon Fire (no pen, little memory): starts, sculpts with a finger, survives switching apps.
+  - Report: maker, model, Android version, pen model, and what felt slow (strokes per second, orbit smoothness).
 ---
 Reviewers: CI builds the APK (.github/workflows/android.yml); the GLES path also builds on Linux with
 -DSCULPTFORGE_GLES=ON.

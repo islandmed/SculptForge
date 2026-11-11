@@ -1729,6 +1729,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
+    if (palmMouseEvent(e)) return; // a palm resting by the pen: not a click anywhere (Touch.cpp)
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)

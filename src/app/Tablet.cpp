@@ -177,6 +177,10 @@ bool App::penSoftCursor() const { return uiPrefs_.tablet.mouseMode && penInProxi
 void App::mapPenPosition(SDL_Event& e) {
     penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
     const Uint64 now = SDL_GetTicksNS();
+    if (e.type >= SDL_EVENT_PEN_PROXIMITY_IN && e.type <= SDL_EVENT_PEN_AXIS) { // (palmGuard, Touch.cpp)
+        penInRange_ = e.type != SDL_EVENT_PEN_PROXIMITY_OUT;
+        penNearUntil_ = double(now) * 1e-9 + 0.3; // kPalmAfterPen
+    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;

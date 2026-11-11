@@ -83,6 +83,6 @@ apk=$(find android/app/build/outputs/apk/$type -name '*.apk' -print -quit)
 suffix=-test
 [ $type = debug ] && suffix=-debug
 [ -n "$unsigned" ] && suffix=-unsigned
-dest=$out/SculptForge-$version-android$suffix.apk
+dest=$out/SculptForge-$version-android-$(IFS=+; echo "${abis[*]}")$suffix.apk
 cp "$apk" "$dest"
 echo "$dest"

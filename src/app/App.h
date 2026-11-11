@@ -3078,6 +3078,13 @@ private:
     bool touchNavigates_ = false;   // this touch began over the 3D view
     bool touchDirect_ = true;       // a touch screen (false: a trackpad)
     bool touchSwallowMouse_ = false; // a gesture ran: the finger's mouse events stay off the canvas until it lifts
+    // Palm rejection (Android, android/README.md): a finger that lands while a pen is in range, or within kPalmAfterPen
+    // of it leaving, is a palm or a resting hand: ignored until it lifts. Every maker's pen reports proximity.
+    bool penInRange_ = false;
+    double penNearUntil_ = 0.0;
+    bool touchPalm_ = false;
+    bool palmGuard() const;
+    bool palmMouseEvent(const SDL_Event& e); // true: a palm's, dropped
     bool touchNativePinch_ = false; // SDL sends pinch events: a trackpad's finger spread doesn't zoom again
     bool touchTwisting_ = false;    // the twist passed kTouchTwistStart: it rolls the view from now on
     bool touchPinching_ = false;    // a trackpad pinch or twist is under way: its stray scroll doesn't zoom
