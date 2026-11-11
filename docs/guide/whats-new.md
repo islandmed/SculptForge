@@ -8,12 +8,23 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.8
 
 ```features
-date: unreleased
+date: 2026-11-11
 tagline: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.
 highlight: Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)
 highlight: Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)
 highlight: Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)
+highlight: Shortcuts with two keys in a row
+highlight: Reference images to sculpt against
 ```
+
+- **Two-key shortcuts**: bind an action to two different keys in a row, like A then S (**Edit > Preferences >
+  Hotkeys**, the small button beside a key).
+- **Reference images**: **View > Reference images** keeps pictures in the view while you sculpt: behind the model, or
+  as planes at its front, side or top that turn with the view. **Front + side...** sets up a character's two drawings
+  in one go. They never take strokes and stay out of renders unless you ask.
+- **Start-up fix**: SculptForge should start again on graphics drivers where 0.12.5 and 0.12.6 stopped with "Shader
+  compile error".
+- **A fast mouse or trackpad stroke right after a pen stroke** keeps its whole line.
 
 ## Version 0.12.7
 

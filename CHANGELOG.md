@@ -6,6 +6,36 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.8] - 2026-11-11
+
+### Added
+- **Two-key shortcuts** (Preferences > Hotkeys, the >> button beside an action's key): press one key, then a different
+  one within half a second (A then S). Added to the action's other keys; the same key twice is refused; a sequence
+  another action uses asks first (Replace / Cancel); Backspace in that box removes only the two-key shortcuts. A first
+  key that is bound on its own still works: it waits half a second and runs by itself when no second key follows.
+  Requested by Artizmo on Discord.
+- **Reference images** (View > Reference images; idea by Oslen on Discord): add one or more PNG or JPEG images (or
+  drop them on the window while the section shows). Each sits **Behind the model** (fixed to the view) or **In the
+  scene** (a plane at the front, side or top that turns with the view and fades out edge-on), with opacity, flips,
+  lock and hide; **Adjust** moves it and scales it from its corners (Shift keeps its proportions). **Front + side...**
+  makes a front and a side plane from two files in one click. They never take strokes or picks and are left out of
+  renders, exports, thumbnails and the timelapse unless **Show in renders** is on. Projects keep them, embedded or by
+  path; images over 4096 px are scaled down, files over 64 MB, 64 megapixels or 8192 px a side refused (read from the
+  header, before decoding), 8 per project. An image a project names by path opens linked, with Embed off, so saving
+  never copies a file from your computer into it unless you tick Embed. Scriptable: `reference_add`, `reference_set`,
+  `reference_remove`, `reference_pair`.
+
+### Fixed
+- **App would not start on some Linux NVIDIA drivers** (0.12.5 regression): most likely the start-up splash left its
+  own OpenGL context current, so the main shaders compiled in the wrong context ("Shader compile error" with garbage
+  text, thanks @dCo3lh0 (#192)). The main context is made current again after every splash step, the splash draws a
+  plain software surface, and a start-up shader error now says "no current OpenGL context" or "(empty driver log)"
+  instead of random bytes.
+- **A fast mouse or trackpad stroke right after a pen stroke** laid only 2 dabs (a mark at each end instead of a line,
+  #195): while the pen is in range the mouse's motion is ignored, because some tablet drivers send stray mouse events
+  beside the pen's, and that also swallowed a stroke the mouse had started. A stroke the mouse began now keeps all of
+  its motion.
+
 ## [0.12.7] - 2026-11-11
 
 ### Added

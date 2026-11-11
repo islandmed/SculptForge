@@ -2,10 +2,10 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.12.0's five cards (SF_WHATS_NEW_VERSION; the chapter starts at 0.11.0), so this stays valid
-# after each release; the guide chapter below is pinned to 0.12.7 (SF_GUIDE_VERSION), so it checks 0.12.7's section
+# after each release; the guide chapter below is pinned to 0.12.8 (SF_GUIDE_VERSION), so it checks 0.12.8's section
 # before and after the release.
 env SF_WHATS_NEW_VERSION 0.12.0
-env SF_GUIDE_VERSION 0.12.7
+env SF_GUIDE_VERSION 0.12.8
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -55,12 +55,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.12.8"
+expect_text "Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts."
 expect_text "Version 0.12.7"
 expect_text "Booleans between Parts, Gaussian splats with Blender, and a panel of your own."
 expect_text "Version 0.12.6"
 expect_text "Pan and zoom keys work again, layouts revert safely, and garments drape on a body."
-expect_text "Version 0.12.5"
-expect_text "Rgb colours Sub strokes, your brushes are safer, and the pan keys glide."
 expect_value whats_new_contents == 5   # 3 versions in full, then 0.12.0 to 0.12.2 and 0.11.x (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide
