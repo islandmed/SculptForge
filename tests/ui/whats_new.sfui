@@ -13,7 +13,7 @@ click "What's New##help.whats_new"
 wait 0.5
 expect_value whats_new_open == 1
 expect_value whats_new_cards == 5
-expect_text "What's new in 0.12.0"
+expect_text "Garments, plugins, cleaner creases."
 expect_text "Garments and cloth"
 expect_text "Plugins"
 expect_text "Pose all Parts"
@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.12.8"
-expect_text "Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts."
+expect_text "Reference images in the view, two-key shortcuts, and a Linux start-up fix."
 expect_text "Version 0.12.7"
 expect_text "Booleans between Parts, Gaussian splats with Blender, and a panel of your own."
 expect_text "Version 0.12.6"

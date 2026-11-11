@@ -9,12 +9,34 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-11
-tagline: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.
+tagline: Reference images in the view, two-key shortcuts, and a Linux start-up fix.
+theme: Your drawings in the view.
+hero: images/wn-0128-hero.jpg
 highlight: Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)
 highlight: Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)
 highlight: Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)
 highlight: Shortcuts with two keys in a row
 highlight: Reference images to sculpt against
+title: Reference images
+line: Front and side drawings stay in the view while you sculpt, behind or as planes.
+image: images/wn-0128-reference-images.jpg
+icon: image
+action: guide:reference-images.md
+title: Two-key shortcuts
+line: Bind an action to two keys in a row, like A then S, in Preferences > Hotkeys.
+image: images/wn-0128-two-key-shortcuts.jpg
+icon: keyboard
+action: guide:interface.md#assign-shortcuts
+title: Starts again on Linux
+line: SculptForge starts again on Linux NVIDIA drivers that stopped with a shader error.
+image: images/wn-0128-starts-again-on-linux.jpg
+icon: rocket
+action: guide:troubleshooting.md#sculptforge-doesnt-start
+title: Quick strokes stay whole
+line: A fast mouse or trackpad stroke right after a pen stroke keeps its whole line.
+image: images/wn-0128-quick-strokes-stay-whole.jpg
+icon: brush
+action: guide:sculpting.md
 ```
 
 - **Two-key shortcuts**: bind an action to two different keys in a row, like A then S (**Edit > Preferences >
@@ -31,6 +53,8 @@ highlight: Reference images to sculpt against
 ```features
 date: 2026-11-11
 tagline: Booleans between Parts, Gaussian splats with Blender, and a panel of your own.
+theme: Splats, straight into Blender.
+hero: images/wn-0127-hero.jpg
 highlight: Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview
 highlight: Gaussian splats both ways with Blender 5.3 through the Blender bridge
 highlight: Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)
@@ -45,6 +69,31 @@ highlight: Exact Booleans between Parts, with a live preview
 highlight: My Panel, a panel you build from your own buttons and sections
 highlight: Smooth Peaks brush
 highlight: Repeat a Part along a curve, real braids and springs
+title: Splats with Blender
+line: Gaussian splats go to Blender 5.3 and back in one click, colour and placement kept.
+image: images/wn-0127-splats-with-blender.jpg
+icon: sparkles
+action: guide:blender.md
+title: Booleans between Parts
+line: Add, Subtract or Intersect Parts with a live preview: exact and watertight.
+image: images/wn-0127-booleans-between-parts.jpg
+icon: box
+action: guide:parts.md
+title: Alpha pool and jitter
+line: Each dab takes a random alpha from a pool, for detail that never repeats.
+image: images/wn-0127-alpha-pool-and-jitter.jpg
+icon: stamp
+action: guide:sculpting.md
+title: My Panel
+line: Alt-drag any button or section into a panel of your own; F4 opens it.
+image: images/wn-0127-my-panel.jpg
+icon: layout-template
+action: guide:interface.md
+title: Faster Undo on dense models
+line: Undo after a remesh on a very dense model no longer stops for a second.
+image: images/wn-0127-faster-undo-on-dense-models.jpg
+icon: undo-2
+action: guide:performance.md#working-with-big-meshes
 ```
 
 - "**Alpha pool and jitter**: **Sculpt > Alpha** has **Scale jitter** and **Position jitter**, and right-clicking an
@@ -93,6 +142,8 @@ highlight: Repeat a Part along a curve, real braids and springs
 ```features
 date: 2026-11-11
 tagline: Pan and zoom keys work again, layouts revert safely, and garments drape on a body.
+theme: Drape it, pan it, keep it.
+hero: images/wn-0126-hero.jpg
 highlight: Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)
 highlight: Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)
 highlight: Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)
@@ -100,6 +151,31 @@ highlight: Drape a garment on a body in Tool > Garments, with a steadier cloth r
 highlight: Save Visible Parts As and a Mask colour preference
 highlight: Save only the visible Parts
 highlight: Featured creator card in the Welcome window
+title: Drape a garment on a body
+line: Click the body for each panel, press Drape, and the pattern sews itself shut and settles.
+image: images/wn-0126-drape-a-garment-on-a-body.jpg
+icon: shirt
+action: guide:garments.md#drape-it-on-a-body
+title: Pan and zoom keys glide
+line: A tap nudges the view and holding glides, on their own keys or rebound.
+image: images/wn-0126-pan-and-zoom-keys-glide.jpg
+icon: orbit
+action: guide:navigation.md
+title: Layouts revert safely
+line: Revert to Saved Layout no longer crashes, and Reset Layout is always a way out.
+image: images/wn-0126-layouts-revert-safely.jpg
+icon: layout-template
+action: guide:interface.md#saving-preferences-and-layouts
+title: Save only the visible Parts
+line: File > Save Visible Parts As writes a copy with just the Parts you can see.
+image: images/wn-0126-save-only-the-visible-parts.jpg
+icon: save
+action: guide:projects.md#save-a-project
+title: Paint keeps its detail
+line: Paint at a low level and it blends over the finer colour above instead of replacing it.
+image: images/wn-0126-paint-keeps-its-detail.jpg
+icon: palette
+action: guide:vertex-paint.md
 ```
 
 - **Drape a garment on a body**: in **Tool > Garments**, click the body once for each panel, press **Drape** and watch
@@ -127,12 +203,34 @@ highlight: Featured creator card in the Welcome window
 
 ```features
 date: 2026-11-10
-tagline: Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.
+tagline: Colour now paints on Sub strokes, your brushes are safer, and the pan keys glide.
+theme: Your brushes, safer and smoother.
+hero: images/wn-0125-hero.jpg
 highlight: Rgb lays colour on Sub strokes too, for every brush and stroke type
 highlight: Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)
 highlight: Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)
 highlight: Thread counts above 16 set in Preferences > Performance apply at the next start (#184)
 highlight: A startup splash shows the bust and version while SculptForge starts
+title: Colour paints on Sub strokes
+line: Colour now paints on Sub strokes too, with every brush and stroke type.
+image: images/wn-0125-colour-paints-on-sub-strokes.jpg
+icon: palette
+action: guide:sculpting.md#sculpt-paint-add-sub-rgb-and-front
+title: Brushes you made, kept safe
+line: A brush file that can't be read comes back from its backup; a missing slot says so.
+image: images/wn-0125-brushes-you-made-kept-safe.jpg
+icon: shield-check
+action: guide:brush-lab.md#your-brush-library
+title: Keys that glide
+line: Hold a pan or zoom key: it eases in, keeps one speed at any frame rate and eases out.
+image: images/wn-0125-keys-that-glide.jpg
+icon: move
+action: guide:navigation.md
+title: More than 16 threads
+line: A thread count above 16 in Preferences > Performance applies at the next start.
+image: images/wn-0125-more-than-16-threads.jpg
+icon: cpu
+action: guide:performance.md#edit--preferences--performance
 ```
 
 - **Startup splash**: while SculptForge takes a moment to start, the bust, wordmark and version show on the dark
@@ -262,6 +360,8 @@ highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten 
 ```features
 date: 2026-11-08
 tagline: Garments and cloth, sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases.
+theme: Garments, plugins, cleaner creases.
+hero: images/wn-0120-hero.jpg
 highlight: Garments and cloth: real-size sewing patterns (millimetres, curves, notches, grain line, seam allowance) from 8 templates at your sizes, sewn with matched seam lengths; print at home at real size (PDF/SVG pages) or export DXF for cutters; plus a Cloth brush and Drape for folds on any mesh. For cosplay, costume and textile work
 highlight: Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks @bribblej-web, #20)
 highlight: The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)
@@ -279,24 +379,29 @@ highlight: One-click Turntable, Ortho, Floor and Flat
 highlight: Cut caps are clean, even triangles instead of thin slivers (thanks dm4nd on Discord)
 highlight: Quad Remesh up to 2.3x faster
 title: Garments and cloth
-line: Real-size sewing patterns from 8 templates at your sizes, printed at home or exported as DXF; Cloth brush and Drape.
-image: images/wn-0120-garments.jpg
+line: Sewing patterns at your sizes, printed at home or cut from DXF, plus Cloth and Drape.
+image: images/wn-0120-garments-and-cloth.jpg
+icon: shirt
 action: guide:garments.md
 title: Plugins
-line: Packs can bring sandboxed plugins: deformers and generators with no file, network or system access.
+line: Sandboxed deformers and generators from packs, with no file, network or system access.
 image: images/wn-0120-plugins.jpg
+icon: puzzle
 action: guide:packs-and-macros.md#plugins
 title: Pose all Parts
-line: Pose every visible Part at once on one light Pose Mesh; Apply gives each Part the pose at full resolution.
-image: images/wn-0120-pose.jpg
+line: Pose every visible Part at once on one light mesh; Apply keeps full resolution.
+image: images/wn-0120-pose-all-parts.jpg
+icon: person-standing
 action: guide:parts.md#pose-all-parts
 title: Tube shapes
 line: Round, square or ribbon cross-sections, with a taper at either end of the tube.
-image: images/wn-0120-tube.jpg
+image: images/wn-0120-tube-shapes.jpg
+icon: spline
 action: guide:tube.md#shape-cross-section-and-taper
 title: Edge creases
 line: Crease edges (select them by angle too) and they stay sharp when you add levels.
-image: images/wn-0120-crease.jpg
+image: images/wn-0120-edge-creases.jpg
+icon: diamond
 action: guide:edges.md#creases
 ```
 
@@ -753,26 +858,32 @@ highlight: The new orange SF app icon
 ```features
 date: 2026-11-05
 tagline: Faster pen-up on dense scans, clean creases on micro levels, moves that go into sculpt layers, Maya style view keys and a UDIM grid.
+theme: Cleaner detail, smarter layers.
+hero: images/wn-0112-hero.jpg
 highlight: Big brushes on dense scans finish sooner after you lift the pen
 highlight: Clean Sharp Crease, Crease and Pinch on micro levels
 highlight: Move, Scale and Rotate into a sculpt layer
 highlight: Maya style view keys, and UDIMs in Columns x Rows
 highlight: Traditional Chinese, and a performance trace for slow moments
 title: Clean creases on micro levels
-line: Sharp Crease, Crease and Pinch at full strength cut clean grooves on a micro level, with no noise around them.
-image: images/wn-0112-micro.jpg
+line: Crease and Pinch cut clean grooves on a micro level, with no noise around them.
+image: images/wn-0112-clean-creases-on-micro-level.jpg
+icon: zoom-in
 action: guide:micro-levels.md#sculpting
 title: Transforms into a layer
-line: With a sculpt layer active, the Transform gizmo moves into that layer: its weight dials the move in and out.
-image: images/wn-0112-layer.jpg
+line: With a sculpt layer active, Move, Scale and Rotate go into it; its weight dials them.
+image: images/wn-0112-transforms-into-a-layer.jpg
+icon: layers
 action: guide:layers.md#add-a-layer-and-sculpt-into-it
 title: Turn your VDM stamps
-line: Brush > Vector Displacement > Stamp rotation: follow the drag, a fixed angle, or a random turn per stamp.
-image: images/wn-0112-vdm.jpg
+line: Stamps follow the drag, keep a fixed angle, or take a random turn each time.
+image: images/wn-0112-turn-your-vdm-stamps.jpg
+icon: stamp
 action: guide:sculpting.md#stamp-rotation
 title: UDIMs in Columns x Rows
-line: UV Editor > Pack fills a grid of UDIM tiles: 10 x 2 fills 1001-1020, 4 x 3 stays four tiles wide.
-image: images/wn-0112-udim.jpg
+line: UV Editor > Pack fills a grid of UDIM tiles: 10 x 2 fills 1001 to 1020.
+image: images/wn-0112-udims-in-columns-x-rows.jpg
+icon: grid-3x3
 action: ui.uv_editor
 ```
 
@@ -815,12 +926,17 @@ action: ui.uv_editor
 ```features
 date: 2026-11-05
 tagline: Dense scans with micro levels keep up with the pen, and one-click updates on Windows and Linux.
+theme: Dense scans keep up.
+hero: images/wn-0111-hero.jpg
 highlight: Dense scans keep up: orbit after a big stroke on a sculpted 112M scan, under 1 to 33 fps
 highlight: One-click update, signed and checked
 highlight: Remesh with one key, or after each stroke
 highlight: Preferences save themselves
 title: Dense scans, fast
-line: Lucy 112M with sculpted detail on an RTX 3060: orbit right after a big stroke, from under 1 to 33 frames a second.
+line: Orbit a sculpted 112M scan right after a big stroke on an RTX 3060: under 1 to 33 fps.
+image: images/wn-0111-dense-scans-fast.jpg
+icon: gauge
+stat: 33 fps
 action: guide:performance.md#working-with-big-meshes
 ```
 

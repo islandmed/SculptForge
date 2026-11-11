@@ -6,10 +6,14 @@
 //   ```features
 //   date: 2026-11-01
 //   tagline: One line under the popup's title.
+//   theme: Splats, straight into Blender.   (optional: the hero band's headline, at most 6 words; else the tagline)
+//   hero: images/wn-0127-hero.jpg         (the hero band's picture, 2880x708: the bust in forge light, no text)
 //   highlight: Short title: one line, used when the version is folded into a group
 //   title: A bold 3-5 word title          <- each title starts a feature card
-//   line: One sentence.
-//   image: images/wn-0107-look.jpg        (600x340)
+//   line: One sentence (at most 90 characters).
+//   icon: sparkles                        (the Lucide icon its picture shows; tools/whats_new_cards.py draws it)
+//   image: images/wn-0127-splats.jpg      (1200x680, drawn by tools/whats_new_cards.py from the icon: no captures, no text)
+//   stat: 33 fps                          (optional: a measured win, shown big above the title)
 //   action: look:new                      (what Try it does; see App::runWhatsNewAction)
 //   link: interface.md#looks-and-layouts  (optional: where the website's card links; guide: actions link there anyway)
 //   clip: images/wn-0111-lucy.mp4         (optional: the website plays it in the card, the image as its poster)
@@ -37,6 +41,7 @@ inline constexpr int kMaxHighlights = 6; // one-line highlights per group
 
 struct Card {
     std::string title, line, image, action, link;
+    std::string icon, stat; // the picture's icon (for the script), a measured win ("33 fps")
     std::string clip;   // the website's video
     std::string frames; // the app's frame sheet (empty: the still image)
     int frameCols = 0, frameRows = 0, frameFps = 0;
@@ -49,6 +54,7 @@ struct Version {
     std::string version; // "0.10.7"
     std::string anchor;  // the heading's anchor, "version-0107"
     std::string date, tagline;
+    std::string theme, hero; // the hero band's headline and picture
     std::vector<std::string> highlights; // "Title: one line"
     std::vector<Card> cards;
     int heading = -1;         // block index of "## Version X"

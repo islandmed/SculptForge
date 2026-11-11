@@ -492,6 +492,8 @@ step_bump() {
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
     out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
     grep -q 'written' <<<"$out" && echo "$out" | sed 's/^/   notes: /'
+    # What's New card art (drawn, never captured): a version with fewer than 3 cards gets some from its highlights. Never stops.
+    python3 tools/whats_new_cards.py fill "$BASE" 2>&1 | sed 's/^/   cards: /' || echo "   cards: whats_new_cards.py failed (the release goes on; fix the cards after)"
     # The What's New UI test checks the guide's newest three sections: pinned here to this version's.
     out=$(python3 tools/release/pin_whats_new_test.py "$BASE" 2>&1) || die "$out" "fix docs/guide/whats-new.md (its newest section must be '## Version $BASE'), commit, push main"
     [ -n "$out" ] && echo "   pinned: $out"
@@ -574,7 +576,7 @@ PY
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
-    git add -A changes tests/ui/whats_new.sfui
+    git add -A changes tests/ui/whats_new.sfui docs/guide/images
     git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
         ok "every version file already says $V and the guide is built"

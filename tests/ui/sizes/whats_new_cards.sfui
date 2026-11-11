@@ -1,0 +1,24 @@
+# What's New's hero band and drawn cards (owner 11-11: no app captures) at 1440 and 2880 wide (CMake: whats_new_cards_1440 /
+# _2880), in the default look and in Forge Terminal. Pinned to 0.12.7 (the splats hero, five cards), so it stays valid
+# after later releases; the window grows to fit the longest card's line instead of cutting it off.
+env SF_WHATS_NEW_VERSION 0.12.7
+run new_sphere subdivisions=3
+action help.whats_new
+wait 0.6
+expect_value whats_new_open == 1
+expect_value whats_new_cards == 5
+expect_text "Splats, straight into Blender."
+expect_text "0.12.7"
+expect_text "Splats with Blender"
+expect_text "Faster Undo on dense models"
+expect_text "Undo after a remesh on a very dense model no longer stops for a second."
+expect "Read more##whats_new.try.0"
+shot whats_new_cards
+key escape
+wait 0.3
+expect_value whats_new_open == 0
+
+run ui_look look=forge scheme=tokyo_night layout=classic
+action help.whats_new
+wait 0.6
+shot whats_new_cards_forge
