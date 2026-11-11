@@ -1,9 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// parallelFor: splits [0, n) into chunks run on up to 16 threads (the calling one included). For coarse jobs
+// parallelFor: splits [0, n) into chunks run on the shared pool's thread count (the calling one included). For coarse jobs
 // (QRemesh's field smoothing, ProjectAll); small ranges run inline.
 #pragma once
+
+#include "core/ThreadPool.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -12,7 +14,8 @@
 
 namespace sf {
 
-inline int parallelThreads() { return int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u)); }
+// The shared pool's size: every hardware thread up to 16, or the count the user set (Preferences > Performance).
+inline int parallelThreads() { return ThreadPool::shared().threads(); }
 
 // Calls fn(begin, end) on disjoint chunks covering [0, n); runs inline when n < minParallel.
 template <class F>

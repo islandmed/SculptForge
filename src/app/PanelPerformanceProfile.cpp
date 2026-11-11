@@ -512,6 +512,8 @@ void App::drawPerformanceProfileSection() {
         {
             uint64_t threads = uint64_t(o.threads);
             number(tr("Threads (next start)"), threads, uint64_t(p.automatic.threads), 1.0, "");
+            // Up to every hardware thread (the default is 16; a value above it is the user's to ask for).
+            if (p.hardware.cpuThreads > 0) threads = std::min<uint64_t>(threads, uint64_t(p.hardware.cpuThreads));
             o.threads = int(threads);
         }
         const char* draftNames[] = {tr("Draft brushes: automatic"), tr("Draft brushes: always"), tr("Draft brushes: never")};

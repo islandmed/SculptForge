@@ -7,6 +7,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Sculpt.h"
+#include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 
 #include <algorithm>
@@ -490,9 +491,9 @@ PerformanceSettings settingsForTier(ProfileTier tier, const HardwareInfo& hw, co
     s.maxSubdivisionTriangles = std::clamp<uint64_t>(roundDownTo(std::min({byRam, byGpu, L.subdivCap}), kM), 2 * kM, L.subdivCap);
     // Micro-displacement: about 8 bytes of GPU memory per micro-triangle, a quarter of the budget.
     s.microTriangleLimit = std::clamp<uint64_t>(roundDownTo((s.vramBudgetMB << 20) / 4 / 8, kM), 1 * kM, L.microCap);
-    // Threads: every hardware thread (the pool's limit is 16); a software renderer draws on the same cores.
+    // Threads: every hardware thread up to the pool's default of 16 (by hand: up to every hardware thread, mapProfile); a software renderer draws on the same cores.
     const int threads = std::max(1, hw.cpuThreads ? hw.cpuThreads : int(std::thread::hardware_concurrency()));
-    s.threads = std::clamp(tier == ProfileTier::Software ? threads / 2 : threads, 1, 16);
+    s.threads = std::clamp(tier == ProfileTier::Software ? threads / 2 : threads, 1, ThreadPool::kDefaultMaxThreads);
     return s;
 }
 
@@ -506,7 +507,7 @@ PerformanceSettings applyOverrides(const PerformanceSettings& a, const ProfileOv
     if (o.maxTextureSize) s.maxTextureSize = o.maxTextureSize;
     if (o.maxSubdivisionTriangles) s.maxSubdivisionTriangles = o.maxSubdivisionTriangles;
     if (o.microTriangleLimit) s.microTriangleLimit = o.microTriangleLimit;
-    if (o.threads) s.threads = std::clamp(o.threads, 1, 64);
+    if (o.threads) s.threads = std::clamp(o.threads, 1, ThreadPool::kMaxThreads);
     if (o.targetFps) s.targetFps = std::clamp(o.targetFps, 15, 360);
     return s;
 }
@@ -542,6 +543,8 @@ HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& cali
     if (const int cap = budgetsForTier(p.hwTier).maxTextureSize; cap > p.automatic.maxTextureSize && p.automatic.vramBudgetMB >= 6144)
         p.automatic.maxTextureSize = hardware.maxTextureSize > 0 ? std::min(cap, hardware.maxTextureSize) : p.automatic.maxTextureSize;
     p.settings = applyOverrides(p.automatic, overrides);
+    // A threads value set by hand goes past the default of 16, up to every hardware thread (#184: 32 on a 48-thread machine).
+    if (overrides.threads && hardware.cpuThreads > 0) p.settings.threads = std::min(p.settings.threads, hardware.cpuThreads);
     const uint64_t gpu = usableGpuMemoryMB(hardware);
     std::string gpuName = hardware.glRenderer.empty() ? std::string("no GPU probed") : hardware.glRenderer;
     // "Detected Apple M1 Pro (G13S C0), 21.3 GB unified -> Workstation (2100M triangles/s)"

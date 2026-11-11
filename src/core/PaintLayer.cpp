@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/PaintLayer.h"
+#include "core/Parallel.h"
 
 #include "core/Commands.h"
 #include "core/Mesh.h"
@@ -87,7 +88,7 @@ bool validLayer(const Mesh& m, int layer) { return layer >= -1 && layer < int(m.
 // Runs fn(begin, end) over [0, n) on several threads for big meshes.
 template <class Fn>
 void parallelRange(size_t n, Fn fn) {
-    const size_t threads = n < 200000 ? 1 : std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16);
+    const size_t threads = n < 200000 ? 1 : size_t(parallelThreads());
     if (threads <= 1) {
         fn(size_t(0), n);
         return;
