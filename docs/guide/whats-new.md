@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.7
+
+```features
+date: unreleased
+tagline: Booleans between Parts, Gaussian splats with Blender, and a panel of your own.
+highlight: Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview
+highlight: Gaussian splats both ways with Blender 5.3 through the Blender bridge
+highlight: Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)
+highlight: My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)
+highlight: Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)
+```
+
 ## Version 0.12.6
 
 ```features
