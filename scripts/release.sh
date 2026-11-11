@@ -306,6 +306,31 @@ card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
+# headline_check: the launch headline the CMO picked for this version (~/Work/.sf/launch.py headline: state/launch/X.Y.Z.json,
+# {"line", "keywords"}) must show in what the release publishes: HIGHLIGHTS line 1 (Discord post, latest.json lead) and the What's
+# New tagline (site bar, README). Every keyword, case-insensitive. Warnings only, never a failed stage (0.12.7 led with the wrong story).
+headline_check() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json kws k line tag miss said
+    if [ ! -f "$f" ]; then
+        printf '   WARNING: no launch headline for %s (%s missing): the CMO picks it with launch.py headline %s "..." KEYWORD...\n' "$V" "$f" "$V"
+        timeout 5 herdr agent prompt cmo "pick the $V headline: ~/Work/.sf/launch.py headline $V \"<one line>\" KEYWORD... (the release stage is running)" >/dev/null 2>&1 || true
+        return 0
+    fi
+    kws=$(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1])).get("keywords", [])))' "$f" 2>/dev/null) ||
+        { printf '   WARNING: %s is not valid launch JSON ({"line", "keywords"})\n' "$f"; return 0; }
+    if [ -n "${HIGHLIGHTS:-}" ] && [ -f "$HIGHLIGHTS" ]; then line=$(grep -m1 '[^[:space:]]' "$HIGHLIGHTS" || true)
+    else line=$(python3 tools/release/assemble_notes.py "$BASE" --highlights 2>/dev/null | grep -m1 '[^[:space:]]' || true); fi
+    tag=$(awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f&&/^tagline:/{sub(/^tagline: */,""); print; exit}' docs/guide/whats-new.md || true)
+    said=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("line", ""))' "$f" 2>/dev/null || true)
+    while IFS= read -r k; do
+        [ -n "$k" ] || continue
+        miss=""
+        grep -qiF -- "$k" <<<"$line" || miss="HIGHLIGHTS line 1"
+        grep -qiF -- "$k" <<<"$tag" || miss="${miss:+$miss and }the What's New tagline"
+        [ -z "$miss" ] || printf '   WARNING: launch keyword "%s" (headline "%s") is missing from %s\n' "$k" "$said" "$miss"
+    done <<<"$kws"
+    return 0
+}
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
@@ -599,6 +624,7 @@ step_stage() {
     local sha c with=${STAGE_WITH-}
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
+    headline_check
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
     # The full suite runs once, on the batch (docs/testing-flow.md "Areas"): t1.sh logged that commit green, and the bump
     # on top only adds paperwork (as CI's reuse, ci_reused), so the PC doesn't run the whole suite a second time.
