@@ -1,0 +1,34 @@
+# e2e: quit paths, children (run by quit_clean.py in its own process group beside a sentinel). Every way a trainer
+# child ends in the app, back to back: it finishes, Good enough - stop, Cancel, a crash, and a new one started right
+# after another (a pid the last one had). No stop may signal anything but that child (#183: quitting logged the Linux
+# user out of their session, a kill(-pid) with a pid of 0 or a reused group).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+env FAKE_BRUSH_MS_PER_EXPORT 150
+env FAKE_BRUSH_FAIL_AT -1
+copy ../data/splat_capture capture_e2e_quit
+
+run splat_train source=capture_e2e_quit
+wait_value splat_previews >= 1 30
+click "Good enough - stop##splats.train_stop"
+wait_idle 60
+expect_value splat_train_stage == 4
+
+env FAKE_BRUSH_MS_PER_EXPORT 400
+run splat_train source=capture_e2e_quit
+wait_value splat_previews >= 1 30
+click "Cancel##splats.train_cancel"
+wait_idle 30
+expect_value splat_train_stage == 6
+run splat_train source=capture_e2e_quit
+wait_value splat_previews >= 1 30
+click "Cancel##splats.train_cancel"
+wait_idle 30
+expect_value splat_train_stage == 6
+
+env FAKE_BRUSH_MS_PER_EXPORT 150
+env FAKE_BRUSH_FAIL_AT 500
+run splat_train source=capture_e2e_quit
+wait_idle 30
+expect_value splat_train_stage == 5
+env FAKE_BRUSH_FAIL_AT -1

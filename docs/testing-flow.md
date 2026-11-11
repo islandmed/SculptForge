@@ -192,6 +192,49 @@ cover the class (src/app/UiTestModes.cpp); both run in T0 whenever the app chang
   `expect_sculpts`, `expect_status_not TEXT`, `snapshot_start` / `undo_all` / `expect_restored`, `expect_mesh_valid`,
   `action ID`. A new mode's state belongs in `App::latchedForTest()` (one line) so failures can name it.
 
+## End-to-end scenarios (label `e2e`)
+
+`tests/e2e/*.sfui` are real modelling workflows, run headless in the real app with numeric asserts (mesh stats, colour,
+undo, frame-time caps for the floor tier). They are ctest entries `ui_e2e_<name>` with labels `ui;e2e`, so **no new release
+step**: the UI tests every tier already runs include them (T0 by the area of the workflow, `ui_e2e_*` lines in
+tests/areas.map; T1 and the Actions full suite whole). `ctest -L e2e` runs only them; the whole set is a few minutes on the
+PC, and each is parallel-safe (UI tests use an isolated settings folder; `e2e_quit_clean` tags its processes).
+
+| scenario | workflow |
+|---|---|
+| sculpt_basics | sphere, Clay raises a bump, Smooth with every stroke type (Dots too), Front Faces Only on / off, undo and redo |
+| voxel_remesh | remesh to about 2M triangles, strokes on it with a frame cap, undo, Quick Remesh |
+| extract_panel, extract_thin_sheet | mask, Extract, Accept, sculpt on the thin sheet (Clay / Flatten are the hidden-spikes bug) |
+| shelf_brush_restart, shelf_value_field | a Brush Lab brush on the shelf survives Save Layout and restart; a value field dropped on a shelf |
+| paint_rgb | Rgb on: Add and Sub both lay the colour |
+| curves_tube | draw a tube, its modifiers, Bake |
+| cloth_drape | a plane draped on a ball comes to rest, one undo step |
+| parts_project | Parts with a hidden one, save project, reopen |
+| export_roundtrip | OBJ, STL, glTF, USD, USDZ, FBX out and back: same counts |
+| prefs_threads | a threads override is kept for the next start |
+| e2e_quit_clean | quit by SIGTERM and SIGINT with a trainer running, and a trainer child's every end: nothing outside the app is signalled (#183) |
+
+**The rule: every bug fix adds or extends a scenario** that reproduces the reporter's steps, with the issue or Discord link
+in the script's first comment. A bug whose fix isn't merged yet is written first with `# xfail: BUG-ID what` in the
+script's first 40 lines: it logs `XFAIL` and passes while the bug stands, and logs `XPASS` when the fix lands (delete the
+line then). A script that names a hook its fix adds (it doesn't parse yet) is XFAIL too. `# xfail` never blocks a batch,
+and it hides any failure in that script, so keep such a script to the one bug.
+
+Run one: `build/sculptforge --ui-test tests/e2e/NAME.sfui --ui-out DIR` (a failure prints `FAIL file:line: why` and
+saves `FAIL-line-N.png` in DIR: read the shot first), or `ctest -R ui_e2e_NAME` / `ctest -L e2e` in a build.
+
+Add one:
+
+1. `tests/e2e/NAME.sfui`, started from a neighbour. The steps and `expect_value` names are listed in the header comment of
+   `src/app/UiTest.cpp`; `run COMMAND` takes any `sculptforge-cli -l` command. Useful: `snapshot` and `moved*`,
+   `remember X name` and `$name`, `expect_mesh_valid`, `open_edges`, `solid_volume`, and `longest_frame_ms` (reset on read;
+   scale its cap by `$scale` after `remember time_limit_scale scale`: 4 on CI).
+2. Write a number that fails when the bug is back, and run the script against the unfixed build to see it fail.
+3. CMake picks the file up. `tests/areas.map` gives it an area by name (the `ui_e2e_*` lines); add a line for a new family.
+4. A new test hook is one line in `UiTest.cpp` (the value, plus its header comment). No other app code for a test.
+5. A scenario that needs its own process (the thread pool, quit paths) is a script plus a small driver, like
+   `tests/e2e/quit_clean.py`. The language has no loops: generate repeated blocks and commit the result.
+
 ## T3 nightly
 
 - `TEST(nightly_*)` cases (tests/test_main.cpp) are left out of every shard. They run in

@@ -23,6 +23,17 @@ site   | i18n, docs, guide, website, release and CI tooling, marks and other rep
 
 [tests]
 # sculpt, mesh, cloth first: their feature UI tests, before the generic ui_ catch-all below.
+# End-to-end modelling scenarios (tests/e2e): each in the area of the workflow it exercises.
+ui_e2e_cloth_*              cloth
+ui_e2e_extract_*            mesh
+ui_e2e_curves_*             mesh
+ui_e2e_voxel_*              mesh
+ui_e2e_parts_*              mesh
+ui_e2e_export_*             io
+ui_e2e_prefs_*              io
+ui_e2e_quit_*               ai
+e2e_quit_*                  ai
+ui_e2e_*                    sculpt
 ui_cloth*                   cloth
 ui_garment*                 cloth
 ui_drape*                   cloth
@@ -391,6 +402,7 @@ src/core/Quad*                     mesh
 src/core/*                         sculpt
 tests/ui/mode_matrix_known.txt     ui
 tests/ui/*                         @test
+tests/e2e/*                        @test
 tests/test_*.cpp                   @unit
 tests/*                            site
 tools/i18n/*                       site

@@ -1,0 +1,131 @@
+# e2e: sculpt basics, the way an artist starts. A sphere, Clay raises a bump, Smooth takes it down with every stroke
+# type (Dots, Drag Stamp, Slide Stamp, Spray, Lazy), with Front Faces Only on and off; undo / redo restores each step.
+# Smooth must never add triangles or leave the mesh invalid. Reporter's steps for Smooth Dots (Discord #bug-reports
+# 1569647593116667905): Front faces only was ON, which skips the inner layer of an Extract shell.
+run new_sphere subdivisions=5
+camera 0 0
+remember triangles tris
+expect_value can_undo == 0
+snapshot_start
+
+# Clay raises a bump.
+click "Clay##brush.clay"
+snapshot
+stroke 0.35 0.5 0.65 0.5
+expect_value can_undo == 1
+expect_value moved > 50
+expect_value moved_out > 0
+expect_value triangles == $tris
+remember moved_out bump
+key ctrl+z
+expect_value moved == 0
+key ctrl+shift+z
+expect_value moved > 50
+
+# Smooth over the bump, every stroke type, Front Faces Only on and off: the surface comes back toward the sphere.
+# Each round: undo the bump's Smooth, so the next one starts from the same bump. Smooth strokes never add triangles.
+action brush.smooth
+
+# Front Faces Only off
+expect_value checked@draw.front_faces == 0
+action stroke.type.dots
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.drag_stamp
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.slide_stamp
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.spray
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.lazy
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+
+# Front Faces Only on
+action draw.front_faces
+expect_value checked@draw.front_faces == 1
+action stroke.type.dots
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.drag_stamp
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.slide_stamp
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.spray
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+action stroke.type.lazy
+stroke 0.25 0.5 0.75 0.5
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_out < $bump
+expect_value triangles == $tris
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved_out >= $bump*0.99
+
+# Back to the plain state: undo everything, the sphere is bit for bit what it was.
+action draw.front_faces
+action stroke.type.dots
+key ctrl+z
+expect_value can_undo == 0
+expect_restored

@@ -188,7 +188,7 @@
 //                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
 //                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
-//                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on),
+//                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on), threads (the shared pool's size), profile_threads (the saved profile's, for the next start),
 //                            last_stroke_dabs (dabs of the last finished stroke)
 //                            xray (1 on), view_resolution (percent), light_yaw / light_pitch (degrees),
 //                            light_intensity, light_ambient, render_aspect (Save Render's shape: 0 view, 1 1:1, 2 16:9,
@@ -664,6 +664,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "antialiasing") return double(app_.uiPrefs_.antialiasing);
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
     if (name == "multithreading") return ThreadPool::shared().serial() ? 0.0 : 1.0;
+    if (name == "threads") return double(ThreadPool::shared().threads()); // the shared pool's size now (workers + the caller)
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
     if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
     if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
@@ -1445,6 +1446,10 @@ double Demo::query(const std::string& name, bool& known) const {
                        tierCardSeen(saved.overrides.tierCardFor, app_.hwProfile_->profile.hardware)
                    ? 1.0
                    : 0.0;
+    }
+    if (name == "profile_threads") { // the saved profile's thread count: what the next start's pool gets (0 = no profile)
+        HardwareProfile saved;
+        return loadHardwareProfile(hardwareProfilePath(), saved) ? double(saved.settings.threads) : 0.0;
     }
     if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
     if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow

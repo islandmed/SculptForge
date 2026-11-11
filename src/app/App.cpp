@@ -43,6 +43,7 @@
 #include <IconsLucide.h>
 
 #include <imgui_internal.h>
+#include <fstream>
 #include "ai/Generator3D.h"
 #include "core/Micro.h"
 #include "core/VertexPaint.h"
@@ -536,6 +537,18 @@ int App::renderHeadless() {
     return 0;
 }
 
+namespace {
+// tests/e2e scripts: a `# xfail: BUG-ID what` line marks a bug whose fix isn't merged yet. The script is expected to
+// fail (XFAIL, exit 0); once the fix lands it passes (XPASS, exit 0) and the line is deleted. Either way nothing blocks.
+std::string xfailLine(const std::string& script) {
+    std::ifstream in(script);
+    std::string line;
+    for (int n = 0; n < 40 && std::getline(in, line); ++n)
+        if (line.rfind("# xfail:", 0) == 0) return line.substr(8);
+    return {};
+}
+} // namespace
+
 int App::runUiTest(int w, int h, int fps) {
     // Same frame loop as a recording, but frames are only read back for screenshots.
     std::vector<uint8_t> rgba;
@@ -707,6 +720,15 @@ int App::runUiTest(int w, int h, int fps) {
         if (status != 0) return 1;
     }
     demo_->printProfile();
+    const std::string known = xfailLine(options_.uiTest);
+    if (!known.empty()) {
+        for (const auto& f : demo_->failures()) std::fprintf(stderr, "known failure: %s\n", f.c_str());
+        if (demo_->failures().empty())
+            std::printf("XPASS %s:%s: fixed, delete its `# xfail:` line\n", options_.uiTest.c_str(), known.c_str());
+        else
+            std::printf("XFAIL %s:%s (known bug, not fixed yet)\n", options_.uiTest.c_str(), known.c_str());
+        return 0;
+    }
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);
@@ -790,6 +812,12 @@ int App::runRecording() {
     if (testing ? !demo_->loadScript(options_.uiTest, err)
                 : !demo_->load(options_.demo.empty() ? "sculpt" : options_.demo, err)) {
         SDL_Log("%s", err.c_str());
+        // A script that names a hook its unmerged fix adds doesn't parse yet: that is the known failure (see xfailLine).
+        if (testing)
+            if (const std::string known = xfailLine(options_.uiTest); !known.empty()) {
+                std::printf("XFAIL %s:%s (known bug, not fixed yet: %s)\n", options_.uiTest.c_str(), known.c_str(), err.c_str());
+                return 0;
+            }
         return 1;
     }
     const int w = options_.width, h = options_.height, fps = std::max(options_.fps, 1);

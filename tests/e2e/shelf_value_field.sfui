@@ -1,0 +1,28 @@
+# e2e: shelf. Customize Shelves: a value field (the Remesh palette's Voxel Resolution slider) drops onto a shelf like a
+# button, moves its value there, and is kept across a restart (masterfull95 on Discord: it only floated).
+# xfail: shelf-value-drop fix/shelf-value-drop adds the drop, the ##voxresgrab handle and these test hooks
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+click "Remesh##tool.remesh"
+expect_value voxel_resolution_on_shelves == 0
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+remember voxel_resolution res
+hold ctrl+alt
+drag_item_to "##voxresgrab" "Clay##brush.clay"
+hold none
+expect_value voxel_resolution == $res
+expect_value voxel_resolution_on_shelves == 1
+click "Clay##brush.clay"
+click "Remesh##tool.remesh"
+expect_value voxel_resolution_on_shelves == 1
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 0
+drag_item "##voxres" 60 0
+expect_value voxel_resolution != $res
+restart
+expect_value voxel_resolution_on_shelves == 1
