@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.6
+
+```features
+date: unreleased
+tagline: Pan and zoom keys work again, layouts revert safely, and garments drape on a body.
+highlight: Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)
+highlight: Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)
+highlight: Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)
+highlight: Drape a garment on a body in Tool > Garments, with a steadier cloth rest
+highlight: Save Visible Parts As and a Mask colour preference
+```
+
 ## Version 0.12.5
 
 ```features
