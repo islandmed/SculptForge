@@ -698,6 +698,9 @@ class WhatsNewPage(Page):
 # as cards with their first picture, then the older ones as groups of highlights, all linking into the guide chapter.
 HOME = ROOT / "website" / "index.html"
 HOME_START, HOME_END = "<!-- whats-new:start", "<!-- whats-new:end -->"
+NEWS_SCRIPT = ('<script>(function(){var b=document.querySelector(".news-bar");if(!b)return;try{if(localStorage.getItem("sf-news-x")===b.dataset.version)b.hidden=true}catch(e){}\n'
+               'b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage.setItem("sf-news-x",b.dataset.version)}catch(e){}}})()</script>')
+HERO_START, HERO_END = "<!-- hero-news:start -->", "<!-- hero-news:end -->"
 NEWS_START, NEWS_END = "<!-- news-hero:start", "<!-- news-hero:end -->"
 CHANGELOG_URL = "https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md"
 
@@ -738,35 +741,40 @@ def home_whats_new(page: "WhatsNewPage") -> str:
 
 
 def news_hero(page: "WhatsNewPage") -> str:
-    """The band above the home page's hero: the newest version's tagline as its headline and its first highlight as the
-    line. A band already written for that version (data-version) is kept, so an edited headline survives the next build."""
+    """The announcement bar under the nav: the newest version's tagline as one line, linking to its What's New entry.
+    A bar already written for that version (data-version) is kept, so an edited line survives the next build."""
     v = page.versions[0]
-    title, rest = split_highlight(v["highlights"][0]) if v["highlights"] else ("", "")
-    line = (f"{title}: {rest}" if title else rest) or v["tagline"]
-    head = (v["tagline"] or f"Version {v['version']}").rstrip(".") + "."
+    text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
     ver = html.escape(v["version"])
-    return (f'    <section class="news-hero" data-version="{ver}" aria-labelledby="news-hero-title">\n'
-            f'      <div class="wrap news-hero-grid">\n        <div class="news-hero-copy">\n'
-            f'          <p class="eyebrow">New in {ver}</p>\n'
-            f'          <h2 id="news-hero-title">{inline(head, [])}</h2>\n'
-            f'          <p class="news-hero-line">{inline(line, [])}</p>\n'
-            f'          <div class="ctas">\n'
-            f'            <a class="btn primary" href="guide/whats-new.html#{v["anchor"]}">What\'s new</a>\n'
-            f'            <a class="btn" href="#download">Download free</a>\n          </div>\n        </div>\n'
-            f'        <img class="news-hero-art" src="media/news-bust.jpg?v=1" alt="A clay bust, sculpted in SculptForge" '
-            f'width="518" height="310">\n      </div>\n    </section>\n')
+    return (f'    <aside class="news-bar" data-version="{ver}" aria-label="Latest release">\n'
+            f'      <div class="wrap news-bar-inner">\n'
+            f'        <a class="news-bar-link" href="guide/whats-new.html#{v["anchor"]}"><span class="news-pill">New</span>'
+            f'<span class="news-bar-text">{text}</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>\n'
+            f'        <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>\n'
+            f'      </div>\n    </aside>\n    {NEWS_SCRIPT}\n')
 
 
 def write_news_hero(t: str, page: "WhatsNewPage") -> str:
-    """T with the news band brought up to the newest version. No markers or no versions: T unchanged (never blocks a release)."""
-    a = t.find(NEWS_START)
-    b = t.find(NEWS_END, a)
-    if a < 0 or b < 0 or not page.versions:
+    """T with the announcement bar and the hero's "New in X" line brought up to the newest version, each only when
+    its data-version differs (an edited one for the same version stays). No markers or no versions: unchanged
+    (never blocks a release)."""
+    if not page.versions:
         return t
-    a = t.index("\n", a) + 1
-    if f'data-version="{html.escape(page.versions[0]["version"])}"' in t[a:b]:
-        return t
-    return t[:a] + news_hero(page) + "    " + t[b:]
+    v = page.versions[0]
+    ver = html.escape(v["version"])
+    text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
+    for start, end, make in (
+            (NEWS_START, NEWS_END, lambda: news_hero(page)),
+            (HERO_START, HERO_END, lambda: f'          <p class="hero-news" data-version="{ver}"><a href="guide/whats-new.html#{v["anchor"]}">'
+                                            f'<strong>New in {ver}:</strong> {text[:1].lower() + text[1:]}.</a></p>\n          ')):
+        a = t.find(start)
+        b = t.find(end, a)
+        if a < 0 or b < 0:
+            continue
+        a = t.index("\n", a) + 1 if start == NEWS_START else a + len(start) + 1
+        if f'data-version="{ver}"' not in t[a:b]:
+            t = t[:a] + make() + ("    " if start == NEWS_START else "") + t[b:]
+    return t
 
 
 def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
@@ -878,7 +886,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:image" content="{SITE}img/social-preview.png?v=5">
   <meta property="og:url" content="{url}">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=37">
+  <link rel="stylesheet" href="../style.css?v=39">
   <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
@@ -1137,7 +1145,7 @@ def supporters_html() -> str:
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
   <link rel="canonical" href="{SITE}supporters.html">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=39">
   <style>
     .supporters {{ columns: 3 14em; column-gap: 32px; padding: 0; list-style: none; }}
     .supporters li {{ break-inside: avoid; padding: 4px 0; }}

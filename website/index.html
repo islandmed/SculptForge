@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=39">
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -51,28 +51,24 @@
   </header>
 
   <main id="top">
-    <!-- news-hero:start (tools/guide/build_site.py rewrites this from the newest version in whats-new.md at each release;
-         a hand-edited band for the same version is kept; the art is media/news-bust.jpg) -->
-    <section class="news-hero" data-version="0.12.7" aria-labelledby="news-hero-title">
-      <div class="wrap news-hero-grid">
-        <div class="news-hero-copy">
-          <p class="eyebrow">New in 0.12.7</p>
-          <h2 id="news-hero-title">Splats, straight into Blender.</h2>
-          <p class="news-hero-line">Blender 5.3 draws splats but can't send them back. SculptForge sculpts them and sends them back, updating the same object.</p>
-          <div class="ctas">
-            <a class="btn primary" href="guide/splats.html#splats-with-blender">How it works</a>
-            <a class="btn" href="#download">Download free</a>
-          </div>
-        </div>
-        <img class="news-hero-art" src="media/news-bust.jpg?v=1" alt="A clay bust, sculpted in SculptForge" width="518" height="310">
+    <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
+    <aside class="news-bar" data-version="0.12.7" aria-label="Latest release">
+      <div class="wrap news-bar-inner">
+        <a class="news-bar-link" href="guide/blender.html#splats-with-blender"><span class="news-pill">New</span><span class="news-bar-text">Splats round-trip with Blender 5.3: sculpt with your scans, send splats back</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
-    </section>
+    </aside>
+    <script>(function(){var b=document.querySelector(".news-bar");if(!b)return;try{if(localStorage.getItem("sf-news-x")===b.dataset.version)b.hidden=true}catch(e){}
+b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage.setItem("sf-news-x",b.dataset.version)}catch(e){}}})()</script>
     <!-- news-hero:end -->
 
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
+          <!-- hero-news:start -->
+          <p class="hero-news" data-version="0.12.7"><a href="guide/blender.html#splats-with-blender"><strong>New in 0.12.7:</strong> bring Gaussian splat scans in from Blender 5.3, sculpt with them, and send splats back.</a></p>
+          <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
             who use it. New versions every few days, bug fixes sooner.</p>
