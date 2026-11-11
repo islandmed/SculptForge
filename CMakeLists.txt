@@ -191,6 +191,7 @@ add_library(sculptforge_core STATIC
   src/core/Guide.cpp
   src/core/WhatsNew.cpp
   src/core/UpdateCheck.cpp
+  src/core/Featured.cpp
   src/core/Tablet.cpp
   src/core/RadialMenu.cpp
   src/core/StrokePopup.cpp
@@ -500,6 +501,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelAiLink.cpp
     src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
+  src/app/PanelFeatured.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
     src/app/PanelDeform.cpp
@@ -1131,6 +1133,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_1440 support --size 1440x900)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
+    # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
+    sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
+    sculptforge_ui_test(featured_creator_2880 featured_creator --size 2880x1800)
     # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
     sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
     sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)

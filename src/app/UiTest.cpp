@@ -104,6 +104,7 @@
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
+//                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
 //                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
@@ -1130,6 +1131,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "featured_shown") return app_.featuredCard() ? 1.0 : 0.0;       // the welcome's featured creator card has an entry
+    if (name == "featured_watch_requests") return double(app_.featuredWatchRequests_);
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
     if (name == "quick_tour_slide") return double(app_.quickTourSlide_ + 1);

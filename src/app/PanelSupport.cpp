@@ -270,6 +270,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::TextWrapped("%s", tr("Hold Ctrl over any control to see what it does. The User Guide (Shift+F1) explains every "
                                "tool, and the quick tour shows what is where."));
+            drawFeaturedCard(); // PanelFeatured.cpp: nothing when there is no featured creator
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
