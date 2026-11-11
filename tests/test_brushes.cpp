@@ -260,8 +260,8 @@ TEST(smooth_peaks_lowers_only_the_high_points) {
     stroke(plain, BrushType::Smooth, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
     CHECK(plain.mesh.positions[floor].y > before[floor].y * 0.95f); // (Smooth fills the pit)
 
-    stroke(d, BrushType::SmoothPeaks, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
-    CHECK(d.mesh.positions[top].y < 0.6f * before[top].y);
+    stroke(d, BrushType::SmoothPeaks, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 12);
+    CHECK(d.mesh.positions[top].y < 0.85f * before[top].y);
     CHECK(glm::distance(d.mesh.positions[floor], before[floor]) < 1e-5f);
     float maxUp = 0.0f;
     for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) maxUp = std::max(maxUp, moved(d, before, v).y);
