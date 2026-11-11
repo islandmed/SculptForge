@@ -173,7 +173,7 @@ bool App::init(const AppOptions& options) {
         setting.interactive = !headless && options.demo.empty() && !sharedWindow_ && !options.benchmark &&
                               options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f;
         const char* off = std::getenv("SF_STARTUP_SPLASH"); // SF_STARTUP_SPLASH=0: not this run (comparisons, bug reports)
-        if (off && *off == '0') setting.interactive = false;
+        if (off && *off == '0' && !splash::forcedFromEnv(std::getenv("SF_SPLASH"))) setting.interactive = false;
         const char* driver = SDL_GetCurrentVideoDriver();
         setting.videoDriver = driver ? driver : "";
         if (setting.interactive && !setting.videoDriver.empty()) { // (ui.json is read in full later: this is only the two settings)
@@ -184,6 +184,8 @@ bool App::init(const AppOptions& options) {
                 setLanguage(languageFromCode(splash::languageFromUiJson(text))); // (for the version line; applyLook sets it again)
             }
         }
+        splashForced_ = splash::forcedFromEnv(std::getenv("SF_SPLASH")); // SF_SPLASH=1: to see it (StartupSplash.h)
+        if (splashForced_) setting.preference = true;
         splashEnabled_ = splash::enabled(setting);
     }
     if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
@@ -441,17 +443,26 @@ void App::splashCheckpoint() {
         return;
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
-    if (!splash::due(true, splashShown_, ms)) return;
+    if (!splash::due(true, splashShown_, ms, splashForced_ ? 0.0 : splash::kShowAfterMs)) return;
     splashShown_ = true; // (once: a window system that said no isn't asked again)
     auto window = std::make_unique<splash::Window>();
     if (window->open(splashVersionLine())) {
         splash_ = std::move(window);
+        splashOpenedAt_ = std::chrono::steady_clock::now();
         SDL_Log("Start-up splash shown after %.0f ms", ms);
-    }
+    } else
+        SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
 }
 
 void App::revealMainWindow() {
     mainWindowHidden_ = false;
+    if (splash_) { // up for at least kMinVisibleMs, so it is seen (only a start that showed it waits; a fast start never gets here)
+        const double visible = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count();
+        for (double left = splash::holdMs(visible); left > 0.0; left -= 16.0) {
+            splash_->pump();
+            SDL_Delay(16);
+        }
+    }
     if (window_) {
         SDL_ShowWindow(window_);
         SDL_RaiseWindow(window_);
@@ -1067,6 +1078,7 @@ int App::run() {
     const bool verify = verifyEnv && *verifyEnv && *verifyEnv != '0';
     const char* snapshotEnv = std::getenv("SF_MEASURE_SNAPSHOT");
     while (running_) {
+        if (mainWindowHidden_) splashCheckpoint(); // (before the first frame: restoring panel windows and the first frame can be slow too)
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
             if (!measuring && t0 >= measureFrom) {

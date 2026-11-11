@@ -2350,9 +2350,9 @@ private:
     // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
     // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
     std::unique_ptr<splash::Window> splash_;
-    bool splashEnabled_ = false, splashShown_ = false, mainWindowHidden_ = false;
-    std::chrono::steady_clock::time_point startedAt_;
-    void splashCheckpoint(); // between start-up steps
+    bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
+    std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;
+    void splashCheckpoint(); // between start-up steps and before the first frame
     void revealMainWindow(); // after the first frame
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
