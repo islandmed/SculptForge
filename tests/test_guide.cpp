@@ -220,6 +220,14 @@ TEST(guide_whats_new_features) {
         CHECK(!whatsnew::parseFeatures(std::string("title: T\nline: x\naction: a\n") + f, w, err));
     }
     CHECK(!whatsnew::parseFeatures("clip: before.mp4\n", bad, err) && err.find("title") != std::string::npos);
+    // The hero band (theme, hero) and a drawn card (icon, stat).
+    whatsnew::Version drawn;
+    CHECK(whatsnew::parseFeatures("tagline: Long.\ntheme: Short.\nhero: images/h.jpg\ntitle: Fast\nline: x\nicon: gauge\n"
+                                  "image: images/f.jpg\nstat: 33 fps\naction: a\n",
+                                  drawn, err));
+    CHECK(drawn.theme == "Short." && drawn.hero == "images/h.jpg" && drawn.cards.size() == 1);
+    CHECK(drawn.cards.size() == 1 && drawn.cards[0].icon == "gauge" && drawn.cards[0].stat == "33 fps");
+    CHECK(!whatsnew::parseFeatures("icon: before\n", bad, err) && err.find("title") != std::string::npos);
     CHECK(whatsnew::splitHighlight("Micro levels: a billion triangles") == std::make_pair(std::string("Micro levels"), std::string("a billion triangles")));
     CHECK(whatsnew::compareVersions("0.9.7", "0.10.0") < 0 && whatsnew::compareVersions("0.8", "0.8.0") == 0);
 }

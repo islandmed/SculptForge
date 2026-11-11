@@ -101,17 +101,26 @@ bool parseFeatures(std::string_view text, Version& v, std::string& error) {
             }
             continue;
         }
-        if (key == "line" || key == "image" || key == "action" || key == "link") {
+        if (key == "line" || key == "image" || key == "action" || key == "link" || key == "icon" || key == "stat") {
             if (v.cards.empty()) {
                 error = "line " + std::to_string(lineNo) + ": '" + std::string(key) + "' before the card's 'title'";
                 return false;
             }
             Card& c = v.cards.back();
-            (key == "line" ? c.line : key == "image" ? c.image : key == "action" ? c.action : c.link) = value;
+            (key == "line"     ? c.line
+             : key == "image"  ? c.image
+             : key == "action" ? c.action
+             : key == "icon"   ? c.icon
+             : key == "stat"   ? c.stat
+                               : c.link) = value;
         } else if (key == "date") {
             v.date = value;
         } else if (key == "tagline") {
             v.tagline = value;
+        } else if (key == "theme") {
+            v.theme = value;
+        } else if (key == "hero") {
+            v.hero = value;
         } else if (key == "highlight") {
             v.highlights.push_back(value);
         } else {

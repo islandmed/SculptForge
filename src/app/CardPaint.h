@@ -54,11 +54,12 @@ struct Painter {
     // Small capitals with letter spacing (eyebrows and badges).
     float spaced(ImFont* f, float px, ImVec2 at, ImU32 c, const char* s, float spacing, bool draw = true) const {
         float x = at.x;
-        char one[2] = {0, 0};
-        for (const char* p = s; *p; ++p) {
-            one[0] = *p;
-            if (draw) dl->AddText(f, px * k, ImVec2(x, at.y), c, one);
-            x += f->CalcTextSizeA(px * k, FLT_MAX, 0.0f, one).x + spacing * k;
+        for (const char* p = s; *p;) { // one character (UTF-8 sequence) at a time
+            const char* e = p + 1;
+            while ((static_cast<unsigned char>(*e) & 0xc0) == 0x80) ++e;
+            if (draw) dl->AddText(f, px * k, ImVec2(x, at.y), c, p, e);
+            x += f->CalcTextSizeA(px * k, FLT_MAX, 0.0f, p, e).x + spacing * k;
+            p = e;
         }
         if (draw) ImGui::LogText("%s\n", s);
         return x - at.x - spacing * k;

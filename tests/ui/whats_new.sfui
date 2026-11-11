@@ -13,7 +13,7 @@ click "What's New##help.whats_new"
 wait 0.5
 expect_value whats_new_open == 1
 expect_value whats_new_cards == 5
-expect_text "What's new in 0.12.0"
+expect_text "Garments, plugins, cleaner creases."
 expect_text "Garments and cloth"
 expect_text "Plugins"
 expect_text "Pose all Parts"
@@ -58,7 +58,7 @@ expect_guide whats-new.md
 expect_text "Version 0.12.6"
 expect_text "Pan and zoom keys work again, layouts revert safely, and garments drape on a body."
 expect_text "Version 0.12.5"
-expect_text "Rgb colours Sub strokes, your brushes are safer, and the pan keys glide."
+expect_text "Colour now paints on Sub strokes, your brushes are safer, and the pan keys glide."
 expect_text "Version 0.12.4"
 expect_text "Shortcuts ask before they take a key, and Front faces only shows when it is on."
 expect_value whats_new_contents == 5   # 3 versions in full, then 0.12.0 to 0.12.2 and 0.11.x (the chapter starts at 0.11.0)

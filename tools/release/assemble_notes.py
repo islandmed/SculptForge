@@ -148,7 +148,7 @@ def whats_new(text, version, frags):
         if not fm:
             raise NoteError(f"whats-new.md: Version {version} has no ```features block for the highlights")
         lines = fm.group(1).split("\n")
-        last = max([i for i, l in enumerate(lines) if l.startswith(("date:", "tagline:", "highlight:"))], default=-1)
+        last = max([i for i, l in enumerate(lines) if l.startswith(("date:", "tagline:", "theme:", "hero:", "highlight:"))], default=-1)
         have = {l[len("highlight:"):].strip() for l in lines if l.startswith("highlight:")}
         # A hand-written line that starts with the note's text (plus a credit) is the same highlight (0.12.2/0.12.3 doubled).
         lines[last + 1:last + 1] = [f"highlight: {h}" for h in dict.fromkeys(highlights)

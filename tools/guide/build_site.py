@@ -470,7 +470,7 @@ def image_size(path: pathlib.Path):
 
 WHATS_NEW = "whats-new.md"
 WN_DETAILED, WN_SERIES_GROUPS, WN_MAX_HIGHLIGHTS = 3, 2, 6
-WN_KEYS = {"date", "tagline", "highlight", "title", "line", "image", "action", "link", "clip", "frames"}
+WN_KEYS = {"date", "tagline", "theme", "hero", "highlight", "title", "line", "image", "icon", "stat", "action", "link", "clip", "frames"}
 
 
 def version_parts(v: str) -> list:
@@ -502,7 +502,7 @@ def project_prerelease() -> str:
 
 def parse_features(text: str) -> dict:
     """The features block: date, tagline, highlights, then cards (each starts with title:). Raises ValueError."""
-    v = {"date": "", "tagline": "", "highlights": [], "cards": []}
+    v = {"date": "", "tagline": "", "theme": "", "hero": "", "highlights": [], "cards": []}
     for k, raw in enumerate(text.split("\n"), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -512,8 +512,9 @@ def parse_features(text: str) -> dict:
         if not sep or key not in WN_KEYS:
             raise ValueError(f"line {k}: " + (f"unknown key '{key}'" if sep else "expected 'key: value'"))
         if key == "title":
-            v["cards"].append({"title": value, "line": "", "image": "", "action": "", "link": "", "clip": "", "frames": ""})
-        elif key in ("line", "image", "action", "link", "clip", "frames"):
+            v["cards"].append({"title": value, "line": "", "image": "", "icon": "", "stat": "", "action": "", "link": "", "clip": "",
+                              "frames": ""})
+        elif key in ("line", "image", "icon", "stat", "action", "link", "clip", "frames"):
             if not v["cards"]:
                 raise ValueError(f"line {k}: '{key}' before the card's 'title'")
             if key == "frames" and not re.fullmatch(r"\S+ \d{1,2}x\d{1,2} \d{1,2}", value):
@@ -618,7 +619,7 @@ class WhatsNewPage(Page):
         self.chars = text
         # Every card picture, also those of a version not released yet (it ships with the next one).
         # Clips too: the video the website plays, and the frame sheet the app plays (shipped with the guide).
-        self.images += [src for src in re.findall(r"^image:\s*(\S+)\s*$", text, re.M) if src not in self.images]
+        self.images += [src for src in re.findall(r"^(?:image|hero):\s*(\S+)\s*$", text, re.M) if src not in self.images]
         self.images += [src for src in re.findall(r"^(?:clip|frames):\s*(\S+)", text, re.M) if src not in self.images]
         for v in self.versions:
             for c in v["cards"]:
@@ -944,8 +945,10 @@ def check(index: Page, chapters) -> list:
             for c in v["cards"]:
                 if not 1 <= len(c["title"].split()) <= 6:
                     problems.append(f"{WHATS_NEW}: Version {v['version']}: card title '{c['title']}' should be 3-5 words")
-                if c["image"] and c["image"].startswith("images/wn-") and image_size(SRC / c["image"]) not in (None, (600, 340)):
-                    problems.append(f"{WHATS_NEW}: {c['image']} should be 600x340 (tools/guide/make_images.py --whats-new)")
+                if c["image"] and c["image"].startswith("images/wn-") and image_size(SRC / c["image"]) not in (None, (600, 340), (1200, 680)):
+                    problems.append(f"{WHATS_NEW}: {c['image']} should be 1200x680 (tools/whats_new_cards.py render {v['version']})")
+                if c["line"] and len(c["line"]) > 90:
+                    problems.append(f"{WHATS_NEW}: Version {v['version']}: card '{c['title']}': its line has at most 90 characters")
             if v["cards"] and not 1 <= len(v["cards"]) <= 5:
                 problems.append(f"{WHATS_NEW}: Version {v['version']} has {len(v['cards'])} cards; the window shows 1 to 5")
     listed = set(pages)
