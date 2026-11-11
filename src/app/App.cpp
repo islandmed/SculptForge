@@ -3023,9 +3023,9 @@ void App::queueFile(FileAction action, std::string path) {
                 : action == FileAction::ExportUsd  ? ".usdz"
                 : action == FileAction::SaveSplats ? ".ply"
                 : action == FileAction::ExportUnreal ? ".fbx"
-                : action == FileAction::SaveProject ? ".sfproj"
+                : action == FileAction::SaveProject || action == FileAction::SaveVisibleParts ? ".sfproj"
                                                    : ".glb";
-    else if (action == FileAction::SaveProject && !path.empty() && !isProjectPath(path))
+    else if ((action == FileAction::SaveProject || action == FileAction::SaveVisibleParts) && !path.empty() && !isProjectPath(path))
         path += kProjectExtension; // as save_project does, so the recent list gets the real name
     std::lock_guard lock(pendingMutex_);
     pendingFiles_.push_back({action, std::move(path)});
@@ -3179,6 +3179,9 @@ void App::processPendingFiles() {
             break;
         }
         case FileAction::SaveProject: saveProjectTo(f.path); break;
+        case FileAction::SaveVisibleParts:
+            if (!f.path.empty()) runCommand("save_visible_parts", {{"path", f.path}});
+            break;
         case FileAction::AppendPart:
             runCommand("part_append", {{"path", f.path}});
             if (lastCommandOk_) frameView(sceneBounds()); // a model can be any size, anywhere

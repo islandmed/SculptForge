@@ -51,7 +51,9 @@ bool isProjectPath(const std::string& path);
 // Detail, core/FocusDetail.h) saves its detail file first: `<stem>.sfdetail` beside the project (`<stem>-2.sfdetail`
 // and so on for more Parts), written in place when it's already there, else as a compact copy that the Part then
 // streams from. `autosave`: the detail files are only named, as last saved (edits since then aren't in them).
-bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave = false);
+// `visibleOnly`: only the visible Parts (Save Visible Parts As; a Part with a streamed level can't go this way).
+bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave = false,
+                 bool visibleOnly = false);
 // A streamed level's detail file is a plain file name resolved beside the project (`<name>.sfdetail`: no folders,
 // so a shared project can't point at other files); only the app's own autosave (`autosave.sfproj` in this folder,
 // set at startup) may name one by its full path (an unsaved level's file in the swap folder, or a saved one).

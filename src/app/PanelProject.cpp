@@ -379,6 +379,13 @@ void App::saveProjectAs(bool forceDialog) {
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
+void App::saveVisiblePartsAs() {
+    std::string suggestion;
+    if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension().concat("-visible").replace_extension(kProjectExtension));
+    sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveVisibleParts)], window_, kProjectFilters, 2,
+                           suggestion.empty() ? nullptr : suggestion.c_str());
+}
+
 void App::saveProjectTo(const std::string& path) {
     if (path.empty()) { // dialog cancelled
         continueAfterSave_ = false;
@@ -779,6 +786,7 @@ void App::drawFileMenuProjectItems() {
     }
     if (ImGui::MenuItem(tr("Save"), "Ctrl+S")) saveProjectAs(false);
     if (ImGui::MenuItem(tr("Save As..."), "Ctrl+Shift+S")) saveProjectAs(true);
+    if (ImGui::MenuItem(tr("Save Visible Parts As..."))) saveVisiblePartsAs();
     ImGui::SetNextItemWidth(120.0f * uiScale_);
     ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, tr(autosaveMinutes_ ? "%d" : "off"));
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();

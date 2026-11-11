@@ -406,6 +406,44 @@ TEST(project_save_adds_extension_to_any_other_extension) {
     std::filesystem::remove(doc.path);
 }
 
+TEST(project_save_visible_parts_keeps_only_shown_parts) {
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.parts[0].name = "Body";
+    doc.addPart(makeIcosphere(1), "Hidden");
+    doc.addPart(makeIcosphere(2), "Head");
+    const int copy = doc.linkedDuplicate(2, glm::vec3(1, 0, 0)); // a linked copy of Head, after it
+    CHECK(copy >= 0);
+    const uint32_t folder = doc.addPartFolder("Face");
+    doc.setPartFolder(doc.findPart("Head"), folder);
+    doc.parts[size_t(doc.findPart("Hidden"))].visible = false;
+    doc.activePart = doc.findPart("Hidden"); // the active Part is hidden: the copy opens on the first Part
+
+    const std::string path = tempPath("sf_project_visible.sfproj");
+    std::filesystem::remove(path);
+    const int partsBefore = doc.partCount();
+    CommandResult r = reg.execute(doc, "save_visible_parts", {{"path", path}});
+    CHECK(r.ok && std::filesystem::exists(path));
+    CHECK(doc.path.empty() && doc.partCount() == partsBefore && doc.parts[size_t(doc.findPart("Hidden"))].data); // untouched
+
+    Document back;
+    std::string err;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partCount() == partsBefore - 1 && back.findPart("Hidden") < 0 && back.findPart("Body") >= 0);
+    const int head = back.findPart("Head");
+    CHECK(head >= 0 && back.partFolders.size() == 1 && back.partFolderIndex(back.parts[size_t(head)].folder) >= 0);
+    int linked = 0; // the copy still shares Head's mesh
+    for (int i = 0; i < back.partCount(); ++i)
+        if (i != head && back.parts[size_t(i)].data == back.parts[size_t(head)].data) ++linked;
+    CHECK(linked == 1 && back.activePart == 0);
+
+    // Nothing visible: nothing to write, and no file made.
+    std::filesystem::remove(path);
+    for (Part& p : doc.parts) p.visible = false;
+    CHECK(!reg.execute(doc, "save_visible_parts", {{"path", path}}).ok && !std::filesystem::exists(path));
+    CHECK(!reg.execute(doc, "save_visible_parts").ok); // a path is required
+}
+
 namespace {
 
 // A plane with planar UVs and a 512 texture (texture tests have their own helpers; this one is enough here).

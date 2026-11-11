@@ -187,7 +187,7 @@ public:
     void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, SaveVisibleParts, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -1825,6 +1825,7 @@ private:
     void tickProject(float dt);
     void saveProjectAs(bool forceDialog); // Ctrl+S (dialog only when needed) / Ctrl+Shift+S
     void saveProjectTo(const std::string& path);
+    void saveVisiblePartsAs(); // File > Save Visible Parts As...: a copy with only the visible Parts
     void storeProjectSettings(); // camera, render, brush and symmetry -> doc_.projectSettings
     void applyProjectSettings(); // and back, after opening a project
     void afterCommand(const std::string& name, const Args& args, const CommandResult& r);
