@@ -301,7 +301,7 @@ CommandRegistry::CommandRegistry() {
                  m = std::move(stitched);
              }
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
-             doc.replaceMeshUndoable(std::move(m), "Remesh");
+             doc.replaceMeshUndoable(std::move(m), "Remesh", true);
              return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
@@ -469,7 +469,7 @@ CommandRegistry::CommandRegistry() {
                                  ? size_t(std::max(4.0, argNumber(a, "triangles", 4)))
                                  : size_t(double(doc.mesh.triangleCount()) *
                                           std::clamp(argNumber(a, "ratio", 0.5), 0.01, 1.0));
-             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate");
+             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate", true);
              return {true, "Decimated to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
 
@@ -862,6 +862,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             doc.syncBvh(); // (a pending rebuild first: a whole-mesh step keeps the tree it swaps out)
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
@@ -871,6 +872,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             doc.syncBvh();
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);

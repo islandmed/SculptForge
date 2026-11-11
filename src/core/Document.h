@@ -263,7 +263,10 @@ struct Document {
     void setMesh(Mesh m, std::string name = "Sculpt", BVH* built = nullptr);
     // Replaces the mesh as an undoable topology change. A result without the old mesh's subdivision levels (a
     // remesh, decimate, ...) leaves a `notice` saying the levels were removed; undo brings them back.
-    void replaceMeshUndoable(Mesh m, std::string label);
+    // `keepTree`: the caller vouches that `bvh` is the tree of the mesh being replaced and that this mesh is the one in
+    // `mesh` (not edited since: Forge Spheres drags put the old mesh back under the dragged one's tree). The step then
+    // keeps that tree and undo / redo swap trees instead of building one (seconds at 10M triangles).
+    void replaceMeshUndoable(Mesh m, std::string label, bool keepTree = false);
 
     // A note for the status line from the last operation, e.g. that subdivision levels were removed.
     // CommandRegistry::execute adds it to the command's message; other callers take it with takeNotice().
