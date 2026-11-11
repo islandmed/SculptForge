@@ -159,6 +159,7 @@ ui_*                        ui
 sculptforge_tests_*         unit
 figure_pose_bench           mesh
 decimate_valence_ab         mesh
+boolean_bench               mesh
 remesh_bench                mesh
 python_api                  io
 blender_*                   io
@@ -251,6 +252,7 @@ test_figure_pose            mesh
 test_forgespheres           mesh
 test_generated_remesh       mesh
 test_linked_duplicate       mesh
+test_mesh_boolean           mesh
 test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
@@ -279,6 +281,7 @@ src/app/I18n*                      site
 src/app/IconsUsed.h                ui
 src/app/Panel*Cloth*               cloth
 src/app/PanelDrape*                cloth
+src/app/BooleanPreview*            mesh
 src/app/PanelGarment*              cloth
 src/app/PanelAi*                   ai
 src/app/PanelConnectAi*            ai
@@ -377,6 +380,9 @@ src/core/GeneratedRemesh*          mesh
 src/core/Dyntopo*                  mesh
 src/core/Decimate*                 mesh
 src/core/Cut*                      mesh
+src/core/Arrangement*              mesh
+src/core/MeshBoolean*              mesh
+src/core/PartBoolean*              mesh
 src/core/CloseHoles*               mesh
 src/core/Tube*                     mesh
 src/core/Parts*                    mesh

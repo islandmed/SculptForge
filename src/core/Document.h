@@ -29,6 +29,13 @@ enum class Shading : uint8_t { Default, Smooth, Flat };
 const char* shadingName(Shading s);           // "default", "smooth", "flat"
 bool parseShading(const std::string& name, Shading& out);
 
+// How a Part takes part in the scene's Boolean (core/MeshBoolean.h, the Parts list's Boolean column): not at all, or
+// added to, subtracted from or intersected with the Parts above it, in list order (the first one taking part is the
+// base). The view shows the result live; Make Boolean Mesh turns it into a Part of its own.
+enum class PartBoolean : uint8_t { None, Add, Subtract, Intersect };
+const char* partBooleanName(PartBoolean b); // "none", "add", "subtract", "intersect"
+bool parsePartBoolean(const std::string& name, PartBoolean& out);
+
 // What a Part is made of: its mesh, attributes, layers and undo history. Shared (reference counted) by the Parts
 // of one link group (Linked Duplicate, #94): sculpting, painting or masking any of them edits this one mesh, and
 // they share its history. `key` names it for the renderer (one GPU mesh per PartData): the id of the Part it
@@ -58,6 +65,7 @@ struct Part {
     // remembered (a Part made during Solo, or Solo is off).
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
+    PartBoolean boolean = PartBoolean::None; // its part in the scene's Boolean
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
     // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).
@@ -88,6 +96,11 @@ struct PartStep {
     std::unique_ptr<Part> stashed;
     bool isTransform = false;
     glm::mat4 transform{1.0f};
+    // Parts the step hid when it added Part `id` (Make Boolean Mesh hides its sources): undo shows them again, redo
+    // hides them. `returnTo`: when Part `id` is the active one (and no linked copy can take over), undo makes this
+    // Part active before taking it away.
+    std::vector<uint32_t> hid;
+    uint32_t returnTo = 0;
 };
 
 // Extract's preview (core/ExtractMirror.h): Part `id`, made from the mask of Part `source` as it was at

@@ -2,7 +2,7 @@
 
 A scene in SculptForge can hold several separate meshes, called Parts (experienced sculptors: Parts): a body, eyes, teeth,
 a helmet and a sword can each live in their own Part. This chapter covers the Parts list, selecting, adding,
-hiding, reordering, merging and splitting Parts, and how they travel through files.
+hiding, reordering, merging, combining with Booleans and splitting Parts, and how they travel through files.
 
 ## How Parts work
 
@@ -13,7 +13,7 @@ hiding, reordering, merging and splitting Parts, and how they travel through fil
 - Each Part has its own undo history. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change in the active
   Part, and switching Parts doesn't lose the history of the others.
 - Adding, deleting, reordering, merging and splitting Parts are **not undoable**, except **Split hidden**,
-  **Split masked** and **Split unmasked** (one undo step each). Merges and deletes ask for confirmation first.
+  **Split masked**, **Split unmasked** and **Make Boolean Mesh** (one undo step each). Merges and deletes ask for confirmation first.
 - The Parts list highlights the active Part. In the Classic layout the title strip also shows it and its place
   in the list, for example `Part Helmet (2/5)`.
 
@@ -23,7 +23,7 @@ The list is in **Tool > Parts**, which is open in the right tray by default.
 
 ![The Parts sub-palette with several Parts, the active one highlighted](images/parts.jpg)
 
-Each row shows a small picture of the Part, its name, its triangle count, its shading and an eye. The pictures are drawn from
+Each row shows a small picture of the Part, its name, its triangle count, its [Boolean](#booleans), its shading and an eye. The pictures are drawn from
 the model the viewport already has on the graphics card, so they cost almost nothing even on very dense Parts,
 and they catch up a moment after you stop changing a Part (not during a stroke).
 
@@ -33,6 +33,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Sculpt the Part under the cursor | Point at it and press <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style, as in Blender): it becomes the active Part, the view stays put and each Part keeps its mask |
 | Rename it | Double-click the row (or right-click > **Rename**), type, press <kbd>Enter</kbd> |
 | Hide or show it | Click the eye at the end of the row |
+| Combine it with other Parts | Click the mark after the triangle count and pick **Add**, **Subtract** or **Intersect**; see [Booleans](#booleans) |
 | Shade it smooth or flat | Click the mark left of the eye: it goes from **as the scene** (dim) to **Smooth** (a disc) to **Flat** (a faceted hexagon) and back. Only this Part changes; the scene's own setting is **Render > Materials > Shading** |
 | Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
 | Make a copy that shares the mesh | Right-click the row > **Linked Duplicate**, or the **Linked Duplicate** button; see [Linked Duplicates](linked-duplicates.md) |
@@ -162,6 +163,52 @@ meshes the Auto UV takes a while. Scripts can skip it with `keep_texture=false`,
 > **Tip:** Merge first when you want one [voxel remesh](geometry.md#voxel-remesh) to fuse several pieces into a
 > single watertight surface.
 
+## Booleans
+
+Booleans combine Parts the way hard-surface and kitbash work does: add one shape to another, cut one out of another,
+or keep only where they overlap.
+
+1. Give each Part that takes part a **Boolean**: click the mark after its triangle count (or right-click the row >
+   **Boolean**) and pick **Add**, **Subtract** or **Intersect**. The mark shows it: a plus, a bar or two overlapping
+   rings; a small ring is **None**.
+2. The shown Parts with a Boolean combine **in list order**. The first one is the base; each one below it is added to,
+   subtracted from or intersected with what the ones above it made. Move a Part up or down to change the order.
+3. While **Preview** is on (in the **Boolean** row under the list), the view shows the result in place of those Parts.
+   Sculpt or move a Part and the result follows: as you go on lighter meshes, when you release on heavy ones (the
+   Parts show as they are during the stroke). The text beside **Preview** says how long the last result took, or that
+   it can't be shown (point at it for why).
+4. Click **Make Boolean Mesh** (also in the command search, F3) to turn the result into a new Part called `Boolean`,
+   below the last source, and make it active. The sources stay as they are, hidden: show one, change it and make the
+   mesh again. <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes the new Part away and shows the sources again.
+
+![A cube with a sphere and a slot set to Subtract: the Parts list with the Boolean marks, the result in the view](images/booleans.jpg)
+
+The **...** button beside **Make Boolean Mesh** holds its options:
+
+| Option | What it does |
+|---|---|
+| **Weld seams** (on) | The result is one closed surface. Off: each source keeps its own vertices along the cut, so the seam is a hard edge in the shading (and the surface is open there) |
+| **Keep face groups** (on) | Each source keeps its face groups, apart from the others'. Off: one face group per source |
+| **New face group on cut faces** (on) | The faces a Subtract or Intersect Part leaves on the result get a face group of their own, ready to mask, hide or polish |
+
+Good to know:
+
+- The Boolean is exact: the surfaces are cut along the curves where they cross, and away from the cut the result is
+  the Parts' own faces, with their face groups, vertex paint and UVs. It is watertight when the Parts are. Sculpt
+  layers are baked in; the mask, hidden faces and subdivision levels don't carry over (each Part takes part at the
+  level it is on).
+- Faces lying exactly on each other are fine: a cutter flush with the surface opens a clean pocket, and boxes side
+  by side merge into one.
+- Parts need to be closed: no holes, every edge shared by two faces. A Part with holes, or one that runs through
+  itself, makes the Boolean fall back to voxels: the result is closed but remeshed into even quads, without face groups
+  or UVs, and the status line says so. A flat sheet has no inside, so it can't take part. To stay exact, close the
+  holes first (**Tool > Geometry > Fill Holes**).
+- Where a cut meets a face at a sharp angle, smooth shading softens the edge as it does any hard edge. For crisp
+  hard-surface edges, shade the result **Flat** (the shading mark in its row), or turn **Weld seams** off.
+- A moved [linked copy](linked-duplicates.md) takes part where it is in the scene. A duplicate keeps its Part's Boolean,
+  so copies of a cutter cut too.
+- Each Part's Boolean is saved in the project.
+
 ## Pose all Parts
 
 A character made of many Parts (body, eyes, teeth, armour plates, belts) can be posed in one go instead of Part by
@@ -285,6 +332,9 @@ used.
 | `part_split_groups` / `part_split_parts` | Split |
 | `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable; `keep=true` copies and leaves the source as it is) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
+| `part_boolean name=Bolt mode=subtract` | Set a Part's Boolean: `none`, `add`, `subtract` or `intersect` |
+| `make_boolean_mesh` | Make Boolean Mesh; `weld=`, `keep_groups=`, `cut_group=` (all `true` by default); `voxel_fallback=false` fails instead of using voxels; `resolution=` (32-512, default 256) for the voxels |
+| `boolean_parts op=subtract a=Body b=Bolt` | The Boolean of two Parts into a new Part, whatever their marks (`union`, `subtract`, `intersect`; `a` and `b` are names or list indices); the same options |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `triangle_corners` / `triangle_border` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
 

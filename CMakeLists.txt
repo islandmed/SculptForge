@@ -111,6 +111,8 @@ add_library(sculptforge_core STATIC
   src/core/EnginePresets.cpp
   src/core/Masking.cpp
   src/core/Cut.cpp
+  src/core/MeshBoolean.cpp
+  src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
@@ -493,6 +495,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
+    src/app/BooleanPreview.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
@@ -766,6 +769,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
   add_test(NAME figure_pose_bench COMMAND sculptforge_tests --nightly nightly_figure_pose_bench)
   set_tests_properties(figure_pose_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
+  # SF_BOOLEAN_BENCH=1: Part Booleans on 2 x 100k and 2 x 1M triangles (tests/test_mesh_boolean.cpp).
+  add_test(NAME boolean_bench COMMAND sculptforge_tests --nightly nightly_boolean_bench)
+  set_tests_properties(boolean_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
   # SF_DECIMATE_AB=1: decimate() with and without its valence cap (tests/test_decimate_valence.cpp).
   add_test(NAME decimate_valence_ab COMMAND sculptforge_tests --nightly nightly_decimate_valence_cap)
   set_tests_properties(decimate_valence_ab PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
