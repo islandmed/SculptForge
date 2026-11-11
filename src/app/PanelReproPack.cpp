@@ -46,11 +46,6 @@ void SDLCALL onReproSave(void* userdata, const char* const* files, int) {
 
 std::string mb(uint64_t v) { return std::to_string(v) + " MB"; }
 
-std::string fileStem(const std::string& path) {
-    const std::u8string s = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
-    return std::string(s.begin(), s.end());
-}
-
 } // namespace
 
 void App::registerReproPack() {
@@ -60,14 +55,15 @@ void App::registerReproPack() {
     a.palette = "Help";
     a.icon = ICON_LC_PACKAGE;
     a.run = [this] { openReproPack(); };
-    a.description = "A .zip for a bug report that is safe to post: version, GPU and driver, changed settings, the end of "
-                    "the log, the last commands, mesh counts and a generated stand-in mesh. No model, texture, name or "
-                    "path goes in, and you see every file before saving. Nothing is sent.";
+    a.description = "A .zip for a bug report without your model: version, GPU and driver, changed settings, the end of the "
+                    "log, the last commands, mesh counts and a generated stand-in mesh. No model or texture goes in; paths, "
+                    "file names, links and your Parts', project's and account's names are replaced. You see every file "
+                    "before saving. Nothing is sent.";
     actions_.add(std::move(a));
     // bug_report_pack path=...: the same pack without the preview (scripts, UI tests).
     commands_.add({"bug_report_pack",
                    "Writes a bug report pack (Help > Create bug report pack): system, settings, log, actions, mesh counts and "
-                   "a stand-in mesh, nothing of the model itself. Nothing is sent.",
+                   "a stand-in mesh, none of the model's shape. Nothing is sent.",
                    {{"path", ParamSpec::Type::String, "The .zip to write.", true}},
                    [this](Document&, const Args& args) -> CommandResult {
                        openReproPack();
@@ -103,12 +99,16 @@ void App::openReproPack() {
     in.settingsJson = diff.dump();
     in.log = repro::tailLines(crashlog::path(), kLogLines);
     in.actions = repro::recentActions();
-    // Names that may turn up in the log: the Parts', the project's, the studio's, the user's and the computer's.
-    for (const Part& p : doc_.parts) in.names.push_back(p.name);
-    if (!doc_.path.empty()) in.names.push_back(fileStem(doc_.path));
-    if (!doc_.bridgeName.empty()) in.names.push_back(doc_.bridgeName);
+    // Names that may turn up in the log: everything the artist named in the scene and the libraries, the studio's,
+    // the user's and the computer's (core/ReproPack.h: free text it doesn't know can remain; the preview says so).
+    in.names = repro::documentNames(doc_);
     const StudioProfile& studio = studioMode().profile;
     for (const std::string* s : {&studio.name, &studio.id, &studio.title}) in.names.push_back(*s);
+    for (const InstalledPack& p : packs_.installed)
+        for (const std::string* s : {&p.manifest.id, &p.manifest.name, &p.manifest.author}) in.names.push_back(*s);
+    for (const auto* list : {&packs_.alphas, &packs_.materials, &packs_.keymaps, &packs_.pieMenus})
+        for (const PackContentItem& i : *list) in.names.push_back(i.name), in.names.push_back(i.packName);
+    for (const Macro& m : macros_.list) in.names.push_back(m.name);
     for (const char* env : {"USER", "USERNAME", "LOGNAME", "HOSTNAME", "COMPUTERNAME"})
         if (const char* v = std::getenv(env); v && *v) in.names.push_back(v);
     in.doc = &doc_;
@@ -156,9 +156,11 @@ void App::drawReproPack() {
         return;
     }
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(tr("One .zip on this computer for a bug report. It holds no model, texture, image, name, "
-                              "path or link: the mesh is a stand-in with the same counts. Nothing is sent; you attach it "
-                              "yourself. Untick anything you'd rather leave out."));
+    ImGui::TextUnformatted(tr("One .zip on this computer for a bug report. It holds no model, texture or image: the mesh "
+                              "is a stand-in with the same counts. Paths, file names, links, e-mail addresses and the "
+                              "names of your Parts, layers, project, packs and account are replaced. Other names can "
+                              "remain: read the log and actions before you post. Nothing is sent; you attach it yourself. "
+                              "Untick anything you'd rather leave out."));
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
     for (repro::Item& item : ui.items) {

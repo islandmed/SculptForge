@@ -5,6 +5,8 @@
 #include "core/Document.h"
 #include "core/Json.h"
 #include "core/Multires.h"
+#include "core/PaintLayer.h"
+#include "core/SelectionSets.h"
 #include "io/Zip.h"
 
 #include <algorithm>
@@ -462,8 +464,10 @@ Json redactJson(const Json& j) {
     return j;
 }
 
-// Every NAMES entry (3 characters or more), in any case, becomes <name>.
-std::string replaceNames(std::string s, const std::vector<std::string>& names) {
+// Every NAMES entry (3 characters or more), in any case, becomes <name>; the longest first, so "Dragon Head" goes
+// whole before "Dragon" would split it.
+std::string replaceNames(std::string s, std::vector<std::string> names) {
+    std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b) { return a.size() > b.size(); });
     auto lower = [](std::string t) {
         for (char& c : t) c = char(std::tolower(static_cast<unsigned char>(c)));
         return t;
@@ -489,6 +493,35 @@ std::string joinLines(const std::vector<std::string>& lines) {
 }
 } // namespace
 
+std::vector<std::string> documentNames(const Document& doc) {
+    std::vector<std::string> n;
+    if (!doc.path.empty()) {
+        const std::u8string stem = std::filesystem::path(std::u8string(doc.path.begin(), doc.path.end())).stem().u8string();
+        n.emplace_back(stem.begin(), stem.end());
+    }
+    if (!doc.bridgeName.empty()) n.push_back(doc.bridgeName);
+    for (const PartFolder& f : doc.partFolders) n.push_back(f.name);
+    for (int i = 0; i < doc.partCount(); ++i) {
+        n.push_back(doc.parts[size_t(i)].name);
+        const Mesh& m = doc.partMesh(i);
+        for (const SculptLayer& l : m.layers) n.push_back(l.name);
+        for (const PaintLayer& l : m.paintLayers) n.push_back(l.name);
+        if (m.selectionSets)
+            for (const auto& set : m.selectionSets->sets)
+                if (set) n.push_back(set->name);
+    }
+    for (const BrushRecipe& b : doc.brushes)
+        if (b.origin.source != BrushSource::Builtin) n.push_back(b.name);
+    for (const BrushRecipe& b : doc.brushes)
+        if (!b.origin.pack.empty()) n.push_back(b.origin.pack);
+    for (const auto& [name, data] : doc.projectFiles) {
+        n.push_back(name);
+        const std::u8string stem = std::filesystem::path(std::u8string(name.begin(), name.end())).stem().u8string();
+        n.emplace_back(stem.begin(), stem.end());
+    }
+    return n;
+}
+
 std::vector<Item> buildItems(const Inputs& in) {
     std::vector<Item> items;
     items.push_back({"system", "system.txt", "Computer", "App version, operating system, processor, memory, GPU and driver",
@@ -502,7 +535,7 @@ std::vector<Item> buildItems(const Inputs& in) {
                      bytes(clean.dump(true) + "\n"), true});
     std::vector<std::string> log;
     for (const std::string& l : in.log) log.push_back(scrub(l, in.names));
-    items.push_back({"log", "log.txt", "Log", "The last " + std::to_string(log.size()) + " lines, paths, names and links removed",
+    items.push_back({"log", "log.txt", "Log", "The last " + std::to_string(log.size()) + " lines; paths, file names, links and known names replaced. Read it first",
                      bytes(joinLines(log)), true});
     std::vector<std::string> actions;
     for (const std::string& a : in.actions) actions.push_back(scrub(a, in.names));
@@ -528,8 +561,10 @@ std::vector<Item> buildItems(const Inputs& in) {
 
 std::string readmeText(const std::vector<Item>& items) {
     std::string s = "SculptForge bug report pack\n\n"
-                    "Made on this computer by Help > Create bug report pack. It holds no model, texture, image, Part name,\n"
-                    "file name, path or link: the mesh is a generated stand-in with the same counts. Nothing was sent anywhere.\n\n";
+                    "Made on this computer by Help > Create bug report pack. It holds no model, texture or image: the mesh is a\n"
+                    "generated stand-in with the same counts. Paths, file names, links, e-mail addresses and the names of the\n"
+                    "Parts, layers, project, packs and account were replaced. Other names typed into the log can remain: read\n"
+                    "log.txt and actions.txt before posting. Nothing was sent anywhere.\n\n";
     for (const Item& i : items)
         if (i.include) s += i.file + ": " + i.summary + "\n";
     return s;

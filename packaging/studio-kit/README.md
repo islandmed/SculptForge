@@ -125,7 +125,8 @@ dependencies) and packages it for the platform you build on. The binaries are th
 
 ## Bug reports
 
-**Help > Create bug report pack...** writes a `.zip` on the artist's computer that is safe to post on a public
-tracker: the version, GPU and driver, changed settings, the end of the log, the last commands, mesh counts and a
-generated stand-in mesh with the same counts. No model, texture, image, name, path or link goes in, every file is
-shown before saving, and nothing is sent.
+**Help > Create bug report pack...** writes a `.zip` on the artist's computer for a bug report, without the model:
+the version, GPU and driver, changed settings, the end of the log, the last commands, mesh counts and a generated
+stand-in mesh with the same counts. No model, texture or image goes in; paths, file names, links, e-mail addresses and the names of your Parts, layers, project, packs and account are replaced.
+Every file is shown before saving and nothing is sent. Read the log and actions before posting publicly: other names
+typed into free text can remain.

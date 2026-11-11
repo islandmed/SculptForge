@@ -322,8 +322,9 @@ good report includes:
 **Can't share the model?** Choose **Help > Create bug report pack...** instead. It writes one `.zip` on your
 computer with the version, GPU and driver, the settings you changed, the end of the log, your last commands and
 a stand-in mesh with your model's counts (vertices, triangles, Parts, holes, levels) but none of its shape. No
-texture, image, name, path or link goes in. The window shows every file before you save, and you can untick any
-of them. Nothing is sent: attach the file to your report yourself.
+texture or image goes in, and paths, file names, links, e-mail addresses and the names of your Parts, layers, project, packs and account are replaced. The window shows every file before you save, and you can untick
+any of them: read the log and actions before you post, as other names can remain. Nothing is sent: attach the file
+to your report yourself.
 
 For a security problem, don't open a public issue; follow `SECURITY.md` in the repository instead.
 

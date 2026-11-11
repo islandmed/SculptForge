@@ -5,12 +5,14 @@
 // artist's work gets in: no vertex position (as bytes or as text), no texture byte, no name, path or link.
 #include "TestHarness.h"
 
+#include "core/BrushRecipe.h"
 #include "core/Document.h"
 #include "core/Primitives.h"
 #include "core/ReproPack.h"
 #include "core/Texture.h"
 #include "io/Zip.h"
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <random>
@@ -252,7 +254,7 @@ TEST(repro_pack_fuzz_never_leaks) {
         const glm::vec3 shift{u(rng), u(rng), u(rng)};
         for (glm::vec3& p : doc.mesh.positions) p = p * (1.0f + float(rng() % 1000) / 333.0f) + shift;
         doc.activePartInfo().name = "Dragon Head"; // (the log below names it, as an app's log may)
-        std::vector<std::string> names = {"Dragon Head", "kira", "troll_head_v12"}; // Parts, the user, the project (as the app passes them)
+        std::vector<std::string> named; // what the artist named, said in plain words in the log below
         const int extra = int(rng() % 4);
         for (int i = 0; i < extra; ++i) {
             Mesh m = shape(int(rng()));
@@ -265,20 +267,49 @@ TEST(repro_pack_fuzz_never_leaks) {
                 for (uint8_t& b : m.texture->pixels) b = uint8_t(rng());
             }
             doc.addPart(std::move(m), "Secret Part " + std::to_string(rng() % 100000));
-            names.push_back(doc.parts.back().name);
+            named.push_back(doc.parts.back().name);
         }
         if (rng() % 2 && doc.partCount() > 1) doc.parts[1].transform[3] = glm::vec4(u(rng), u(rng), u(rng), 1.0f);
+        if (rng() % 2) named.push_back(doc.mesh.layers[size_t(doc.mesh.addLayer("Wing Scales " + std::to_string(rng() % 1000)))].name);
+        if (rng() % 2) {
+            doc.addPartFolder("Hero Props " + std::to_string(rng() % 1000));
+            named.push_back(doc.partFolders.back().name);
+        }
+        // The app adds the installed packs' names (PanelReproPack.cpp), the user's and the computer's.
+        const std::string packName = "Acme Props " + std::to_string(rng() % 1000);
+        named.push_back(packName);
+        named.push_back("Dragon Head");
+        std::vector<std::string> names = repro::documentNames(doc);
+        names.insert(names.end(), {packName, "kira", "troll_head_v12"});
         repro::Inputs in = inputsFor(doc, names);
-        for (const std::string& n : names) in.log.push_back("Selected " + n + " at /tmp/" + n + ".obj");
+        in.log.push_back("Installed (pack " + packName + ")"); // as PanelPacks.cpp logs it
+        for (const std::string& n : named) in.log.push_back("Selected " + n + " at /tmp/" + n + ".obj");
         std::vector<repro::Item> items = repro::buildItems(in);
         for (repro::Item& i : items) i.include = rng() % 4 != 0;
         std::string err;
         CHECK(repro::writePack(path, items, err));
         const std::vector<ZipEntry> pack = readEntries(path);
         std::vector<std::string> secrets = kSecrets;
-        secrets.insert(secrets.end(), names.begin(), names.end());
-        secrets.push_back("Secret Part");
+        secrets.insert(secrets.end(), named.begin(), named.end());
+        secrets.insert(secrets.end(), {"Secret Part", "Wing Scales", "Hero Props", "Acme Props"});
         CHECK(leaks(doc, pack, secrets) == 0);
     }
     std::filesystem::remove(path);
+}
+
+TEST(repro_document_names_cover_what_the_artist_named) {
+    Document doc = test::makeDoc(makeIcosphere(2));
+    doc.activePartInfo().name = "Troll Body";
+    doc.mesh.addLayer("Wrinkles Pass");
+    doc.addPartFolder("Hero Props");
+    BrushRecipe b;
+    b.name = "Acme Skin Pores";
+    b.origin.source = BrushSource::User;
+    doc.addBrush(b);
+    doc.path = "/show/troll/troll_v12.sfproj";
+    const std::vector<std::string> n = repro::documentNames(doc);
+    for (const char* want : {"Troll Body", "Wrinkles Pass", "Hero Props", "Acme Skin Pores", "troll_v12"})
+        CHECK(std::find(n.begin(), n.end(), want) != n.end());
+    for (const BrushRecipe& r : doc.brushes) // built-in brush names aren't secrets
+        if (r.origin.source == BrushSource::Builtin) CHECK(std::find(n.begin(), n.end(), r.name) == n.end());
 }

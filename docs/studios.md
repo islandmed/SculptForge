@@ -175,8 +175,10 @@ archive starts with the overlay's brush, keymap, macro and branding.
 
 ## Bug report packs
 
-**Help > Create bug report pack...** writes one `.zip` on the artist's computer for a bug report, safe to post on a
-public tracker by default. Before saving, a preview lists every file and shows its text; any of them can be left out.
+**Help > Create bug report pack...** writes one `.zip` on the artist's computer for a bug report, without the model.
+Before saving, a preview lists every file and shows its text; any of them can be left out. The text is redacted by
+rules, not understood: **read `log.txt` and `actions.txt` before posting a pack publicly**, as a name typed into free
+text that SculptForge doesn't know can remain.
 
 | File | What's in it |
 |---|---|
@@ -192,12 +194,14 @@ public tracker by default. Before saving, a preview lists every file and shows i
 - **No model:** no vertex position, normal, UV, colour or mask value goes in. The stand-in is built from the counts
   alone; Part names, positions and transforms are left out.
 - **No textures or images**, no project files, no attachments.
-- **No names or places:** file names and paths, URLs and host names, e-mail addresses, Part, project and studio
-  names, and the user and computer names are replaced wherever they appear.
+- **Names and places replaced:** file names and paths, URLs and host names, e-mail addresses and quoted text, and
+  the names of the Parts, Part folders, layers, selection sets, custom brushes, project, packs, macros and studio,
+  and the user and computer names, wherever they appear. Other words in log lines stay as they are.
 - **No upload.** The pack is written where the artist chooses; there is no send button and no telemetry.
 
-tests/test_repro_pack.cpp checks that no source vertex (as bytes or as text) and no texture byte ends up in a pack,
-including a fuzz test over random multi-Part scenes with textures, colours and moved Parts.
+tests/test_repro_pack.cpp checks that no source vertex (as bytes or as text), no texture byte and none of those
+names ends up in a pack, including a fuzz test over random multi-Part scenes with textures, colours, layers, packs
+and moved Parts.
 
 ## Roadmap items for pipelines
 

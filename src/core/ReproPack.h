@@ -1,8 +1,9 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// A bug report pack (Help > Create bug report pack..., docs/studios.md "Bug report packs"): one local .zip that is
-// safe to post publicly, so a studio can send us a bug without sending its work. Nothing here reaches the network.
+// A bug report pack (Help > Create bug report pack..., docs/studios.md "Bug report packs"): one local .zip for a bug
+// report that holds none of the artist's work, so a studio can send us a bug without sending its model. Nothing here
+// reaches the network. Text is redacted by rules, not understood: the preview asks the artist to read it first.
 //
 // What it holds, each item a file the user sees in full and can leave out before saving:
 //   system.txt      app version, OS, CPU, memory, GPU and driver
@@ -13,8 +14,9 @@
 //                   subdivision levels and layers; the scene's overall size
 //   proxy.ply       a generated stand-in with those counts: spheres, tori and sheets laid in a row inside the overall
 //                   size; none of the sculpt's positions, so none of its shape
-// and README.txt saying so. Never in it: vertex positions, textures, images, Part and file names, paths, URLs or
-// e-mail addresses (text goes through redactText, values through the item builders, which only copy numbers).
+// and README.txt saying so. Never in it: vertex positions, textures or images. Paths, file names, URLs, e-mail
+// addresses, quoted text and every name in Inputs::names are replaced (redactText); a name typed into free text that
+// isn't known can remain, which is why the log and actions are shown before saving.
 #pragma once
 
 #include "core/Commands.h"
@@ -91,6 +93,9 @@ struct Inputs {
     std::vector<std::string> names;  // Part names, the project's name, the user and computer names: <name> wherever they appear
     const Document* doc = nullptr;
 };
+// Every name the artist gave something in DOC: Parts, Part folders, sculpt and paint layers, selection sets, brushes
+// that aren't built in, files kept in the project, the project's own name. (The app adds packs, macros and accounts.)
+std::vector<std::string> documentNames(const Document& doc);
 std::vector<Item> buildItems(const Inputs& in);
 // The zip: README.txt plus the included items. False with ERROR when it can't be written.
 bool writePack(const std::string& path, const std::vector<Item>& items, std::string& error);
