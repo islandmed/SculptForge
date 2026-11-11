@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
+#include "app/BooleanPreview.h"
 #include "app/NativeDialog.h"
 #include "core/FocusDetail.h"
 #include "app/Pickers.h"
@@ -3244,8 +3245,10 @@ void App::syncScene() {
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
     lastDisplayed_ = &shown;
+    updateBooleanPreview(); // (before the upload clears this frame's dirty marks: BooleanPreview.cpp)
+    Mesh* booleanResult = booleanPreviewMesh();
     std::vector<SceneMesh> scene;
-    scene.reserve(doc_.parts.size());
+    scene.reserve(doc_.parts.size() + 1);
     for (int i = 0; i < doc_.partCount(); ++i) {
         Part& s = doc_.parts[size_t(i)];
         const bool active = i == doc_.activePart;
@@ -3258,6 +3261,14 @@ void App::syncScene() {
         scene.back().model = s.transform;
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
+        if (booleanResult && booleanPreviewDrawn(s.id)) scene.back().visible = false; // (the result stands in for it)
+    }
+    if (booleanResult) {
+        // Drawn as the active Part is when that is one of its sources (not dimmed), else like the others.
+        const bool activeSource = booleanPreviewDrawn(doc_.activePartInfo().id);
+        scene.push_back({BooleanPreviewState::kKey, booleanResult, activeSource, true, nullptr,
+                         activeSource && renderSettings_.wireframe, renderSettings_.flatShading});
+        scene.back().pbr = renderSettings_.pbr();
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);

@@ -163,12 +163,17 @@ bool Document::applyPartStep(PartStep& step) {
         modified = true;
         return true;
     }
+    auto showHid = [&](bool show) {
+        for (uint32_t id : step.hid)
+            if (const int k = partIndex(id); k >= 0) parts[size_t(k)].visible = show;
+    };
     if (step.stashed) { // redo: put it back where it was
         const int at = std::clamp(step.at, 0, partCount());
         parts.insert(parts.begin() + at, std::move(*step.stashed));
         step.stashed.reset();
         if (at <= activePart) ++activePart;
         partMesh(at).topologyDirty = true;
+        showHid(false);
         modified = true;
         return true;
     }
@@ -178,9 +183,11 @@ bool Document::applyPartStep(PartStep& step) {
         int other = -1;
         for (int k = 0; k < partCount() && other < 0; ++k)
             if (k != i && checkedOut(k)) other = k;
-        if (other < 0) return false;
+        if (other < 0 && step.returnTo) other = partIndex(step.returnTo);
+        if (other < 0 || other == i) return false;
         selectPart(other);
     }
+    showHid(true);
     step.at = i;
     step.stashed = std::make_unique<Part>(std::move(parts[size_t(i)]));
     parts.erase(parts.begin() + i);
@@ -320,6 +327,7 @@ int Document::linkedDuplicate(int i, const glm::vec3& offset) {
                            glm::translate(glm::mat4(1.0f), offset) * parts[size_t(i)].transform, i + 1);
     parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
     parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
+    parts[size_t(at)].boolean = parts[size_t(at - 1)].boolean;
     selectPart(at);
     // One step in the shared history: undo takes the copy away again (applyPartStep).
     UndoRecord r;
@@ -403,6 +411,27 @@ bool parseShading(const std::string& name, Shading& out) {
             return true;
         }
     }
+    return false;
+}
+
+const char* partBooleanName(PartBoolean b) {
+    switch (b) {
+    case PartBoolean::Add: return "add";
+    case PartBoolean::Subtract: return "subtract";
+    case PartBoolean::Intersect: return "intersect";
+    default: return "none";
+    }
+}
+
+bool parsePartBoolean(const std::string& name, PartBoolean& out) {
+    std::string lower = name;
+    for (char& c : lower) c = char(std::tolower(static_cast<unsigned char>(c)));
+    if (lower == "union") lower = "add";
+    for (PartBoolean b : {PartBoolean::None, PartBoolean::Add, PartBoolean::Subtract, PartBoolean::Intersect})
+        if (lower == partBooleanName(b)) {
+            out = b;
+            return true;
+        }
     return false;
 }
 

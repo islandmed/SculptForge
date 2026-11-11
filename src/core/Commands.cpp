@@ -32,6 +32,7 @@
 #include "core/PathStroke.h"
 #include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Units.h"
 #include "core/VertexPaint.h"
@@ -907,6 +908,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
+    registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)

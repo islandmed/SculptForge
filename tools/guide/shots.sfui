@@ -397,6 +397,23 @@ wait 0.2
 shot extract
 click "Groups##view.facegroups"
 
+# Booleans (parts.md): a cube with a sphere biting its corner and a slot through it, both set to Subtract; the view
+# shows the result live and the Parts list the Boolean marks.
+run new_cube
+run part_append type=sphere name=Bolt size=0.5
+run transform translate=-0.75,0.85,0.85
+run part_append type=cube name=Slot size=0.3
+run transform scale=0.4,4,0.4 translate=-2.11,-0.175,0.425
+run part_boolean index=0 mode=add
+run part_boolean name=Bolt mode=subtract
+run part_boolean name=Slot mode=subtract
+run part_select index=0
+camera 30 -25
+key f
+wait_value boolean_preview > 0 30
+wait 0.3
+shot booleans
+
 # Make Symmetric (geometry.md): a head sculpted on one side, then mirrored and welded.
 run new_head
 run stroke points="0.035,0.005,0.2 0.06,-0.03,0.2 0.07,-0.07,0.2" brush=Standard radius=0.012 strength=1

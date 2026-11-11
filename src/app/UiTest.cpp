@@ -114,6 +114,8 @@
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
+//                            boolean_preview (triangles of the Boolean result the view shows in place of its Parts, 0
+//                            none), boolean_parts (shown Parts with a Boolean),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
@@ -1192,6 +1194,11 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
+    if (name == "boolean_preview") {
+        const Mesh* r = app_.booleanPreviewMesh();
+        return r ? double(r->triangleCount()) : 0.0;
+    }
+    if (name == "boolean_parts") return double(booleanPartIndices(doc).size());
     if (name == "open_edges") {
         std::map<std::pair<uint32_t, uint32_t>, int> edges;
         for (const auto& t : m.triangles)

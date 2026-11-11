@@ -519,6 +519,11 @@ void App::initActions() {
         ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
+    add("part.make_boolean_mesh", "Make Boolean Mesh", "Tool > Parts", nullptr,
+        [this] { runCommand("make_boolean_mesh", booleanArgs()); }, nullptr, "make_boolean_mesh", nullptr,
+        [this] { return booleanPartIndices(doc_).size() >= 2; },
+        "Combine the shown Parts with a Boolean (Add, Subtract or Intersect, set in the Parts list) into a new Part, in "
+        "list order. They stay as they are, hidden. One undo step.");
     add("part.split_hidden", "Split Hidden", "Tool > Parts", nullptr, [this] { runCommand("part_split_hidden"); }, nullptr,
         "part_split_hidden", nullptr, [this] { return doc_.mesh.hasHidden(); },
         "Move the hidden triangles of the active Part into a new Part just below it, shown. One undo step.");

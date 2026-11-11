@@ -34,6 +34,7 @@
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Plugin.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Document.h"
 #include "core/Deform.h"
@@ -1988,6 +1989,17 @@ private:
     PartThumbnailSchedule partThumbSchedule_;
     std::unordered_map<uint32_t, unsigned> partThumbs_;
     bool partPanelShown_ = false; // drawn this frame
+    // The scene's Boolean (core/PartBoolean.h), shown in the view in place of its Parts while two or more take part
+    // (app/BooleanPreview.cpp): worked out on another thread whenever they change, live while they're sculpted or
+    // moved when that is quick, else on release.
+    std::unique_ptr<struct BooleanPreviewState> boolPreview_;
+    bool booleanPreview_ = true;         // Parts > Boolean > Preview
+    BooleanSceneOptions booleanOptions_; // Make Boolean Mesh's options
+    void updateBooleanPreview();         // syncScene, before the upload: takes a finished run, starts the next
+    bool booleanPreviewDrawn(uint32_t partId) const; // Part `partId` is drawn as part of the shown result
+    Mesh* booleanPreviewMesh();          // the result to draw (null: none, or the Parts are shown as they are)
+    void drawBooleanSection();           // the Parts panel's Boolean row (PanelParts.cpp)
+    Args booleanArgs() const;            // booleanOptions_ as make_boolean_mesh's arguments
     void updatePartThumbnails();  // after syncScene, GL current
     void clearPartThumbnails();
     bool focusRename_ = false;
