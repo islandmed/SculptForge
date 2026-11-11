@@ -2565,6 +2565,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
+        stampAlpha_ = alphaPool_ && !alphaPool_->empty() ? alphaPool_->pick(stampSeed_) : nullptr; // (one alpha per stamp)
         stampPressure_.reset();
         stampPlaced_ = false;
         slideTurn_.reset();
@@ -2850,10 +2851,18 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     // Spray's own turn. Custom and Community brushes get them too: dabRecipe turns their alpha by alphaUp.
     if (!haveLastDab_) {
         alphaRake_.reset(pathPoint);
-        alphaSeed_ = 0x9e3779b9u;
+        alphaSeed_ = 0x9e3779b9u + 0x632be5abu * ++alphaStrokeSerial_;
     }
+    if (st.pool && !st.pool->empty()) p.alpha = st.pool->pick(alphaSeed_).get(); // (the stroke's pool keeps it alive)
     alphaRake_.update(pathPoint);
     dabAngle_ += alphaDabAngle(st.alphaOptions, alphaRake_, alphaSeed_);
+    if (const AlphaDabJitter j = alphaDabJitter(st.alphaOptions, alphaSeed_); j.scale != 1.0f || j.offset != glm::vec2(0.0f)) {
+        p.radius *= j.scale;
+        // Moved on the screen's plane, kept on the surface (along the tangent plane at the hit).
+        glm::vec3 move = (cam.orientation() * glm::vec3(j.offset.x, j.offset.y, 0.0f)) * p.radius;
+        if (glm::length(p.pickNormal) > 0.0f) move -= p.pickNormal * glm::dot(move, p.pickNormal);
+        p.center += move;
+    }
     lastDabAngle_ = dabAngle_;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = st.vdm;

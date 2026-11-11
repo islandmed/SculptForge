@@ -1920,6 +1920,18 @@ constexpr Entry kSimplifiedChinese[] = {
      "印章会跟着你转动：使用 Drag Stamp 时，其顶端指向你拖动的方向；在点状笔触中则沿笔触转动。关闭时，Drag Stamp 只"
      "设置大小，印章保持“角度”的旋转。Slide Stamp 滑动时永不转动。"},
     {"Angle jitter", "角度抖动"},
+    {"Add to alpha pool", "加入透明度图库"},
+    {"Alpha pool", "透明度图库"},
+    {"Alpha pool: empty", "透明度图库：空"},
+    {"Each dab and each Drag Stamp takes one of these alphas at random, ahead of the brush's own alpha. Clear puts the brush's own alpha back. Kept until you quit.", "每一笔和每个拖拽印章都会从这些透明度图中随机取一张，而不是用笔刷自己的透明度图。“清除”会恢复笔刷自己的透明度图。保留到退出程序为止。"},
+    {"Make each dab bigger or smaller by a random amount, up to this many percent either way: wood grain, pores and chips that are never the same size twice.", "让每一笔随机变大或变小，最多到此百分比：纹理、毛孔和碎片不会两次大小相同。"},
+    {"Move each dab off the cursor by a random amount, up to this many percent of the brush radius, so a line of stamps does not sit in a tidy row.", "让每一笔随机偏离光标，最多到笔刷半径的此百分比，使一排印章不会整齐排列。"},
+    {"Position jitter", "位置抖动"},
+    {"Position jitter %.0f%%", "位置抖动 %.0f%%"},
+    {"Right-click an alpha in the Library or the alpha list and pick Add to alpha pool, or right-click a folder of images and pick Use folder as alpha pool. Then every dab takes one of them at random, so scanned planks or pores never repeat. Tile does not apply to pool alphas.", "在资源库或透明度图列表中的透明度图上右键并选择“加入透明度图库”，或在图片文件夹上右键并选择“将文件夹作为透明度图库”。之后每一笔都会随机取其中一张，因此扫描的板材或毛孔不会重复。重复设定不适用于图库中的透明度图。"},
+    {"Scale jitter", "缩放抖动"},
+    {"Scale jitter %.0f%%", "缩放抖动 %.0f%%"},
+    {"Use folder as alpha pool", "将文件夹作为透明度图库"},
     {"Turn each dab by a random angle, up to this many degrees either way: breaks up repeats in skin, rock and noise "
      "alphas.",
      "将每个笔触随机旋转，向两侧最多此角度：打破皮肤、岩石与噪波 Alpha 的重复感。"},

@@ -536,6 +536,8 @@ Under the preview in **Sculpt > Alpha**:
 | **Follow stroke direction** | The alpha turns with the stroke, its top pointing the way you draw: scales, stitches and hair line up along the stroke. Small wobbles are smoothed out, as with Blender's Rake: the direction is taken again each time the cursor has gone 20 pixels. |
 | **Angle** | Turns the alpha by a fixed angle (-180 to 180 degrees, counter-clockwise), on its own or on top of the stroke's direction. |
 | **Angle jitter** | Turns each dab by a random angle, up to this many degrees either way, to break up repeats. |
+| **Scale jitter** | Makes each dab bigger or smaller by a random amount, up to this many percent either way (0 to 90). |
+| **Position jitter** | Moves each dab off the cursor by a random amount, up to this many percent of the brush radius (0 to 100), along the surface. |
 | **Tile across** / **Tile down** | Repeats the alpha 1 to 8 times across and down inside the brush; the preview shows the result. |
 
 They work with every brush, custom and Community brushes included, and each brush keeps its own (see
@@ -543,7 +545,29 @@ They work with every brush, custom and Community brushes included, and each brus
 also writes Follow stroke direction, Angle and Angle jitter into its brush file, so a brush you share (a brush code,
 a .sfpack) turns its alpha the same way for everyone. Vector displacement stamps have the same options: see
 [Stamp rotation](#stamp-rotation). From a script:
-`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
+`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 scale_jitter=20 position_jitter=30 tile_x=2 tile_y=2`.
+Scale and Position jitter are for the dots strokes; a Drag Stamp keeps the size and place you give it.
+
+### Alpha pool
+
+An **alpha pool** makes each dab draw with a different alpha, picked at random from a set: planks, pores or chips
+that never repeat. Together with Angle, Scale and Position jitter, a long stroke looks like many separate stamps.
+
+1. Put your images in a sub-folder of the Library's `Alphas` folder (for example `Alphas/Planks`); any PNG, JPG, BMP or
+   TGA works, and the **Alpha** tab shows the sub-folder as its own tile.
+2. In **Library > Alpha**, right-click the folder and choose **Use folder as alpha pool** (up to 32 images, taken
+   A-Z). Or right-click single alphas, in the Library or the alpha list, and choose **Add to alpha pool**.
+3. **Sculpt > Alpha** shows *Alpha pool: N* with a **Clear** button. Stroke as usual; a **Drag Stamp** takes one alpha
+   per stamp.
+
+A stroke repeats the same way when it is played back, and each new stroke picks a different order. The pool is kept
+until you quit and is not part of a brush or a project; Tile does not apply to pool alphas. Images are used at up to
+512 px. From a script: `brush_alpha_pool folder=...`, `brush_alpha_pool name=...`, `brush_alpha_pool path=...`,
+`brush_alpha_pool clear=true`.
+
+**Procedural wood grains.** Three alphas made in code come with the app: **Procedural Wood Straight**, **Procedural
+Wood Cathedral** and **Procedural Wood Weathered**. They are not scans and say so; they stand in until you have real
+scans of your own planks (scan or photograph boards you own, or use images you have the licence to use).
 
 ### Stencil
 

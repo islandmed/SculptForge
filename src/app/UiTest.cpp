@@ -232,7 +232,8 @@
 //                            phone_captures (captures received), phone_face_frames, phone_face_fps, phone_recording,
 //                            phone_take_frames, phone_ar_version (AR models published), phone_ar_busy
 //                            brush_sort / alpha_sort / material_sort / library_sort (0 A-Z, 1 Recent, 2 Pack),
-//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image)
+//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image),
+//                            alpha_pool_size, alpha_scale_jitter, alpha_position_jitter (the alpha pool and jitter, Alpha palette)
 //   (mesh values are the active Part's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
@@ -844,6 +845,9 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
     if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
+    if (name == "alpha_pool_size") return app_.alphaPool_ ? double(app_.alphaPool_->size()) : 0.0;
+    if (name == "alpha_scale_jitter") return double(app_.alphaOptions_.scaleJitter);
+    if (name == "alpha_position_jitter") return double(app_.alphaOptions_.positionJitter);
     if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab
         const float d = std::remainder(glm::degrees(app_.lastDabAngle_), 360.0f);
         return std::round(d);

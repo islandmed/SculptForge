@@ -436,6 +436,40 @@ const Generated kGenerated[] = {
              return std::clamp(seam * (level + grain) - 0.3f * nail * seam, 0.0f, 1.0f) * squareEdge(u, v);
          });
      }},
+    // Procedural stand-ins for scanned boards (the alpha pool, core/AlphaOptions.h, takes real scans from a folder).
+    {"Procedural Wood Straight", "Made in code, not a scan: fine straight grain lines with pores, for planed boards.",
+     [] {
+         return generate("Procedural Wood Straight", [](float u, float v) {
+             const float warp = (fbm(u * 1.2f + 3.0f, v * 0.35f, 141, 3) - 0.5f) * 0.35f;
+             const float ring = 0.5f + 0.5f * std::sin((u * 11.0f + warp) * kPi);
+             const float late = std::pow(ring, 3.0f);                       // thin hard late-wood lines
+             const float pores = fbm(u * 14.0f, v * 1.6f + 7.0f, 143, 2);   // long, thin pores along the grain
+             const float fine = std::pow(std::max(pores - 0.48f, 0.0f) * 3.0f, 1.5f);
+             return std::clamp(0.25f + 0.55f * late - 0.45f * fine, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Procedural Wood Cathedral", "Made in code, not a scan: nested pointed arches of flat-sawn grain, for boards and veneers.",
+     [] {
+         return generate("Procedural Wood Cathedral", [](float u, float v) {
+             const float wob = (fbm(u * 2.0f + 5.0f, v * 1.0f, 145, 3) - 0.5f) * 0.25f;
+             const float d = std::abs(u) * 1.6f + (1.0f - (v * 0.5f + 0.5f)) * 0.55f * (1.0f - std::abs(u)) + wob; // arches opening downward
+             const float rings = 0.5f + 0.5f * std::cos(d * 9.0f * kPi * 0.5f);
+             const float late = std::pow(rings, 2.2f);
+             const float fibre = fbm(u * 18.0f, v * 2.0f + 11.0f, 147, 2);
+             return std::clamp(0.2f + 0.65f * late + 0.15f * fibre, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Procedural Wood Weathered", "Made in code, not a scan: sun-bleached board with raised grain, worn pits and a few checks.",
+     [] {
+         return generate("Procedural Wood Weathered", [](float u, float v) {
+             const float warp = (fbm(u * 1.4f + 2.0f, v * 0.4f, 149, 3) - 0.5f) * 0.6f;
+             const float line = std::pow(1.0f - std::abs(std::sin((u * 7.0f + warp) * kPi)), 3.0f);
+             const float wear = fbm(u * 4.0f, v * 2.5f + 3.0f, 151, 3);
+             const float pit = smooth01((fbm(u * 22.0f, v * 22.0f, 153, 2) - 0.62f) / 0.12f);
+             const float check = (1.0f - smooth01(std::abs(u - 0.35f - 0.1f * std::sin(v * 5.0f)) / 0.015f)) * smooth01((0.7f - std::abs(v)) / 0.2f);
+             return std::clamp(line * (0.4f + 0.8f * wear) + 0.15f * wear - 0.35f * pit - 0.5f * check, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
 };
 
 } // namespace
