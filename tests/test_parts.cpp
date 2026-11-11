@@ -13,6 +13,9 @@
 #include "core/Project.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
+#include "render/Camera.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <cmath>
 #include <filesystem>
@@ -400,4 +403,55 @@ TEST(part_split_mask_threshold) {
     const auto in = trianglesIn(m, TriangleSet::Masked, &n);
     CHECK(n == 1 && in[0] == 0 && in[1] == 1);
     CHECK(trianglesIn(m, TriangleSet::Unmasked)[0] == 1);
+}
+
+// Alt+click on a Part (Discord, macOS: it often missed until the user zoomed in close): a thin Part a few points off
+// the pointer still counts, near or far, and a click that wobbles a few points is still a click.
+TEST(part_pick_near_thin_part) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 4.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    doc.selectPart(0); // the sphere is the Part being sculpted; the cube becomes a thin wire (a Part's mesh, not a
+                       // scaled Part transform: those are similarities)
+    const float W = 800.0f, H = 800.0f;
+    Camera cam;
+    // A wire 2 points wide on screen at the given camera distance (a Part about as thin as a visible one gets).
+    auto placeWire = [&](float z) {
+        const float pxPerUnit = H / (2.0f * std::max(cam.distance - 1.6f, 0.5f) * std::tan(cam.fovY * 0.5f));
+        const float half = 1.0f / pxPerUnit;
+        doc.partMesh(1) = placedMesh(makeCube(2, 2.0f), glm::scale(glm::mat4(1.0f), glm::vec3(half, 0.5f, half)));
+        doc.parts[1].data->bvhDirty = true;
+        doc.parts[1].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.3f, 0.0f, z));
+        doc.syncBvh();
+    };
+
+    for (float distance : {4.0f, 12.0f}) {
+        cam.distance = distance;
+        cam.aspect = W / H;
+        placeWire(1.6f);
+        CHECK(doc.parts[1].moved());
+        const PartRayFn rayAt = [&](float x, float y, glm::vec3& o, glm::vec3& d) { cam.screenRay(x, y, W, H, o, d); };
+        const glm::vec4 clip = cam.projection() * cam.view() * glm::vec4(0.3f, 0.0f, 1.6f, 1.0f);
+        const float px = (clip.x / clip.w * 0.5f + 0.5f) * W, py = (0.5f - clip.y / clip.w * 0.5f) * H;
+        const int sphere = pickPartAt(doc, rayAt, px + 40.0f, py, kPartPickTolerance, 0);
+        CHECK(sphere == 0); // well off the wire: the sphere under the pointer
+        CHECK(pickPartAt(doc, rayAt, px, py, 0.0f, 0) == 1); // dead on the wire: the exact pick finds it
+        // 4 points off the wire: the exact pick sees the sphere (the active Part), the tolerant one the wire.
+        RayHit hit;
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, 0.0f, 0) == 0);
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, kPartPickTolerance, 0, &hit) == 1);
+        CHECK(hit.position.z > 1.5f);
+        CHECK(pickPartAt(doc, rayAt, px - 5.0f, py + 30.0f, kPartPickTolerance, 0) == 1);
+        // Behind the sphere's edge a Part is not picked through it: hide-and-seek stays honest.
+        placeWire(-2.5f);
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, kPartPickTolerance, 0) == 0);
+        placeWire(1.6f);
+    }
+
+    // The press-to-release wobble that is still a click, and the drag that is not.
+    CHECK(!partClickIsDrag(3.0f, 3.0f)); // 4.2 points: a trackpad click
+    CHECK(!partClickIsDrag(5.0f, 0.0f));
+    CHECK(partClickIsDrag(6.0f, 0.0f));
+    CHECK(partClickIsDrag(4.5f, 4.5f));
 }

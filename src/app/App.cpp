@@ -2018,7 +2018,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool penNear = penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.partCount() > 1) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             if (target >= 0 && target != doc_.activePart) {
                 runCommand("part_select", {{"index", double(target)}});
                 partSelected("triple-click");
@@ -2034,7 +2034,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool frameClick = (keys & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
         if (!blenderStyle() && (keys & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
             (doc_.partCount() > 1 || frameClick)) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             partClickFrame_ = frameClick;
             if (target >= 0 && (target != doc_.activePart || frameClick)) {
                 drag_ = Drag::PartClick;

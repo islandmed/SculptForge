@@ -536,7 +536,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     const GizmoHandle h = gizmoHandleAt(x, y);
     if (h == H::None) {
         RayHit hit;
-        const int st = pickPart(x, y, &hit);
+        const int st = alt ? pickPartNear(x, y, &hit) : pickPart(x, y, &hit); // (Alt+click picks as the Part click does)
         if (st >= 0 && gizmo_.snapNext) {
             snapGizmoPivot(hit, st);
             return true;
