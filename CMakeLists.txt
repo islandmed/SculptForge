@@ -1120,6 +1120,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # #173's levels prompt before a remesh or decimate (tests/ui/levels_confirm.sfui).
     sculptforge_ui_test(levels_confirm_1440 levels_confirm --size 1440x900)
     sculptforge_ui_test(levels_confirm_2880 levels_confirm --size 2880x1800)
+    # The same prompt before Mirror, Make Symmetric, Delete Masked, Split and Merge by Distance, and its Preferences switch.
+    sculptforge_ui_test(levels_confirm_ops_1440 levels_confirm_ops --size 1440x900)
+    sculptforge_ui_test(levels_confirm_ops_2880 levels_confirm_ops --size 2880x1800)
+    sculptforge_ui_test(levels_confirm_prefs_1440 levels_confirm_prefs --size 1440x900)
+    sculptforge_ui_test(levels_confirm_prefs_2880 levels_confirm_prefs --size 2880x1800)
     # The Tool sub-palettes named and ordered by task (tests/ui/tool_palettes.sfui; narrow/ at 1024).
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)
