@@ -239,6 +239,25 @@ TEST(micro_smooth_flattens_noise) {
     CHECK(watertight(doc.mesh));
 }
 
+TEST(micro_smooth_peaks_lowers_the_high_points_only) {
+    Document doc = microDoc(3);
+    microNoise(doc.mesh, 0.01f, 30.0f);
+    const auto before = doc.mesh.micro->disp;
+    const auto [lo0, hi0] = std::minmax_element(before.begin(), before.end());
+    const double min0 = *lo0, max0 = *hi0;
+    Symmetry sym;
+    doc.sculptor.beginStroke(doc.mesh, "SmoothPeaks");
+    for (int i = 0; i < 8; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::SmoothPeaks, dabAt(glm::vec3(0, 0, 1), 0.4f, 1.0f), sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    const auto& after = doc.mesh.micro->disp;
+    const auto [lo1, hi1] = std::minmax_element(after.begin(), after.end());
+    CHECK(double(*hi1) < max0);       // the tallest peak came down
+    CHECK(double(*lo1) >= min0);      // no hollow was cut deeper
+    for (size_t i = 0; i < after.size(); ++i)
+        if (double(after[i]) > double(before[i])) { CHECK(false); break; } // nothing rose
+    CHECK(watertight(doc.mesh));
+}
+
 TEST(micro_mask_brush_protects) {
     Document doc = microDoc(3);
     Symmetry sym;

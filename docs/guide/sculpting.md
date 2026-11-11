@@ -51,6 +51,7 @@ are on the bottom shelf by default and in the brush picker.
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
 | **Cloth** | | Moves the surface like fabric: drag it and it folds where it bunches up (see [Cloth brush](#cloth-brush)). | Push mode: pulls out |
+| **Smooth Peaks** | | Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone. <kbd>Shift</kbd> still gives the plain Smooth. | No change |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Vertex Paint and materials](vertex-paint.md). | Paints back to white |
 
 Notes on particular brushes:

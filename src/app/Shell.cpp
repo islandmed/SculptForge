@@ -168,6 +168,15 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         curve(w * 0.9f, hi, w * 0.5f);
         break;
     case BrushType::Smooth: dl->AddCircleFilled(ImVec2(c.x - r * 0.2f, c.y - r * 0.2f), r * 0.35f, IM_COL32(255, 240, 230, 40), 24); break;
+    case BrushType::SmoothPeaks: { // the waves with their crests cut off flat: the hollows stay
+        ImVec2 pts[12];
+        for (int i = 0; i < 12; ++i) {
+            const float u = float(i) / 11.0f;
+            pts[i] = ImVec2(c.x - r * 0.62f + r * 1.24f * u, c.y + std::max(std::sin(u * 6.28f) * r * 0.16f, -r * 0.06f));
+        }
+        dl->AddPolyline(pts, 12, hi, 0, w);
+        break;
+    }
     case BrushType::Move:
     case BrushType::SnakeHook:
     case BrushType::Nudge: {
@@ -448,6 +457,7 @@ void App::registerShellActions() {
         "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
         "Target); Alt pushes away. Works at any subdivision level.",
         "Moves the surface like fabric: drag it and it folds where it bunches up. Mode and fabric in Brush > Cloth.",
+        "Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {

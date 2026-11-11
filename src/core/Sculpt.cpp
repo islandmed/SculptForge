@@ -44,6 +44,7 @@ const char* brushName(BrushType type) {
     case BrushType::DetailClone: return "DetailClone";
     case BrushType::Morph: return "Morph";
     case BrushType::Cloth: return "Cloth";
+    case BrushType::SmoothPeaks: return "SmoothPeaks";
     default: return "?";
     }
 }
@@ -51,6 +52,7 @@ const char* brushName(BrushType type) {
 const char* brushLabel(BrushType type) {
     switch (type) {
     case BrushType::SharpCrease: return "Sharp Crease";
+    case BrushType::SmoothPeaks: return "Smooth Peaks";
     case BrushType::ClayBlock: return "Clay Block";
     case BrushType::SnakeHook: return "Tendril";
     case BrushType::KelvinSnake: return "Elastic Tendril";
@@ -1016,7 +1018,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
     adaptiveDab_ = (adaptiveDabs || analyticNormals) && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
-                   type != BrushType::Smooth && type != BrushType::Layer && type != BrushType::Morph &&
+                   type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Layer && type != BrushType::Morph &&
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
                    type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
@@ -1106,8 +1108,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         case BrushType::Inflate:
             d = nrm[v] * (sign * s * r * 0.05f * f);
             break;
-        case BrushType::Smooth: {
-            if (p.groupBorders) { // along the border, on the tangent plane; junctions and inner vertices stay
+        case BrushType::Smooth: case BrushType::SmoothPeaks: {
+            if (p.groupBorders && type == BrushType::Smooth) { // along the border, on the tangent plane; junctions and inner vertices stay
                 uint32_t nb[3];
                 if (groupBorderNeighbours(mesh, v, nb) != 2) break;
                 const glm::vec3 mid = 0.5f * (pos[nb[0]] + pos[nb[1]]);
@@ -1132,6 +1134,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             for (uint32_t n : ring) avg += pos[n];
             avg /= static_cast<float>(ring.size());
             d = (avg - x) * std::min(1.0f, s * f);
+            if (type == BrushType::SmoothPeaks) { // only down, along the normal: what sits above the average plane
+                const float up = glm::dot(avg - x, nrm[v]);
+                d = up < 0.0f ? nrm[v] * (up * std::min(1.0f, s * f)) : glm::vec3(0.0f);
+            }
             break;
         }
         case BrushType::ClayBlock: {
