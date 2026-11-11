@@ -10,6 +10,12 @@
 # and quads (n-gons as triangle fans), the active UV map, the active colour attribute (vertex paint),
 # the sculpt mask (.sculpt_mask) and face sets (.sculpt_face_set, SculptForge's face groups).
 #
+# Gaussian splats (Blender 5.3+: point clouds of type 3D Gaussian Splat) travel the same way as standard 3DGS PLY
+# files (splats.py): positions, scales, rotations, opacity and spherical harmonics, with the object's matrix_world
+# beside them. Blender imports splats itself but cannot export them: File > Export > Gaussian Splats (.ply) here
+# does, and a dropped .splat file (the compact web format) imports like a PLY. On older Blenders the splat parts
+# say so and do nothing.
+#
 # The preference "Classic sculpting keys in Sculpt Mode" adds the classic keys to Blender's Sculpt Mode (classic_keys.py).
 
 bl_info = {  # legacy add-on install (Blender 4.2+ reads blender_manifest.toml instead)
@@ -18,21 +24,23 @@ bl_info = {  # legacy add-on install (Blender 4.2+ reads blender_manifest.toml i
     "version": (1, 0, 0),
     "blender": (4, 2, 0),
     "location": "3D View > Sidebar > SculptForge, Object menu, File > Import / Export",
-    "description": "Send meshes to SculptForge and back, updating the objects in place",
+    "description": "Send meshes and Gaussian splats to SculptForge and back, updating the objects in place",
     "doc_url": "https://sculptforge.app/guide/blender.html",
     "category": "Import-Export",
 }
 
 import contextlib
 import os
+import tempfile
 import time
 import traceback
 
 import bpy
 import numpy as np
-from bpy.props import BoolProperty, EnumProperty, StringProperty
+from bpy_extras.io_utils import ExportHelper, ImportHelper, poll_file_object_drop
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, StringProperty
 
-from . import exchange, classic_keys
+from . import exchange, classic_keys, splats as splat_io
 
 APPLIED_KEY = "sculptforge_applied_modifiers"
 MASK = ".sculpt_mask"
@@ -250,6 +258,153 @@ def new_object(context, name, g):
 
 
 # --------------------------------------------------------------------------------------------------
+# Gaussian splats (Blender 5.3+). A splat object is a point cloud of type GAUSSIAN_SPLAT with the attributes
+# "scale" (linear), "rotation" (quaternion), "radiance:base" (the band-0 coefficient and the linear opacity as a
+# colour) and "radiance:sh_<k>" (the higher bands, one vector per coefficient).
+# --------------------------------------------------------------------------------------------------
+
+SPLAT_TYPE = "GAUSSIAN_SPLAT"
+NEEDS_53 = "Gaussian splats need Blender 5.3 or newer"
+
+
+def splats_supported():
+    try:
+        return SPLAT_TYPE in bpy.types.PointCloud.bl_rna.properties["type"].enum_items.keys()
+    except (AttributeError, KeyError):
+        return False
+
+
+def is_splat_object(obj):
+    return obj is not None and obj.type == "POINTCLOUD" and getattr(obj.data, "type", None) == SPLAT_TYPE
+
+
+def selected_splats(context):
+    found = [o for o in context.selected_objects if is_splat_object(o)]
+    if not found and is_splat_object(context.active_object):
+        found = [context.active_object]
+    return found
+
+
+def _attribute_values(pc, name, width, count):
+    """Attribute `name` of a point cloud as float32 (count, width), or None when it is missing."""
+    attr = pc.attributes.get(name)
+    if attr is None or len(attr.data) != count:
+        return None
+    prop = {"FLOAT_VECTOR": "vector", "FLOAT_COLOR": "color", "FLOAT": "value", "QUATERNION": "value"}.get(attr.data_type)
+    out = np.empty(count * width, dtype=np.float32)
+    if count:
+        try:
+            if prop is None:
+                raise TypeError(attr.data_type)
+            attr.data.foreach_get(prop, out)
+        except (AttributeError, TypeError, RuntimeError, ValueError):
+            # (a type foreach_get does not take: read element by element)
+            for i, item in enumerate(attr.data):
+                out[i * width:(i + 1) * width] = list(getattr(item, "value", None) or getattr(item, "vector", None) or item.color)
+    return out.reshape(count, width)
+
+
+def splat_arrays(pc):
+    """The splats of a point cloud as splat_io.SplatArrays (object space). Raises ValueError when it lacks
+    what a splat has."""
+    pos = pc.attributes.get("position")
+    count = len(pos.data) if pos is not None else 0
+    positions = _attribute_values(pc, "position", 3, count)
+    scales = _attribute_values(pc, "scale", 3, count)
+    rotations = _attribute_values(pc, "rotation", 4, count)
+    base = _attribute_values(pc, "radiance:base", 4, count)
+    for what, found in (("position", positions), ("scale", scales), ("rotation", rotations), ("radiance:base", base)):
+        if found is None:
+            raise ValueError("This point cloud has no '%s' attribute: it is not a Gaussian splat" % what)
+    bands = []
+    while True:
+        band = _attribute_values(pc, "radiance:sh_%d" % len(bands), 3, count)
+        if band is None:
+            break
+        bands.append(band)
+    # Whole bands only: 3, 8 or 15 coefficients beyond the first.
+    usable = max((k for k in (0, 3, 8, 15) if k <= len(bands)), default=0)
+    sh = np.empty((count, usable + 1, 3), dtype=np.float32)
+    sh[:, 0, :] = base[:, :3]
+    for k in range(usable):
+        sh[:, k + 1, :] = bands[k]
+    return splat_io.SplatArrays(positions, rotations, scales, base[:, 3], sh)
+
+
+def _matrix_rows(obj):
+    return [list(row) for row in obj.matrix_world]
+
+
+def _write_splats(objects, folder, prefix):
+    """The first splat object as a PLY file in `folder`; returns its manifest entries (a scene holds one capture)."""
+    entries = []
+    for obj in objects[:1]:
+        arrays = splat_arrays(obj.data)
+        if len(arrays) == 0:
+            continue
+        file = "%ssplats%s" % (prefix, ".ply")
+        splat_io.write_ply(os.path.join(folder, file), arrays)
+        entries.append({"name": obj.name, "file": file, "matrix_world": _matrix_rows(obj)})
+    return entries
+
+
+def import_splat_ply(context, path, name, matrix=None):
+    """Blender's own PLY import of a splat file (it decodes opacity and scale itself), as the object `name`, placed
+    by `matrix` (rows). An object of that name that is a splat cloud takes the new data instead (its collections,
+    materials and modifiers stay). Returns (object, whether it replaced one). Raises ValueError when Blender does
+    not read the file as splats."""
+    if not splats_supported():
+        raise ValueError(NEEDS_53)
+    before = {o.name for o in bpy.data.objects}
+    try:
+        bpy.ops.wm.ply_import(filepath=path, forward_axis="Y", up_axis="Z")
+    except RuntimeError as e:
+        raise ValueError("Blender cannot import %s: %s" % (os.path.basename(path), e))
+    fresh = [o for o in bpy.data.objects if o.name not in before]
+    new = next((o for o in fresh if is_splat_object(o)), None)
+    if new is None:
+        for o in fresh:  # (a mesh: the file was not a splat file)
+            bpy.data.objects.remove(o)
+        raise ValueError("Blender did not read %s as Gaussian splats" % os.path.basename(path))
+    replaced = False
+    old = bpy.data.objects.get(name)
+    if old is not None and old is not new and is_splat_object(old) and old.library is None:
+        try:
+            old_data = old.data
+            old.data = new.data
+            bpy.data.objects.remove(new)
+            if old_data.users == 0:
+                bpy.data.pointclouds.remove(old_data)
+            new, replaced = old, True
+        except (AttributeError, TypeError, RuntimeError):
+            bpy.data.objects.remove(old)
+    new.name = name
+    new.data.name = name
+    if matrix is not None:
+        new.matrix_world = matrix
+    return new, replaced
+
+
+def _entry_matrix(entry):
+    rows = entry.get("matrix_world")
+    if not rows:
+        return None
+    import mathutils
+    return mathutils.Matrix(rows)
+
+
+def import_dot_splat(context, path):
+    """A .splat file (the compact web format) as a splat object: written out as a PLY, which Blender imports."""
+    arrays = splat_io.read_dot_splat(path)
+    name = os.path.splitext(os.path.basename(path))[0]
+    with tempfile.TemporaryDirectory(prefix="sculptforge_splat_") as tmp:
+        ply = os.path.join(tmp, name + ".ply")
+        splat_io.write_ply(ply, arrays)
+        obj, _ = import_splat_ply(context, ply, name)
+    return obj, len(arrays)
+
+
+# --------------------------------------------------------------------------------------------------
 # Modes (meshes are updated in Object Mode; the previous mode comes back afterwards)
 # --------------------------------------------------------------------------------------------------
 
@@ -332,8 +487,9 @@ def send(context):
     objects = [o for o in context.selected_objects if o.type == "MESH"]
     if not objects and context.active_object is not None and context.active_object.type == "MESH":
         objects = [context.active_object]
-    if not objects:
-        return "ERROR", "Select one or more mesh objects to send"
+    splat_objects = selected_splats(context)
+    if not objects and not splat_objects:
+        return "ERROR", "Select one or more mesh objects (or a Gaussian splat object) to send"
     apply = p is not None and p.modifiers == "APPLY"
     folder = exchange.outbox(root)
     first = not os.path.isdir(folder)
@@ -344,11 +500,19 @@ def send(context):
             entries = _write_objects(context, objects, folder, prefix, apply)
     except RuntimeError as e:
         return "ERROR", "Leave %s to send to SculptForge (%s)" % (context.mode.replace("_", " ").title(), e)
-    if not entries:
-        return "ERROR", "The selected meshes have no faces"
-    exchange.write_manifest(folder, entries, bpy.app.version_string)
+    try:
+        splat_entries = _write_splats(splat_objects, folder, prefix)
+    except ValueError as e:
+        return "ERROR", str(e)
+    if not entries and not splat_entries:
+        return "ERROR", "The selected meshes have no faces" if objects else "The selected splat object has no splats"
+    exchange.write_manifest(folder, entries, bpy.app.version_string, splat_entries)
     state.sent = True
     count = "%d object%s" % (len(entries), "" if len(entries) == 1 else "s")
+    if splat_entries:
+        count = ("%s and " % count if entries else "") + "the Gaussian splats \"%s\"" % splat_entries[0]["name"]
+        if len(splat_objects) > 1:
+            count += " (SculptForge holds one splat capture: the others stay here)"
     # A running SculptForge loads it within a second. It beats only once the folder exists, and one this session
     # started may still be starting: wait for its heartbeat rather than start a second one.
     starting = time.time() - state.launched < 60.0
@@ -378,6 +542,7 @@ def receive(context):
         return "ERROR", "Nothing has been sent from SculptForge yet (File > Blender > Send to Blender)"
     state.seen = int(manifest.get("revision", 0))
     entries = manifest.get("objects", [])
+    splat_entries = manifest.get("splats", [])
     meshes = []
     for entry in entries:
         try:
@@ -390,6 +555,17 @@ def receive(context):
         obj = bpy.data.objects.get(name)
         return obj if obj is not None and obj.type == "MESH" and obj.library is None else None
 
+    imported = []
+    skipped = ""
+    for entry in splat_entries[:1]:
+        try:
+            obj, replaced = import_splat_ply(context, os.path.join(folder, entry["file"]), entry.get("name") or "Splats",
+                                             _entry_matrix(entry))
+            imported.append((obj, replaced))
+        except ValueError as e:
+            if not meshes and str(e) == NEEDS_53:
+                return "ERROR", "SculptForge sent Gaussian splats. %s (this is Blender %s)" % (NEEDS_53, bpy.app.version_string)
+            skipped = "; the splats were skipped: %s" % e
     counts = {"updated": 0, "rebuilt": 0, "new": 0}
     disabled = 0
     keys = 0
@@ -423,7 +599,12 @@ def receive(context):
         parts.append("%d with new topology" % counts["rebuilt"])
     if counts["new"]:
         parts.append("%d new" % counts["new"])
-    message = "Received %d object%s from SculptForge (%s)" % (len(meshes), "" if len(meshes) == 1 else "s", ", ".join(parts))
+    if imported:
+        obj, replaced = imported[0]
+        parts.append("Gaussian splats %s" % ("updated" if replaced else "new"))
+    message = "Received %d object%s from SculptForge (%s)" % (len(meshes) + len(imported),
+                                                              "" if len(meshes) + len(imported) == 1 else "s", ", ".join(parts))
+    message += skipped
     if disabled:
         message += "; turned off %d modifier%s applied when sending" % (disabled, "" if disabled == 1 else "s")
     if keys:
@@ -470,14 +651,14 @@ def _poll_inbox():
 class SCULPTFORGE_OT_send(bpy.types.Operator):
     bl_idname = "sculptforge.send"
     bl_label = "Send to SculptForge"
-    bl_description = ("Send the selected meshes to SculptForge (starting it if needed); each becomes a Part. "
+    bl_description = ("Send the selected meshes (and a Gaussian splat object, Blender 5.3+) to SculptForge, starting it if needed; each mesh becomes a Part. "
                       "Send them back from SculptForge with File > Blender > Send to Blender")
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
         return any(o.type == "MESH" for o in context.selected_objects) or (
-            context.active_object is not None and context.active_object.type == "MESH")
+            context.active_object is not None and context.active_object.type == "MESH") or bool(selected_splats(context))
 
     def execute(self, context):
         level, state.message = send(context)
@@ -496,6 +677,101 @@ class SCULPTFORGE_OT_receive(bpy.types.Operator):
         level, state.message = receive(context)
         self.report({level}, state.message)
         return {"CANCELLED"} if level == "ERROR" else {"FINISHED"}
+
+
+class SCULPTFORGE_OT_export_splats(bpy.types.Operator, ExportHelper):
+    bl_idname = "sculptforge.export_splats"
+    bl_label = "Gaussian Splats (.ply)"
+    bl_description = ("Save the selected Gaussian splat object as a standard 3D Gaussian Splatting PLY (positions, scales, "
+                      "rotations, opacity and spherical harmonics), which SculptForge and most splat tools open. "
+                      "Blender 5.3 imports splats but does not export them")
+    bl_options = {"REGISTER"}
+
+    filename_ext = ".ply"
+    filter_glob: StringProperty(default="*.ply", options={"HIDDEN"})
+    world_space: BoolProperty(
+        name="Apply Object Transform",
+        description="Write the splats where the object puts them (move, rotate, scale). Off: as they are in the object. "
+                    "Turning splats keeps their plain colour only: view-dependent colour (spherical harmonics) "
+                    "would point the wrong way",
+        default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return bool(selected_splats(context))
+
+    def invoke(self, context, event):
+        if not splats_supported():
+            self.report({"ERROR"}, NEEDS_53)
+            return {"CANCELLED"}
+        objects = selected_splats(context)
+        if objects:
+            self.filepath = bpy.path.clean_name(objects[0].name) + ".ply"
+        return ExportHelper.invoke(self, context, event)
+
+    def execute(self, context):
+        objects = selected_splats(context)
+        if not objects:
+            self.report({"ERROR"}, "Select a Gaussian splat object")
+            return {"CANCELLED"}
+        obj = objects[0]
+        try:
+            arrays = splat_arrays(obj.data)
+            kept = True
+            if self.world_space:
+                arrays, kept = splat_io.baked(arrays, np.array(obj.matrix_world))
+            if len(arrays) == 0:
+                raise ValueError("The splat object has no splats")
+            splat_io.write_ply(self.filepath, arrays)
+        except (ValueError, OSError) as e:
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
+        note = "" if kept else " (turned: only the plain colour is kept, not the view-dependent colour)"
+        self.report({"INFO"}, "Saved %d splats to %s%s" % (len(arrays), self.filepath, note))
+        return {"FINISHED"}
+
+
+class SCULPTFORGE_OT_import_splat(bpy.types.Operator, ImportHelper):
+    bl_idname = "sculptforge.import_splat"
+    bl_label = "Gaussian Splats (.splat)"
+    bl_description = "Import a .splat file (the compact format of web splat viewers) as a Gaussian splat object (Blender 5.3+)"
+    bl_options = {"REGISTER", "UNDO"}
+
+    filename_ext = ".splat"
+    filter_glob: StringProperty(default="*.splat", options={"HIDDEN"})
+    directory: StringProperty(subtype="DIR_PATH", options={"HIDDEN", "SKIP_SAVE"})
+    files: CollectionProperty(type=bpy.types.OperatorFileListElement, options={"HIDDEN", "SKIP_SAVE"})
+
+    def invoke(self, context, event):
+        if not splats_supported():
+            self.report({"ERROR"}, NEEDS_53)
+            return {"CANCELLED"}
+        return ImportHelper.invoke(self, context, event)
+
+    def execute(self, context):
+        if not splats_supported():
+            self.report({"ERROR"}, "%s (this is Blender %s)" % (NEEDS_53, bpy.app.version_string))
+            return {"CANCELLED"}
+        paths = [os.path.join(self.directory, f.name) for f in self.files] if self.directory and self.files else [self.filepath]
+        done = 0
+        for path in paths:
+            try:
+                import_dot_splat(context, path)
+                done += 1
+            except (ValueError, OSError) as e:
+                self.report({"ERROR"}, str(e))
+        return {"FINISHED"} if done else {"CANCELLED"}
+
+
+class SCULPTFORGE_FH_splat(bpy.types.FileHandler):
+    bl_idname = "SCULPTFORGE_FH_splat"
+    bl_label = "Gaussian Splats (.splat)"
+    bl_import_operator = "sculptforge.import_splat"
+    bl_file_extensions = ".splat"
+
+    @classmethod
+    def poll_drop(cls, context):
+        return poll_file_object_drop(context)
 
 
 class SCULPTFORGE_PT_panel(bpy.types.Panel):
@@ -599,9 +875,15 @@ def _export_menu(self, context):
 
 def _import_menu(self, context):
     self.layout.operator(SCULPTFORGE_OT_receive.bl_idname, text="SculptForge (receive)")
+    self.layout.operator(SCULPTFORGE_OT_import_splat.bl_idname)
 
 
-CLASSES = (SculptForgePreferences, SCULPTFORGE_OT_send, SCULPTFORGE_OT_receive, SCULPTFORGE_PT_panel)
+def _export_splats_menu(self, context):
+    self.layout.operator(SCULPTFORGE_OT_export_splats.bl_idname)
+
+
+CLASSES = (SculptForgePreferences, SCULPTFORGE_OT_send, SCULPTFORGE_OT_receive, SCULPTFORGE_OT_export_splats,
+           SCULPTFORGE_OT_import_splat, SCULPTFORGE_FH_splat, SCULPTFORGE_PT_panel)
 
 
 def _apply_classic_keys(p=None):
@@ -625,6 +907,7 @@ def register():
     bpy.app.timers.register(_apply_classic_keys_later, first_interval=0.1)
     bpy.types.VIEW3D_MT_object.append(_object_menu)
     bpy.types.TOPBAR_MT_file_export.append(_export_menu)
+    bpy.types.TOPBAR_MT_file_export.append(_export_splats_menu)
     bpy.types.TOPBAR_MT_file_import.append(_import_menu)
     # What SculptForge sent before Blender started is not loaded by itself (Receive loads it).
     folder = exchange.inbox(exchange_root())
@@ -637,6 +920,7 @@ def unregister():
     if bpy.app.timers.is_registered(_poll_inbox):
         bpy.app.timers.unregister(_poll_inbox)
     bpy.types.TOPBAR_MT_file_import.remove(_import_menu)
+    bpy.types.TOPBAR_MT_file_export.remove(_export_splats_menu)
     bpy.types.TOPBAR_MT_file_export.remove(_export_menu)
     bpy.types.VIEW3D_MT_object.remove(_object_menu)
     classic_keys.unregister()  # (removes the classic keys)

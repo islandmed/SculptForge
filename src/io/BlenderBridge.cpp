@@ -6,6 +6,7 @@
 #include "core/Json.h"
 #include "io/BridgeProtocol.h"
 #include "io/BridgeIO.h"
+#include "io/PlyIO.h"
 
 #include <algorithm>
 #include <chrono>
@@ -145,6 +146,28 @@ glm::dmat4 blenderMatrixToSculptForge(const glm::dmat4& m) {
     return a * m * glm::transpose(a);
 }
 
+glm::mat4 splatPlacementFromBlender(const glm::dmat4& m) {
+    glm::dmat4 t = axesBlenderToSf() * m;
+    glm::dmat3 r(t);
+    const double det = glm::determinant(r);
+    const double scale = std::cbrt(std::abs(det));
+    glm::dvec3 x = glm::normalize(r[0]), y = r[1], z;
+    y = glm::normalize(y - x * glm::dot(x, y)); // Gram-Schmidt: a sheared or unevenly scaled object keeps its rotation
+    z = glm::cross(x, y);
+    glm::dmat4 out(1.0);
+    if (scale > 1e-12 && std::isfinite(scale) && std::isfinite(x.x + x.y + x.z) && std::isfinite(y.x + y.y + y.z)) {
+        out[0] = glm::dvec4(x * scale, 0.0);
+        out[1] = glm::dvec4(y * scale, 0.0);
+        out[2] = glm::dvec4(z * scale, 0.0);
+    }
+    out[3] = glm::dvec4(glm::dvec3(t[3]), 1.0);
+    return glm::mat4(out);
+}
+
+glm::dmat4 splatMatrixToBlender(const glm::mat4& placement) {
+    return glm::transpose(axesBlenderToSf()) * glm::dmat4(placement);
+}
+
 bool parseBridgeManifest(const std::string& text, BridgeManifest& out, std::string& error) {
     Json j;
     if (!Json::parse(text, j, error)) {
@@ -160,6 +183,25 @@ bool parseBridgeManifest(const std::string& text, BridgeManifest& out, std::stri
                 std::to_string(int(j["version"].asNumber())) + "); update the older one";
         return false;
     }
+    // matrix_world: rows, as Blender prints a Matrix: matrix_world[row][column].
+    auto parseMatrix = [](const Json& o, const std::string& name, bool& has, glm::dmat4& matrix, std::string& err) {
+        const Json& mw = o["matrix_world"];
+        if (!mw.isArray()) return true;
+        bool ok = mw.size() == 4;
+        for (size_t r = 0; ok && r < 4; ++r) {
+            ok = mw[r].isArray() && mw[r].size() == 4;
+            for (size_t c = 0; ok && c < 4; ++c) {
+                ok = mw[r][c].isNumber() && std::isfinite(mw[r][c].asNumber());
+                if (ok) matrix[int(c)][int(r)] = mw[r][c].asNumber();
+            }
+        }
+        if (!ok) {
+            err = "Bridge manifest has a bad matrix_world for \"" + name + "\"";
+            return false;
+        }
+        has = true;
+        return true;
+    };
     BridgeManifest m;
     m.revision = int64_t(j["revision"].asNumber(0));
     m.sender = j["sender"].asString();
@@ -177,27 +219,32 @@ bool parseBridgeManifest(const std::string& text, BridgeManifest& out, std::stri
             error = "Bridge manifest names a bad file: \"" + b.shapes + "\"";
             return false;
         }
-        const Json& mw = o["matrix_world"];
-        if (mw.isArray()) {
-            // Rows, as Blender prints a Matrix: matrix_world[row][column].
-            bool ok = mw.size() == 4;
-            for (size_t r = 0; ok && r < 4; ++r) {
-                ok = mw[r].isArray() && mw[r].size() == 4;
-                for (size_t c = 0; ok && c < 4; ++c) {
-                    ok = mw[r][c].isNumber() && std::isfinite(mw[r][c].asNumber());
-                    if (ok) b.matrix[int(c)][int(r)] = mw[r][c].asNumber();
-                }
-            }
-            if (!ok) {
-                error = "Bridge manifest has a bad matrix_world for \"" + b.name + "\"";
-                return false;
-            }
-            b.hasMatrix = true;
-        }
+        if (!parseMatrix(o, b.name, b.hasMatrix, b.matrix, error)) return false;
         m.objects.push_back(std::move(b));
+    }
+    for (const Json& o : j["splats"].items()) {
+        BridgeSplats b;
+        b.name = o["name"].asString();
+        b.file = o["file"].asString();
+        if (!plainFileName(b.file)) {
+            error = "Bridge manifest names a bad file: \"" + b.file + "\"";
+            return false;
+        }
+        if (!parseMatrix(o, b.name, b.hasMatrix, b.matrix, error)) return false;
+        m.splats.push_back(std::move(b));
     }
     out = std::move(m);
     return true;
+}
+
+static std::string matrixRows(const glm::dmat4& m) {
+    std::string s = "[";
+    for (int r = 0; r < 4; ++r) {
+        s += r ? ", [" : "[";
+        for (int c = 0; c < 4; ++c) s += (c ? ", " : "") + number(m[c][r]);
+        s += "]";
+    }
+    return s + "]";
 }
 
 std::string writeBridgeManifest(const BridgeManifest& m) {
@@ -212,18 +259,22 @@ std::string writeBridgeManifest(const BridgeManifest& m) {
         s += i ? ",\n    {" : "\n    {";
         s += "\"name\": " + jsonQuote(o.name) + ", \"file\": " + jsonQuote(o.file);
         if (!o.shapes.empty()) s += ", \"shapes\": " + jsonQuote(o.shapes);
-        if (o.hasMatrix) {
-            s += ", \"matrix_world\": [";
-            for (int r = 0; r < 4; ++r) {
-                s += r ? ", [" : "[";
-                for (int c = 0; c < 4; ++c) s += (c ? ", " : "") + number(o.matrix[c][r]);
-                s += "]";
-            }
-            s += "]";
-        }
+        if (o.hasMatrix) s += ", \"matrix_world\": " + matrixRows(o.matrix);
         s += "}";
     }
-    s += m.objects.empty() ? "]\n}\n" : "\n  ]\n}\n";
+    s += m.objects.empty() ? "]" : "\n  ]";
+    if (!m.splats.empty()) {
+        s += ",\n  \"splats\": [";
+        for (size_t i = 0; i < m.splats.size(); ++i) {
+            const BridgeSplats& o = m.splats[i];
+            s += i ? ",\n    {" : "\n    {";
+            s += "\"name\": " + jsonQuote(o.name) + ", \"file\": " + jsonQuote(o.file);
+            if (o.hasMatrix) s += ", \"matrix_world\": " + matrixRows(o.matrix);
+            s += "}";
+        }
+        s += "\n  ]";
+    }
+    s += "\n}\n";
     return s;
 }
 
@@ -321,7 +372,8 @@ bool readBridgeShapes(const std::string& path, uint32_t& vertexCount, std::vecto
 }
 
 bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, BridgeManifest* manifest,
-                    std::string& message) {
+                    std::string& message, SplatCloud* splats, bool* splatsFound) {
+    if (splatsFound) *splatsFound = false;
     if (root.empty()) {
         message = "No Blender exchange folder (no user data folder)";
         return false;
@@ -332,12 +384,29 @@ bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, Bridg
         if (message.rfind("Nothing", 0) == 0) message = "Nothing has been sent from Blender yet";
         return false;
     }
-    if (m.objects.empty()) {
-        message = "Blender sent no objects";
+    if (m.objects.empty() && (m.splats.empty() || !splats)) {
+        message = m.splats.empty() ? "Blender sent no objects" : "Blender sent only Gaussian splats";
         return false;
     }
     std::vector<MeshObject> objects;
     std::string warnings;
+    SplatCloud cloud;
+    if (splats && !m.splats.empty()) {
+        // A scene holds one capture: the first splat object (the add-on sends one).
+        const BridgeSplats& b = m.splats.front();
+        Mesh unused;
+        PlyContent content = PlyContent::Splats;
+        std::string err;
+        if (!loadPly(pathUtf8(utf8Path(inbox) / utf8Path(b.file)), unused, cloud, content, err) || content != PlyContent::Splats ||
+            cloud.empty()) {
+            message = "Cannot load the Gaussian splats \"" + b.name + "\" from Blender: " +
+                      (err.empty() ? std::string("the file holds no splats") : err);
+            return false;
+        }
+        cloud.name = b.name.empty() ? "Splats" : b.name;
+        cloud.transform = splatPlacementFromBlender(b.hasMatrix ? b.matrix : glm::dmat4(1.0));
+        if (m.splats.size() > 1) warnings += "; only the first of " + std::to_string(m.splats.size()) + " splat objects was loaded";
+    }
     for (const BridgeObject& b : m.objects) {
         MeshObject obj;
         obj.name = b.name.empty() ? "Object" : b.name;
@@ -358,19 +427,26 @@ bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, Bridg
     size_t triangles = 0;
     for (const auto& o : objects) triangles += o.mesh.triangleCount();
     message = "Received " + std::to_string(objects.size()) + (objects.size() == 1 ? " object" : " objects") +
-              " from Blender (" + std::to_string(triangles) + " triangles)" + warnings;
+              " from Blender (" + std::to_string(triangles) + " triangles";
+    if (!cloud.empty()) message += std::string(triangles ? ", " : "") + std::to_string(cloud.size()) + " Gaussian splats";
+    message += ")" + warnings;
+    if (!cloud.empty()) {
+        if (splats) *splats = std::move(cloud);
+        if (splatsFound) *splatsFound = true;
+    }
     out = std::move(objects);
     if (manifest) *manifest = std::move(m);
     return true;
 }
 
 bool blenderSend(const std::vector<MeshObjectRef>& objects, const std::string& root, std::string& message,
-                 std::vector<std::string>* sentNames, int64_t* revision) {
+                 std::vector<std::string>* sentNames, int64_t* revision, const SplatCloud* splats) {
     if (root.empty()) {
         message = "No Blender exchange folder (no user data folder)";
         return false;
     }
-    if (objects.empty()) {
+    const bool sendSplats = splats && !splats->empty();
+    if (objects.empty() && !sendSplats) {
         message = "Nothing visible to send to Blender";
         return false;
     }
@@ -427,6 +503,20 @@ bool blenderSend(const std::vector<MeshObjectRef>& objects, const std::string& r
         }
         m.objects.push_back(std::move(b));
     }
+    if (sendSplats) {
+        // The splats as they are (no baking: view-dependent colour stays right); their placement goes in the manifest.
+        BridgeSplats b;
+        b.name = splats->name.empty() ? "Splats" : splats->name;
+        b.file = prefix + "splats.ply";
+        b.hasMatrix = true;
+        b.matrix = splatMatrixToBlender(splats->transform);
+        std::string err;
+        if (!saveSplatPly(pathUtf8(outbox / utf8Path(b.file)), *splats, err, false)) {
+            message = "Cannot send the Gaussian splats to Blender: " + err;
+            return false;
+        }
+        m.splats.push_back(std::move(b));
+    }
     if (!writeAtomically(outbox / "manifest.json", writeBridgeManifest(m))) {
         message = "Cannot write " + pathUtf8(outbox / "manifest.json");
         return false;
@@ -440,6 +530,7 @@ bool blenderSend(const std::vector<MeshObjectRef>& objects, const std::string& r
         }
     }
     message = "Sent " + std::to_string(objects.size()) + (objects.size() == 1 ? " object" : " objects") +
+              (sendSplats ? " and " + std::to_string(splats->size()) + " Gaussian splats" : std::string()) +
               " to Blender: press Receive in Blender's SculptForge panel if it doesn't update by itself";
     if (sentNames) *sentNames = std::move(names);
     if (revision) *revision = m.revision;
