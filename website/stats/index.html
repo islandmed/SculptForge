@@ -48,6 +48,14 @@
     th { color: var(--muted); font-weight: 400; }
     td.n, th.n { text-align: right; }
     td.file { word-break: break-all; }
+    .wide { overflow-x: auto; }
+    .wide table { min-width: 720px; }
+    td.name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td.name small { color: var(--muted); font-size: 0.75rem; margin-left: 6px; }
+    svg.spark { display: block; width: 96px; height: 24px; }
+    svg.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+    svg.spark line { stroke: var(--grid); stroke-width: 1; }
+    code { overflow-wrap: anywhere; }
     .err { color: #ff8a80; }
     @media (max-width: 720px) {
       .tiles { grid-template-columns: repeat(2, 1fr); }
@@ -60,6 +68,18 @@
 <main>
   <h1>Downloads</h1>
   <p class="muted small" id="status">Loading…</p>
+
+  <section class="card" id="funnel" hidden>
+    <h2>Where people come from</h2>
+    <p class="muted small" id="funnel-status"></p>
+    <div class="tiles" id="funnel-tiles"></div>
+    <div class="wide"><table id="funnel-table"></table></div>
+    <p class="muted small">Members are paid memberships that joined from that link, counted when they sign up; MRR is each
+      one's monthly price (yearly divided by 12). Conversion = members / visits and members / download clicks, last 30
+      days. Cost per member needs ad spend. Rows are the <code>utm_campaign</code> of the link
+      (creators: <code>?utm_source=name&amp;utm_medium=referral&amp;utm_campaign=slug</code>) or a referrer without a tag.
+      Counts only, no cookies, no personal data.</p>
+  </section>
 
   <div class="tiles" id="tiles"></div>
 
@@ -241,6 +261,67 @@ async function load() {
 }
 load();
 setInterval(load, 10 * 60 * 1000);
+
+// ---- Where people come from (funnel.json: ~/Work/.sf/stats/funnel.py, hourly; counts only) ----
+const usd = (n) => n == null ? "–" : "$" + (Math.round(n * 100) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 });
+const pct = (n) => n == null ? "–" : (n * 100).toFixed(n < 0.1 ? 1 : 0) + "%";
+const pair = (o) => o ? `${fmt(o.d7)} / ${fmt(o.d30)}` : "–";
+function spark(values) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "spark"); svg.setAttribute("viewBox", "0 0 96 24"); svg.setAttribute("aria-hidden", "true");
+  const max = Math.max(1, ...values), step = values.length > 1 ? 96 / (values.length - 1) : 0;
+  const base = document.createElementNS(svg.namespaceURI, "line");
+  for (const [k, v] of Object.entries({ x1: 0, x2: 96, y1: 23.5, y2: 23.5 })) base.setAttribute(k, v);
+  const line = document.createElementNS(svg.namespaceURI, "polyline");
+  line.setAttribute("points", values.map((v, i) => `${(i * step).toFixed(1)},${(22 - v / max * 20).toFixed(1)}`).join(" "));
+  svg.append(base, line);
+  return svg;
+}
+function renderFunnel(f) {
+  const sec = $("funnel"); sec.hidden = false;
+  const rowsAll = f.rows || [], t = f.totals, gc = f.goatcounter;
+  const paid = rowsAll.filter((r) => r.spend30 && r.members.d30);
+  const spend = paid.reduce((s, r) => s + r.spend30, 0), pm = paid.reduce((s, r) => s + r.members.d30, 0);
+  const vis = rowsAll.reduce((s, r) => s + (r.visits ? r.visits.d30 : 0), 0);
+  const tiles = [["New members", fmt(t.members.d30), `last 30 days · ${fmt(t.members.d7)} in the last 7`],
+                 ["New MRR", usd(t.mrr.d30), `monthly price, 30 days · ${usd(t.mrr.d7)} in the last 7`],
+                 ["Visit to member", gc && vis ? pct(t.members.d30 / vis) : "–", gc ? "members / visits, 30 days" : "needs the visit counts"],
+                 ["Cost per member", pm ? usd(spend / pm) : "–", pm ? "paid sources, 30 days" : "no paid source has a member yet"]];
+  $("funnel-tiles").replaceChildren(...tiles.map(([label, value, sub]) => {
+    const d = document.createElement("div"); d.className = "tile";
+    d.innerHTML = `<div class="label"></div><div class="value"></div><div class="sub"></div>`;
+    d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = sub; return d;
+  }));
+  const head = ["Source", "Members 7 / 30 d", "MRR 30 d", "Visit → member", "Download → member", "Visits 30 d", "Downloads 30 d",
+                "Checkouts 30 d", "Spend 30 d", "Per member", "30 days"];
+  const tbl = $("funnel-table"); tbl.replaceChildren();
+  const tr = (cells, tag) => { const r = document.createElement("tr");
+    cells.forEach((c, i) => { const td = document.createElement(tag); if (i) td.className = "n";
+      if (c instanceof Node) td.append(c); else td.textContent = c; r.append(td); }); return r; };
+  tbl.append(tr(head, "th"));
+  if (!rowsAll.length) tbl.append(tr(["Nothing yet", ...Array(head.length - 1).fill("")], "td"));
+  rowsAll.slice(0, 25).forEach((r) => {
+    const name = document.createElement("span"); name.textContent = r.name;
+    if (r.kind === "referrer") { const k = document.createElement("small"); k.textContent = "referrer"; name.append(k); }
+    const row = tr([name, pair(r.members), r.mrr.d30 ? usd(r.mrr.d30) : "–", pct(r.conv_visits), pct(r.conv_downloads),
+                    r.visits ? fmt(r.visits.d30) : "–", r.downloads ? fmt(r.downloads.d30) : "–",
+                    r.checkouts ? fmt(r.checkouts.d30) : "–", usd(r.spend30), r.cost_per ? usd(r.cost_per.member) : "–", spark(r.spark)], "td");
+    row.firstChild.className = "name"; row.firstChild.title = r.name;
+    const last = row.lastChild; last.firstChild.setAttribute("aria-label", `${r.name}: ${r.spark_of} per day, last 30 days`);
+    tbl.append(row);
+  });
+  const ago = Math.round((Date.now() - Date.parse(f.updated)) / 60000);
+  $("funnel-status").textContent = (gc ? "Members, visits, download and checkout clicks" : "Members and spend only: visit counts not connected yet")
+    + ` · sorted by members, then MRR · updated ${ago < 90 ? ago + " min" : Math.round(ago / 60) + " h"} ago`;
+}
+async function loadFunnel() {
+  try {
+    const r = await fetch("funnel.json?t=" + Math.floor(Date.now() / 300000), { cache: "no-store" });
+    if (r.ok) renderFunnel(await r.json());
+  } catch (e) { /* no funnel.json yet: the section stays hidden */ }
+}
+loadFunnel();
+setInterval(loadFunnel, 10 * 60 * 1000);
 </script>
 </body>
 </html>

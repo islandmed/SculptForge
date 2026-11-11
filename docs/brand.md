@@ -68,3 +68,7 @@ history; no shipped file uses them. "SF" is fine as a nickname in text only.
 
 (`--style filled` for the alternative.) Then `tools/check_marks.py` and `tools/check_marks_media.py`. Trademark review
 of the bust before the SculptForge 2027 launch; the cube is a stock ISC icon, so it can't be registered as our mark.
+
+## Referral links
+
+Creators and partners get a tagged link, `https://sculptforge.app/?utm_source=<name>&utm_medium=referral&utm_campaign=<slug>` (slug: lowercase letters, digits, hyphens); the private stats page shows their visits, downloads, memberships and monthly revenue as their own row (no cookies or pixels), and existing ad tags (`fb1107-*`) keep working.
