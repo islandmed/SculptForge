@@ -1,6 +1,6 @@
 ---
 whats_new: **Brushes you made are safer**: a brush file that can't be read is kept and comes back from its backup; a bottom-shelf slot whose brush is missing shows a "missing" mark instead of a brush that looks usable.
-fixed: **A custom brush lost from the bottom shelf** (@rand_gogh): a slot whose brush wasn't loaded kept its name and looked usable.
+fixed: **A custom brush lost from the bottom shelf** (rand_gogh): a slot whose brush wasn't loaded kept its name and looked usable.
   It now shows a missing mark with a tooltip, finds the brush again if its file comes back (or is in the new backups folder),
   and Remove from shelf clears it.
 fixed: **Brush files are saved more safely**: a save that doesn't fully reach the disk no longer replaces the good file, the file being
