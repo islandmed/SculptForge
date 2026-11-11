@@ -420,6 +420,7 @@ const BrushRecipe* App::strokeRecipe() const {
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
+    if (strokeSculpt_) p.invert = false; // Rgb while sculpting lays colour on Sub too (#186); only the Paint brush erases on Alt
     if (texturePainter_.active()) { // the brush material: colour plus the material channels it paints
         BrushMaterial m = doc_.paintMaterial;
         m.color = doc_.paintColor;

@@ -1,0 +1,71 @@
+# #186: Rgb paints as brushes sculpt, so a Sub stroke (Alt) lays colour like an Add stroke, for every stroke type, with an
+# alpha and without. Add is unchanged. (Only the Paint brush itself erases on Alt.)
+run new_sphere subdivisions=5
+run set_color color=ff0000
+action draw.rgb
+expect_value paint_mode == 0
+remember paint_mean_g white_g
+
+# Add and Sub, no alpha, Freehand: both lay red.
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g add_g
+expect_value paint_mean_g < $white_g-0.5
+key ctrl+z
+expect_value paint_mean_g >= $white_g
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+shot rgb-sub-freehand
+key ctrl+z
+
+# Every other stroke type, Sub.
+action stroke.type.dots
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+key ctrl+z
+action stroke.type.spray
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+key ctrl+z
+action stroke.type.lazy
+hold alt
+stroke 0.1 0.5 0.9 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+key ctrl+z
+action stroke.type.drag_stamp
+hold alt
+stroke 0.35 0.5 0.65 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+key ctrl+z
+
+# With an alpha (the report): Sub lays the colour under the alpha, as Add does.
+run brush_set_alpha name=Cobblestone
+action stroke.type.dots
+stroke 0.2 0.5 0.8 0.5
+remember paint_mean_g add_alpha_g
+key ctrl+z
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g < $white_g-0.5
+shot rgb-sub-alpha
+key ctrl+z
+expect_value paint_mean_g >= $white_g
+
+# The Paint brush keeps its Alt: it paints back towards white.
+run brush_set_alpha name=none
+run paint_fill color=ff0000
+remember paint_mean_g red_g
+action draw.rgb
+action draw.paint
+hold alt
+stroke 0.2 0.5 0.8 0.5
+hold none
+expect_value paint_mean_g > $red_g+0.5

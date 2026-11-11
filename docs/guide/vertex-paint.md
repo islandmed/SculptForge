@@ -39,7 +39,7 @@ Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sc
 ## Paint while sculpting
 
 Turn on **Rgb** on the top shelf (or **RGB while sculpting** in the **Paint** menu). Every sculpt brush then also
-paints the current colour along its stroke. The Smooth brush and <kbd>Shift</kbd>-smoothing never paint.
+paints the current colour along its stroke, Add and Sub (<kbd>Alt</kbd>) alike. The Smooth brush and <kbd>Shift</kbd>-smoothing never paint.
 
 ## Choose a colour
 

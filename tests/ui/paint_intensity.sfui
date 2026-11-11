@@ -143,8 +143,7 @@ key enter
 stroke 0.2 0.5 0.8 0.5
 expect_value paint_mean_g < $low_g-0.5
 key ctrl+z
-# Sub (Alt): Rgb paints back towards white, also at the Colour intensity (over a red fill).
-run paint_fill color=ff0000
+# Sub (Alt): Rgb lays the colour too (#186), also at the Colour intensity.
 action ui.rgb_popup
 key 2
 key enter
@@ -161,6 +160,6 @@ key enter
 hold alt
 stroke 0.2 0.5 0.8 0.5
 hold none
-expect_value paint_mean_g > $low_g+0.5
+expect_value paint_mean_g < $low_g-0.5
 shot sculpt-rgb-sub
 key ctrl+z
