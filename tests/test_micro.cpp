@@ -243,18 +243,31 @@ TEST(micro_smooth_peaks_lowers_the_high_points_only) {
     Document doc = microDoc(3);
     microNoise(doc.mesh, 0.01f, 30.0f);
     const auto before = doc.mesh.micro->disp;
-    const auto [lo0, hi0] = std::minmax_element(before.begin(), before.end());
-    const double min0 = *lo0, max0 = *hi0;
+    // The heights under the front, where the dabs land.
+    const auto front = [&](const MicroStore& d, int16_t& lo, int16_t& hi) {
+        const MicroMesh& mm = *doc.mesh.micro;
+        lo = INT16_MAX, hi = INT16_MIN;
+        for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+            if (doc.mesh.positions[doc.mesh.triangles[t].x].z < 0.97f) continue;
+            for (uint32_t k = 0; k < mm.samples; ++k) {
+                const int16_t v = d[size_t(t) * mm.samples + k];
+                lo = std::min(lo, v), hi = std::max(hi, v);
+            }
+        }
+    };
+    int16_t lo0, hi0, lo1, hi1;
+    front(before, lo0, hi0);
     Symmetry sym;
     doc.sculptor.beginStroke(doc.mesh, "SmoothPeaks");
     for (int i = 0; i < 8; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::SmoothPeaks, dabAt(glm::vec3(0, 0, 1), 0.4f, 1.0f), sym);
     doc.undo.push(doc.sculptor.endStroke());
-    const auto& after = doc.mesh.micro->disp;
-    const auto [lo1, hi1] = std::minmax_element(after.begin(), after.end());
-    CHECK(double(*hi1) < max0);       // the tallest peak came down
-    CHECK(double(*lo1) >= min0);      // no hollow was cut deeper
-    for (size_t i = 0; i < after.size(); ++i)
-        if (double(after[i]) > double(before[i])) { CHECK(false); break; } // nothing rose
+    const MicroStore& after = doc.mesh.micro->disp;
+    front(after, lo1, hi1);
+    CHECK(hi1 < hi0);  // the tallest peak came down
+    CHECK(lo1 >= lo0); // no hollow was cut deeper
+    bool rose = false;
+    for (size_t i = 0; i < after.size(); ++i) rose = rose || after[i] > before[i];
+    CHECK(!rose); // nothing rose
     CHECK(watertight(doc.mesh));
 }
 

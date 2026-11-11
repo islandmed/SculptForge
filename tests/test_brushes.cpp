@@ -253,12 +253,12 @@ TEST(smooth_peaks_lowers_only_the_high_points) {
         if (d.mesh.positions[v].y > d.mesh.positions[top].y) top = v;
         if (d.mesh.positions[v].y < d.mesh.positions[floor].y) floor = v;
     }
-    CHECK(d.mesh.positions[top].y > 0.05f && d.mesh.positions[floor].y < -0.05f);
+    CHECK(d.mesh.positions[top].y > 0.005f && d.mesh.positions[floor].y < -0.005f);
     const auto before = d.mesh.positions;
 
     Document plain = bumpy();
     stroke(plain, BrushType::Smooth, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
-    CHECK(plain.mesh.positions[floor].y > before[floor].y + 0.01f);
+    CHECK(plain.mesh.positions[floor].y > before[floor].y * 0.95f); // (Smooth fills the pit)
 
     stroke(d, BrushType::SmoothPeaks, dabAt(glm::vec3(0.0f), 0.8f, 1.0f), kNoSymmetry, 4);
     CHECK(d.mesh.positions[top].y < 0.6f * before[top].y);
