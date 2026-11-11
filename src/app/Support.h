@@ -25,6 +25,19 @@ namespace sf {
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
+// The community places the Welcome dialog's icon row opens (in this order, like the strip in assets/branding/social); the same
+// accounts as the website's footer. Opened on a click only; the app makes no request to any of them.
+struct SocialLink { const char* name; const char* url; };
+inline constexpr SocialLink kSocialLinks[] = {
+    {"Discord", kDiscordUrl},
+    {"GitHub", "https://github.com/islandmed/SculptForge"},
+    {"X", "https://x.com/SculptForgeApp?utm_source=app&utm_medium=welcome"},
+    {"Bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=app&utm_medium=welcome"},
+    {"Instagram", "https://www.instagram.com/sculptforge.app?utm_source=app&utm_medium=welcome"},
+    {"Facebook", "https://www.facebook.com/profile.php?id=61596196961617&utm_source=app&utm_medium=welcome"},
+};
+inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLinks[0]));
+
 // Two memberships: Member ($5 / month or $48 / year) and Studio (a flat $300 / month for the whole studio, any number of
 // artists; the first 5 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
 // and studios.html (tests/test_support.cpp checks they match). An empty yearly link hides the yearly choice in the

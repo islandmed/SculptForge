@@ -1157,6 +1157,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "parts") return double(doc.partCount());
+    if (name == "social_requests") return double(app_.socialRequests_); // Welcome icon row clicks
+    if (name == "last_social") return double(app_.lastSocial_);
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)

@@ -3446,6 +3446,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin(tr("About SculptForge"), &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            const float headerY = ImGui::GetCursorPosY();
             brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
@@ -3453,6 +3454,13 @@ void App::drawUi() {
             ImGui::Text(tr("SculptForge %s"), appVersionLabel().c_str());
             ImGui::TextUnformatted(tr("Free and open-source digital sculpting."));
             ImGui::EndGroup();
+            const float headerEnd = ImGui::GetCursorPosY();
+            // the community icons, top right, level with the version line
+            drawSocialRow("about", ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - socialRowWidth(),
+                                          ImGui::GetWindowPos().y - ImGui::GetScrollY() + headerY +
+                                              (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f +
+                                              ImGui::GetTextLineHeight() * 0.5f));
+            ImGui::SetCursorPosY(headerEnd);
             ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;

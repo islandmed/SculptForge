@@ -141,6 +141,24 @@ TEST(founding_members_json) {
     CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
 }
 
+TEST(social_links_are_the_websites_https_pages) {
+    // The Welcome icon row opens the same accounts as the site's socials row, over https, and nothing else.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/index.html", std::ios::binary);
+    CHECK(f.good());
+    const std::string page{std::istreambuf_iterator<char>(f), {}};
+    CHECK(kSocialCount == 6);
+    for (const SocialLink& link : kSocialLinks) {
+        const std::string url = link.url, base = url.substr(0, url.find('?'));
+        CHECK(url.rfind("https://", 0) == 0);
+        if (std::string(link.name) == "Facebook") { // the page the owner gave; the site gets the same link in its own branch
+            CHECK(url.rfind("https://www.facebook.com/profile.php?id=61596196961617&", 0) == 0);
+            continue;
+        }
+        if (page.find("href=\"" + base) == std::string::npos) std::printf("  not on the site: %s\n", link.url);
+        CHECK(page.find("href=\"" + base) != std::string::npos);
+    }
+}
+
 TEST(support_card_links_match_the_website) {
     // The card opens the same Stripe checkout pages as the membership page and the studio page (never links of its own).
     auto read = [](const char* name) {
