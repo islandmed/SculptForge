@@ -1,13 +1,13 @@
 {
-  "version": "0.12.6",
+  "version": "0.12.7",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)",
-    "Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)",
-    "Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)",
-    "Drape a garment on a body in Tool > Garments, with a steadier cloth rest",
-    "Save Visible Parts As and a Mask colour preference"
+    "Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview",
+    "Gaussian splats both ways with Blender 5.3 through the Blender bridge",
+    "Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)",
+    "My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)",
+    "Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)"
   ],
   "support": {
     "founding": {

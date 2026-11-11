@@ -25,13 +25,30 @@ namespace sf {
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
+// The community places the Welcome dialog's icon row opens (in this order, like the strip in assets/branding/social); the same
+// accounts as the website's footer. Opened on a click only; the app makes no request to any of them.
+struct SocialLink { const char* name; const char* url; };
+inline constexpr SocialLink kSocialLinks[] = {
+    {"Discord", kDiscordUrl},
+    {"GitHub", "https://github.com/islandmed/SculptForge"},
+    {"X", "https://x.com/SculptForgeApp?utm_source=app&utm_medium=welcome"},
+    {"Bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=app&utm_medium=welcome"},
+    {"Instagram", "https://www.instagram.com/sculptforge.app?utm_source=app&utm_medium=welcome"},
+    {"Facebook", "https://www.facebook.com/profile.php?id=61596196961617&utm_source=app&utm_medium=welcome"},
+};
+inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLinks[0]));
+
 // Two memberships: Member ($5 / month or $48 / year) and Studio (a flat $300 / month for the whole studio, any number of
 // artists; the first 5 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
 // and studios.html (tests/test_support.cpp checks they match). An empty yearly link hides the yearly choice in the
 // app and on the site. The card's Studio button opens the studio page (its own build is set up by email first).
-inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201";   // $5 / month
-inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206"; // $48 / year
-inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204";   // Founding Studio, $150 / month
+// Each checkout link carries ?client_reference_id=app-card (kSupportSourceTag: lowercase letters, digits and dashes
+// only, no personal data) so a membership started in the app is attributed to it; the site tags its links at runtime
+// the same way (website/motion.js), so the tests compare the links without the query.
+inline constexpr const char* kSupportSourceTag = "app-card";
+inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card";   // $5 / month
+inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card"; // $48 / year
+inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204?client_reference_id=app-card";   // Founding Studio, $150 / month
 inline constexpr const char* kStudioPageUrl = "https://sculptforge.app/studios.html#membership";
 // The membership terms (refunds, cancelling): the page website/support.html and studios.html link to.
 inline constexpr const char* kTermsUrl = "https://sculptforge.app/terms.html";

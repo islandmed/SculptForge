@@ -423,6 +423,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
             ++lastSeek_.batched;
         } else {
             flushBatch(doc);
+            doc.syncBvh();
             if (!s.undo(mesh, doc.bvh)) break;
             if (UndoRecord* u = s.lastRedo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;
@@ -442,6 +443,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
             ++lastSeek_.batched;
         } else {
             flushBatch(doc);
+            doc.syncBvh();
             if (!s.redo(mesh, doc.bvh)) break;
             if (UndoRecord* u = s.lastUndo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;

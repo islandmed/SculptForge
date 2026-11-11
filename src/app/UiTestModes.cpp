@@ -159,6 +159,7 @@ const char* const kNeverRun[] = {
     "sculptable.", // Make sculptable: a splat and its workers
     "studio.",     // studio mode: its own folder
     "discord.",    // Rich Presence: Discord's socket
+    "ui.my_panel", // a floating window of its own at the cursor (ui_my_panel); one more toggle shifted every seed's picks
 };
 
 bool neverRun(const std::string& id) {

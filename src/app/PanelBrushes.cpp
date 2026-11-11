@@ -113,6 +113,19 @@ void App::drawAlphaOptions(bool vdm) {
         ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
         return;
     }
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_scale_jitter", &o.scaleJitter, 0.0f, 90.0f, "Scale jitter %.0f%%");
+    ui::HelpText("Scale jitter", nullptr,
+                 "Make each dab bigger or smaller by a random amount, up to this many percent either way: wood grain, "
+                 "pores and chips that are never the same size twice.",
+                 where);
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_position_jitter", &o.positionJitter, 0.0f, 100.0f, "Position jitter %.0f%%");
+    ui::HelpText("Position jitter", nullptr,
+                 "Move each dab off the cursor by a random amount, up to this many percent of the brush radius, so "
+                 "a line of stamps does not sit in a tidy row.",
+                 where);
+    drawAlphaPool();
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::SetNextItemWidth(half);
     float tileX = float(o.tileX), tileY = float(o.tileY);
@@ -124,6 +137,28 @@ void App::drawAlphaOptions(bool vdm) {
     ui::HelpText("Tile down", nullptr, "Repeat the alpha this many times down the brush (1 = once).", "Alpha");
     syncAlphaTile();
     ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
+}
+
+// The alpha pool (core/AlphaOptions.h): the alphas each dab draws from at random. Filled from the Library (right-click
+// an alpha, or a folder of scans) or brush_alpha_pool.
+void App::drawAlphaPool() {
+    if (!alphaPool_ || alphaPool_->empty()) {
+        ImGui::TextDisabled("%s", tr("Alpha pool: empty"));
+        ui::HelpText("Alpha pool", nullptr,
+                     "Right-click an alpha in the Library or the alpha list and pick Add to alpha pool, or right-click "
+                     "a folder of images and pick Use folder as alpha pool. Then every dab takes one of them at "
+                     "random, so scanned planks or pores never repeat. Tile does not apply to pool alphas.",
+                     "Alpha");
+        return;
+    }
+    const std::string label = tr("Alpha pool") + std::string(": ") + std::to_string(alphaPool_->size());
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(tr("Clear##alphapool"))) runCommand("brush_alpha_pool", {{"clear", true}});
+    ui::HelpText("Alpha pool", nullptr,
+                 "Each dab and each Drag Stamp takes one of these alphas at random, ahead of the brush's own alpha. "
+                 "Clear puts the brush's own alpha back. Kept until you quit.",
+                 "Alpha");
 }
 
 // SnakeHook: pull the region under the click along with the cursor, like Move,
@@ -182,7 +217,7 @@ void App::dragRectTo(float x, float y, bool commit) {
     p.connectedOnly = uiPrefs_.connectedOnly;
     p.viewFalloff = uiPrefs_.viewFalloff;
     p.focal = focalShift_;
-    p.alpha = &doc_.brushAlpha;
+    p.alpha = stampAlpha_ ? stampAlpha_.get() : &doc_.brushAlpha;
     p.stampFootprint = commit; // (the moves before the release keep the sphere: the live preview stays cheap)
     stampCursor_ = glm::vec2(x, y);
     stampPlaced_ = true;

@@ -108,6 +108,7 @@ struct TubeShape {
     float taperStart = 0.0f, taperEnd = 0.0f; // fraction of the length narrowing to a point at each end
     float twist = 0.0f;  // degrees the cross-section turns from the start to the end (on top of roll)
     float spin = 0.0f;   // degrees it turns per average radius of length (on top of roll and twist)
+    int strands = 3;     // Rope/Braid: how many strands (1..8; a rope of one strand is a spring)
     float spread = 0.5f; // Rope/Braid: strand spacing (0.5: touching); Sleeve: wall thickness (half of it, as a fraction of the radius)
     bool curve = false;  // a Curve Part: only the guide line (a thin wire) is swept until Tube from curve clears this
     bool empty() const { return points.empty(); }

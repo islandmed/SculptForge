@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
+#include "app/BooleanPreview.h"
 #include "app/NativeDialog.h"
 #include "core/FocusDetail.h"
 #include "app/Pickers.h"
@@ -140,6 +141,12 @@ struct StartupTimer {
 App::App() = default;
 App::~App() = default;
 
+bool App::usesProfileThreads(const AppOptions& options) {
+    const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
+    const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
+    return !headless && options.demo.empty();
+}
+
 bool App::init(const AppOptions& options) {
     options_ = options;
     startedAt_ = std::chrono::steady_clock::now();
@@ -156,7 +163,6 @@ bool App::init(const AppOptions& options) {
     SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
-    if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     // The graphics card chosen in Preferences > Performance, before the GL context (a failed start falls back).
     std::string gpuNotice;
     if (!headless && options.demo.empty() && !sharedWindow_) gpuNotice = applyCachedGpuChoice();
@@ -1939,8 +1945,10 @@ void App::updateMouseCursor() {
 BrushType App::activeBrush() const {
     // classic convention: holding Shift temporarily switches to Smooth.
     // The pen's eraser end can be set to smooth too (Preferences > Tablet).
-    const bool smooth = (inputMods() & SDL_KMOD_SHIFT) || (erasing() && eraserAction() == PenAction::Smooth);
-    return smooth ? BrushType::Smooth : brush_;
+    if (erasing() && eraserAction() == PenAction::Smooth) return BrushType::Smooth;
+    // Shift+click / Ctrl+click on a shelf brush rebinds Shift / Ctrl (ModifierBrush.cpp).
+    if (const ModifierSlot slot = heldSlot(); slot != ModifierSlot::None) return BrushType(uiPrefs_.modifierBrushes.brush(slot));
+    return (inputMods() & SDL_KMOD_SHIFT) ? BrushType::Smooth : brush_;
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
@@ -2048,7 +2056,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             }
         }
         RayHit hit;
-        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl; // (a Ctrl brush sculpts)
         if (!insertType_.empty() && !maskMod && previewLod_ < 0 && pick(x, y, hit)) { // Append > Insert (#34)
             drag_ = Drag::Insert;
             insertAt_ = hit.position;
@@ -2260,6 +2268,11 @@ void App::orbitBy(float x, float y, float dx, float dy) {
         camera_.ortho = false;
         autoOrtho_ = false;
     }
+    if (!orbitPivotPicked_) { // once per drag, where it began: no readback while the view turns
+        orbitPivotPicked_ = true;
+        orbitPivot_ = orbitPivotAt(x - dx, y - dy);
+        if (orbitPivot_) camera_.targetDepthOf(*orbitPivot_);
+    }
     if (!orbitStarted_) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
@@ -2270,8 +2283,20 @@ void App::orbitBy(float x, float y, float dx, float dy) {
     else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
-    if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
-    else camera_.setOrientation(orbitRaw_.orientation());
+    const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();
+    if (orbitPivot_) camera_.turnAbout(q, *orbitPivot_);
+    else camera_.setOrientation(q);
+}
+
+// Orbit around the pointer: the nearest visible Part's surface under (x, y), in world space; none over the background,
+// with the preference off, in demos (their scripted moves turn about the target), or while the mesh is busy
+// (mid-stroke, a preview level).
+std::optional<glm::vec3> App::orbitPivotAt(float x, float y) {
+    if (!uiPrefs_.orbitAtPointer || forceTurntable_ || solverBusy() || previewLod_ >= 0) return std::nullopt;
+    doc_.syncBvh();
+    RayHit hit;
+    if (pickPart(x, y, &hit) < 0) return std::nullopt;
+    return hit.position;
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
@@ -2300,6 +2325,8 @@ void App::onMouseUp() {
     rightClick_.pending = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;
+    orbitPivotPicked_ = false;
+    orbitPivot_.reset();
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
@@ -2447,6 +2474,7 @@ glm::vec3 App::alongNormalTarget(float x, float y) const {
 void App::beginStroke(float x, float y, const RayHit& hit) {
     refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
+    strokeSlot_ = heldSlot(); // a Shift / Ctrl brush: its own Intensity (ModifierBrush.cpp)
     strokeAlongNormal_ = false;
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
@@ -2556,6 +2584,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     }
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
+        stampAlpha_ = alphaPool_ && !alphaPool_->empty() ? alphaPool_->pick(stampSeed_) : nullptr; // (one alpha per stamp)
         stampPressure_.reset();
         stampPlaced_ = false;
         slideTurn_.reset();
@@ -2581,8 +2610,8 @@ void App::strokeTo(float x, float y) {
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
-    if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
-        !(inputMods() & SDL_KMOD_SHIFT)) {
+    if (alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
+                              (inputMods() & SDL_KMOD_SHIFT) != 0)) {
         strokeAltSmooth_ = true;
         status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
@@ -2841,10 +2870,18 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     // Spray's own turn. Custom and Community brushes get them too: dabRecipe turns their alpha by alphaUp.
     if (!haveLastDab_) {
         alphaRake_.reset(pathPoint);
-        alphaSeed_ = 0x9e3779b9u;
+        alphaSeed_ = 0x9e3779b9u + 0x632be5abu * ++alphaStrokeSerial_;
     }
+    if (st.pool && !st.pool->empty()) p.alpha = st.pool->pick(alphaSeed_).get(); // (the stroke's pool keeps it alive)
     alphaRake_.update(pathPoint);
     dabAngle_ += alphaDabAngle(st.alphaOptions, alphaRake_, alphaSeed_);
+    if (const AlphaDabJitter j = alphaDabJitter(st.alphaOptions, alphaSeed_); j.scale != 1.0f || j.offset != glm::vec2(0.0f)) {
+        p.radius *= j.scale;
+        // Moved on the screen's plane, kept on the surface (along the tangent plane at the hit).
+        glm::vec3 move = (cam.orientation() * glm::vec3(j.offset.x, j.offset.y, 0.0f)) * p.radius;
+        if (glm::length(p.pickNormal) > 0.0f) move -= p.pickNormal * glm::dot(move, p.pickNormal);
+        p.center += move;
+    }
     lastDabAngle_ = dabAngle_;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = st.vdm;
@@ -2925,6 +2962,23 @@ void App::runCommand(const std::string& name, const Args& args) {
         reviewPackFile(argString(args, "path"));
         lastCommandOk_ = packs_.review != nullptr;
         return;
+    }
+    // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
+    // A running macro and the "keep original" / preview forms don't touch the levels.
+    if (macros_.runDepth == 0) {
+        const char* op = nullptr;
+        if (name == "delete_masked") op = "Delete Masked";
+        else if (name == "delete_hidden") op = "Remove Hidden";
+        else if (name == "mirror") op = "Mirror";
+        else if (name == "mirror_and_weld") op = "Make Symmetric";
+        else if (name == "weld_points" && !argBool(args, "preview", false)) op = "Merge by Distance";
+        else if ((name == "part_split_hidden" || name == "part_split_masked" || name == "part_split_unmasked") &&
+                 !argBool(args, "keep", false))
+            op = "Split";
+        if (op && !levelsAllow(op, [this, name, args] { runCommand(name, args); })) {
+            lastCommandOk_ = false;
+            return;
+        }
     }
     // A big mesh (Subdivide, Add Level, micro, remesh) asks first when it wouldn't fit the memory free now.
     if (!memoryAllows(name, args, [this, name, args] { runCommand(name, args); })) {
@@ -3222,8 +3276,10 @@ void App::syncScene() {
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
     lastDisplayed_ = &shown;
+    updateBooleanPreview(); // (before the upload clears this frame's dirty marks: BooleanPreview.cpp)
+    Mesh* booleanResult = booleanPreviewMesh();
     std::vector<SceneMesh> scene;
-    scene.reserve(doc_.parts.size());
+    scene.reserve(doc_.parts.size() + 1);
     for (int i = 0; i < doc_.partCount(); ++i) {
         Part& s = doc_.parts[size_t(i)];
         const bool active = i == doc_.activePart;
@@ -3236,6 +3292,14 @@ void App::syncScene() {
         scene.back().model = s.transform;
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
+        if (booleanResult && booleanPreviewDrawn(s.id)) scene.back().visible = false; // (the result stands in for it)
+    }
+    if (booleanResult) {
+        // Drawn as the active Part is when that is one of its sources (not dimmed), else like the others.
+        const bool activeSource = booleanPreviewDrawn(doc_.activePartInfo().id);
+        scene.push_back({BooleanPreviewState::kKey, booleanResult, activeSource, true, nullptr,
+                         activeSource && renderSettings_.wireframe, renderSettings_.flatShading});
+        scene.back().pbr = renderSettings_.pbr();
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
@@ -3382,6 +3446,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin(tr("About SculptForge"), &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            const float headerY = ImGui::GetCursorPosY();
             brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
@@ -3389,6 +3454,13 @@ void App::drawUi() {
             ImGui::Text(tr("SculptForge %s"), appVersionLabel().c_str());
             ImGui::TextUnformatted(tr("Free and open-source digital sculpting."));
             ImGui::EndGroup();
+            const float headerEnd = ImGui::GetCursorPosY();
+            // the community icons, top right, level with the version line
+            drawSocialRow("about", ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - socialRowWidth(),
+                                          ImGui::GetWindowPos().y - ImGui::GetScrollY() + headerY +
+                                              (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f +
+                                              ImGui::GetTextLineHeight() * 0.5f));
+            ImGui::SetCursorPosY(headerEnd);
             ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;
@@ -3430,6 +3502,7 @@ void App::drawUi() {
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     if (!panelDetached("guide")) guide_.draw(*this); // Help > User Guide (or in its own window: PanelWindows.cpp)
     drawFloatingPanels(); // palettes detached where there are no windows of their own (PanelWindows.cpp)
+    drawMyPanelFloating(); // My Panel on its key (PanelMyPanel.cpp)
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawPluginWindow();  // a plugin's parameters, Apply / Add Part, Stop (PanelPlugins.cpp)
@@ -3675,9 +3748,16 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             break;
         case RecipeParam::Kind::Bool:
             ImGui::Checkbox(p.label, &recipe.frontFacesOnly);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", p.help);
             ImGui::Checkbox(tr("Connected only##recipe"), &recipe.connectedOnly); // (falloff options, not recipeParams)
             ImGui::Checkbox(tr("View falloff##recipe"), &recipe.viewFalloff);
-            break;
+            ImGui::Checkbox(tr("Lock plane##recipe"), &recipe.planeLock); // (hard-surface planes, not recipeParams)
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("Keep the plane the stroke starts on for the whole stroke."));
+            ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);
             if (ImGui::Combo(p.label, &idx, p.options.data(), int(p.options.size()))) recipe.setEnumIndex(p.key, idx);
@@ -4570,6 +4650,7 @@ bool App::axisGizmoMouseDown(float x, float y) {
     const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
     if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
+        orbitPivotPicked_ = true; // (about the target: the gizmo's disc is not a point on the model)
         rightClick_.pending = false;
         return true;
     }
@@ -4759,7 +4840,7 @@ void App::drawBrushCursor() {
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
                                                 : invertToggle_ != (((mod & SDL_KMOD_ALT) != 0) ||
                                                                     (erasing() && eraserAction() == PenAction::Invert));
-    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl;
     if (masking && drag_ != Drag::Stroke && maskShape_ != SelectShape::Pen) { // MaskLasso / MaskRect: a crosshair
         const float arm = 8.0f * uiScale_;
         dl->AddLine(ImVec2(c.x - arm, c.y), ImVec2(c.x + arm, c.y), IM_COL32(230, 230, 230, 220), 1.5f);

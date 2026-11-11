@@ -7,7 +7,7 @@ list. User documentation: [docs/guide/blender.md](guide/blender.md).
 Code: `src/io/BlenderBridge.h/.cpp` (folder, manifest, send/receive), `src/io/BlenderCommands.cpp`
 (`blender_send`, `blender_receive`), `src/app/PanelBlender.cpp` (File > Blender, polling, heartbeat),
 `addons/blender/sculptforge_bridge/exchange.py` (the add-on's bpy-free side: folder, manifest, Bridge file, faces) and
-`__init__.py` (Blender UI, mesh <-> arrays). Tests: `tests/test_blender_bridge.cpp`,
+`__init__.py` (Blender UI, mesh <-> arrays). Tests: `tests/test_blender_bridge.cpp` (also `blender_splats_round_trip`),
 `tests/blender/test_exchange.py` (numpy, against `sculptforge-cli`), `tests/blender/test_in_blender.py` (a real
 Blender or the `bpy` wheel; CI), `tests/ui/blender_bridge.sfui`.
 
@@ -76,6 +76,14 @@ Windows).
   Older add-ons ignore the field (and then get the base shape without the keys).
 - Version: readers refuse a manifest with a higher `version` and say which side to update.
 
+- `splats` (optional, beside `objects`; older readers skip the key, so the version stays 1): Gaussian splat objects, each
+  `{name, file, matrix_world}` with a standard 3DGS PLY (`f_dc_*`, `f_rest_*` channel-major, logit `opacity`, log
+  `scale_*`, `rot_*` as w, x, y, z; SH up to degree 3). The PLY holds the splats **as they are in the object**, in
+  both directions: nothing is rotated or baked, so view-dependent colour (spherical harmonics) keeps pointing the
+  right way. SculptForge keeps one capture: the first entry is loaded, with `SplatCloud::transform` set to
+  `A * matrix_world` (`splatPlacementFromBlender`: scale made uniform, rotation orthonormal), and it sends its capture
+  back with `A^-1 * transform` as the matrix. So Flip / Turn 90 / Fit in SculptForge move the Blender object, not the data.
+
 ## Faces, winding and in-place updates
 
 The add-on writes each Blender polygon as one Bridge file face: triangles and quads as they are, n-gons as the fan
@@ -100,6 +108,27 @@ quads, reversed back for a mirrored object.
 | active colour attribute, point or corner domain (`color_srgb`) | vertex paint (sRGB bytes; corner colours are averaged per vertex) |
 | `.sculpt_mask` (float, point) | mask (1 = masked). A send without a mask section removes `.sculpt_mask` |
 | `.sculpt_face_set` (int, face) | face group = face set - 1 (16-bit, renumbered if out of range) |
+
+## Gaussian splats (Blender 5.3+)
+
+Blender 5.3 (`projects.blender.org` PR 163102, design issue 159470) stores splats as a point cloud whose `type` is
+`'GAUSSIAN_SPLAT'`, with the attributes `scale` (linear: the PLY's log already exponentiated), `rotation` (quaternion),
+`radiance:base` (a float4: the band-0 coefficient `f_dc` and the linear opacity) and `radiance:sh_<k>` (a float3 per
+further coefficient, in PLY order: the k-th of `f_rest` for red, green and blue). It imports PLY (the importer
+recognises splats by `f_dc_*`, `opacity`, `scale_*`, `rot_*` and no faces), SPZ, glTF and USD, also on a viewport
+drop, and has **no export**. The add-on therefore
+
+- **receives** through `bpy.ops.wm.ply_import` (Blender's own decoding; identity axes, the matrix is set from the manifest)
+  and swaps the data into an object of the same name, so its collections, materials and modifiers stay;
+- **sends** by reading the attributes with `foreach_get` and writing the PLY itself (`splats.py`, numpy only);
+- adds **File > Export > Gaussian Splats (.ply)** (world space by default: `splats.baked`; a turned splat keeps band 0
+  only, like `SplatCloud::bakeTransform`) and a `FileHandler` for the compact `.splat` format on viewport drops;
+- refuses cleanly on older Blenders (`splats_supported()` looks for the enum value): a message, no change.
+
+Apply Transform on a splat object is wrong in Blender 5.3 (it does not update rotation and SH), which is one more
+reason the placement travels as a matrix. Blender assumes sRGB splats. Tests: `test_exchange.py` (PLY, `.splat`, baking,
+a round trip through `sculptforge-cli`), `test_in_blender.py` `test_splats` (import, attributes against the PLY, the
+round trip through SculptForge, export, `.splat`), run against bpy 5.3.0 in CI; 4.2 and 5.2 check the refusal.
 
 ## Starting SculptForge
 

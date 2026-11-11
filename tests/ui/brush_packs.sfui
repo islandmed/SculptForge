@@ -4,7 +4,7 @@
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=6
 key f
-expect_value builtin_pack_brushes == 70
+expect_value builtin_pack_brushes == 71
 expect_value brush_sort == 0
 expect_value alpha_index == 0
 

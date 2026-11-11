@@ -141,6 +141,24 @@ TEST(founding_members_json) {
     CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
 }
 
+TEST(social_links_are_the_websites_https_pages) {
+    // The Welcome icon row opens the same accounts as the site's socials row, over https, and nothing else.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/index.html", std::ios::binary);
+    CHECK(f.good());
+    const std::string page{std::istreambuf_iterator<char>(f), {}};
+    CHECK(kSocialCount == 6);
+    for (const SocialLink& link : kSocialLinks) {
+        const std::string url = link.url, base = url.substr(0, url.find('?'));
+        CHECK(url.rfind("https://", 0) == 0);
+        if (std::string(link.name) == "Facebook") { // the page the owner gave; the site gets the same link in its own branch
+            CHECK(url.rfind("https://www.facebook.com/profile.php?id=61596196961617&", 0) == 0);
+            continue;
+        }
+        if (page.find("href=\"" + base) == std::string::npos) std::printf("  not on the site: %s\n", link.url);
+        CHECK(page.find("href=\"" + base) != std::string::npos);
+    }
+}
+
 TEST(support_card_links_match_the_website) {
     // The card opens the same Stripe checkout pages as the membership page and the studio page (never links of its own).
     auto read = [](const char* name) {
@@ -149,15 +167,17 @@ TEST(support_card_links_match_the_website) {
         return std::string{std::istreambuf_iterator<char>(f), {}};
     };
     const std::string page = read("support.html"), studios = read("studios.html");
+    // (the app's links carry the source tag; the site's are tagged at runtime by motion.js, so compare without the query)
+    const auto bare = [](const char* url) { return std::string(url).substr(0, std::string(url).find('?')); };
     for (const char* url : {kSupportUrlMember, kSupportUrlStudio}) {
         CHECK(std::string(url).rfind("https://buy.stripe.com/", 0) == 0);
-        CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
+        CHECK(page.find("href=\"" + bare(url) + "\"") != std::string::npos);
     }
-    CHECK(studios.find(std::string("href=\"") + kSupportUrlStudio + "\"") != std::string::npos);
+    CHECK(studios.find("href=\"" + bare(kSupportUrlStudio) + "\"") != std::string::npos);
     // The yearly Member checkout: the same on both, or empty on both (the yearly choice hidden until it exists).
     const std::string yearly(kSupportUrlMemberYearly);
     CHECK(yearly.empty() || yearly.rfind("https://buy.stripe.com/", 0) == 0);
-    CHECK(page.find("data-yearly=\"" + yearly + "\"") != std::string::npos);
+    CHECK(page.find("data-yearly=\"" + bare(kSupportUrlMemberYearly) + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
     // Retired: the Insider tier, one-time payments and the monthly pack, and Studio's per-artist price (owner 11-06: a flat
@@ -193,6 +213,25 @@ TEST(support_card_opens_only_its_fixed_links) {
     for (const char* url : {"", "https://sculptforge.app/terms.html.evil.example", "https://sculptforge.app/terms.htm",
                             "file:///etc/passwd", "https://buy.stripe.com/", "javascript:alert(1)"})
         CHECK(!supportLinkAllowed(url));
+    // The checkout links carry exactly the source tag: accepted tagged, refused untagged or with anything else.
+    const std::string tag = std::string("client_reference_id=") + kSupportSourceTag;
+    CHECK(std::string(kSupportSourceTag).find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") == std::string::npos);
+    CHECK(kSupportSourceTag[0] != '\0');
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kSupportUrlStudio}) {
+        const std::string u(url);
+        CHECK(u.rfind("https://buy.stripe.com/", 0) == 0);
+        CHECK(u.size() > tag.size() + 1 && u.compare(u.size() - tag.size() - 1, std::string::npos, "?" + tag) == 0); // the only query
+        CHECK(u.find('?') == u.size() - tag.size() - 1 && u.find('&') == std::string::npos && u.find('#') == std::string::npos);
+        const std::string base = u.substr(0, u.find('?'));
+        CHECK(supportLinkAllowed(u));
+        CHECK(!supportLinkAllowed(base));                                 // untagged
+        CHECK(!supportLinkAllowed(base + "?client_reference_id=other"));  // another tag
+        CHECK(!supportLinkAllowed(base + "?client_reference_id=" + kSupportSourceTag + "&email=a@b.c")); // extra params
+        CHECK(!supportLinkAllowed(base + "?prefilled_email=a@b.c&" + tag));
+        CHECK(!supportLinkAllowed(u + "x"));
+        CHECK(!supportLinkAllowed(u + "#frag"));
+        CHECK(!supportLinkAllowed(base + "?utm_source=x"));
+    }
 }
 
 TEST(support_card_timing) {

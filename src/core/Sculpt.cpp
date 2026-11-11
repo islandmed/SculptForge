@@ -44,6 +44,7 @@ const char* brushName(BrushType type) {
     case BrushType::DetailClone: return "DetailClone";
     case BrushType::Morph: return "Morph";
     case BrushType::Cloth: return "Cloth";
+    case BrushType::SmoothPeaks: return "SmoothPeaks";
     default: return "?";
     }
 }
@@ -51,6 +52,7 @@ const char* brushName(BrushType type) {
 const char* brushLabel(BrushType type) {
     switch (type) {
     case BrushType::SharpCrease: return "Sharp Crease";
+    case BrushType::SmoothPeaks: return "Smooth Peaks";
     case BrushType::ClayBlock: return "Clay Block";
     case BrushType::SnakeHook: return "Tendril";
     case BrushType::KelvinSnake: return "Elastic Tendril";
@@ -434,6 +436,7 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     draftLeaves_.clear();
     dropLazy(); // (a stroke that never ended)
     pending_.clear();
+    lockedPlanes_.clear();
     lastRegion_ = 0;
     lastRegionRadius_ = 0.0f;
     strokeDiagonal_ = 0.0f;
@@ -1016,7 +1019,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
     adaptiveDab_ = (adaptiveDabs || analyticNormals) && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
-                   type != BrushType::Smooth && type != BrushType::Layer && type != BrushType::Morph &&
+                   type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Layer && type != BrushType::Morph &&
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
                    type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
@@ -1106,8 +1109,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         case BrushType::Inflate:
             d = nrm[v] * (sign * s * r * 0.05f * f);
             break;
-        case BrushType::Smooth: {
-            if (p.groupBorders) { // along the border, on the tangent plane; junctions and inner vertices stay
+        case BrushType::Smooth: case BrushType::SmoothPeaks: {
+            if (p.groupBorders && type == BrushType::Smooth) { // along the border, on the tangent plane; junctions and inner vertices stay
                 uint32_t nb[3];
                 if (groupBorderNeighbours(mesh, v, nb) != 2) break;
                 const glm::vec3 mid = 0.5f * (pos[nb[0]] + pos[nb[1]]);
@@ -1132,6 +1135,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             for (uint32_t n : ring) avg += pos[n];
             avg /= static_cast<float>(ring.size());
             d = (avg - x) * std::min(1.0f, s * f);
+            if (type == BrushType::SmoothPeaks) { // only down, along the normal: what sits above the average plane
+                const float up = glm::dot(avg - x, nrm[v]);
+                d = up < 0.0f ? nrm[v] * (up * std::min(1.0f, s * f)) : glm::vec3(0.0f);
+            }
             break;
         }
         case BrushType::ClayBlock: {
@@ -1272,7 +1279,8 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
 // The BVH after a mirror's dab moved (some of) the vertices its query returned, verts_ (the kernel ran since
 // `clock`). The next mirror's query needs the new boxes; normals wait until every mirror moved its vertices
 // (updateDabNormals), so where mirrors overlap they are updated once.
-void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock) {
+void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock,
+                         const std::vector<uint32_t>* moved) {
     timings.kernelMs += lapMs(clock);
     bvh.refitQueried(mesh);
     timings.bvhMs += lapMs(clock);
@@ -1289,6 +1297,10 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
             for (size_t i = b; i < e; ++i) set.insertLocal(verts_[i]);
         });
         timings.normalsMs += lapMs(clock);
+        return;
+    }
+    if (moved) { // (only these moved: their rings' normals, updateDabNormals' vertex path)
+        dabVerts_.insert(dabVerts_.end(), moved->begin(), moved->end());
         return;
     }
     dabVerts_.insert(dabVerts_.end(), verts_.begin(), verts_.end()); // a vertex twice is fine: updateNormals dedups
@@ -1387,16 +1399,18 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     dabVerts_.clear();
     dabLeaves_.clear();
     lastLazyLeaves_.clear();
-    for (const SymCopy& m : copies(sym)) {
+    const std::vector<SymCopy> all = copies(sym);
+    for (size_t k = 0; k < all.size(); ++k) {
+        const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? base : transformed(base, m);
-        dabRecipeSingle(mesh, bvh, recipe, mp);
+        dabRecipeSingle(mesh, bvh, recipe, mp, k);
     }
-    updateDabNormals(mesh, bvh);
+    if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh); // (as dab)
     repairDab(mesh, bvh);
 }
 
-void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p) {
+void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy) {
     auto clock = std::chrono::steady_clock::now();
     // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Falloff shifts the tip
     // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it. With an alpha the region
@@ -1428,14 +1442,24 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
 
     // Per-vertex weight: tip shape, cavity mask and pattern.
     weights_.resize(verts_.size());
-    const float edge = std::max(0.05f, 1.0f - r.hardness * 0.95f);
-    const float exponent = 1.0f + r.tipSharpness * 5.0f;
+    float edge = std::max(0.05f, 1.0f - r.hardness * 0.95f);
+    float exponent = 1.0f + r.tipSharpness * 5.0f;
+    if (r.crispEdge) {
+        // Full strength out to a hard edge, anti-aliased over about 2.5 vertex spacings so the boundary stays a
+        // clean line instead of stair-stepping along the triangles (the spacing from the region's vertex count: a
+        // triangle mesh has about one vertex per 0.87 e^2 of surface, and the region covers about pi r^2).
+        const float spacing = 1.9f / std::sqrt(float(verts_.size()));
+        edge = std::clamp(2.5f * spacing, 0.03f, 0.5f);
+        exponent = 1.0f;
+    }
     const float patternFreq = 1.0f / std::max(rad * r.patternScale, 1e-6f);
+    const float focalExp = std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f));
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];
         float t = std::clamp((1.0f - brushDistance(p, pos[v]) / rad) / edge, 0.0f, 1.0f);
-        if (p.focal != 0.0f) t = std::pow(t, std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f))); // (brushFalloff's)
-        float w = std::pow(t * t * (3.0f - 2.0f * t), exponent);
+        if (p.focal != 0.0f) t = std::pow(t, focalExp); // (brushFalloff's)
+        float w = t * t * (3.0f - 2.0f * t);
+        if (exponent != 1.0f) w = std::pow(w, exponent); // (a pow a vertex is a third of a big dab's weights)
         if (useAlpha && p.focal < 0.0f) w += (1.0f - w) * std::min(-p.focal, 1.0f); // (alphaFalloff's)
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
@@ -1469,11 +1493,53 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    float dabLevel = 0.0f; // Lock plane: how far this dab's own surface lies above the locked plane, in radii
+    if (r.planeLock && r.plane != BrushRecipe::Plane::None) {
+        // Lock plane: the first dab's plane for the whole stroke (each symmetry copy its own).
+        if (copy >= lockedPlanes_.size()) lockedPlanes_.resize(copy + 1, {glm::vec3(0.0f), glm::vec3(0.0f)});
+        auto& [n, c] = lockedPlanes_[copy];
+        if (n == glm::vec3(0.0f)) n = areaNormal, c = areaCenter;
+        else dabLevel = glm::dot(areaCenter - c, n) / p.radius, areaNormal = n, areaCenter = c;
+    }
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;
         lastRegion_ = verts_.size();
         lastRegionRadius_ = p.radius;
+    }
+    // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull).
+    const float planePull = r.crispEdge ? clayPull(s) : s;
+    const bool crispMax = r.crispEdge && r.planeLock && (r.plane == BrushRecipe::Plane::Flatten ||
+                                                         r.plane == BrushRecipe::Plane::Fill ||
+                                                         r.plane == BrushRecipe::Plane::Scrape);
+    const uint32_t stamp = uint32_t(strokeId_);
+    if (crispMax && crispStamp_.size() != mesh.vertexCount()) {
+        crispStamp_.resize(mesh.vertexCount(), 0);
+        crispDone_.resize(mesh.vertexCount(), 0.0f);
+        crispFacing_.resize(mesh.vertexCount(), 0.0f);
+    }
+    // A big region on a locked crisp plane takes the adaptive path's normals, as the built-in plane brushes do
+    // (Sculpt.h, analyticNormals): a point the plane takes has its normal, and the band's turn toward it by the share
+    // of the way they went; the exact normals follow behind the brush and when the stroke ends. Only for a pure plane
+    // pull with no mask or hidden part (where the move is the plane's alone).
+    bool lazyNormals = crispMax && analyticNormals && !dynTopo_.active() && !draft_ &&
+                       verts_.size() >= kAdaptiveMinVertices && mesh.normals.size() == mesh.vertexCount() &&
+                       r.depth == 0.0f && r.pinch == 0.0f && r.drag <= 0.0f && r.smooth <= 0.0f;
+    if (lazyNormals && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) { // (as dabSingle: masked regions only)
+        std::atomic<bool> masked{false};
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e && !masked.load(std::memory_order_relaxed); ++i)
+                if (vertexInfluence(mesh, verts_[i]) < 1.0f) masked.store(true, std::memory_order_relaxed);
+        }, 65536);
+        lazyNormals = !masked.load();
+    }
+    if (lazyNormals) {
+        if (curvature_.size() != mesh.vertexCount() || curvatureMesh_ != &mesh) {
+            curvature_.assign(mesh.vertexCount(), 0.0f);
+            curvatureFilled_ = false;
+            curvatureMesh_ = &mesh;
+        }
+        if (curvatureStamp_.size() != mesh.vertexCount()) curvatureStamp_.assign(mesh.vertexCount(), 0);
     }
 
     glm::vec3 strokeDir = p.strokeDelta;
@@ -1485,7 +1551,38 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     for (size_t i = begin; i < end; ++i) {
         const uint32_t v = verts_[i];
         const glm::vec3& x = pos[v];
-        const float f = weights_[i];
+        float f = weights_[i];
+        const float h = glm::dot(x - areaCenter, areaNormal);
+        // Crisp edge on a locked plane: the height and facing this stroke found the vertex with (h is what is left
+        // of that height), so every dab of the stroke asks the same of it.
+        float h0 = h, facing = glm::dot(nrm[v], areaNormal);
+        if (crispMax) {
+            if (crispStamp_[v] != stamp) crispStamp_[v] = stamp, crispDone_[v] = 0.0f, crispFacing_[v] = facing;
+            h0 = h / std::max(1.0f - crispDone_[v], 1e-3f);
+            facing = crispFacing_[v];
+        }
+        if (r.crispEdge && r.plane != BrushRecipe::Plane::None && f > 0.0f) {
+            // Crisp edge: the surface turned away from the plane (the side of a box past its edge, the far side of
+            // a thin part) fades out between 85 and 60 degrees off it when cut, so a full pull doesn't fold it onto
+            // the plane as a flap (a 45 degree chamfer across a rounded edge still cuts). Below the plane only a
+            // surface nearly parallel to it fills (dips, not the faces beside a chamfer: those are 45 degrees off
+            // and filling them raised a lip along the facet), fading out between 37 and 23 degrees. (The surface
+            // beside a 45 degree chamfer stays clear of both, so the small turns its normals take as their
+            // neighbours move don't speckle the pull.)
+            const float lo = h0 < 0.0f ? 0.8f : 0.1f;
+            const float hi = h0 < 0.0f ? 0.92f : 0.5f;
+            const float t = std::clamp((facing - lo) / (hi - lo), 0.0f, 1.0f);
+            f *= t * t * (3.0f - 2.0f * t);
+            // Where the tip's edge crosses material far from the plane (the ends of a cut through a ridge), the band
+            // widens to the depth of the cut there, so the wall is a clean slope of about 45 degrees instead of a
+            // cliff a few vertices wide that the triangles can only show as ragged steps.
+            const float depth = std::abs(h0) / rad;
+            if (depth > edge) {
+                const float u = std::clamp(1.0f - brushDistance(p, x) / rad, 0.0f, 1.0f);
+                const float a = std::min(u / edge, 1.0f), b = std::min(u / std::min(depth, 1.0f), 1.0f);
+                f *= a > 0.0f ? std::min((b * b * (3.0f - 2.0f * b)) / (a * a * (3.0f - 2.0f * a)), 1.0f) : 0.0f;
+            }
+        }
         glm::vec3 dir;
         switch (r.direction) {
         case BrushRecipe::Direction::Inflate: dir = nrm[v]; break;
@@ -1495,7 +1592,34 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         }
         glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f);
 
-        const float h = glm::dot(x - areaCenter, areaNormal);
+        // Crisp edge: below the plane only shallow dips fill (fading out from 10% to 30% of the radius deep), so
+        // a plane dragged over a curving form cuts it clean instead of building a wall of filled surface that folds.
+        // And only while the dab is on the plane's level: once a locked stroke runs on over a form falling away
+        // below it (5% to 15% of the radius under it), the brush only cuts, so it doesn't lay a ledge down the curve.
+        float fill = 1.0f;
+        if (r.crispEdge && h0 < 0.0f) {
+            const float t = std::clamp((-h0 / rad - 0.1f) / 0.2f, 0.0f, 1.0f);
+            const float l = std::clamp((-dabLevel - 0.05f) / 0.1f, 0.0f, 1.0f);
+            fill = (1.0f - t * t * (3.0f - 2.0f * t)) * (1.0f - l * l * (3.0f - 2.0f * l));
+        }
+        if (crispMax) {
+            // The vertex goes the strongest pull's share of the way from where this stroke found it: what is
+            // missing of it (h is what is left of that height).
+            const bool side = r.plane == BrushRecipe::Plane::Flatten || (r.plane == BrushRecipe::Plane::Fill) == (h0 < 0.0f);
+            const float want = side ? std::clamp(planePull * f * fill * r.planeAmount, 0.0f, 1.0f) : 0.0f;
+            const float done = crispDone_[v];
+            if (want > done) {
+                const float step = (want - done) / std::max(1.0f - done, 1e-6f);
+                d -= areaNormal * (h * step);
+                crispDone_[v] = want;
+                if (lazyNormals) {
+                    if (curvatureStamp_[v] != stamp) curvatureStamp_[v] = stamp, curvature_[v] = kKeepCurvature;
+                    const glm::vec3 n = glm::mix(nrm[v], areaNormal, step);
+                    const float len = glm::length(n);
+                    if (len > 1e-12f) mesh.normals[v] = n / len;
+                }
+            }
+        } else
         switch (r.plane) {
         case BrushRecipe::Plane::Clay: {
             glm::vec3 planePoint = areaCenter + areaNormal * (sign * rad * 0.06f * s);
@@ -1503,12 +1627,12 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount * clayPull(s));
             break;
         }
-        case BrushRecipe::Plane::Flatten: d -= areaNormal * (h * s * f * r.planeAmount); break;
+        case BrushRecipe::Plane::Flatten: d -= areaNormal * (h * planePull * f * fill * r.planeAmount); break;
         case BrushRecipe::Plane::Fill:
-            if (h < 0.0f) d -= areaNormal * (h * s * f * r.planeAmount);
+            if (h < 0.0f) d -= areaNormal * (h * planePull * f * fill * r.planeAmount);
             break;
         case BrushRecipe::Plane::Scrape:
-            if (h > 0.0f) d -= areaNormal * (h * s * f * r.planeAmount);
+            if (h > 0.0f) d -= areaNormal * (h * planePull * f * r.planeAmount);
             break;
         default: break;
         }
@@ -1517,7 +1641,46 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         scratch_[i] = d;
     }
     });
-    displaceAll(mesh, verts_, scratch_);
+    if (crispMax) { // (most of a locked stroke's region is as far as this dab asks already: only the moves)
+        crispMovedVerts_.clear();
+        crispMoved_.clear();
+        for (size_t i = 0; i < verts_.size(); ++i)
+            if (scratch_[i] != glm::vec3(0.0f)) crispMovedVerts_.push_back(verts_[i]), crispMoved_.push_back(scratch_[i]);
+        displaceAll(mesh, crispMovedVerts_, crispMoved_);
+    } else {
+        displaceAll(mesh, verts_, scratch_);
+    }
+
+    if (crispMax) {
+        // The points pulled onto the plane bunch up where they came from a curve (tiny triangles, speckled
+        // shading): each slides toward its neighbours' middle along the plane only, so the facet's triangles even
+        // out and every height stays as it is.
+        poolFor(verts_.size(), [&](size_t begin, size_t end) {
+            for (size_t i = begin; i < end; ++i) {
+                const uint32_t v = verts_[i];
+                // (only the points this dab moved: the rest of the facet was evened out by the dabs that took it)
+                const bool movedNow = scratch_[i] != glm::vec3(0.0f);
+                scratch_[i] = glm::vec3(0.0f);
+                if (!movedNow) continue;
+                // (only points inside the facet, the plane having taken them and their whole ring: one on its
+                // border would slide over the half-pulled points of the edge's band and fold a triangle there)
+                auto taken = [&](uint32_t u) { return crispStamp_[u] == stamp && crispDone_[u] >= 0.99f; };
+                if (!taken(v)) continue;
+                auto ring = mesh.polygonNeighbors(v);
+                if (ring.empty() || !std::all_of(ring.begin(), ring.end(), taken)) continue;
+                glm::vec3 avg(0.0f);
+                for (uint32_t n : ring) avg += pos[n];
+                const glm::vec3 delta = avg / float(ring.size()) - pos[v];
+                scratch_[i] = (delta - areaNormal * glm::dot(delta, areaNormal)) * 0.25f;
+            }
+        });
+        // (only the points that slide: most of a dab's region doesn't, and displaceAll walks all it is given)
+        crispSlideVerts_.clear();
+        crispSlide_.clear();
+        for (size_t i = 0; i < verts_.size(); ++i)
+            if (scratch_[i] != glm::vec3(0.0f)) crispSlideVerts_.push_back(verts_[i]), crispSlide_.push_back(scratch_[i]);
+        displaceAll(mesh, crispSlideVerts_, crispSlide_);
+    }
 
     if (r.smooth > 0.0f) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
@@ -1535,7 +1698,9 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         });
         displaceAll(mesh, verts_, scratch_);
     }
-    finishDab(mesh, bvh, clock);
+    adaptiveDab_ = lazyNormals;
+    // (a crisp dab's normals: around the points it moved, the relax's being among them, not its whole region)
+    finishDab(mesh, bvh, clock, crispMax && !lazyNormals ? &crispMovedVerts_ : nullptr);
 }
 
 void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) {

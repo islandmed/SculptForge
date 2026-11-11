@@ -575,6 +575,14 @@ void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
         if (ImGui::MenuItem(tr("Use as alpha")))
             app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
     }
+    if (place_.tab == LibraryTab::Alpha) { // the alpha pool (core/AlphaOptions.h): each dab takes one at random
+        if (e.kind == AssetKind::Folder && ImGui::MenuItem(tr("Use folder as alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"folder", e.path}});
+        if (e.kind == AssetKind::Alpha && ImGui::MenuItem(tr("Add to alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"name", builtinAlpha(e.index).name}});
+        if (e.kind == AssetKind::AlphaFile && ImGui::MenuItem(tr("Add to alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"path", e.path}});
+    }
     if (!e.path.empty() && e.kind != AssetKind::Up) {
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Show in file manager"))) {

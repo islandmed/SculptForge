@@ -5,6 +5,68 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.7
+
+```features
+date: 2026-11-11
+tagline: Booleans between Parts, Gaussian splats with Blender, and a panel of your own.
+highlight: Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview
+highlight: Gaussian splats both ways with Blender 5.3 through the Blender bridge
+highlight: Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)
+highlight: My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)
+highlight: Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)
+highlight: Alpha pool and jitter for non-repeating detail
+highlight: Crisp Flatten: hard planes with a sharp edge
+highlight: Warnings before destructive operations
+highlight: Put any brush on Shift or Ctrl
+highlight: Orbit around the point under the pointer
+highlight: Exact Booleans between Parts, with a live preview
+highlight: My Panel, a panel you build from your own buttons and sections
+highlight: Smooth Peaks brush
+highlight: Repeat a Part along a curve, real braids and springs
+```
+
+- "**Alpha pool and jitter**: **Sculpt > Alpha** has **Scale jitter** and **Position jitter**, and right-clicking an
+  alpha or a folder of images in the Library gives **Add to alpha pool** / **Use folder as alpha pool**: each dab
+  takes a random alpha, for wood grain and scans that never repeat. Three procedural wood grains are included.
+  Requested by a member."
+- **Splats with Blender**: with the Blender add-on and Blender 5.3, Gaussian splats go to Blender and back with one
+  click, view-dependent colour and placement kept. **File > Export > Gaussian Splats (.ply)** in Blender saves them
+  (Blender can't), and a dropped `.splat` file imports there.
+- **Crisp Flatten** (Hard Surface pack; thanks _tfx on Discord): flattens to the plane the stroke starts on with a
+  clean, sharp edge instead of a soft fade, for hard planes and crisp bevels. In Brush Lab, any custom brush can use
+  the new **Lock plane** and **Crisp edge** options.
+- **More warnings before levels go**: Delete Masked, Remove Hidden, Split, Mirror, Make Symmetric and Merge by
+  Distance ask before they drop a Part's subdivision levels.
+- **Shift and Ctrl brushes**: **Shift+click** a brush on the bottom shelf (Trim, Flatten...) and holding Shift sculpts
+  with it instead of Smooth; **Ctrl+click** one and holding Ctrl sculpts with it instead of masking. Your main brush
+  stays.
+- **Orbit around the pointer**: Preferences > Input. A rotation that starts over the model turns the view about the
+  point under the pointer, and zooms after it work at that depth. On for new installs; turn it on there if you used
+  SculptForge before (thanks dm4nd on Discord).
+- **Booleans between Parts**: in **Tool > Parts**, click the mark in a Part's row for **Add**, **Subtract** or
+  **Intersect**; the view shows the result live, and **Make Boolean Mesh** turns it into a new Part (the sources stay,
+  hidden). Exact and watertight, with face groups, vertex paint and UVs kept.
+- "**My Panel** (Edit menu): a panel of your own. Hold Alt and drag any button or whole section from any palette into
+  it, then keep it in a tray or press F4 to open it at the cursor."
+- "**Smooth Peaks brush**: a new brush in the Smooth family that only lowers the high points, the parts that stick out
+  above the surrounding surface, and leaves the hollows alone. Shift-smooth is unchanged. Requested by ABHITAR."
+- **Tube**: Braid now weaves over and under, Rope and Braid take 1 to 8 **Strands** (one is a spring), and **Repeat
+  along curve** lays copies of another Part along a tube or curve (chain links, beads, scales).
+- **A leaner Welcome** (Help > Welcome): the 10-minute lesson and the quick tour side by side, shorter AI and
+  membership lines, and a row of small icons for Discord, GitHub, X, Bluesky, Instagram and Facebook (also in Help >
+  About).
+- The layout now saves itself. Customize Shelves edits, trays and palettes are written a couple of seconds after you
+  change them and when you quit, so a restart or a crash no longer loses them. **Save Layout** now marks the layout
+  that **Revert to Saved Layout** returns to.
+- **SpaceMouse** (macOS, Windows): a SpaceMouse that 3Dconnexion's driver was holding when SculptForge started should
+  be picked up on its own once the driver lets go, no unplugging needed.
+- **More threads, for real**: a **Threads** value above 16 (Preferences > Performance) now reaches the brushes and the
+  remesher after a restart.
+- **Faster Undo after a remesh**: undoing or redoing a Voxel Remesh (or another whole-model step) on a very dense
+  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
+
 ## Version 0.12.6
 
 ```features

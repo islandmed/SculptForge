@@ -8,8 +8,11 @@
 #include "core/AlphaOptions.h"
 #include "core/BrushAlpha.h"
 #include "core/BrushSettings.h"
+#include "core/Image.h"
 
 #include <cmath>
+#include <filesystem>
+#include <set>
 
 using namespace sf;
 
@@ -92,6 +95,8 @@ TEST(alpha_options_saved_per_brush) {
     s.alphaOptions.followStroke = true;
     s.alphaOptions.angle = -45.0f;
     s.alphaOptions.jitter = 15.0f;
+    s.alphaOptions.scaleJitter = 25.0f;
+    s.alphaOptions.positionJitter = 40.0f;
     s.alphaOptions.tileX = 3;
     s.alphaOptions.tileY = 2;
     BrushToolSettings back;
@@ -178,4 +183,96 @@ TEST(slide_stamp_turn_follows_the_cursor_while_the_key_is_held) {
     t.reset();
     CHECK(!t.turned() && t.angle() == 0.0f);
     CHECK(brush == before);
+}
+
+// The alpha-pool workflow: Scale and Position jitter per dab.
+TEST(alpha_scale_and_position_jitter) {
+    AlphaOptions o;
+    uint32_t seed = 7;
+    AlphaDabJitter none = alphaDabJitter(o, seed);
+    CHECK(none.scale == 1.0f && none.offset == glm::vec2(0.0f) && seed == 7); // off: nothing drawn, the seed untouched
+    o.scaleJitter = 30.0f;
+    o.positionJitter = 50.0f;
+    float lo = 9.0f, hi = 0.0f, far = 0.0f;
+    std::set<float> seen;
+    for (int i = 0; i < 400; ++i) {
+        const AlphaDabJitter j = alphaDabJitter(o, seed);
+        lo = std::min(lo, j.scale);
+        hi = std::max(hi, j.scale);
+        far = std::max(far, glm::length(j.offset));
+        seen.insert(j.scale);
+    }
+    CHECK(lo >= 0.7f - 1e-5f && hi <= 1.3f + 1e-5f && lo < 0.8f && hi > 1.2f); // spans the range, never outside
+    CHECK(far <= 0.5f + 1e-5f && far > 0.4f);                                   // inside the disc, reaching out
+    CHECK(seen.size() > 100);
+    // Scale alone leaves the dab where it is; the same seed repeats the same jitter.
+    AlphaOptions scaleOnly;
+    scaleOnly.scaleJitter = 20.0f;
+    uint32_t a = 99, b = 99;
+    const AlphaDabJitter first = alphaDabJitter(scaleOnly, a), again = alphaDabJitter(scaleOnly, b);
+    CHECK(first.offset == glm::vec2(0.0f) && first.scale == again.scale && a == b);
+    // Damaged files are clamped.
+    AlphaOptions bad;
+    bad.scaleJitter = 500.0f;
+    bad.positionJitter = std::nanf("");
+    bad.clamp();
+    CHECK(bad.scaleJitter == 90.0f && bad.positionJitter == 0.0f);
+}
+
+TEST(alpha_pool_from_folder_and_pick) {
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / "sculptforge_alpha_pool_test";
+    fs::remove_all(dir);
+    fs::create_directories(dir / "sub");
+    auto plank = [&](const char* name, uint8_t grey) {
+        Image img;
+        img.width = img.height = 8;
+        img.rgba.assign(8 * 8 * 4, grey);
+        for (size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
+        std::string err;
+        CHECK(img.savePng((dir / name).string(), err));
+    };
+    plank("plank_b.png", 200);
+    plank("plank_a.png", 100);
+    plank("plank_c.png", 50);
+    plank("sub/hidden.png", 10); // sub-folders are not part of the pool
+    { std::FILE* f = std::fopen((dir / "notes.txt").string().c_str(), "w"); if (f) std::fclose(f); }
+    std::string err;
+    const auto pool = AlphaPool::fromFolder(dir.string(), err);
+    CHECK(pool && pool->size() == 3);
+    if (!pool) return;
+    CHECK(pool->at(0)->name == "plank_a" && pool->at(1)->name == "plank_b" && pool->at(2)->name == "plank_c"); // A-Z
+    CHECK(pool->contains(pool->at(1)->path) && !pool->contains("nope"));
+    // Every member gets picked, and the same seed repeats the same sequence (a stroke is repeatable).
+    uint32_t s1 = 12345, s2 = 12345;
+    std::set<std::string> picked;
+    for (int i = 0; i < 60; ++i) {
+        const auto& x = pool->pick(s1);
+        CHECK(x->name == pool->pick(s2)->name);
+        picked.insert(x->name);
+    }
+    CHECK(picked.size() == 3);
+    // Picked alphas keep the image's values (grey 100 -> 0.39).
+    CHECK(near(pool->at(0)->values[0], 100.0f / 255.0f, 0.01f));
+    // An empty folder says so; adding is a copy that dedupes; a one-alpha pool never uses the seed.
+    fs::create_directories(dir / "empty");
+    CHECK(!AlphaPool::fromFolder((dir / "empty").string(), err) && !err.empty());
+    const auto more = pool->with(*pool->at(0));
+    CHECK(more->size() == 3 && pool->size() == 3);
+    BrushAlpha wood;
+    CHECK(BrushAlpha::builtin("Procedural Wood Straight", wood));
+    const auto four = pool->with(wood);
+    CHECK(four->size() == 4 && pool->size() == 3 && four->contains("Procedural Wood Straight"));
+    const auto one = AlphaPool{}.with(wood);
+    uint32_t seed = 5;
+    CHECK(one->pick(seed)->name == "Procedural Wood Straight" && seed == 5);
+    fs::remove_all(dir);
+}
+
+TEST(procedural_wood_alphas_are_named_as_such) {
+    for (const char* name : {"Procedural Wood Straight", "Procedural Wood Cathedral", "Procedural Wood Weathered"}) {
+        BrushAlpha a;
+        CHECK(BrushAlpha::builtin(name, a) && !a.empty());
+        CHECK(BrushAlpha::builtinHelp(name).find("not a scan") != std::string::npos); // never passed off as a scan
+    }
 }

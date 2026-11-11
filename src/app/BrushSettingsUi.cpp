@@ -93,6 +93,7 @@ void App::initBrushSettings() {
                        options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f && !options_.measureKeyNav;
     brushSettingsKey_ = currentBrushKey();
     registerAlphaOptionsCommand();
+    registerAlphaPoolCommand();
     registerPenPressureCommand();
     shippedPenPressure();
     if (!brushSettingsOn_) return;
@@ -215,6 +216,8 @@ void App::registerAlphaOptionsCommand() {
                    {{"follow_stroke", T::Bool, "Turn the alpha along the stroke (smoothed over 20 pixels).", false},
                     {"angle", T::Number, "Fixed angle in degrees, -180..180 (counter-clockwise).", false},
                     {"angle_jitter", T::Number, "Random turn per dab, up to this many degrees either way (0..180).", false},
+                    {"scale_jitter", T::Number, "Random size per dab, up to this many percent bigger or smaller (0..90).", false},
+                    {"position_jitter", T::Number, "Random shift per dab, up to this many percent of the dab's radius (0..100).", false},
                     {"tile_x", T::Number, "Repeat the alpha this many times across the dab (1..8).", false},
                     {"tile_y", T::Number, "Repeat the alpha this many times down the dab (1..8).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -222,6 +225,8 @@ void App::registerAlphaOptionsCommand() {
                        o.followStroke = argBool(a, "follow_stroke", o.followStroke);
                        o.angle = float(argNumber(a, "angle", o.angle));
                        o.jitter = float(argNumber(a, "angle_jitter", o.jitter));
+                       o.scaleJitter = float(argNumber(a, "scale_jitter", o.scaleJitter));
+                       o.positionJitter = float(argNumber(a, "position_jitter", o.positionJitter));
                        o.tileX = int(std::lround(argNumber(a, "tile_x", o.tileX)));
                        o.tileY = int(std::lround(argNumber(a, "tile_y", o.tileY)));
                        syncAlphaTile();
@@ -231,8 +236,51 @@ void App::registerAlphaOptionsCommand() {
                                              std::to_string(int(std::lround(o.jitter)))};
                        return {true, std::string("Alpha: ") + (o.followStroke ? "follows the stroke, " : "") + "angle " +
                                          std::to_string(int(std::lround(o.angle))) + ", jitter " +
-                                         std::to_string(int(std::lround(o.jitter))) + ", tile " +
+                                         std::to_string(int(std::lround(o.jitter))) + ", scale jitter " +
+                                         std::to_string(int(std::lround(o.scaleJitter))) + "%, position jitter " +
+                                         std::to_string(int(std::lround(o.positionJitter))) + "%, tile " +
                                          std::to_string(o.tileX) + " x " + std::to_string(o.tileY)};
+                   }});
+}
+
+// The alpha pool (core/AlphaOptions.h): each dab takes one of these alphas at random. Not kept per brush or in the
+// project: a folder of scans is one command (or one right-click in the Library) away.
+void App::registerAlphaPoolCommand() {
+    using T = ParamSpec::Type;
+    commands_.add({"brush_alpha_pool",
+                   "The alpha pool: each dab (and each Drag Stamp) draws with one of these alphas, picked at random. "
+                   "Use a folder of images, or add alphas one at a time; clear empties it. Combine with Angle, Scale and "
+                   "Position jitter so the detail never repeats.",
+                   {{"folder", T::String, "Replace the pool with the images in this folder (up to 32, A-Z).", false},
+                    {"path", T::String, "Add this image file to the pool.", false},
+                    {"name", T::String, "Add this built-in alpha to the pool.", false},
+                    {"clear", T::Bool, "Empty the pool (the brush draws with its own alpha again).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       if (argBool(a, "clear", false)) {
+                           alphaPool_.reset();
+                           return {true, "Alpha pool emptied"};
+                       }
+                       if (const std::string folder = argString(a, "folder"); !folder.empty()) {
+                           std::string err;
+                           auto pool = AlphaPool::fromFolder(folder, err);
+                           if (!pool) return {false, err};
+                           alphaPool_ = std::move(pool);
+                       } else if (const std::string path = argString(a, "path"); !path.empty()) {
+                           Image img;
+                           std::string err;
+                           if (!Image::load(path, img, err)) return {false, err};
+                           const auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
+                           BrushAlpha alpha = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()));
+                           alpha.path = path;
+                           alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
+                       } else if (const std::string name = argString(a, "name"); !name.empty()) {
+                           BrushAlpha alpha;
+                           if (!BrushAlpha::builtin(name, alpha)) return {false, "Unknown alpha: " + name};
+                           alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
+                       } else {
+                           return {false, "Give a folder, a path or a built-in name (or clear)"};
+                       }
+                       return {true, "Alpha pool: " + std::to_string(alphaPool_->size()) + " alphas"};
                    }});
 }
 
