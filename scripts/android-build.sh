@@ -43,10 +43,12 @@ rm -rf "$jni"
 sdl=
 for abi in "${abis[@]}"; do
   b=$out/native-$abi
+  # (no C++ modules here: CMake would scan with the system's clang-scan-deps, which can't read the NDK's PCHs)
   cmake -S . -B "$b" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-28 -DANDROID_STL=c++_static \
     -DCMAKE_BUILD_TYPE=$cmake_type -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_PLUGINS=OFF \
+    -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
     ${CMAKE_CXX_COMPILER_LAUNCHER:+-DCMAKE_C_COMPILER_LAUNCHER=$CMAKE_CXX_COMPILER_LAUNCHER -DCMAKE_CXX_COMPILER_LAUNCHER=$CMAKE_CXX_COMPILER_LAUNCHER}
   cmake --build "$b" --target sculptforge
   mkdir -p "$jni/$abi"
