@@ -41,6 +41,9 @@ enum Kind : uint32_t { kStretch = 0, kBend = 1, kSeam = 2 };
 constexpr int kSeamRampFrames = 30;
 constexpr float kOmega = 1.0f; // (Gauss-Seidel over colours: no over-relaxation needed)
 constexpr float kDrag = 0.3f;  // air drag, 1/s (wind)
+// A slow particle's contact (under this many times restSpeed: cloth settling) keeps last frame's triangle unless
+// another is nearer by this share of the contact thickness. (Moving cloth needs no keep; keeping slowed its settling.)
+constexpr float kContactKeepSpeed = 3.0f, kContactKeep = 0.5f;
 
 } // namespace
 
@@ -185,11 +188,22 @@ bool ClothColliders::raycast(const glm::vec3& origin, const glm::vec3& dir, floa
 bool ClothColliders::empty() const { return impl_->triangles.empty(); }
 size_t ClothColliders::triangles() const { return impl_->triangles.size(); }
 
-bool ClothColliders::closest(const glm::vec3& p, float maxDistance, glm::vec3& point, glm::vec3& normal) const {
+bool ClothColliders::closest(const glm::vec3& p, float maxDistance, glm::vec3& point, glm::vec3& normal, uint32_t* triangle,
+                             float keep) const {
     const Impl& m = *impl_;
     if (!m.built || m.triangles.empty()) return false;
     SurfaceHit hit;
     if (!m.bvh.closestPoint(p, maxDistance, hit)) return false;
+    if (triangle && *triangle < m.triangles.size() && *triangle != hit.prim) {
+        // (the last one, unless this one is clearly nearer: a particle resting near an edge went from one face to the
+        // next and back, its push and friction turning each time, and cloth on a faceted body crept round it)
+        const glm::uvec3 k = m.triangles[*triangle];
+        glm::vec3 bary;
+        const glm::vec3 q = closestPointOnTriangle(p, m.positions[k.x], m.positions[k.y], m.positions[k.z], bary);
+        const float d = glm::distance(p, q);
+        if (d <= maxDistance && d <= hit.distance + keep) hit.prim = *triangle, hit.position = q, hit.bary = bary, hit.distance = d;
+    }
+    if (triangle) *triangle = hit.prim;
     const glm::uvec3 t = m.triangles[hit.prim];
     glm::vec3 n = m.normals[t.x] * hit.bary.x + m.normals[t.y] * hit.bary.y + m.normals[t.z] * hit.bary.z;
     const float l = glm::length(n);
@@ -455,12 +469,14 @@ void ClothSim::findContacts(float frame) {
     contact_.assign(n, 0);
     contactPoint_.resize(n);
     contactNormal_.resize(n);
+    contactTri_.resize(n, ~0u);
     contactReach_.assign(n, 0.0f);
     hadContact2_.swap(contact2_);
     hadContact2_.resize(n, 0);
     contact2_.assign(n, 0);
     contactPoint2_.resize(n);
     contactNormal2_.resize(n);
+    contactTri2_.resize(n, ~0u);
     if (!colliders_ || colliders_->empty()) return;
     const float thickness = contactThickness();
     poolFor(n, [&](size_t b, size_t e) {
@@ -470,7 +486,9 @@ void ClothSim::findContacts(float frame) {
             const float reach = thickness * 2.0f + (glm::length(v_[i]) + glm::length(settings_.gravity) * frame) * frame * 1.5f;
             contactReach_[i] = reach;
             glm::vec3 q, nrm;
-            if (colliders_->closest(x_[i], reach, q, nrm)) {
+            const bool slow = glm::length(v_[i]) < kContactKeepSpeed * settings_.restSpeed;
+            const float keep = slow ? kContactKeep * thickness : 0.0f;
+            if (colliders_->closest(x_[i], reach, q, nrm, &contactTri_[i], keep)) {
                 contact_[i] = 1;
                 contactPoint_[i] = q;
                 contactNormal_[i] = nrm;
@@ -483,12 +501,16 @@ void ClothSim::findContacts(float frame) {
                 glm::vec3 q2, n2;
                 // (and only one the particle, pushed off this surface, could reach this frame: a wrinkle nearby on a
                 // dense scan is no corner)
-                if (colliders_->closest(q + nrm * probe, probe * 0.999f, q2, n2) && glm::dot(n2, nrm) < 0.9f &&
-                    glm::dot(q + nrm * thickness - q2, n2) < reach) {
+                if (colliders_->closest(q + nrm * probe, probe * 0.999f, q2, n2, &contactTri2_[i], keep) &&
+                    glm::dot(n2, nrm) < 0.9f && glm::dot(q + nrm * thickness - q2, n2) < reach) {
                     contact2_[i] = 1;
                     contactPoint2_[i] = q2;
                     contactNormal2_[i] = n2;
+                } else {
+                    contactTri2_[i] = ~0u;
                 }
+            } else {
+                contactTri_[i] = contactTri2_[i] = ~0u;
             }
         }
     }, 1024);
@@ -860,14 +882,36 @@ bool ClothSim::step() {
         if (w_[i] > 0.0f) far = std::max(far, glm::dot(x_[i] - twoBack_[i], x_[i] - twoBack_[i]));
     restPeak_ = std::max(restPeak_, std::sqrt(far) / (2.0f * frame));
     twoBack_ = start_; // (this frame's start: two frames back at the end of the next one)
+    // (each particle's mean position over the window against the last window's, not where it ended: one going round
+    // three spots, or any short cycle, goes nowhere; at rest it stops at the middle of its cycle, not on one end of it.
+    // One moving steadily moves its mean as far as its end, so this is no looser for it.)
     const int window = std::max(1, settings_.restFrames);
-    if (restFrom_.size() != x_.size()) restFrom_ = start_, restFromFrame_ = frame_ - 1, restPeak_ = maxSpeed_;
+    if (restSum_.size() != x_.size()) {
+        restFromFrame_ = frame_ - 1, restPeak_ = maxSpeed_;
+        restSum_.assign(x_.size(), glm::vec3(0.0f));
+        restMean_.clear();
+    }
+    for (size_t i = 0; i < x_.size(); ++i) restSum_[i] += x_[i];
     if (frame_ - restFromFrame_ >= window) {
-        float drift = 0.0f;
-        for (size_t i = 0; i < x_.size(); ++i)
-            if (w_[i] > 0.0f) drift = std::max(drift, glm::dot(x_[i] - restFrom_[i], x_[i] - restFrom_[i]));
-        rested_ = std::sqrt(drift) < settings_.restSpeed * frame * float(window) * 0.5f && restPeak_ < settings_.restSpeed * 10.0f;
-        restFrom_ = x_, restFromFrame_ = frame_, restPeak_ = 0.0f;
+        const float inv = 1.0f / float(frame_ - restFromFrame_);
+        float moved = std::numeric_limits<float>::max(); // (the first window has nothing to compare with)
+        if (restMean_.size() == x_.size()) {
+            moved = 0.0f;
+            for (size_t i = 0; i < x_.size(); ++i)
+                if (w_[i] > 0.0f) {
+                    const glm::vec3 d = restSum_[i] * inv - restMean_[i];
+                    moved = std::max(moved, glm::dot(d, d));
+                }
+            moved = std::sqrt(moved);
+        }
+        restMean_.resize(x_.size());
+        for (size_t i = 0; i < x_.size(); ++i) restMean_[i] = restSum_[i] * inv;
+        rested_ = moved < settings_.restSpeed * frame * float(window) * 0.5f && restPeak_ < settings_.restSpeed * 10.0f;
+        if (rested_)
+            for (size_t i = 0; i < x_.size(); ++i)
+                if (w_[i] > 0.0f) x_[i] = restMean_[i], v_[i] = glm::vec3(0.0f);
+        restFromFrame_ = frame_, restPeak_ = 0.0f;
+        restSum_.assign(x_.size(), glm::vec3(0.0f));
     }
     return !atRest();
 }

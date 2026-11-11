@@ -2008,6 +2008,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
+        if (garmentPlaceMouseDown(x, y, mod)) return; // Garments > Place panels (PanelGarmentDrape.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another Part makes it the active one and frames it (#43). (Its first two clicks
@@ -2930,6 +2931,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     if (doc_.sculptor.strokeActive()) endStroke();
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
+    if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
@@ -2960,6 +2962,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
+    if (name == "garment_drape") garmentPreviewDirty_ = false; // (no preview over the Part it made)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
