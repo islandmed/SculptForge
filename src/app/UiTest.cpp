@@ -159,7 +159,7 @@
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
-//                            saved_views (View > Views), mask_darkness (0-100),
+//                            saved_views (View > Views), mask_darkness (0-100), mask_colour_custom (1: a picked Mask colour),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
 //                            axis), camera_distance, camera_pan (target offset);
@@ -965,6 +965,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "dynamic") return app_.doc_.sculptor.dyntopo.enabled ? 1.0 : 0.0;
     if (name == "dynamic_detail") return std::round(app_.doc_.sculptor.dyntopo.detail * 100.0f);
     if (name == "saved_views") return double(app_.savedViews_.size());
+    if (name == "mask_colour_custom") return app_.renderSettings_.maskColorCustom ? 1.0 : 0.0;
     if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
     if (name == "dab_scene_error_px") { // the last dab's centre, placed in the scene and shown by the view, to the cursor

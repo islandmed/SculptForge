@@ -3040,6 +3040,13 @@ void App::freezeLevelsAndDynamic() {
 
 void App::setMaskDarkness(float k) { uiPrefs_.maskDarkness = renderSettings_.maskDarkness = std::clamp(k, 0.0f, 1.0f); }
 
+void App::setMaskColor(bool custom, const glm::vec3& srgb) {
+    uiPrefs_.maskColorCustom = custom;
+    uiPrefs_.maskColor = glm::clamp(srgb, 0.0f, 1.0f);
+    renderSettings_.maskColorCustom = custom;
+    renderSettings_.maskColor = srgbToLinear(uiPrefs_.maskColor); // (the shader blends in linear light)
+}
+
 void App::confirmLevelDelete(const std::string& command) {
     pendingLevelDelete_ = command;
     openLevelDelete_ = true;
