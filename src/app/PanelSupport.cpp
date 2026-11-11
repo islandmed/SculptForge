@@ -285,7 +285,9 @@ void App::drawSupportUi() {
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Appearing);
+        // Height 0 every frame: the window fits its content, so the featured creator card arriving after the first frame
+        // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold.
+        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Always);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         if (ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags)) {
             // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
