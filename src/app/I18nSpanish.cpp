@@ -724,6 +724,9 @@ constexpr Entry kSpanish[] = {
      "Clay Block...) stay as they are.",
      "El idioma de los menús, las paletas, los estantes y los mensajes. Los nombres de pinceles y herramientas "
      "(Quad Remesh, Forge Spheres, Clay Block...) se quedan como están."},
+    {"Ask before dropping subdivision levels", "Preguntar antes de quitar niveles de subdivisión"},
+    {"Subdivide, Voxel and Quad Remesh, Decimate, Delete Masked or Hidden, Split, Mirror, Make Symmetric and Merge by Distance remove the subdivision levels of a Part that has them. On: they ask first (Ctrl+Z brings the levels back). Off: they go straight through.",
+     "Subdividir, Voxel y Quad Remesh, Decimar, Eliminar enmascarado u oculto, Dividir, Espejo, Hacer simétrico y Unir por distancia quitan los niveles de subdivisión de una pieza que los tiene. Activado: preguntan antes (Ctrl+Z recupera los niveles). Desactivado: se ejecutan directamente."},
     {"Ctrl+hover help", "Ayuda con Ctrl+pasar el ratón"},
     {"Help box opacity", "Opacidad del cuadro de ayuda"},
     {"Tooltip delay", "Retardo de las descripciones"},

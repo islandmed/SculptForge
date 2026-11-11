@@ -2911,6 +2911,23 @@ void App::runCommand(const std::string& name, const Args& args) {
         lastCommandOk_ = packs_.review != nullptr;
         return;
     }
+    // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
+    // A running macro and the "keep original" / preview forms don't touch the levels.
+    if (macros_.runDepth == 0) {
+        const char* op = nullptr;
+        if (name == "delete_masked") op = "Delete Masked";
+        else if (name == "delete_hidden") op = "Remove Hidden";
+        else if (name == "mirror") op = "Mirror";
+        else if (name == "mirror_and_weld") op = "Make Symmetric";
+        else if (name == "weld_points" && !argBool(args, "preview", false)) op = "Merge by Distance";
+        else if ((name == "part_split_hidden" || name == "part_split_masked" || name == "part_split_unmasked") &&
+                 !argBool(args, "keep", false))
+            op = "Split";
+        if (op && !levelsAllow(op, [this, name, args] { runCommand(name, args); })) {
+            lastCommandOk_ = false;
+            return;
+        }
+    }
     // A big mesh (Subdivide, Add Level, micro, remesh) asks first when it wouldn't fit the memory free now.
     if (!memoryAllows(name, args, [this, name, args] { runCommand(name, args); })) {
         lastCommandOk_ = false;

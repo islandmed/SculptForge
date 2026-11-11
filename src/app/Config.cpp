@@ -1804,6 +1804,16 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Show startup splash", nullptr,
                  "Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
                  "Preferences > Interface");
+    {
+        // #173: Don't ask again in the pop-ups turns these off; this brings the asking back (or turns it off in one go).
+        bool ask = p.confirmRemeshLevels || p.confirmSubdivide;
+        if (ImGui::Checkbox(tr("Ask before dropping subdivision levels"), &ask)) p.confirmRemeshLevels = p.confirmSubdivide = ask;
+        ui::HelpText("Ask before dropping subdivision levels", nullptr,
+                     "Subdivide, Voxel and Quad Remesh, Decimate, Delete Masked or Hidden, Split, Mirror, Make Symmetric and "
+                     "Merge by Distance remove the subdivision levels of a Part that has them. On: they ask first (Ctrl+Z "
+                     "brings the levels back). Off: they go straight through.",
+                     "Preferences > Interface");
+    }
     ImGui::Checkbox(tr("Ctrl+hover help"), &p.popupInfo);
     ui::HelpText("Ctrl+hover help", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "

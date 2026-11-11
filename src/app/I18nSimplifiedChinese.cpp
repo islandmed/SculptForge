@@ -1341,6 +1341,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"The language of menus, palettes, shelves and messages. Brush and tool names (Quad Remesh, Forge Spheres, Clay "
      "Block...) stay as they are.",
      "菜单、调色板、工具栏与消息所使用的语言。笔刷与工命名称（Quad Remesh、Forge Spheres、Clay Block...）保持原样。"},
+    {"Ask before dropping subdivision levels", "丢弃细分级别前先询问"},
+    {"Subdivide, Voxel and Quad Remesh, Decimate, Delete Masked or Hidden, Split, Mirror, Make Symmetric and Merge by Distance remove the subdivision levels of a Part that has them. On: they ask first (Ctrl+Z brings the levels back). Off: they go straight through.",
+     "细分、体素和四边形重拓扑、减面、删除遮罩或隐藏部分、拆分、镜像、对称化和按距离合并，会移除带细分级别的部件的细分级别。开启：先询问（Ctrl+Z 可恢复级别）。关闭：直接运行。"},
     {"Ctrl+hover help", "Ctrl+悬停帮助"},
     {"Help box opacity %.2f", "帮助框不透明度 %.2f"},
     {"Help box opacity", "帮助框不透明度"},
