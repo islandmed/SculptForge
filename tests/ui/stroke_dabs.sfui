@@ -1,0 +1,22 @@
+# Dab placement (#195): a stroke lays the same dabs whatever came before it.
+run new_sphere subdivisions=5
+brush_size 30
+
+# #195: the first fast mouse stroke after a pen stroke. While the pen is in range its mouse events are ignored
+# (some drivers send stray ones beside the pen's), and that took every motion sample of the flick but the first
+# and the last: 2 dabs instead of the line the next flick laid.
+stroke 0.40 0.5 0.60 0.5 0.12
+remember last_stroke_dabs flick
+expect_value last_stroke_dabs > 10
+key ctrl+z
+pen_stroke 0.3 0.45 0.7 0.45 0.6 0.6
+expect_value stroking == 0
+stroke 0.40 0.5 0.60 0.5 0.12
+expect_value last_stroke_dabs >= $flick*0.9
+expect_value last_stroke_dabs <= $flick*1.1
+key ctrl+z
+key ctrl+z
+# ... and straight after the pen lifted, before it left the range
+pen_stroke 0.3 0.45 0.7 0.45 0.6 0.6 tail
+stroke 0.40 0.55 0.60 0.55 0.12
+expect_value last_stroke_dabs >= $flick*0.9
