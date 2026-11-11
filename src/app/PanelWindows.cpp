@@ -264,6 +264,11 @@ void App::restorePanelWindows() {
         return;
     }
     if (!rememberWindow_ || !panelWindowsAvailable()) return;
+    if (options_.resetLayout) { // --reset-layout: every panel in the main window, the windows' old places forgotten
+        panelPlacements_.clear();
+        savePanelWindows();
+        return;
+    }
     std::ifstream f(panelsPath());
     if (!f) return;
     Json j;

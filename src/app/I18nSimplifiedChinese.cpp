@@ -1338,6 +1338,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
      "立即将偏好设置与快捷键写入磁盘。通常不需要：每次更改后它们会在片刻后自动保存。"},
     {"Reset Layout and Shortcuts", "重置布局与快捷键"},
+    {"Reset Layout", "重置布局"},
+    {"Put back on the shelf: ", "放回工具架: "},
+    {"Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).",
+     "回到内置的工具架、托盘和面板，所有面板都回到主窗口。快捷键与偏好设置保留。无论布局处于什么状态都能使用（布局无法使用时：用 --reset-layout 启动）。"},
     {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
      "the layout.",
      "回到内置的布局、快捷键与饼菜单。快捷键会自动保存；“保存布局”会保留布局。"},

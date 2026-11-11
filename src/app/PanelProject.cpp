@@ -53,6 +53,7 @@ std::string utf8(const std::filesystem::path& p) {
     return std::string(s.begin(), s.end());
 }
 std::string autosavePath(const std::string& prefDir) { return prefDir + "autosave.sfproj"; }
+std::string autosavePrevPath(const std::string& prefDir) { return prefDir + "autosave.prev.sfproj"; }
 bool fileExists(const std::string& p) {
     std::error_code ec;
     return std::filesystem::is_regular_file(fsPath(p), ec);
@@ -218,7 +219,9 @@ void App::initProject() {
 
     // An autosave newer than the last clean exit means the previous session ended unexpectedly.
     std::error_code ec;
-    const auto autosave = fsPath(autosavePath(prefDir_)), marker = fsPath(prefDir_ + "clean_exit");
+    auto autosave = fsPath(autosavePath(prefDir_));
+    const auto marker = fsPath(prefDir_ + "clean_exit");
+    if (!std::filesystem::is_regular_file(autosave, ec)) autosave = fsPath(autosavePrevPath(prefDir_)); // (the one before a skipped prompt)
     if (std::filesystem::is_regular_file(autosave, ec)) {
         const auto saved = std::filesystem::last_write_time(autosave, ec);
         std::error_code ec2;
@@ -313,6 +316,7 @@ void App::rememberRecent(const std::string& path) {
     std::string full = utf8(std::filesystem::absolute(fsPath(path), ec).lexically_normal());
     if (ec) full = path;
     if (full == utf8(fsPath(autosavePath(prefDir_)).lexically_normal())) return;
+    if (full == utf8(fsPath(autosavePrevPath(prefDir_)).lexically_normal())) return;
     recentFiles_ = addRecentFile(std::move(recentFiles_), full);
     saveProjectPrefs();
 }
@@ -357,15 +361,30 @@ void App::tickProject(float dt) {
         (revision == autosaveRevision_ && !doc_.modified))
         return;
     autosaveTimer_ = 0.0f;
+    autosaveNow();
+}
+
+// The first autosave of a session never replaces the one a session before it left: that one is kept as
+// autosave.prev.sfproj (a crash, then a start whose Restore prompt was skipped or declined, must not cost the work).
+bool App::autosaveNow() {
+    // (UI tests run as a demo script, so interactive() is false there; they set prefDir_ before it and write the file too.)
+    const bool recording = !options_.renderPath.empty() || !options_.recordPath.empty() || (demo_ && options_.uiTest.empty());
+    if (recording || prefDir_.empty() || !doc_.dirty()) return false;
+    const uint64_t revision = doc_.undo.revision() * 1000003u + doc_.splatsVersion;
+    std::error_code ec;
+    if (!autosaveWritten_ && std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), ec))
+        std::filesystem::rename(fsPath(autosavePath(prefDir_)), fsPath(autosavePrevPath(prefDir_)), ec);
+    autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
-        autosaveRevision_ = revision;
-        autosaveWritten_ = true;
-        SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
-    } else {
+    if (!saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
         status_ = "Autosave failed: " + err;
+        return false;
     }
+    autosaveRevision_ = revision;
+    autosaveWritten_ = true;
+    SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
+    return true;
 }
 
 void App::saveProjectAs(bool forceDialog) {
@@ -852,7 +871,9 @@ void App::drawProjectPopups() {
         }
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
-        const std::string autosave = autosavePath(prefDir_);
+        std::error_code existsEc;
+        const std::string autosave = std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), existsEc)
+                                         ? autosavePath(prefDir_) : autosavePrevPath(prefDir_);
         if (ImGui::Button(tr("Restore"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             runCommand("open_project", {{"path", autosave}});
@@ -866,7 +887,8 @@ void App::drawProjectPopups() {
         if (ImGui::Button(tr("Discard"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             std::error_code ec;
-            std::filesystem::remove(fsPath(autosave), ec);
+            std::filesystem::remove(fsPath(autosavePath(prefDir_)), ec);
+            std::filesystem::remove(fsPath(autosavePrevPath(prefDir_)), ec);
         }
         ImGui::EndPopup();
     }

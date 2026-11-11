@@ -122,7 +122,7 @@ key enter
 expect_status "Layout saved"
 expect_value ui_config == 1
 key f3
-type "##Command palette" "reset layout"
+type "##Command palette" "reset layout and shortcuts"
 key enter
 expect_status "Standard layout and shortcuts restored"
 expect_value console_open == 0
