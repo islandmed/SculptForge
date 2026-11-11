@@ -4123,6 +4123,8 @@ constexpr Entry kSpanish[] = {
     {"Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo step for the levels: Ctrl+Z brings them back).", "Conserva el nivel de subdivisión mostrado como una malla simple, borra los demás niveles y activa Dinámica (un solo paso de deshacer para los niveles: Ctrl+Z los recupera)."},
     {"Mask Darkness", "Oscuridad de máscara"},
     {"Mask Darkness %.2f", "Oscuridad de máscara %.2f"},
+    {"Mask colour", "Color de la máscara"},
+    {"The colour masked areas show. Reset goes back to the default: the model's own colours, darkened.", "El color que muestran las áreas enmascaradas. Restablecer vuelve al valor por defecto: los colores del modelo, oscurecidos."},
     {"Mask darkness", "Oscuridad de máscara"},
     {"Mask darkness %.2f", "Oscuridad de máscara %.2f"},
     {"Mask first (Ctrl+drag)", "Enmascara primero (Ctrl+arrastrar)"},

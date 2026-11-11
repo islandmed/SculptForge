@@ -36,6 +36,8 @@ struct RenderSettings {
     bool showTexture = true;     // with showVertex paint: a Part's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker
     float maskDarkness = 0.7f;   // how dark: 0 = no tint .. 1 = darkest (Preferences > Interface > Mask darkness)
+    bool maskColorCustom = false; // masked areas blend towards maskColor (linear) instead of darkening (Mask colour)
+    glm::vec3 maskColor{0.20f, 0.22f, 0.30f};
     bool showFaceGroups = false; // colour each face group (see face groupColor)
     int litsphere = defaultLitSphere(); // built-in Lit Sphere material (core/Lit Sphere.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
@@ -563,7 +565,7 @@ private:
     struct MeshProgram {
         GLuint id = 0;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
-              showMask = -1, maskDarkness = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
+              showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
               lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,

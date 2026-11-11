@@ -110,9 +110,13 @@ struct UiPrefs {
     bool floorGrid = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
-    // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
+    // Preferences > Interface > Mask darkness (and Tool > Masking): how strongly masked areas show, 0-1
     // (RenderSettings::maskDarkness).
     float maskDarkness = 0.7f;
+    // Preferences > Interface > Mask colour: maskColorCustom off = the darkening look; on = masked areas blend towards
+    // maskColor (display values, sRGB) by the same amount (the opacity above).
+    bool maskColorCustom = false;
+    glm::vec3 maskColor{0.20f, 0.22f, 0.30f};
     bool confirmRemeshLevels = true; // Voxel/Quad Remesh and Decimate ask first on a Part with levels (#173)
     bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons

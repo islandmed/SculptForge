@@ -21,6 +21,7 @@
 #include "app/UserData.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
+#include "core/MaskColour.h"
 #include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
@@ -150,6 +151,7 @@ Json toJson(const UiPrefs& p) {
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
+    if (p.maskColorCustom) j.set("maskColor", maskColorToJson(p.maskColor));
     j.set("confirmSubdivide", p.confirmSubdivide);
     j.set("confirmRemeshLevels", p.confirmRemeshLevels);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
@@ -266,6 +268,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
+    p.maskColorCustom = maskColorFromJson(j["maskColor"], p.maskColor);
     p.confirmSubdivide = j["confirmSubdivide"].asBool(p.confirmSubdivide);
     p.confirmRemeshLevels = j["confirmRemeshLevels"].asBool(p.confirmRemeshLevels);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
@@ -1201,6 +1204,7 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     renderSettings_.floorGrid = uiPrefs_.floorGrid;
     uvPackColumns_ = uiPrefs_.uvPackColumns, uvPackRows_ = uiPrefs_.uvPackRows;
     renderSettings_.maskDarkness = uiPrefs_.maskDarkness;
+    setMaskColor(uiPrefs_.maskColorCustom, uiPrefs_.maskColor);
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1827,6 +1831,21 @@ void drawInterfaceSection(App& app) {
                  "How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable "
                  "under the mask.",
                  "Preferences > Interface");
+    {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("Mask colour"));
+        ImGui::SameLine();
+        glm::vec3 c = p.maskColor;
+        if (ImGui::ColorEdit3("##mask_colour", &c.x, ImGuiColorEditFlags_NoInputs))
+            app.setMaskColor(true, c);
+        ui::HelpText("Mask colour", nullptr,
+                     "The colour masked areas show. Reset goes back to the default: the model's own colours, darkened.",
+                     "Preferences > Interface");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!p.maskColorCustom);
+        if (ImGui::Button(tr("Reset##mask_colour"))) app.setMaskColor(false, UiPrefs().maskColor);
+        ImGui::EndDisabled();
+    }
     ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);
     ui::HelpText("Reduce motion", nullptr,
                  "Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",

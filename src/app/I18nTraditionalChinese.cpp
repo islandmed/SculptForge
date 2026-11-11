@@ -3671,6 +3671,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Keep the subdivision level shown as a plain mesh, delete the other levels and turn Dynamic on (one undo step for the levels: Ctrl+Z brings them back).", "將目前顯示的細分層級保留為單一網格，刪除其他層級並開啟動態（層級為一個復原步驟：Ctrl+Z 可復原）。"},
     {"Mask Darkness", "遮罩深度"},
     {"Mask Darkness %.2f", "遮罩深度 %.2f"},
+    {"Mask colour", "遮罩顏色"},
+    {"The colour masked areas show. Reset goes back to the default: the model's own colours, darkened.", "遮罩區域顯示的顏色。重設會回到預設值：模型自身的顏色，變暗顯示。"},
     {"Mask darkness", "遮罩深度"},
     {"Mask darkness %.2f", "遮罩深度 %.2f"},
     {"Mask first (Ctrl+drag)", "請先遮罩（Ctrl+拖曳）"},

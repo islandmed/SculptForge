@@ -163,6 +163,7 @@ class App {
 
 public:
     App();
+    void setMaskColor(bool custom, const glm::vec3& srgb); // Preferences > Interface > Mask colour (false: the default look)
     void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
