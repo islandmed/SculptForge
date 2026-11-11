@@ -938,6 +938,16 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
     endif()
+    # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
+    if(UNIX AND NOT APPLE)
+      add_test(NAME apt_retry COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/apt_retry_test.sh)
+      set_tests_properties(apt_retry PROPERTIES TIMEOUT 60)
+    endif()
+    # tools/ci/ci_status.sh: the ci-status branch's one line per finished run (ci-status.yml), in a local bare remote.
+    if(UNIX AND NOT APPLE) # (it only ever runs on the Ubuntu runner; macOS's BSD tools differ and 0.12.6's staging failed there)
+      add_test(NAME ci_status COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/ci_status.sh --self-test)
+      set_tests_properties(ci_status PROPERTIES TIMEOUT 60)
+    endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
     add_test(NAME test_warm_ui COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py self-test)
