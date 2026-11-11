@@ -58,6 +58,16 @@
      "shipped": ""
     },
     {
+     "slug": "move-brush-reach-beyond-the-edge",
+     "anchor": "vote-move-brush-reach-beyond-the-edge",
+     "title": "Move brush reach beyond the edge",
+     "line": "A small buffer distance, so the Move brush still grabs the surface when the cursor is just outside the silhouette, instead of you having to rotate the camera.",
+     "where": "Move brush",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "wood-detail-brush-pack",
      "anchor": "vote-wood-detail-brush-pack",
      "title": "Wood detail brush pack",
@@ -814,5 +824,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T19:37:51Z"
+ "updated": "2026-11-11T20:38:38Z"
 }
