@@ -26,7 +26,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Tools
-        run: sudo apt-get update -q && sudo apt-get install -y -q createrepo-c
+        run: sudo ./packaging/linux/apt-retry.sh update -q && sudo ./packaging/linux/apt-retry.sh install -y -q createrepo-c
       - name: The latest release's packages
         env:
           GH_TOKEN: ${{ github.token }}

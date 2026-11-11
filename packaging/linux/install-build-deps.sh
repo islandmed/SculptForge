@@ -2,8 +2,11 @@
 # Installs everything needed to build SculptForge on Debian/Ubuntu or Fedora/RHEL-family systems.
 set -eu
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  # apt-retry.sh: retries and falls back to other Ubuntu mirrors (a flaky mirror failed every CI job on 11-11); plain apt-get without it.
+  here=$(dirname "$0")
+  if [ -f "$here/apt-retry.sh" ]; then aptr() { sh "$here/apt-retry.sh" "$@"; }; else aptr() { apt-get "$@"; }; fi
+  aptr update
+  DEBIAN_FRONTEND=noninteractive aptr install -y --no-install-recommends \
     build-essential cmake pkg-config git file ca-certificates \
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
     libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \

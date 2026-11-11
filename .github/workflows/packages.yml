@@ -122,7 +122,7 @@ jobs:
         run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
@@ -205,7 +205,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
-        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y flatpak flatpak-builder xvfb
       - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
         uses: actions/cache@v5
         with:

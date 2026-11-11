@@ -190,6 +190,7 @@ mcp*                        site
 reply_drafts*               site
 sbom                        site
 stale_tree                  site
+apt_retry                   site
 *                           site
 
 [units]
