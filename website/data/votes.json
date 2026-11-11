@@ -529,6 +529,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "silhouette-view",
+     "anchor": "vote-silhouette-view",
+     "title": "Silhouette view",
+     "line": "A small window with a flat black outline of the model, with saved camera angles and lens in mm, to judge the shape.",
+     "where": "View menu",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
     }
    ]
   },
@@ -804,5 +814,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T10:37:51Z"
+ "updated": "2026-11-11T19:37:51Z"
 }
