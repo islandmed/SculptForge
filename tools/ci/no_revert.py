@@ -19,7 +19,8 @@ isn't main's to lose: only the net change counts. A deliberate revert passes wit
 `git reset --soft origin/main` after origin/main had moved put the feed, the home page and security.txt back to an
 older main inside the branch's own commit). A file TIP has as an older version from BASE's recent history (its last
 STALE_DEPTH changes), or a file BASE added in that history that TIP no longer has, is refused, unless a commit in
-BASE..TIP named `Reapply "..."` or `Revert "..."` touched it (a deliberate re-apply after a revert).
+BASE..TIP named `Reapply "..."` or `Revert "..."` touched it (a deliberate re-apply after a revert), or a commit's
+message has a line `Removed on purpose: PATH...` naming it (a file the branch replaces, such as an old picture).
 Exit 0 ok, 1 refused, 2 usage or git error.
 """
 import os
@@ -137,6 +138,9 @@ def stale(base, tip, cwd=None):
         subject = git("log", "-1", "--format=%s", c, cwd=cwd)
         if subject.startswith(('Reapply "', 'Revert "')):
             deliberate |= set(git("diff-tree", "-r", "-m", "--no-commit-id", "--name-only", c, cwd=cwd).split())
+        for line in git("log", "-1", "--format=%b", c, cwd=cwd).splitlines():
+            if line.startswith("Removed on purpose:"):
+                deliberate |= set(line[len("Removed on purpose:"):].split())
     out = []
     for f in git("diff", "--name-only", base, tip, cwd=cwd).split():
         if SKIP.match(f) or f in deliberate:
@@ -279,6 +283,9 @@ def self_test():
         g("checkout", "-q", "-b", "again", "main")
         write("e.cpp", ["int e = 1;"]); g("add", "-A"); g("commit", "-qm", 'Reapply "e v1"')
         assert run(["--stale", "main", "again"], d) == 0, "a deliberate Reapply was refused"
+        g("checkout", "-q", "-b", "replaced", "main")
+        os.remove(os.path.join(d, "feed.json")); g("add", "-A"); g("commit", "-qm", "drop the feed\n\nRemoved on purpose: feed.json")
+        assert run(["--stale", "main", "replaced"], d) == 0, "a deletion named Removed on purpose was refused"
         # 6. main merged a topic and reverted it (net change empty): a later merge of a branch that edits the same file
         #    elsewhere is not a revert; a real revert of a change main kept still is
         g("checkout", "-q", "main")
