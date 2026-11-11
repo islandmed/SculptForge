@@ -84,6 +84,11 @@ Projects (`.sfproj`) keep loaded splats and their placement.
 
 **Clear** in **Render > Gaussian Splats** removes the capture.
 
+## Splats with Blender
+
+Splats go to Blender 5.3 and back with one click, view-dependent colour and placement intact: see
+[Splats with Blender](blender.md#splats-with-blender).
+
 ## From scripts
 
 | Command | What it does | Key parameters |
@@ -110,6 +115,7 @@ To render only the splats headless, use `sculptforge scan.ply --render scan.png 
 ## See also
 
 - [From scan to sculptable mesh](scan-to-sculptable.md): Make sculptable in detail
+- [Working with Blender](blender.md#splats-with-blender): send splats to Blender 5.3 and back
 - [Image and text to 3D](generate-3d.md): another way to get a base mesh
 - [Subdivide, Remesh, Decimate and LODs](geometry.md): clean up a converted mesh
 - [Exporting](exporting.md): USD and glTF exports that carry splats

@@ -15,6 +15,7 @@
 //   <root>/alive.json  SculptForge's heartbeat, so the add-on knows it is running
 #pragma once
 
+#include "core/Splats.h"
 #include "io/MeshObject.h"
 
 #include <glm/glm.hpp>
@@ -34,11 +35,22 @@ struct BridgeObject {
     std::string shapes;          // optional: blend shapes file (writeBridgeShapes) beside the Bridge
 };
 
+// A Gaussian splat capture in a manifest ("splats", beside "objects": older readers skip the key). The file is a
+// standard 3DGS PLY (SH kept) holding the splats as they are in the object's own space, so nothing is rotated or
+// baked on the way; `matrix` places the object, as for meshes.
+struct BridgeSplats {
+    std::string name;            // the Blender object name
+    std::string file;            // PLY file name inside the manifest's folder
+    bool hasMatrix = false;
+    glm::dmat4 matrix{1.0};      // Blender's matrix_world (Z-up, metres)
+};
+
 struct BridgeManifest {
     int64_t revision = 0;        // changes on every send (each side keeps the last one it loaded)
     std::string sender;          // "blender" or "sculptforge"
     std::string senderVersion;
     std::vector<BridgeObject> objects;
+    std::vector<BridgeSplats> splats;
 };
 
 // The exchange folder: $SCULPTFORGE_BLENDER_EXCHANGE, else <app data>/blender
@@ -64,6 +76,12 @@ bool readBridgeManifest(const std::string& path, BridgeManifest& out, std::strin
 glm::dvec3 blenderToSculptForge(const glm::dvec3& p);
 glm::dvec3 sculptForgeToBlender(const glm::dvec3& p);
 glm::dmat4 blenderMatrixToSculptForge(const glm::dmat4& m);
+// A splat object's placement: SculptForge's SplatCloud::transform for splats in a Blender object's space with
+// matrix_world `m` (the axes turn the object into the scene; the splats themselves stay as they are, so
+// view-dependent colour keeps pointing the right way). Scale is made uniform (the cube root of |det|) and the
+// rotation orthonormal: a splat cloud's placement cannot hold more. And back.
+glm::mat4 splatPlacementFromBlender(const glm::dmat4& m);
+glm::dmat4 splatMatrixToBlender(const glm::mat4& placement);
 
 // Blend shapes (sculpt layers) for the add-on's shape keys, sent beside an object's Bridge (which then holds the base
 // shape, every layer at zero). Little endian: "SFSHAPES", u32 version 1, u32 vertex count, u32 shape count, then per
@@ -79,15 +97,19 @@ bool writeBridgeShapes(const std::string& path, const Mesh& mesh, std::string& e
 bool readBridgeShapes(const std::string& path, uint32_t& vertexCount, std::vector<BridgeShape>& out, std::string& error);
 
 // Loads what Blender sent (<root>/to_sculptforge): every object's Bridge, moved by its matrix into place, named
-// after its Blender object. `manifest` receives the manifest (for its revision).
+// after its Blender object. `manifest` receives the manifest (for its revision). A Gaussian splat object goes to
+// `splats` (the first one: a scene holds one capture) when it is given, with its placement and name; `splatsFound`
+// says one arrived.
 bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, BridgeManifest* manifest,
-                    std::string& message);
+                    std::string& message, SplatCloud* splats = nullptr, bool* splatsFound = nullptr);
 
 // Writes the objects to <root>/to_blender (world space, so the add-on puts each mesh back into its object's own
 // space) with the next revision, and removes the files of earlier sends. Names are kept exactly (duplicates
 // get .001, .002... as Blender would name them); `sentNames` receives them.
+// `splats` (when not empty) goes along as a PLY with its placement; the cloud's name is the Blender object's.
 bool blenderSend(const std::vector<MeshObjectRef>& objects, const std::string& root, std::string& message,
-                 std::vector<std::string>* sentNames = nullptr, int64_t* revision = nullptr);
+                 std::vector<std::string>* sentNames = nullptr, int64_t* revision = nullptr,
+                 const SplatCloud* splats = nullptr);
 
 // Modification time of a file (0 when missing), for cheap polling.
 long long bridgeFileTime(const std::string& path);
