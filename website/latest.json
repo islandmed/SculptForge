@@ -1,13 +1,11 @@
 {
-  "version": "0.12.7",
+  "version": "0.12.8",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview",
-    "Gaussian splats both ways with Blender 5.3 through the Blender bridge",
-    "Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)",
-    "My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)",
-    "Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)"
+    "Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)",
+    "Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)",
+    "Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)"
   ],
   "support": {
     "founding": {
