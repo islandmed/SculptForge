@@ -5,7 +5,10 @@
 # Builds the Android APK (android/README.md): the app's native code with the NDK (libmain.so + libSDL3.so per ABI),
 # then the Gradle project around it. Unsigned: scripts/android-sign.sh signs a release APK with our key, locally.
 #
-#   scripts/android-build.sh [--abi arm64-v8a] [--abi x86_64] [--debug] [--out DIR]
+#   scripts/android-build.sh [--abi arm64-v8a] [--abi x86_64] [--debug] [--unsigned] [--out DIR]
+#
+# The APK is signed with this machine's debug key (a tester build that installs as it is), or with --unsigned left
+# for scripts/android-sign.sh.
 #
 # Needs ANDROID_HOME (the SDK, with build-tools and platform 35), an NDK (ANDROID_NDK_HOME, else the newest in the
 # SDK), Java 17, CMake 3.24+, Ninja and Gradle 8.9+ on PATH. GitHub's ubuntu-24.04 runners have all of them.
@@ -13,11 +16,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-abis=() type=release out=build-android
+abis=() type=release out=build-android unsigned=
 while [ $# -gt 0 ]; do
   case $1 in
     --abi) abis+=("$2"); shift ;;
     --debug) type=debug ;;
+    --unsigned) unsigned=-PsfUnsigned=1 ;;
     --out) out=$2; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
@@ -74,8 +78,11 @@ fi
 task=assembleRelease
 [ $type = debug ] && task=assembleDebug
 (cd android && gradle --no-daemon -q "$task" -PsfJniLibs="$jni" -PsfRes="$res" \
-  -PsfSdlJava="$sdl/android-project/app/src/main/java" -PsfVersion="$version" -PsfVersionCode="$code")
+  -PsfSdlJava="$sdl/android-project/app/src/main/java" -PsfVersion="$version" -PsfVersionCode="$code" $unsigned)
 apk=$(find android/app/build/outputs/apk/$type -name '*.apk' -print -quit)
-dest=$out/SculptForge-$version-android$([ $type = debug ] && echo -debug || echo -unsigned).apk
+suffix=-test
+[ $type = debug ] && suffix=-debug
+[ -n "$unsigned" ] && suffix=-unsigned
+dest=$out/SculptForge-$version-android$suffix.apk
 cp "$apk" "$dest"
 echo "$dest"

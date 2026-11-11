@@ -1,8 +1,8 @@
 name: Android
 
 # The Android APK (android/README.md): scripts/android-build.sh on GitHub's runner, which has the SDK, an NDK, Java 17
-# and Gradle. Unsigned (the release key never leaves the release machine: scripts/android-sign.sh); the artifact is
-# the APK testers sideload. No secrets, read-only, pinned actions.
+# and Gradle. The artifact is the tester APK (signed with the runner's throwaway debug key, so it installs; the release
+# key never leaves the release machine: scripts/android-sign.sh). No secrets, read-only, pinned actions.
 
 on:
   push:
@@ -65,6 +65,6 @@ jobs:
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/aapt2 dump permissions "$apk" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: sculptforge-android-unsigned
+          name: sculptforge-android-test
           path: build-android/*.apk
           retention-days: 14

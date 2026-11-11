@@ -7,8 +7,9 @@ fingers, undoes, and saves and opens projects. A tablet layout of its own comes 
 ## Build
 
 ```sh
-scripts/android-build.sh                 # build-android/SculptForge-X.Y.Z-android-unsigned.apk (arm64-v8a)
-scripts/android-build.sh --debug         # a debug-signed APK that installs as it is (adb install)
+scripts/android-build.sh                 # build-android/SculptForge-X.Y.Z-android-test.apk (arm64-v8a)
+scripts/android-build.sh --debug         # with debug info in the native code (ndk-stack)
+scripts/android-build.sh --unsigned      # for scripts/android-sign.sh
 scripts/android-build.sh --abi x86_64    # for the emulator
 ```
 
@@ -32,5 +33,7 @@ two always match).
 
 ## Signing
 
-CI builds unsigned APKs. A release APK is signed on the release machine with our own key
+Tester APKs (CI's artifact) carry the build machine's throwaway debug key: they install as they are, but one from
+another build machine needs the old one uninstalled first (projects in its Projects folder go with it: copy them
+off). A release APK is signed on the release machine with our own key
 (`~/.config/sculptforge/android-release.jks`, never committed): `scripts/android-sign.sh APK`.
