@@ -344,29 +344,4 @@ inline FoundingMembers parseFoundingMembers(const std::string& json) {
     return f;
 }
 
-// assets/featured/featured.json: {"videos": [{"title", "creator", "url", "thumb"}]}, the creator videos the Welcome dialog
-// features (bundled with the app, nothing fetched; an empty list hides the section). At most kFeaturedMax; an entry without
-// a title, an https url or a thumbnail file name is dropped; title and creator are sanitised like the supporters.
-inline constexpr size_t kFeaturedMax = 3;
-struct FeaturedVideo {
-    std::string title, creator, url, thumb;
-};
-inline std::vector<FeaturedVideo> parseFeaturedVideos(const std::string& json) {
-    std::vector<FeaturedVideo> out;
-    Json j;
-    std::string error;
-    if (!Json::parse(json, j, error) || !j.isObject() || !j["videos"].isArray()) return out;
-    for (const Json& v : j["videos"].items()) {
-        if (out.size() >= kFeaturedMax) break;
-        if (!v.isObject() || !v["title"].isString() || !v["url"].isString() || !v["thumb"].isString()) continue;
-        FeaturedVideo f{sanitizeSupporterName(v["title"].asString()),
-                        v["creator"].isString() ? sanitizeSupporterName(v["creator"].asString()) : std::string(),
-                        v["url"].asString(), v["thumb"].asString()};
-        const bool plainName = !f.thumb.empty() && f.thumb.find_first_of("/\\:") == std::string::npos && f.thumb[0] != '.';
-        if (f.title.empty() || f.url.rfind("https://", 0) != 0 || f.url.size() > 300 || !plainName) continue;
-        out.push_back(std::move(f));
-    }
-    return out;
-}
-
 } // namespace sf

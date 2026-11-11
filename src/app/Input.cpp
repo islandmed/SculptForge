@@ -464,21 +464,25 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
     }
 }
 
-// A press of a pan or zoom key only notes the press (a tap shorter than a frame still moves the view a little);
-// updateKeyNav does the moving.
-void App::keyNavStep(const std::string& id) { keyNavTapped_[id] = true; }
+// A press of a pan or zoom key only notes the press: it counts as held for kKeyNavTapSeconds at least, so a tap (down and
+// up inside one frame) still glides the view a little; updateKeyNav does the moving.
+void App::keyNavStep(const std::string& id) { keyNavTap_[id] = kKeyNavTapSeconds; }
 
 // Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
 // distance at any frame rate, and nothing to do with the OS's key repeat.
 void App::updateKeyNav(float dt) {
     const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
-    dt = std::min(dt, 0.1f); // (a hitch of a frame is not a jump of the view)
+    // (a hitch of a frame is not a jump of the view; and the frame a press wakes the idle loop with has waited since the
+    // last one: it counts as one 60 Hz frame)
+    dt = std::min(dt, keyNavMoving_ ? 0.1f : 1.0f / 60.0f);
+    keyNavMoving_ = false;
     float px = 0.0f, py = 0.0f, zoom = 0.0f;
     bool any = false;
     for (const char* id : {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"}) {
-        bool on = keyNavTapped_[id] && !blocked;
-        keyNavTapped_[id] = false;
+        float& tap = keyNavTap_[id];
+        bool on = tap > 0.0f && !blocked;
+        tap = blocked ? 0.0f : std::max(0.0f, tap - dt);
         if (!blocked)
             for (const Chord& c : parseChords(actions_.shortcutText(id)))
                 for (const auto& [key, mods] : keysDown_) { // (key events, not the keyboard state: focus loss clears them)
@@ -497,6 +501,68 @@ void App::updateKeyNav(float dt) {
     if (zoom != 0.0f) camera_.zoom(zoom * k);
     keyNavMoving_ = true;
     regrabAfterViewMove();
+}
+
+// --measure-key-nav (ui_key_nav_loop): in the interactive frame loop, tap and hold each pan and zoom action on its default
+// key and again rebound, and check the view moved (a hold: while the key is still down too). The UI test runner has a
+// frame loop of its own, so only this catches a loop that never calls updateKeyNav (0.12.5: no pan or zoom key worked).
+int App::measureKeyNavStep(bool& draw) {
+    static const char* const kIds[] = {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"};
+    static const char* const kRebound[] = {"J", "L", "I", "K", "P", "O"};
+    KeyNavProbe& p = keyNavProbe_;
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    const int total = 4 * 6;
+    const auto moved = [&] {
+        return glm::length(camera_.target - p.target) > 1e-5f || std::abs(camera_.distance - p.distance) > 1e-4f * p.distance;
+    };
+    const auto send = [&](bool down) {
+        const auto chords = parseChords(actions_.shortcutText(kIds[p.caseIndex % 6]));
+        if (chords.empty()) return;
+        SDL_Event e{};
+        e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+        e.key.windowID = SDL_GetWindowID(window_);
+        e.key.key = chords[0].key;
+        e.key.scancode = SDL_GetScancodeFromKey(chords[0].key, nullptr);
+        e.key.mod = down ? SDL_Keymod((chords[0].ctrl ? SDL_KMOD_LCTRL : 0) | (chords[0].shift ? SDL_KMOD_LSHIFT : 0) |
+                                      (chords[0].alt ? SDL_KMOD_LALT : 0))
+                         : SDL_KMOD_NONE;
+        e.key.down = down;
+        handleEvent(e);
+        draw = true; // (as the loop does for an event)
+        activeUntil_ = std::max(activeUntil_, now + 0.75);
+    };
+    const bool hold = (p.caseIndex / 6) % 2 == 1;
+    if (p.stage == 0) {
+        if (p.caseIndex == 2 * 6 && !p.rebound) { // the second half: other keys
+            p.rebound = true;
+            for (int i = 0; i < 6; ++i) actions_.assignShortcut(kIds[i], kRebound[i]);
+        }
+        p.target = camera_.target;
+        p.distance = camera_.distance;
+        p.movedWhileHeld = false;
+        send(true);
+        if (!hold) send(false); // a tap: down and up inside one pass of the loop
+        p.stage = hold ? 1 : 2;
+        p.stageAt = now;
+    } else if (p.stage == 1) {
+        if (now - p.stageAt >= 0.3 && moved()) p.movedWhileHeld = true;
+        if (now - p.stageAt >= 0.4) {
+            send(false);
+            p.stage = 2;
+            p.stageAt = now;
+        }
+    } else if (now - p.stageAt >= 0.6) {
+        const bool ok = moved() && (!hold || p.movedWhileHeld);
+        std::printf("KeyNav: %-14s %s %-7s %s\n", kIds[p.caseIndex % 6], hold ? "hold" : "tap ", p.rebound ? "rebound" : "default",
+                    ok ? "moved the view" : hold && moved() ? "STOOD STILL while held" : "STAYED PUT");
+        p.failures += ok ? 0 : 1;
+        p.stage = 0;
+        if (++p.caseIndex == total) {
+            std::printf("KeyNav: %s\n", p.failures ? "FAILED" : "OK");
+            return p.failures ? 1 : 0;
+        }
+    }
+    return -1;
 }
 
 void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {

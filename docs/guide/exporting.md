@@ -18,7 +18,7 @@ or mark it saved, so your next <kbd>Ctrl</kbd>+<kbd>S</kbd> still saves the proj
 | FBX for Unreal (`.fbx`) | **File > Export FBX for Unreal...** | Unreal naming and scale, quads, UVs, LOD group, layers as blend shapes, the painted texture as a PNG beside it | Unreal Engine (by hand) |
 | Wavefront OBJ (`.obj`) | **File > Export OBJ...** | One `o` object per Part, quads, face groups as `g` groups, vertex paint as vertex colour, UVs, the painted texture through a `.mtl` (`map_Kd`) and a PNG beside it. Layers are baked into the current blend | Any 3D app |
 | Bridge file | **File > Bridge > Export Bridge file...** | Quads, face groups, mask, vertex paint, UVs, the painted texture as a PNG beside it | The [Bridge](#exchange-models-through-the-bridge) |
-| STL (`.stl`) | **File > Bridge > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
+| STL (`.stl`) | **File > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
 | PLY (`.ply`) | `export_ply` command | Geometry, quads and vertex paint, visible Parts merged | Scan tools, MeshLab, Blender |
 | FBX (general) | `export_fbx` command | One model per Part, quads, UVs, blend shapes, optional LOD groups, the painted texture | Other FBX pipelines |
 
@@ -97,7 +97,7 @@ sculptforge-cli -c 'open path=bust.sfproj; export_stl path=bust.stl; export_ply 
 
 ## 3D printing
 
-**File > Bridge > Export STL...** writes every visible Part as one binary STL, ready for a slicer
+**File > Export STL...** writes every visible Part as one binary STL, ready for a slicer
 (PrusaSlicer, Cura, Bambu Studio, OrcaSlicer ...). The status line gives the printed size, for example
 "Exported lion.stl (47214 triangles, 320.8 x 206.6 x 436.4 mm)": width, depth and height as the slicer shows them.
 
@@ -216,7 +216,6 @@ application's own exchange plug-in does, on Windows and macOS. The commands are 
 | **Custom bridge folder (optional)** | Use another bridge folder, for example inside a Wine prefix |
 | **Import Bridge file...** | Opens a Bridge file, replacing the scene |
 | **Export Bridge file...** | Writes a Bridge file. With several visible Parts, one file per Part next to the path |
-| **Export STL...** | Writes a binary STL of the visible Parts |
 
 On Windows and macOS the Bridge finds the shared exchange folder by itself; nothing to install. On Linux it needs a
 custom folder; Bridge files still import and export.

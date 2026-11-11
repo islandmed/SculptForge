@@ -90,7 +90,7 @@ void App::applyBrushSettings(const BrushToolSettings& in) {
 void App::initBrushSettings() {
     const bool recording = !options_.recordPath.empty() && options_.uiTest.empty(); // demo videos
     brushSettingsOn_ = !recording && !options_.benchmark && options_.timelapsePath.empty() &&
-                       options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f;
+                       options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f && !options_.measureKeyNav;
     brushSettingsKey_ = currentBrushKey();
     registerAlphaOptionsCommand();
     registerPenPressureCommand();

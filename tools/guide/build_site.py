@@ -44,7 +44,8 @@ NAV_SOCIALS = [("Discord", "discord", "https://discord.gg/gWrYkEmQhH"),
            ("GitHub", "github", "https://github.com/islandmed/SculptForge"),
            ("X", "x", "https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium={m}"),
            ("Bluesky", "bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium={m}"),
-           ("Instagram", "instagram", "https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium={m}")]
+           ("Instagram", "instagram", "https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium={m}"),
+           ("Facebook", "facebook", "https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium={m}")]
 
 
 def social_links(prefix, medium):

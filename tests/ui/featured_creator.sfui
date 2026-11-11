@@ -1,0 +1,49 @@
+# The welcome window's Featured creator card: it appears with the update check's featured.json (a local feed here,
+# thumbnail beside it), Watch only asks for the video (UI tests never start a browser), the x hides that video, and the
+# card is gone when the list is empty, the feed can't be read (offline) or Check for updates is off.
+run ui_look look=classic layout=classic        # written for the Classic look and its palette bar (Help menu)
+run new_sphere subdivisions=3
+expect_value featured_shown == 0
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+expect_no_text "Featured creator"
+key escape
+
+env SF_UPDATE_FEED $SCRIPT_DIR/data/featured/latest.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_value featured_shown == 1
+key f3
+type "##Command palette" "welcome"
+key enter
+expect_value welcome_open == 1
+expect_text "Featured creator"
+expect_text "SculptForge Is Now Super Powerful"
+expect_text "by askNK"
+expect "Watch##featured.watch"
+wait 0.3
+shot featured-card
+click "Watch##featured.watch"
+expect_value featured_watch_requests == 1
+expect_status https://www.youtube.com/watch?v=8oMCKB_7TRs
+
+# The x hides the video: nothing else is listed, so the card goes.
+click "x##featured.hide"
+expect_value featured_shown == 0
+expect_no_text "Featured creator"
+click "Close##welcome"
+
+# An empty list shows nothing; so does a site that can't be reached (no featured.json beside latest.json).
+env SF_UPDATE_FEED $SCRIPT_DIR/data/featured_none/latest.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_value featured_shown == 0
+env SF_UPDATE_FEED $SCRIPT_DIR/data/featured_offline/latest.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_value featured_shown == 0

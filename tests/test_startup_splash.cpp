@@ -40,6 +40,27 @@ TEST(splash_is_due_only_after_300_ms_once_and_only_when_enabled) {
     CHECK(!splash::due(false, false, 5000.0)); // not enabled
 }
 
+TEST(splash_can_be_forced_with_sf_splash_1_to_see_it_on_a_fast_machine) {
+    CHECK(splash::forcedFromEnv("1"));
+    CHECK(!splash::forcedFromEnv(nullptr));
+    CHECK(!splash::forcedFromEnv(""));
+    CHECK(!splash::forcedFromEnv("0"));
+    CHECK(!splash::forcedFromEnv("yes"));
+    CHECK(splash::due(true, false, 5.0, 0.0)); // forced: due at the first checkpoint
+    CHECK(!splash::due(true, false, 5.0));     // normal: a start under 300 ms never shows it
+    CHECK(!splash::due(true, false, 0.0, 0.0));
+}
+
+TEST(splash_once_shown_stays_a_minimum_time_and_a_fast_start_is_never_held) {
+    CHECK(splash::holdMs(0.0) == splash::kMinVisibleMs); // opened and the first frame is already there: stays the minimum
+    CHECK(splash::holdMs(100.0) == splash::kMinVisibleMs - 100.0);
+    CHECK(splash::holdMs(splash::kMinVisibleMs) == 0.0);
+    CHECK(splash::holdMs(5000.0) == 0.0); // a slow start that showed it for seconds: no extra wait
+    CHECK(splash::holdMs(-3.0) == splash::kMinVisibleMs); // (a clock that stepped back never waits longer than the minimum)
+    // A start under the threshold never opens the splash, so holdMs is never asked: nothing is added to a fast start.
+    CHECK(!splash::due(true, false, 110.0));
+}
+
 TEST(splash_preference_is_on_unless_ui_json_turns_it_off) {
     CHECK(splash::preferenceFromUiJson(""));
     CHECK(splash::preferenceFromUiJson("not json {"));

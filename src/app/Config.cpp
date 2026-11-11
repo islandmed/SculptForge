@@ -21,6 +21,7 @@
 #include "app/UserData.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
+#include "core/MaskColour.h"
 #include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
@@ -32,6 +33,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cfloat>
 #include <cmath>
@@ -150,6 +152,7 @@ Json toJson(const UiPrefs& p) {
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
+    if (p.maskColorCustom) j.set("maskColor", maskColorToJson(p.maskColor));
     j.set("confirmSubdivide", p.confirmSubdivide);
     j.set("confirmRemeshLevels", p.confirmRemeshLevels);
     j.set("background", std::string(p.gradientBackground ? "gradient" : "flat"));
@@ -266,6 +269,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
+    p.maskColorCustom = maskColorFromJson(j["maskColor"], p.maskColor);
     p.confirmSubdivide = j["confirmSubdivide"].asBool(p.confirmSubdivide);
     p.confirmRemeshLevels = j["confirmRemeshLevels"].asBool(p.confirmRemeshLevels);
     if (j["background"].isString()) p.gradientBackground = j["background"].asString() != "flat";
@@ -383,6 +387,12 @@ void App::initUiConfig(bool deterministic) {
     std::string err;
     if (fileExists(uiConfigPath())) {
         if (!readUiConfig(uiConfigPath(), err, true)) SDL_Log("%s", err.c_str());
+        if (options_.resetLayout) { // --reset-layout: the saved layout is dropped (the next save writes without it); keys and preferences stay
+            const bool customize = layout_.customize;
+            layout_ = standardLayout(uiPrefs_.shellLayout);
+            layout_.customize = customize;
+            storedLayout_ = Json();
+        }
     } else if (const std::string& studio = studioMode().profile.preferences; !studio.empty() && fileExists(studio)) {
         // A studio build's first start: the studio's layout, keys and scale (core/StudioProfile.h); saved as the
         // artist's own from the first change on.
@@ -695,6 +705,9 @@ void App::initActions() {
         "Save the project (.sfproj: every Part, layer, brush and setting). Asks for a name the first time.");
     add("file.save_as", "Save As...", "File", "Ctrl+Shift+S", [this] { saveProjectAs(true); }, nullptr, nullptr, nullptr, nullptr,
         "Save the project under a new name.");
+    add("file.save_visible_parts", "Save Visible Parts As...", "File", nullptr, [this] { saveVisiblePartsAs(); }, nullptr, nullptr,
+        nullptr, nullptr,
+        "Save a copy of the project (.sfproj) with only the visible Parts, and their materials and layers. The open project stays as it is.");
     add("file.export_glb", "Export GLB...", "File > Export", "Ctrl+E", [this] { saveFileDialog(FileAction::ExportGlb); },
         ICON_LC_PACKAGE, nullptr, nullptr, nullptr,
         "Export the model as glTF binary, with sculpt layers as blend shapes (morph targets).");
@@ -892,11 +905,15 @@ void App::initActions() {
     add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
-    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { restoreStandardUi(); },
+    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(3); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
         "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
         "the layout.");
-    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { restoreCustomUi(); },
+    add("config.reset_layout", "Reset Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(2); },
+        ICON_LC_LAYOUT_TEMPLATE, nullptr, nullptr, nullptr,
+        "Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. "
+        "Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).");
+    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(1); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
         "Go back to the layout the last Save Layout kept.");
     add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
@@ -1201,6 +1218,7 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     renderSettings_.floorGrid = uiPrefs_.floorGrid;
     uvPackColumns_ = uiPrefs_.uvPackColumns, uvPackRows_ = uiPrefs_.uvPackRows;
     renderSettings_.maskDarkness = uiPrefs_.maskDarkness;
+    setMaskColor(uiPrefs_.maskColorCustom, uiPrefs_.maskColor);
     renderSettings_.gradientBackground = uiPrefs_.gradientBackground;
     renderSettings_.backgroundColor = uiPrefs_.backgroundColor;
     return true;
@@ -1234,6 +1252,67 @@ void App::restoreStandardUi() {
     resetPanels(); // every panel back in the main window (PanelWindows.cpp)
     layoutBaseline_ = layoutKey();
     status_ = "Standard layout and shortcuts restored - Save Layout keeps the layout";
+}
+
+void App::applyPendingLayoutOp() {
+    const int op = std::exchange(pendingLayoutOp_, 0);
+    if (op == 0) return;
+    autosaveNow(); // unsaved work first: whatever happens next, it is on disk
+    std::string err;
+    if (op == 1) restoreCustomUi();
+    else if (op == 2) resetLayoutOnly();
+    else if (op == 3) restoreStandardUi();
+    else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
+                                    ? std::string("Interface loaded - Save Layout keeps its layout") : err;
+}
+
+void App::resetLayoutOnly() {
+    const bool customize = layout_.customize;
+    layout_ = standardLayout(uiPrefs_.shellLayout);
+    layout_.customize = customize;
+    resetPanels();
+    dropdown_.clear();
+    layoutBaseline_ = layoutKey();
+    status_ = "Standard layout restored - Save Layout keeps it";
+}
+
+std::vector<std::string> App::missingShelfWidgets() const {
+    std::vector<std::string> missing;
+    const UiLayout standard = standardLayout(uiPrefs_.shellLayout);
+    for (const auto* list : {&standard.topShelf, &standard.leftShelf, &standard.rightShelf, &standard.bottomShelf})
+        for (const std::string& id : *list) {
+            if (id.rfind("widget.", 0) != 0 || std::find(missing.begin(), missing.end(), id) != missing.end()) continue;
+            bool held = false;
+            for (const auto* now : {&layout_.topShelf, &layout_.leftShelf, &layout_.rightShelf, &layout_.bottomShelf})
+                held = held || std::find(now->begin(), now->end(), id) != now->end();
+            if (!held) missing.push_back(id);
+        }
+    return missing;
+}
+
+// Where the standard layout has it: on that shelf, after the nearest item before it that the shelf still holds.
+void App::addShelfWidget(const std::string& id) {
+    UiLayout standard = standardLayout(uiPrefs_.shellLayout);
+    auto shelves = [](UiLayout& l) { return std::array<std::vector<std::string>*, 4>{&l.topShelf, &l.leftShelf, &l.rightShelf, &l.bottomShelf}; };
+    auto from = shelves(standard);
+    auto to = shelves(layout_);
+    for (size_t s = 0; s < 4; ++s) {
+        const auto at = std::find(from[s]->begin(), from[s]->end(), id);
+        if (at == from[s]->end()) continue;
+        size_t insert = 0;
+        for (auto it = at; it != from[s]->begin();) {
+            --it;
+            const auto held = std::find(to[s]->begin(), to[s]->end(), *it);
+            if (*it != "sep" && *it != "row" && held != to[s]->end()) {
+                insert = size_t(held - to[s]->begin()) + 1;
+                break;
+            }
+        }
+        to[s]->insert(to[s]->begin() + std::ptrdiff_t(std::min(insert, to[s]->size())), id);
+        noteLayoutChanged();
+        status_ = "Put back on the shelf";
+        return;
+    }
 }
 
 void App::restoreCustomUi() {
@@ -1555,11 +1634,8 @@ void App::drawHelpConsoleUi() {
                 if (fsPath(path).extension().empty()) path += ".json";
                 status_ = writeUiConfig(path, err) ? "Interface exported to " + path : err;
             } else if (kind == kLoadUi) {
-                if (readUiConfig(path, err)) {
-                    status_ = "Interface loaded - Save Layout keeps its layout";
-                } else {
-                    status_ = err;
-                }
+                pendingImportPath_ = path; // applied at the top of the next frame (applyPendingLayoutOp)
+                queueLayoutOp(4);
             } else if (kind == kBlenderKeymap) {
                 importBlenderKeymap(path);
             } else if (kind == kRadialImport) {
@@ -1748,7 +1824,14 @@ void drawConfigSection(App& app) {
     ui::HelpAction(app, "config.customize");
     ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "config.reset_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
+    // Widgets (colour picker, brush tiles, sliders) dragged off a shelf can't be dragged back from a palette: put back here.
+    for (const std::string& id : app.missingShelfWidgets()) {
+        const std::string name = id.substr(7);
+        const std::string label = std::string(tr("Put back on the shelf: ")) + name + "##putback." + id;
+        if (ImGui::Button(label.c_str(), full)) app.addShelfWidget(id);
+    }
     ui::ActionButton(app, "panel.reset", full, ui::Look::IconLabel); // panels in windows of their own (PanelWindows.cpp)
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ui::ActionButton(app, "config.save", ImVec2(half, 0), ui::Look::IconLabel);
@@ -1827,6 +1910,21 @@ void drawInterfaceSection(App& app) {
                  "How dark masked areas show: 0 = not at all, 1 = nearly black. The default keeps the form readable "
                  "under the mask.",
                  "Preferences > Interface");
+    {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("Mask colour"));
+        ImGui::SameLine();
+        glm::vec3 c = p.maskColor;
+        if (ImGui::ColorEdit3("##mask_colour", &c.x, ImGuiColorEditFlags_NoInputs))
+            app.setMaskColor(true, c);
+        ui::HelpText("Mask colour", nullptr,
+                     "The colour masked areas show. Reset goes back to the default: the model's own colours, darkened.",
+                     "Preferences > Interface");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!p.maskColorCustom);
+        if (ImGui::Button(tr("Reset##mask_colour"))) app.setMaskColor(false, UiPrefs().maskColor);
+        ImGui::EndDisabled();
+    }
     ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);
     ui::HelpText("Reduce motion", nullptr,
                  "Hover and focus highlights change colour only: no easing, and tiles don't lift or grow.",

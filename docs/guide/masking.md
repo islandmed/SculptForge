@@ -1,6 +1,6 @@
 # Masking
 
-A mask protects part of the model from change. Masked areas are drawn darker, and every brush, the Paint
+A mask protects part of the model from change. Masked areas are drawn darker (or in a colour you pick, see below), and every brush, the Paint
 brush and colour fills leave them alone. This chapter covers painting masks with <kbd>Ctrl</kbd>, masking
 with a lasso or rectangle, the background gestures, and the **Tool > Masking** panel for inverting, blurring, growing and building masks
 from cavities, peaks, face groups, vertex paint, the direction the surface faces or the mesh border.
@@ -20,6 +20,9 @@ To see the mask, keep **Mask** on in the right shelf. The same toggle is **Show 
 palette. Turning it off hides the darkening without clearing the mask: it still protects the surface, the status
 bar says so, and turning it on again shows the same mask. **Clear Mask** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>)
 is what removes it.
+
+**Mask colour**: **Edit > Preferences > Interface > Mask colour** picks the colour masked areas show (the default is the
+model's own colours, darkened); **Mask darkness** there sets how much of it shows, and **Reset** goes back to the default.
 
 ## Paint a mask
 

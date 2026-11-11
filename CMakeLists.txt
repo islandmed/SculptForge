@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.5 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.6 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -78,6 +78,7 @@ add_library(sculptforge_core STATIC
   src/core/GarmentMesh.cpp
   src/core/GarmentFiles.cpp
   src/core/GarmentCommands.cpp
+  src/core/GarmentDrape.cpp
   src/core/GarmentPrint.cpp
   src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
@@ -191,6 +192,7 @@ add_library(sculptforge_core STATIC
   src/core/Guide.cpp
   src/core/WhatsNew.cpp
   src/core/UpdateCheck.cpp
+  src/core/Featured.cpp
   src/core/Tablet.cpp
   src/core/RadialMenu.cpp
   src/core/StrokePopup.cpp
@@ -412,14 +414,11 @@ if(SCULPTFORGE_BUILD_APP)
     socialIcons ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/social/social-icons.png # the community icon strip (Welcome; tools/brand/make_social_icons.py)
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
-  include(cmake/EmbedFeatured.cmake)
-  embed_featured(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp ${CMAKE_CURRENT_SOURCE_DIR}/assets/featured) # the Welcome dialog's creator videos
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
   add_executable(sculptforge
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp
     src/app/main.cpp
     src/app/Bench.cpp
     src/app/Calibration.cpp
@@ -475,6 +474,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelGarments.cpp
+    src/app/PanelGarmentDrape.cpp
     src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp
@@ -504,6 +504,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelAiLink.cpp
     src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
+  src/app/PanelFeatured.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
     src/app/PanelDeform.cpp
@@ -554,8 +555,7 @@ if(SCULPTFORGE_BUILD_APP)
     target_compile_options(sculptforge PRIVATE -Wall -Wextra -Wno-unused-parameter)
   endif()
   sculptforge_pch(sculptforge <imgui.h>)
-  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
-                              ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFeatured.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   if(WIN32)
     set_target_properties(sculptforge PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release,MinSizeRel>)
     set(ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.ico")
@@ -1061,6 +1061,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
+    # Revert to Saved Layout / Reset Layout from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
+    # at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
+    sculptforge_ui_test(layout_revert_2880 layout_revert --size 2880x1800)
     # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
     sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
     sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
@@ -1104,6 +1108,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Curves and the Tube modifiers at 1440 and 2880 px (tests/ui/curve.sfui; its 200% shots inside).
     sculptforge_ui_test(curve_1440 curve --size 1440x900)
     sculptforge_ui_test(curve_2880 curve --size 2880x1800)
+    # Garments draped on the Full Body at 1440 and 2880 px (tests/ui/garments_drape.sfui).
+    sculptforge_ui_test(garments_drape_1440 garments_drape --size 1440x900)
+    sculptforge_ui_test(garments_drape_2880 garments_drape --size 2880x1800)
+    # Drape on the Full Body (centimetres) at its default Units per metre: comes to rest (tests/ui/cloth_drape_units.sfui).
+    sculptforge_ui_test(cloth_drape_units_1440 cloth_drape_units --size 1440x900)
+    sculptforge_ui_test(cloth_drape_units_2880 cloth_drape_units --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
@@ -1136,9 +1146,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_2880 support --size 2880x1620) # the welcome and About at 200 %: the icon rows keep their line
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
+    # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
+    sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
+    sculptforge_ui_test(featured_creator_2880 featured_creator --size 2880x1800)
     # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
     sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
     sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)
+    sculptforge_ui_test(save_visible_parts_1440 sizes/save_visible_parts --size 1440x900)
+    sculptforge_ui_test(save_visible_parts_2880 sizes/save_visible_parts --size 2880x1800)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
@@ -1198,6 +1213,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The right shelf's view toggles and the Size slider's ring at 1440 px, 100 % and 200 % (tests/ui/sizes/view_toggles.sfui).
     sculptforge_ui_test(view_toggles_1440 sizes/view_toggles --size 1440x900)
     sculptforge_ui_test(view_toggles_1440_200 sizes/view_toggles --size 2880x1800)
+    # Preferences > Interface > Mask colour and the mask in it (tests/ui/sizes/mask_colour.sfui).
+    sculptforge_ui_test(mask_colour_1440 sizes/mask_colour --size 1440x900)
+    sculptforge_ui_test(mask_colour_1440_200 sizes/mask_colour --size 2880x1800)
     # A shorter window: the view toggles fold into one View button (tests/ui/sizes/view_toggles_short.sfui).
     sculptforge_ui_test(view_toggles_1024 sizes/view_toggles_short --size 1024x768)
     sculptforge_ui_test(view_toggles_1024_200 sizes/view_toggles_short --size 2048x1536)
@@ -1227,6 +1245,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # The pan and zoom keys in the interactive loop (0.12.5: updateKeyNav was only in the UI test loop, no key worked): tap and
+    # hold of each action on its default key and rebound (tests/ui/key_nav.sfui covers the logic in the test runner's loop).
+    add_test(NAME ui_key_nav_loop COMMAND sculptforge --run "new_sphere" --measure-key-nav)
+    set_tests_properties(ui_key_nav_loop PROPERTIES LABELS ui TIMEOUT 90 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # A benchmark take (--benchmark-script, src/app/BenchTake.cpp) on a sphere: played in real time, a CSV row per
     # frame with the strokes' lag, and a video as long as the take (within 5%).
     if(Python3_Interpreter_FOUND)

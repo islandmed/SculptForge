@@ -38,6 +38,7 @@
 #include "core/Document.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
+#include "core/Garment.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/Backdrop.h"
@@ -60,6 +61,7 @@
 #include "core/SelfUpdate.h"
 #include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
+#include "core/Featured.h"
 #include "core/ViewCapture.h"
 #include "core/Voxel.h"
 #include "core/WhatsNew.h"
@@ -124,8 +126,10 @@ struct AppOptions {
     std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
     std::string uiOutDir; // where UI tests save screenshots
     bool fullscreen = false; // start fullscreen (F11 toggles)
+    bool resetLayout = false; // --reset-layout: start with the standard layout and every panel in the main window (keys and preferences stay)
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
+    bool measureKeyNav = false; // --measure-key-nav: tap and hold every pan / zoom key in the interactive loop, exit 1 if the view stays
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
     // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
     std::string timelapsePath;
@@ -162,6 +166,7 @@ class App {
 
 public:
     App();
+    void setMaskColor(bool custom, const glm::vec3& srgb); // Preferences > Interface > Mask colour (false: the default look)
     void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
@@ -184,7 +189,7 @@ public:
     void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, SaveVisibleParts, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -522,8 +527,6 @@ private:
     // browser; nothing else changes.
     void openSupportPage();
     void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
-    void drawFeaturedVideos();       // Welcome: the creator video cards, nothing while there are none (PanelSupport.cpp)
-    void openFeaturedVideo(int index);
     void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
     float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
@@ -569,7 +572,6 @@ private:
     size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
     void openPerformancePrefs();            // Preferences > Performance, opened and flashed
     void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
-    int featuredRequests_ = 0;          // UI tests: how often a featured video was opened
     int socialRequests_ = 0;            // UI tests: how often a community icon was clicked
     int lastSocial_ = -1;               // and which one (index into kSocialLinks)
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
@@ -1059,10 +1061,13 @@ private:
     struct DrapeJob;
     std::shared_ptr<DrapeJob> drape_;
     DrapeRequest drapeRequest_;
+    bool drapeScaleTouched_ = false; // the user moved the slider: stop guessing
+    uint32_t drapeScalePart_ = 0xffffffffu;       // the active Part the guess was made for
     void drawDrapeSection();
     void startDrape();
     void pollDrape();
     void finishDrape(bool keep);
+    int drapeFrame() const; // the running Drape's frame count (0 when none; the UI tests read it)
     // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);
@@ -1259,6 +1264,32 @@ private:
     double garmentTestValue(const std::string& name);
     static void SDLCALL onGarmentFileChosen(void* userdata, const char* const* files, int filter);
     std::shared_ptr<struct GarmentEditorState> garments_;
+    // Drape on the body (PanelGarmentDrape.cpp; core/GarmentDrape.h): Place panels (a click on the body per panel),
+    // the placed panels as a preview Part (no undo), Drape live on it, Convert to Part (one undo step).
+    struct GarmentDrapeJob;
+    std::shared_ptr<GarmentDrapeJob> garmentDrape_;
+    int garmentPlacing_ = -1;      // the panel the next click on the body places (-1: not placing)
+    int garmentEditPanel_ = -1;    // the placed panel Turn / Wrap / Gap adjust
+    garment::Placement garmentEdit_; // its values while a slider is dragged
+    bool garmentEditing_ = false;
+    bool garmentPreviewDirty_ = false;
+    uint32_t garmentPreview_ = 0;  // the preview Part's id (0: none)
+    std::vector<glm::vec3> garmentDrapeResult_; // metres, the last drape (Convert to Part keeps it)
+    float garmentSeamGapMm_ = -1.0f;            // its widest seam gap, whether it rested, particles left inside a
+    bool garmentDrapeRested_ = false;           // body (UI tests)
+    int garmentInside_ = -1;
+    void drawGarmentDrapeSection();
+    bool garmentPlaceMouseDown(float x, float y, SDL_Keymod mod);
+    void garmentPreviewRefresh();
+    void dropGarmentPreview();
+    void startGarmentDrape();
+    void pollGarmentDrape();
+    void finishGarmentDrape();
+    void convertGarment();
+    void garmentDraped(); // before garment_drape: the placement preview goes (else it collides), placing stops
+    // UI test values: garment_placed, garment_placing, garment_drape_running, garment_draped, garment_preview,
+    // garment_units, garment_seam_gap_mm, garment_drape_rested, garment_inside; NaN for other names.
+    double garmentDrapeTestValue(const std::string& name);
     bool showGarments_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
     // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Image).
@@ -1801,6 +1832,7 @@ private:
     void tickProject(float dt);
     void saveProjectAs(bool forceDialog); // Ctrl+S (dialog only when needed) / Ctrl+Shift+S
     void saveProjectTo(const std::string& path);
+    void saveVisiblePartsAs(); // File > Save Visible Parts As...: a copy with only the visible Parts
     void storeProjectSettings(); // camera, render, brush and symmetry -> doc_.projectSettings
     void applyProjectSettings(); // and back, after opening a project
     void afterCommand(const std::string& name, const Args& args, const CommandResult& r);
@@ -1830,7 +1862,28 @@ private:
         std::string error;
         std::string memberError;   // the member check's problem (the public check may still have worked)
         bool memberSignedOut = false; // the sign-in ran out or was revoked: signed out
+        bool featuredTried = false, featuredOk = false; // the featured creator feed (PanelFeatured.cpp)
+        std::vector<FeaturedItem> featured;
     };
+    // The welcome window's featured creator card (PanelFeatured.cpp, core/Featured.h): the kept featured.json and
+    // thumbnails, refreshed by the daily update check; one entry a start; the x hides a video for good.
+    static bool readFeedText(const std::string& from, std::string& body, std::string& error);
+    static void fetchFeatured(UpdateJob& job, const std::string& source, const std::string& fallback, const std::string& dir);
+    void applyFeaturedJob(const UpdateJob& job);
+    void loadFeaturedCache();
+    void pickFeaturedCard();
+    const FeaturedItem* featuredCard() const; // what is shown, nullptr when nothing is
+    void watchFeatured();
+    void hideFeatured();
+    unsigned featuredTexture(const FeaturedItem& it);
+    void drawFeaturedCard();
+    std::vector<FeaturedItem> featured_;
+    int featuredShown_ = -1;
+    std::vector<std::string> featuredHidden_; // links of the videos the x hid
+    uint64_t featuredLaunch_ = 0;             // starts so far: each start shows the next entry
+    unsigned featuredTex_ = 0;
+    std::string featuredTexFor_;
+    int featuredWatchRequests_ = 0;           // UI tests: Watch clicks (never opens a browser there)
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
     static const char* appPrerelease();     // "beta.1" in a beta build, else ""
@@ -1905,6 +1958,7 @@ private:
     void drawPartPopups();
     // Index of the nearest visible Part under the cursor (-1: none); builds stale BVHs on the way.
     int pickPart(float x, float y, RayHit* hit = nullptr);
+    int pickPartNear(float x, float y, RayHit* hit = nullptr); // ... and a Part a few points off the pointer
     void partClickMove(float x, float y); // Alt press on another Part: dragging turns it into a stroke
     void partClickRelease();              // ... and releasing without dragging selects it
     int partClickTarget_ = -1;
@@ -2325,6 +2379,16 @@ public:
     void savePrefsNow(); // config.store: write them at once
     void restartPrefsForTest(const std::string& uiJson = {}); // the UI test step `restart`: save, back to the defaults, read ui.json again
     void restoreStandardUi();
+    // Revert / Reset run at the top of the next frame (applyPendingLayoutOp, Shell.cpp), never inside the palette that
+    // asked: they swap the layout, the shell mode, the preferences and the fonts under the frame being drawn.
+    int pendingLayoutOp_ = 0;            // 1 Revert to Saved Layout, 2 Reset Layout, 3 Reset Layout and Shortcuts, 4 import
+    std::string pendingImportPath_;
+    void queueLayoutOp(int op) { pendingLayoutOp_ = op; redrawIn(0.0); }
+    void applyPendingLayoutOp();
+    bool autosaveNow(); // an autosave right now if there is unsaved work (before a risky step); true if one was written
+    void resetLayoutOnly();  // config.reset_layout: the built-in layout and every panel back in the main window; keys stay
+    std::vector<std::string> missingShelfWidgets() const; // the standard shelves' widgets (colour picker, tiles...) no shelf holds now
+    void addShelfWidget(const std::string& id);           // puts one back where the standard layout has it
     void restoreCustomUi();
     void saveUiDialog();
     void loadUiDialog();
@@ -2358,9 +2422,9 @@ private:
     // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
     // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
     std::unique_ptr<splash::Window> splash_;
-    bool splashEnabled_ = false, splashShown_ = false, mainWindowHidden_ = false;
-    std::chrono::steady_clock::time_point startedAt_;
-    void splashCheckpoint(); // between start-up steps
+    bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
+    std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;
+    void splashCheckpoint(); // between start-up steps and before the first frame
     void revealMainWindow(); // after the first frame
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
@@ -2419,8 +2483,16 @@ private:
     ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
     std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
     std::map<std::string, KeyNavEase> keyNavEase_; // each pan / zoom key's eased speed (updateKeyNav)
-    std::map<std::string, bool> keyNavTapped_;     // pressed since the last frame (a tap shorter than a frame still moves)
+    std::map<std::string, float> keyNavTap_;      // seconds a pressed key still counts as down (a tap shorter than a frame still glides)
     bool keyNavMoving_ = false;
+    struct KeyNavProbe { // --measure-key-nav's state
+        int caseIndex = 0, failures = 0;
+        double stageAt = 0.0;
+        int stage = 0; // 0: press, 1: held (checked while down), 2: waiting after the release
+        glm::vec3 target{0.0f};
+        float distance = 0.0f;
+        bool rebound = false, movedWhileHeld = false;
+    } keyNavProbe_;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
@@ -2558,6 +2630,7 @@ private:
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void keyNavStep(const std::string& id);   // notes a press of a pan or zoom key
+    int measureKeyNavStep(bool& draw); // --measure-key-nav, once a loop pass: -1 running, else the exit code
     void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)

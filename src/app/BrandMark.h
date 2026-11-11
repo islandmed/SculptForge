@@ -18,10 +18,6 @@ void appMarkItem(float size, float alpha = 1.0f); // as an ImGui item at the cur
 void bust(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
 void bustItem(float size, float alpha = 1.0f); // as an ImGui item at the cursor
 
-// A PNG or JPEG as a GL texture, uploaded once per call (cache the result); 0 when it can't be decoded. For bundled
-// pictures (the Welcome dialog's featured thumbnails).
-unsigned imageTexture(const unsigned char* bytes, unsigned long long size);
-
 // Community icon `index` (0..kSocialCount-1, the order of kSocialLinks in Support.h), `size` px wide at `at`, in `color`
 // (the strip is white; it is tinted). Draws nothing without a texture.
 void socialIcon(ImDrawList* dl, int index, ImVec2 at, float size, ImU32 color);

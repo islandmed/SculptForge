@@ -198,6 +198,8 @@ Shortcuts and preferences save themselves; the layout (shelves, trays, open pale
 
 - **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
   save themselves; press **Save Layout** afterwards to keep the layout.
+- **Reset Layout** (same place, or <kbd>F3</kbd> and type "reset layout") restores only the shelves, trays and panels and keeps your shortcuts and preferences. It works whatever state the layout is in. Starting `sculptforge --reset-layout` does it before the window opens.
+- A colour picker, brush tile or slider you dragged off a shelf is listed in the same section with **Put back on the shelf**.
 - **Revert to Saved Layout** goes back to the layout the last Save Layout kept.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
   and `imgui.ini` (positions of floating windows such as Brush Lab) from the settings folder below.

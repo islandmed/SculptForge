@@ -21,16 +21,6 @@
 #include <vector>
 
 namespace sf {
-namespace featured_data { // assets/featured, compiled in (cmake/EmbedFeatured.cmake)
-struct File {
-    const char* path;
-    const unsigned char* data;
-    unsigned long long size;
-};
-extern const File kFiles[];
-extern const int kFileCount;
-} // namespace featured_data
-
 namespace assets {
 extern const unsigned char supporters[]; // docs/supporters.txt (CMakeLists.txt)
 extern const unsigned long long supporters_size;
@@ -111,74 +101,6 @@ void App::drawSocialRow(const char* where, ImVec2 at) {
     ImGui::SetCursorScreenPos(topLeft);
     ImGui::Dummy(ImVec2(socialRowWidth(), frame));
     ImGui::EndGroup();
-}
-
-namespace {
-// The bundled creator videos (assets/featured), parsed once; their thumbnails are uploaded when first drawn.
-struct FeaturedSlot {
-    std::vector<FeaturedVideo> videos;
-    std::vector<unsigned> textures;
-};
-FeaturedSlot& featuredSlot() {
-    static FeaturedSlot slot = [] {
-        FeaturedSlot f;
-        const featured_data::File* json = nullptr;
-        for (int i = 0; i < featured_data::kFileCount; ++i)
-            if (std::string_view(featured_data::kFiles[i].path) == "featured.json") json = &featured_data::kFiles[i];
-        if (json) f.videos = parseFeaturedVideos(std::string(reinterpret_cast<const char*>(json->data), size_t(json->size)));
-        f.textures.assign(f.videos.size(), 0u);
-        return f;
-    }();
-    return slot;
-}
-} // namespace
-
-// "Featured by creators": up to three cards (thumbnail, title, creator); a click opens the video's page in the browser. Nothing
-// is drawn, not even the heading, while the bundled list is empty.
-void App::drawFeaturedVideos() {
-    FeaturedSlot& slot = featuredSlot();
-    if (slot.videos.empty()) return;
-    ImGui::Spacing();
-    ImGui::TextUnformatted(tr("Featured by creators"));
-    const float gap = ImGui::GetStyle().ItemSpacing.x;
-    const float width = (ImGui::GetContentRegionAvail().x - gap * float(kFeaturedMax - 1)) / float(kFeaturedMax), height = width * 9.0f / 16.0f;
-    for (size_t i = 0; i < slot.videos.size(); ++i) {
-        const FeaturedVideo& v = slot.videos[i];
-        if (i > 0) ImGui::SameLine();
-        ImGui::BeginGroup();
-        const ImVec2 at = ImGui::GetCursorScreenPos();
-        const std::string id = "##welcome.featured." + std::to_string(i);
-        const bool clicked = ImGui::InvisibleButton(id.c_str(), ImVec2(width, height));
-        if (slot.textures[i] == 0)
-            for (int k = 0; k < featured_data::kFileCount; ++k)
-                if (v.thumb == featured_data::kFiles[k].path)
-                    slot.textures[i] = brand::imageTexture(featured_data::kFiles[k].data, featured_data::kFiles[k].size);
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), IM_COL32(24, 24, 28, 255), 3.0f * uiScale_);
-        if (slot.textures[i])
-            dl->AddImageRounded(ImTextureID(uintptr_t(slot.textures[i])), at, ImVec2(at.x + width, at.y + height), ImVec2(0, 0), ImVec2(1, 1),
-                                ImGui::IsItemHovered() ? IM_COL32_WHITE : IM_COL32(220, 220, 220, 255), 3.0f * uiScale_);
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
-        ImGui::TextUnformatted(v.title.c_str());
-        ImGui::TextDisabled("%s", v.creator.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndGroup();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens in your browser."));
-        if (clicked) openFeaturedVideo(int(i));
-    }
-}
-
-void App::openFeaturedVideo(int index) {
-    const FeaturedSlot& slot = featuredSlot();
-    if (index < 0 || size_t(index) >= slot.videos.size()) return;
-    ++featuredRequests_;
-    const std::string& url = slot.videos[size_t(index)].url;
-    if (!interactive()) { // UI tests, renders and demos never start a browser
-        status_ = "Featured video: " + url;
-        return;
-    }
-    status_ = sf::dialogs::openUrl(url.c_str()) ? std::string("Opened the video in your browser")
-                                                : std::string("Couldn't open ") + url + ": " + SDL_GetError();
 }
 
 void App::drawSupportersSection() {
@@ -386,6 +308,7 @@ void App::drawSupportUi() {
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", tr("Ten short slides: remeshing, dynamic topology, retopology, levels, masking, cut, "
                                   "brushes and baking, each with a Show me button."));
+            drawFeaturedCard(); // PanelFeatured.cpp: nothing when there is no featured creator
             // The look (0.10.9, #U6): three cards, the first the default. Existing installs never see this window
             // unless they open Help > Welcome, so nobody's look changes by itself.
             ImGui::Spacing();
@@ -439,7 +362,6 @@ void App::drawSupportUi() {
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", tr("Bust, full body, hand, foot, ear, eye, stylised and creature heads, torso and "
                                   "bevelled primitives: Library > Tool > Starter meshes."));
-            drawFeaturedVideos(); // creator reviews and tutorials: bundled, and nothing at all while there are none
             // AI (Preferences > AI changes it later; saved at once).
             ImGui::Spacing();
             ImGui::AlignTextToFramePadding();

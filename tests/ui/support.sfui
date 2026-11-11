@@ -27,8 +27,6 @@ key enter
 expect_value welcome_open == 1
 expect_text "Free for everyone. Members get betas and a vote on what's next."
 expect_text "Your art is never uploaded or used for training."
-expect_no_text "Featured by creators"      # no approved videos bundled yet: the section is not drawn at all
-expect_value featured_requests == 0
 shot welcome
 # Its Support button shows the membership card (each tier a click from its checkout) over the welcome.
 click "Support SculptForge##welcome"

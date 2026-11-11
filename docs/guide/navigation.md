@@ -249,7 +249,7 @@ These live on the right shelf and in the **View** menu:
   the surface as a wireframe. Quads show as quads (see [Quads and triangles](geometry.md#quads-and-triangles)).
   Useful for judging mesh density before you subdivide or remesh.
 - **Groups**: colours each face group.
-- **Mask**: tints masked areas dark (how dark: **Mask darkness** in Edit > Preferences > Interface).
+- **Mask**: tints masked areas dark (how dark: **Mask darkness**, and its colour: **Mask colour**, in Edit > Preferences > Interface).
 - **Paint**: shows vertex paint colours (off shows the plain material).
 - **Solo**: shows only the active Part, to get at parts hidden behind others.
 - **Show Mesh** (**View** menu): hides the sculpt, for example to look at a splat capture on its own.

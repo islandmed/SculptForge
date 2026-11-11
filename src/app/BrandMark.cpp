@@ -78,11 +78,6 @@ void bust(ImDrawList* dl, ImVec2 at, float size, float alpha) {
     draw(dl, texture(tex, assets::bustMark, assets::bustMark_size), at, size, alpha);
 }
 
-unsigned imageTexture(const unsigned char* bytes, unsigned long long size) {
-    MarkTexture t;
-    return texture(t, bytes, size);
-}
-
 void socialIcon(ImDrawList* dl, int index, ImVec2 at, float size, ImU32 color) {
     static MarkTexture tex;
     const unsigned t = texture(tex, assets::socialIcons, assets::socialIcons_size);
