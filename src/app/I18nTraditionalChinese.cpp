@@ -2728,6 +2728,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Copy", "複製"},
     {"Download the new package from the website and open it.", "從網站下載新的安裝套件並開啟。"},
     {"Try again", "再試一次"},
+    {"Switched off by the Space's owner, use Image to 3D", "該 Space 的擁有者已將其關閉，請使用圖像轉 3D"},
     {"Update", "更新"},
     {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
      "The current version is kept until the new one has started.",
