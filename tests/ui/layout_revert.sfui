@@ -51,3 +51,9 @@ shot put_back_button
 click "Put back on the shelf: color##putback.widget.color"
 expect_value shelf_has_widget.color == 1
 shot put_back
+# The first write of a session keeps the file it replaces: a second Save Layout leaves ui.prev.json behind.
+key f3
+type "##Command palette" "save layout"
+key enter
+expect_status "Layout saved"
+expect_value ui_prev_file == 1

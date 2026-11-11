@@ -2428,6 +2428,7 @@ private:
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
     bool prefsKeyKnown_ = false, actionsReady_ = false;
+    bool uiConfigBackedUp_ = false; // ui.json copied to ui.prev.json before this session's first write
     double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;
