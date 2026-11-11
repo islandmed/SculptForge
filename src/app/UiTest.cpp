@@ -866,6 +866,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
     if (name == "reduce_motion") return app_.uiPrefs_.reduceMotion ? 1.0 : 0.0;
     if (name == "shell_layout") return double(app_.uiPrefs_.shellLayout); // 0 classic, 1 SculptForge
+    if (name == "one_surface") return app_.oneSurface() ? 1.0 : 0.0;          // the one-surface look (OneSurface.cpp)
+    if (name == "caption_owned") return app_.captionOwned_ ? 1.0 : 0.0;      // its top bar is the window's caption
+    if (name == "stats_pinned") return app_.statsPinned_ ? 1.0 : 0.0;
+    if (name == "uv_editor") return app_.showUvEditor_ ? 1.0 : 0.0;
+    if (name == "canvas_y") return double(app_.shell_.canvas.y);
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
@@ -2533,6 +2538,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
         wait(0.05f);
+    } else if (verb == "caption") { // caption own | system | auto: the one-surface bar as the window's caption (window
+                                    // buttons drawn) on a screenless run too, never, or as the desktop decides
+        if (!need(1)) return false;
+        run([this, f = w[1] == "own" ? 1 : w[1] == "system" ? 0 : -1] {
+            app_.captionForce_ = f;
+            app_.captionTried_ = false;
+        });
+        wait(0.1f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });
@@ -4031,7 +4044,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "caption", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};

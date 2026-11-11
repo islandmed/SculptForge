@@ -54,6 +54,25 @@ models, brushes or shortcuts.
 
 Switching the layout swaps the shelves for that layout's standard ones; the trays and what is in them stay.
 
+**The one-surface look** (the default with the SculptForge layout; idea by polyflow on Discord): one calm top
+bar that is also the window's title bar. From the left: the menus button (every task menu, and the layout presets
+1 2 3), the project's name and whether it is saved (click for **File**), the rooms **Sculpt**, **Paint**, **UV**
+and **Model** (Model opens the **Mesh** menu), the brush with its size and strength (click for the brush picker),
+undo and redo, the stats chip (point at it for triangles, memory, frame time and the slowest frame, Parts, undo
+steps, the version and the performance tier; click it, or the pin, to keep them open), search (<kbd>F3</kbd>) and
+the window buttons. Drag the empty parts of the bar to move the window, double-click them to maximise it, and drag
+the window's edges to resize it. The bars, shelves and trays are one flat colour (Forge Night: deep blue-grey with
+the forge orange; a Forge Terminal scheme other than Neutral, or Match my desktop theme, keeps its own colours),
+and a right click on the model adds Select Part, Hide and Isolate face group, Frame, Mask, Face Groups, Remesh and
+Search all tools to the Quick Menu.
+
+- **Classic look** (Edit > Preferences > Interface > Look) brings back the status bar, the tiles and the system title bar
+  in one click. Shelves, trays, menus and every key are the same in both. The first start after the update shows
+  one line, **New look: switch back any time**, with the same switch.
+- **System title bar** keeps the system's own title bar and window buttons above the one-surface bar. Tiling
+  desktops (Hyprland, Sway, i3 and others) and macOS always keep their own, and the bar is then a plain top bar
+  without window buttons.
+
 **Look** (the colours and style):
 
 - **Forge Terminal** (the default): tiles with small gaps and thin borders, JetBrains Mono for labels and numbers.

@@ -1,0 +1,78 @@
+# The one-surface look (polyflow on Discord, "Alternate UI"; src/app/OneSurface.cpp). Tests start with the Classic
+# look's bars; ui.classic_look switches to the one surface and back, with the shelves and keys unchanged.
+run new_sphere subdivisions=4
+expect_value one_surface == 0
+expect_value title_height < 40
+action ui.classic_look
+wait_idle 10
+expect_value one_surface == 1
+expect_value title_height > 40
+expect_value title_overlaps == 0
+shot one-surface
+
+# The rooms: Sculpt, Paint, UV and back; Model opens the Mesh menu.
+click "Paint##room.paint"
+expect_value paint_mode == 1
+click "UV##room.uv"
+expect_value uv_editor == 1
+click "Sculpt##room.sculpt"
+expect_value paint_mode == 0
+expect_value uv_editor == 0
+click "Model##room.model"
+expect "Parts & Geometry"
+key escape
+
+# The menus button lists every task menu; File opens from the file name too.
+click "Menus##os.menus"
+click "Sculpt##menu.sculpt"
+expect "Draw & Tablet"
+key escape
+click "##os.file"
+expect_text Save
+key escape
+
+# The stats chip: hover shows the card, click pins it.
+hover "##os.stats"
+expect_text Triangles
+expect_text slowest
+click "##os.stats"
+expect_value stats_pinned == 1
+mouse_move 0.5 0.6
+expect_text Triangles
+shot stats-pinned
+click "##os.stats"
+expect_value stats_pinned == 0
+
+# Undo and redo from the bar.
+stroke 0.40 0.45 0.60 0.50
+expect_value timeline_steps == 1
+click "Undo##os.undo"
+expect_value timeline_cursor == 0
+click "Redo##os.redo"
+expect_value timeline_cursor == 1
+
+# Right click on the model: the QuickMenu with its tool rows.
+button_drag right 0.5 0.5 0.5 0.5 0.1
+expect_value quickmenu_open == 1
+expect_text Isolate face group
+expect_text Search all tools...
+shot quickmenu-tools
+click "Remesh##qm.tool.6"
+expect_value quickmenu_open == 0
+expect "Voxel Remesh"
+key escape
+
+# Every key still works: F3 search, Space QuickMenu.
+key f3
+expect_value command_palette_open == 1
+key escape
+mouse_move 0.5 0.5
+key space
+expect_value quickmenu_open == 1
+key escape
+
+# Classic look: back to the status bar, same shelves.
+action ui.classic_look
+wait_idle 10
+expect_value one_surface == 0
+expect_value title_height < 40

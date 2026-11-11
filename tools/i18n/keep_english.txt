@@ -42,3 +42,5 @@ Tube
 CPU
 GPU
 Turbo
+UV
+fps

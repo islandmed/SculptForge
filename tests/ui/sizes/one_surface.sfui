@@ -1,0 +1,28 @@
+# The one-surface look for the look review (src/app/OneSurface.cpp), with the window buttons drawn (the bar as the
+# caption): 1440 x 900 at 100 %, 2880 x 1800 at 200 %, and a narrow 1024 x 768. Nothing in the bar overlaps; a
+# narrow window drops the room names and the brush's values before anything collides.
+run new_sphere subdivisions=4
+caption own
+action ui.classic_look
+wait_idle 10
+expect_value one_surface == 1
+expect_value caption_owned == 1
+expect_value title_overlaps == 0
+expect "Close##window"
+expect "Maximize##window"
+shot bar
+hover "##os.stats"
+expect_text Triangles
+shot stats
+mouse_move 0.5 0.5
+button_drag right 0.5 0.5 0.5 0.5 0.1
+expect_value quickmenu_open == 1
+shot quickmenu
+key escape
+click "Menus##os.menus"
+shot menus
+key escape
+action ui.classic_look
+wait_idle 10
+expect_value caption_owned == 0
+shot classic
