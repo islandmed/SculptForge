@@ -5,7 +5,7 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 
 | tier | when | where | what | target |
 |---|---|---|---|---|
-| **T0 impact** | every agent commit | the PC (laptop if the PC sleeps), or GitHub Actions while the PC queue is long | build + the tests the change can break | < 1 min |
+| **T0 impact** | every agent commit | GitHub Actions (the PC only for `SF_PC_PRIO=1`) | build + the tests the change can break | < 1 min |
 | **T1 batch** | once per merge batch | the PC, while T2 runs | the whole suite, -j10 on the GPU, test cache on | < 5 min |
 | **T2 platforms** | once per merge batch | CI on the branch `staging` | every platform, VFX Reference Platform, Blender | the gate for main |
 | **T3 nightly** | once a day | CI (scheduled) + the PC | label `nightly`: benchmarks, stress, heavy meshes, floor-tier perf | |
@@ -26,17 +26,26 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
    commits as it in the last 600 commits, and a smoke set.
 
 `marks` (the IP check) always runs. CMake files mean everything runs (`.`). `-v` explains each pick.
-Run it with `~/Work/.sf/t0.sh`: `pc.sh` builds on the PC, runs impacted.py there against the PC's build graph, then
-runs the tests through `tools/test/run.py`.
+Run it with `~/Work/.sf/t0.sh`: it runs on GitHub Actions (below); the PC only builds and runs T0 for `SF_PC_PRIO=1`
+(there `pc.sh` runs impacted.py against the PC's build graph, then the tests through `tools/test/run.py`).
 
 ### T0 on GitHub Actions
 
-`SF_T0_CI=1 ~/Work/.sf/t0.sh` (automatic while more than 3 jobs wait for the PC, never with `SF_PC_PRIO=1`;
-`SF_T0_CI=0` turns it off) runs the same T0 on GitHub's free runners, so branches test in parallel instead of
-queueing for the PC. `~/Work/.sf/t0-ci.sh <worktree>` pushes the worktree's state to `t0/<branch>` (uncommitted work
+`~/Work/.sf/t0.sh` (the default; never with `SF_PC_PRIO=1`; `SF_T0_CI=0` skips it) runs T0 on GitHub's free runners,
+so branches test in parallel instead of queueing for the PC. `~/Work/.sf/t0-ci.sh <worktree>` pushes the worktree's state to `t0/<branch>` (uncommitted work
 as a temporary commit; the worktree is not touched), waits for `.github/workflows/t0.yml`, prints the same lines as
-`t0.sh` and exits 0 green, 1 red, 3 unavailable (t0.sh then uses the PC); it deletes the `t0/` ref after. Results
+`t0.sh` and exits 0 green, 1 red, 3 unavailable (t0.sh then uses the PC only if nobody waits for it, else the laptop); it deletes the `t0/` ref after. Results
 stay in `~/Work/.sf/t0-ci/<worktree>/`.
+
+### PC flow guards (11-10: 13 branch T0s and a daytime bench jammed both PC slots for hours)
+
+- `pc.sh` refuses a branch T0 (`SF_T0=1`, exit 7, "use t0-ci.sh") unless `SF_PC_PRIO=1` (release stage, security), `--shots` or `--bench`.
+- Until `ops/t0-full` (14ae2fb8, the full-suite warm-UI fix) is on main, `t0-ci.sh` adds it to the CI ref only.
+- A whole-PC job (`bench.sh` PC rows, `win.sh run`) holds the slots only 00:30-06:30 local, or when no `pc.sh` job waits; otherwise it queues behind them (`SF_WIN_NOW=1`: by hand).
+- A `SF_PC_PRIO=1` job always goes first, past a draining or between-run bench; whole-PC runs step behind it.
+- Queue watchdog (`pcq.sh alerts`, every minute while the queue is active): a job waiting > 45 min (PRIO > 10 min) wakes the coordinator once, with the queue table.
+- `spawn.sh` starts agents on Sonnet (`--opus` for hard design or perf work); the model is a column of `agents.tsv`.
+- `tidy.sh --apply` closes the herdr pane of an idle agent whose branch is merged and whose REPORT.md says done.
 
 - The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
   the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
