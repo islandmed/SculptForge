@@ -5,6 +5,7 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/PathStroke.h"
+#include "core/StableMath.h"
 #include "core/Units.h"
 
 #include <glm/gtc/constants.hpp>
@@ -100,8 +101,10 @@ glm::vec3 placedPoint(const Panel& panel, glm::vec2 q, float scale, const glm::v
     up = glm::length(up) > 1e-6f ? glm::normalize(up) : glm::vec3(0.0f, 1.0f, 0.0f);
     const glm::vec3 right0 = glm::cross(up, f); // right x up = facing: the sheet seen from its right side
     const float turn = glm::radians(pl.turnDegrees);
-    const glm::vec3 right = std::cos(turn) * right0 + std::sin(turn) * up;
-    const glm::vec3 up2 = -std::sin(turn) * right0 + std::cos(turn) * up;
+    // (stableSin / stableCos: the same bits on every OS, so a pattern drapes alike everywhere)
+    const float ct = stableCos(turn), st = stableSin(turn);
+    const glm::vec3 right = ct * right0 + st * up;
+    const glm::vec3 up2 = -st * right0 + ct * up;
     const glm::vec2 lo = panelMin(panel), hi = panelMax(panel);
     const glm::vec2 local = q - (anchor ? *anchor : panelAnchor(panel));
     const float mm = 0.001f * scale;
@@ -114,8 +117,9 @@ glm::vec3 placedPoint(const Panel& panel, glm::vec2 q, float scale, const glm::v
     // Curled back around an axis behind the centre, along the sheet's y: the width becomes the arc.
     const float r = std::max(1.0f, hi.x - lo.x) / wrap;
     const float a = local.x / r;
-    if (normal) *normal = right * std::sin(a) + f * std::cos(a); // (out from the curl's axis)
-    return centre + (right * (r * std::sin(a)) + f * (r * (std::cos(a) - 1.0f)) + up2 * local.y) * mm;
+    const float sa = stableSin(a), ca = stableCos(a);
+    if (normal) *normal = right * sa + f * ca; // (out from the curl's axis)
+    return centre + (right * (r * sa) + f * (r * (ca - 1.0f)) + up2 * local.y) * mm;
 }
 
 bool placedPositions(const Pattern& pat, const GarmentMesh& m, std::vector<glm::vec3>& world, std::string& error,

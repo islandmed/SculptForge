@@ -9,6 +9,7 @@
 #include "core/Commands.h"
 #include "core/GarmentDrape.h"
 #include "core/Primitives.h"
+#include "core/StableMath.h"
 #include "core/Units.h"
 
 #include <algorithm>
@@ -139,6 +140,20 @@ TEST(garment_drape_command_adds_the_part_in_one_undo_step) {
     CHECK(reg.execute(doc, "garment_place", {{"panel", std::string("Front")}, {"clear", true}}).ok);
     Pattern pat;
     CHECK(documentPattern(doc, pat) && !pat.panels[0].place.placed && pat.panels[1].place.placed);
+}
+
+TEST(stable_sin_cos_match_the_library) {
+    // Placement's sine and cosine (the same bits on every OS) are as good as the library's.
+    double worst = 0.0;
+    for (int k = -20000; k <= 20000; ++k) {
+        const double x = k * 0.000731 * 3.0;
+        double s, c;
+        stableSinCos(x, s, c);
+        worst = std::max({worst, std::abs(s - std::sin(x)), std::abs(c - std::cos(x))});
+    }
+    std::printf("  stable sin / cos: worst %.2g off the library's over +-44 rad\n", worst);
+    CHECK(worst < 1e-14);
+    CHECK(stableSin(0.0f) == 0.0f && stableCos(0.0f) == 1.0f);
 }
 
 TEST(garment_panels_anchor_at_their_widest_line) {
