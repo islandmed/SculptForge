@@ -65,8 +65,8 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 **Crisp Flatten** (thanks _tfx on Discord) cuts hard-surface planes with a clean boundary instead of the soft
 fade of Flatten and Trim. The plane is taken where the stroke starts and held for the whole stroke, so you can drag
 across a curved form and leave one flat facet; start the next stroke on another side for the next facet, and where
-two meet you get a crisp bevel. It cuts everything above the plane and fills only shallow dips below it, so dragging
-over a rounded form never builds a wall of clay past the form. The edge is hard with a thin smoothed band (about two or three polygons), so it reads
+two meet you get a crisp bevel. It only cuts: everything above the plane comes down to it and nothing below it is ever
+raised, so it never adds clay (use Flatten when you want dips filled). The edge is hard with a thin smoothed band (about two or three polygons), so it reads
 as a clean line at any resolution; subdivide or use [Dynamic topology](dynamic-topology.md) for a sharper one. It
 works with symmetry, masks and Dynamic topology. In Brush Lab, **Lock plane** off makes the plane follow the surface
 instead, and **Crisp edge** off gives the soft edge back.
