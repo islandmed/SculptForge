@@ -1,0 +1,10 @@
+# e2e: quit paths, quit while a trainer runs (run by quit_clean.py, which then quits the app with SIGTERM and with SIGINT,
+# the way SDL turns into its quit event). The script just starts the trainer and waits for the harness.
+run new_sphere subdivisions=3
+env FAKE_BRUSH_MS_PER_EXPORT 400
+env FAKE_BRUSH_FAIL_AT -1
+copy ../data/splat_capture capture_e2e_quit
+run splat_train source=capture_e2e_quit
+wait_value splat_previews >= 1 30
+print splat_training
+wait 120

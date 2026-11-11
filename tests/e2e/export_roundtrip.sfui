@@ -1,0 +1,66 @@
+# e2e: export. A sculpted model out to every common format and back: OBJ, STL, glTF, USD (text and package), FBX.
+# The reimport has the same triangle count (STL and OBJ: the same shape to a tolerance, units kept) and is as closed as
+# the original. A scene of two Parts comes back as two Parts.
+run new_sphere subdivisions=4
+click "Clay##brush.clay"
+stroke 0.3 0.4 0.7 0.5
+camera 0 0
+remember triangles tris
+expect_value open_edges == 0
+remember size_x width
+
+run save_obj path=sf_e2e_rt.obj
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.obj
+expect_value triangles == $tris
+expect_value open_edges == 0
+expect_value size_x > $width*0.99
+expect_value size_x < $width*1.01
+
+run open path=sf_e2e_rt.obj
+run export_stl path=sf_e2e_rt.stl
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.stl
+expect_value triangles == $tris
+expect_value open_edges == 0
+expect_value size_x > $width*0.99
+expect_value size_x < $width*1.01
+
+run open path=sf_e2e_rt.obj
+run export_glb path=sf_e2e_rt.glb
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.glb
+expect_value triangles == $tris
+expect_value open_edges == 0
+
+run open path=sf_e2e_rt.obj
+run export_usd path=sf_e2e_rt.usda
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.usda
+expect_value triangles == $tris
+expect_value open_edges == 0
+
+run open path=sf_e2e_rt.obj
+run export_usd path=sf_e2e_rt.usdz
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.usdz
+expect_value triangles == $tris
+expect_value open_edges == 0
+
+run open path=sf_e2e_rt.obj
+run export_fbx path=sf_e2e_rt.fbx
+run new_sphere subdivisions=1
+run open path=sf_e2e_rt.fbx
+expect_value triangles == $tris
+expect_value open_edges == 0
+
+# Two Parts out and back.
+run open path=sf_e2e_rt.obj
+run part_append type=cube size=0.5 name=Block
+expect_value parts == 2
+run export_glb path=sf_e2e_rt2.glb
+run open path=sf_e2e_rt2.glb
+expect_value parts == 2
+run save_obj path=sf_e2e_rt2.obj
+run open path=sf_e2e_rt2.obj
+expect_value parts == 2

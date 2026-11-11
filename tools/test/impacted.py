@@ -209,8 +209,8 @@ def co_changed(root, files, ui_names, limit=600, top=6, log_file=None):
         hit = names & want
         if not hit:
             continue
-        scripts = {"ui_" + os.path.splitext(os.path.basename(f))[0] for f in names
-                   if f.startswith("tests/ui/") and f.endswith(".sfui")}
+        scripts = {("ui_e2e_" if f.startswith("tests/e2e/") else "ui_") + os.path.splitext(os.path.basename(f))[0] for f in names
+                   if f.startswith(("tests/ui/", "tests/e2e/")) and f.endswith(".sfui")}
         for f in hit:
             for s in scripts & ui_names:
                 pairs[f][s] += 1

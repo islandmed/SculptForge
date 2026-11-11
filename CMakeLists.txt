@@ -999,6 +999,26 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME perf_${name} COMMAND sculptforge --ui-test ${script} --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/perf_${name})
       set_tests_properties(perf_${name} PROPERTIES LABELS "ui;nightly" TIMEOUT 3600 RUN_SERIAL TRUE)
     endforeach()
+    # End-to-end modelling scenarios (tests/e2e/*.sfui, docs/testing-flow.md "End-to-end"): each is a real artist workflow with
+    # numeric asserts. ui_e2e_NAME, labels ui + e2e, so every suite that runs the UI tests runs them: no extra release step.
+    # `ctest -L e2e` runs just these. A `# xfail: BUG-ID` line in a script marks a bug whose fix isn't merged yet (XFAIL, XPASS).
+    # quit_*.sfui are driven by quit_clean.py (below), not run alone.
+    file(GLOB SCULPTFORGE_E2E_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/*.sfui)
+    foreach(script ${SCULPTFORGE_E2E_TESTS})
+      get_filename_component(name ${script} NAME_WE)
+      if(name MATCHES "^quit_")
+        continue()
+      endif()
+      sculptforge_ui_test(e2e_${name} ../e2e/${name})
+      set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
+    endforeach()
+    if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
+      # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
+      add_test(NAME e2e_quit_clean COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/quit_clean.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/e2e_quit_clean)
+      set_tests_properties(e2e_quit_clean PROPERTIES LABELS "ui;e2e" TIMEOUT 600 ENVIRONMENT
+        "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
+    endif()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
       if(TEST ${t})

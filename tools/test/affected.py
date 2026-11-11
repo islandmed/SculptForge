@@ -87,7 +87,10 @@ class AreaMap:
         """Area of a repo path; tests/ui/x.sfui and tests/test_x.cpp are the area of the test they belong to."""
         a = self.first("paths", path)
         if a == "@test":
-            return self.test_area("ui_" + os.path.splitext(os.path.basename(path))[0]) or self.test_area("ui_x")
+            stem = os.path.splitext(os.path.basename(path))[0]
+            if path.startswith("tests/e2e/"):  # tests/e2e/x.sfui is ui_e2e_x (quit_*.sfui belong to e2e_quit_clean)
+                return self.test_area("ui_e2e_" + stem) or self.test_area("ui_e2e_x")
+            return self.test_area("ui_" + stem) or self.test_area("ui_x")
         if a == "@unit":
             return self.unit_area(os.path.splitext(os.path.basename(path))[0])
         return a
