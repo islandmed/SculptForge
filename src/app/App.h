@@ -2128,6 +2128,16 @@ private:
     void fillPanelHost(ImGuiWindowFlags& flags);
     void registerPanelActions();
     void finishShelfDrag();
+    std::string myPanelSection_;      // while drawMyPanelSection runs: the section whose body subpalette() lets through
+    bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
+    bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
+    std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
+    std::unordered_map<std::string, std::string> myPanelTitles_; // section id -> its title as the palette gives it (English)
+    bool myPanelProbe_ = false;       // drawMyPanelSection only learns the title
+    struct MyPanelDrag {
+        bool active = false, accepted = false, fromPanel = false;
+        std::string entry;
+    } myPanelDrag_;
     void noteLayoutChanged();
     void applyPreset(int preset);
     void updateCameraAspect(); // camera_.aspect from the canvas
@@ -2168,6 +2178,14 @@ private:
     void drawPalette_Stroke();
     void drawPalette_Tool();
     void drawPalette_Transform();
+    // My Panel (PanelMyPanel.cpp): buttons and whole sections dragged in from any palette, in a tray or a drop-down
+    // like the others, or floating at the cursor on a key (ui.my_panel).
+    void drawPalette_MyPanel();
+    void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
+    void drawMyPanelFloating();
+    void registerMyPanelActions();
+    void finishMyPanelDrag();
+    bool myPanelAdd(const std::string& entry, int at); // false when it is not an entry
     void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
     void drawLayersContents();

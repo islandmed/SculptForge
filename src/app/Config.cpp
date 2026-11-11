@@ -959,6 +959,7 @@ void App::initActions() {
     registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
     registerPanelActions();      // panels in windows of their own, Reset panel windows (PanelWindows.cpp)
+    registerMyPanelActions();    // My Panel's key (PanelMyPanel.cpp)
 
     registerBrushSets(); // brush set commands and actions; the active set's shelf back (PanelBrushSets.cpp)
     // Every command, so the command palette finds anything scriptable.

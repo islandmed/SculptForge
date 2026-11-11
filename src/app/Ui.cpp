@@ -126,6 +126,25 @@ bool CtrlHeld() {
 
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
 
+bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel) {
+    if (!AltHeld() || CtrlHeld()) return false;
+    if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) return false;
+    MyPanelPayload p;
+    std::snprintf(p.entry, sizeof p.entry, "%s%s", section ? "section:" : "action:", id);
+    p.fromPanel = fromPanel;
+    ImGui::SetDragDropPayload(kMyPanelPayload, &p, sizeof p);
+    ImGui::TextUnformatted(label);
+    ImGui::TextColored(rgba(color::textDim), "%s", tr(fromPanel ? "Drop on My Panel to move, elsewhere to remove" : "Drop on My Panel to add"));
+    ImGui::EndDragDropSource();
+    return true;
+}
+
+bool MyPanelDragged() {
+    if (!AltHeld() || CtrlHeld()) return false;
+    const ImGuiIO& io = ImGui::GetIO();
+    return std::abs(io.MousePos.x - io.MouseClickedPos[0].x) + std::abs(io.MousePos.y - io.MouseClickedPos[0].y) >= 4.0f;
+}
+
 const char* FloatingWindowAt(ImVec2 p) {
     const ImGuiContext* g = ImGui::GetCurrentContext();
     if (!g) return nullptr;
@@ -692,12 +711,14 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
 
     const bool customize = app.layout().customize;
     dragSource(app, id.c_str(), label.c_str(), shelf, index);
+    MyPanelDragSource(id.c_str(), false, label.c_str());
     HelpAction(app, id.c_str());
     if (clipped) {
         const std::string chord = app.actions().shortcutText(id);
         DelayedTooltip((chord.empty() ? label : label + "   " + chord).c_str());
     }
     if (!clicked) return false;
+    if (MyPanelDragged()) return false; // the end of an Alt-drag into My Panel, not a click
     if (CtrlHeld() && AltHeld()) {
         // Ctrl+Alt+click: customize mode drags instead; otherwise it assigns a shortcut.
         // A click that moved was the start of a customize drag (Fenix, Discord: it rebound F silently).

@@ -87,6 +87,7 @@ Json toJson(const UiLayout& l) {
     j.set("leftTray", stringArray(l.leftTray));
     j.set("rightTray", stringArray(l.rightTray));
     j.set("openSubpalettes", stringArray(l.openSubpalettes));
+    if (!l.myPanel.empty()) j.set("myPanel", stringArray(l.myPanel));
     j.set("topShelf", stringArray(l.topShelf));
     j.set("leftShelf", stringArray(l.leftShelf));
     j.set("rightShelf", stringArray(l.rightShelf));
@@ -100,6 +101,13 @@ Json toJson(const UiLayout& l) {
     j.set("libraryBottom", l.libraryBottom);
     j.set("shelfTiles", double(l.shelfTiles));
     return j;
+}
+
+MyPanelEntry myPanelEntry(const std::string& entry) {
+    MyPanelEntry e;
+    if (entry.rfind("action:", 0) == 0) e.section = false, e.id = entry.substr(7);
+    else if (entry.rfind("section:", 0) == 0) e.section = true, e.id = entry.substr(8);
+    return e;
 }
 
 bool shelfEmpty(const std::vector<std::string>& items) {
@@ -124,6 +132,16 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     readStrings(j["leftTray"], out.leftTray);
     readStrings(j["rightTray"], out.rightTray);
     readStrings(j["openSubpalettes"], out.openSubpalettes);
+    readStrings(j["myPanel"], out.myPanel);
+    // Only well-formed entries, no repeats, at most kMyPanelMax (a hand-edited or shared file).
+    {
+        std::vector<std::string> kept;
+        for (const std::string& e : out.myPanel)
+            if (myPanelEntry(e).valid() && e.size() < 96 && std::find(kept.begin(), kept.end(), e) == kept.end() &&
+                kept.size() < kMyPanelMax)
+                kept.push_back(e);
+        out.myPanel = std::move(kept);
+    }
     readStrings(j["topShelf"], out.topShelf);
     // Version 2 (0.8) added Dynamic and its Detail slider: put them into stored top shelves, before symmetry.
     if (int(j["version"].asNumber(1)) < 2 && j["topShelf"].isArray() &&

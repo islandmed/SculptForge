@@ -5168,6 +5168,13 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Put this panel back in the main window. Preferences > Saving & Layouts > Reset panel windows puts all of them back.", "将此面板移回主窗口。偏好设置 > 保存与布局 > 重置面板窗口会将全部移回。"},
     {"Reset panel windows", "重置面板窗口"},
     {"User Guide in its own window", "在独立窗口中显示使用指南"},
+    {"Alt+drag to add or move. Right-click an entry to remove it.", "按住 Alt 拖动即可添加或移动。右键单击条目可将其移除。"},
+    {"Drop on My Panel to add", "拖放到“我的面板”以添加"},
+    {"Drop on My Panel to move, elsewhere to remove", "拖放到“我的面板”以移动，拖到其他位置则移除"},
+    {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "按住 Alt，将任意面板中的按钮或分区标题拖到此面板。右键单击条目可将其移除。"},
+    {"My Panel", "我的面板"},
+    {"Remove from My Panel", "从“我的面板”移除"},
+    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "属于你自己的面板，浮动在光标处：包含你拖入的按钮和分区（按住 Alt 从任意面板拖动）。再按一次该快捷键或 Esc 即可关闭。它也是一个可放入侧栏的面板（编辑 > 我的面板），还可以移到独立窗口。"},
 };
 
 } // namespace

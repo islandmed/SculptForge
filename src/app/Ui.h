@@ -117,6 +117,19 @@ void SetNextItemOrigin(int shelf, int index);
 // Makes the last item a Ctrl+Alt drag source in customize mode (for widgets that aren't ActionButtons).
 bool UiItemDragSource(App& app, const char* itemId, const char* label);
 
+// My Panel (Palettes.cpp): hold Alt and drag a button or a section header from any palette into it. The payload names the
+// entry as My Panel stores it ("action:<id>" / "section:<id>"); fromPanel marks one dragged out of My Panel, which
+// is removed when it is dropped anywhere but back on a My Panel.
+struct MyPanelPayload {
+    char entry[100] = "";
+    bool fromPanel = false;
+};
+inline constexpr const char* kMyPanelPayload = "SF_MYPANEL";
+// Makes the last item a drag source for My Panel while Alt (without Ctrl) is held. `section`: a header, else an action.
+bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel = false);
+// Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
+bool MyPanelDragged();
+
 // Keyboard keycaps for a chord ("Ctrl+Shift+I", "F3 / Ctrl+Shift+P"), drawn inline as an item.
 void Keycaps(const std::string& chord);
 float KeycapsWidth(const std::string& chord);

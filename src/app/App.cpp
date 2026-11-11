@@ -3463,6 +3463,7 @@ void App::drawUi() {
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
     if (!panelDetached("guide")) guide_.draw(*this); // Help > User Guide (or in its own window: PanelWindows.cpp)
     drawFloatingPanels(); // palettes detached where there are no windows of their own (PanelWindows.cpp)
+    drawMyPanelFloating(); // My Panel on its key (PanelMyPanel.cpp)
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawPluginWindow();  // a plugin's parameters, Apply / Add Part, Stop (PanelPlugins.cpp)

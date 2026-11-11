@@ -601,6 +601,13 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name == "mypanel_entries") return double(app_.layout_.myPanel.size()); // My Panel (PanelMyPanel.cpp)
+    if (name == "mypanel_floating") return app_.myPanelFloating_ ? 1.0 : 0.0;
+    if (name.rfind("mypanel_at@", 0) == 0) { // mypanel_at@action:geometry.subdivide: its place in My Panel (0 first), -1 not in it
+        const auto& list = app_.layout_.myPanel;
+        const auto it = std::find(list.begin(), list.end(), name.substr(11));
+        return it == list.end() ? -1.0 : double(it - list.begin());
+    }
     if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
         const Action* a = app_.actions_.find(name.substr(8));
         return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
@@ -2276,6 +2283,38 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         });
         wait(0.1f);
+    } else if (verb == "drag_to") {
+        // drag_to "from" "to" [dx dy] [seconds]: press on one item, glide to the middle of another (plus an offset) and
+        // let go: a drag and drop between two panels (My Panel).
+        if (!need(2)) return false;
+        const std::string from = w[1], to = w[2];
+        const float dx = num(3, 0), dy = num(4, 0), seconds = num(5, 0.5f);
+        auto a = std::make_shared<ImVec2>(), b = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, from, a](float t) {
+            if (findItem(from, *a)) {
+                mouseMotion(a->x, a->y);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(from));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, line, to, b](float t) {
+            if (findItem(to, *b)) return true;
+            if (t > 3.0f) fail(line, notFound(to));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, a, b, dx, dy, seconds](float t) {
+            if (t == 0.0f) return false;
+            if (!buttonDown_) mouseButton(true, SDL_BUTTON_LEFT);
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(a->x + (b->x + dx - a->x) * u, a->y + (b->y + dy - a->y) * u);
+            if (t >= seconds + 0.1f) {
+                mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            return false;
+        });
+        wait(0.1f);
     } else if (verb == "drag_shelf_items") {
         // Every action on the shelves (Customize Shelves, Ctrl+Alt held): drag it out onto the canvas; it must come off its
         // shelf (item 45: one button had no drag source). Expects at least N dragged.
@@ -3934,7 +3973,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
