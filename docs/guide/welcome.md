@@ -18,7 +18,7 @@ It is free software under the GNU General Public License v3.0 or later. You own 
 the GPL covers the program, not your models.
 
 SculptForge stays free and works the same for everyone; nothing is ever paywalled. A membership adds betas and
-early builds (from SculptForge 1.0, each release about two weeks early), a vote on what gets built, Member Requests
+early builds (from SculptForge 2027, each release about two weeks early), a vote on what gets built, Member Requests
 (one request a month, built first and credited to you; bugs are always free, and every idea goes in the public
 [feature queue](https://sculptforge.app/queue.html)) and your name in the credits (every release stays free for everyone; bug-fix and security releases
 go out to everyone the same day): **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your browser, where you can become a
