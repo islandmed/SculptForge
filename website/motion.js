@@ -132,9 +132,11 @@
 
   // --- Memberships per ad: a visit that arrived from a tagged link carries its campaign into Stripe's checkout as
   // client_reference_id (onboarding reads it back), and the click is a GoatCounter event named for the tier and the
-  // campaign. Current page view only: no cookie, no storage. Without a campaign the links are left as they are. ---
-  const ref = (new URLSearchParams(location.search).get("utm_campaign") || "")
+  // campaign. Current page view only: no cookie, no storage. A visit without a campaign is tagged "site", so the
+  // tag is never empty and organic traffic is told apart from the links we post ourselves. ---
+  const given = (new URLSearchParams(location.search).get("utm_campaign") || "")
     .toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 200);
+  const ref = given || "site";
   const buy = 'a[href^="https://buy.stripe.com/"]';
   const tag = (u) => {
     if (!ref || !u) return u;
@@ -148,13 +150,13 @@
   const utm = [...new URLSearchParams(location.search)].filter(([k]) => /^utm_[a-z]+$/.test(k));
   const member = 'a[href*="support"], a[href*="studios"]';
   const carry = (a) => {
-    if (!ref || !a.href) return;
+    if (!given || !a.href) return;
     const url = new URL(a.href, location.href);
     if (url.origin !== location.origin || !/\/(support|studios)(\.html)?$/.test(url.pathname)) return;
     utm.forEach(([k, v]) => { if (!url.searchParams.has(k)) url.searchParams.set(k, v.slice(0, 200)); });
     a.href = url.href;
   };
-  if (ref) {
+  {
     document.querySelectorAll(member).forEach(carry);
     document.querySelectorAll(buy).forEach((a) => {
       a.href = tag(a.href);
@@ -173,7 +175,7 @@
     const a = e.target.closest(buy);
     if (!a || !window.goatcounter?.count) return;
     const tier = a.hasAttribute("data-member-link") ? "member" : "studio"; // every other buy link is a Studio plan
-    window.goatcounter.count({ path: "checkout: " + tier + (ref ? " [" + ref.slice(0, 40) + "]" : ""),
+    window.goatcounter.count({ path: "checkout: " + tier + " [" + ref.slice(0, 40) + "]",
       title: a.innerText.replace(/\s+/g, " ").trim().slice(0, 60), event: true });
   });
 
