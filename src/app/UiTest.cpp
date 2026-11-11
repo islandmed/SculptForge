@@ -1041,7 +1041,19 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.uiConfigPath();
         return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
+    if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
+        std::error_code ec;
+        const std::string p = app_.prefDir_ + (name == "autosave_file" ? "autosave.sfproj" : "autosave.prev.sfproj");
+        return !app_.prefDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
     if (name == "console_open") return app_.layout_.consoleOpen ? 1.0 : 0.0;
+    if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
+        const std::string id = name.substr(10);
+        int n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += int(std::count(list->begin(), list->end(), id));
+        return n;
+    }
     if (name == "command_palette_open") return app_.palette_.isOpen() ? 1.0 : 0.0;
     if (name == "customize") return app_.layout_.customize ? 1.0 : 0.0;
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;

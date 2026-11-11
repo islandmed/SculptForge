@@ -62,6 +62,7 @@ void usage() {
         "  --ui-record out.mp4      Also record the UI test, every frame in real time with the pointer drawn (needs ffmpeg)\n"
         "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --reset-layout           Start with the standard layout, every panel back in the main window\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --studio FILE            Start in studio mode with this studio profile (studio.json; docs/studios.md)\n"
@@ -220,6 +221,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--reset-layout") options.resetLayout = true; // the way out of a layout that cannot be used
         else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--studio") studioProfile = next();             // core/StudioProfile.h

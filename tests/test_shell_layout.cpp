@@ -309,3 +309,42 @@ TEST(panel_placements_json) {
     CHECK(!panelOnDisplays(left, one));
     CHECK(!panelOnDisplays({"guide", 0, 0, 900, 700, false}, two)); // the window system places it
 }
+
+// Revert to Saved Layout and Reset Layout read whatever ui.json holds (#bug-reports: Revert crashed on a layout with its
+// shelf items dragged off): a corrupt or odd layout must load into something the shell can lay out, in every built-in
+// layout, and the standard one is always a way back.
+TEST(layout_from_corrupt_or_odd_json_still_lays_out) {
+    const char* const files[] = {
+        R"({})",
+        R"({"layout": 5})",
+        R"({"topShelf": [], "leftShelf": [], "rightShelf": [], "bottomShelf": []})",
+        R"({"topShelf": [1, null, {"a": 1}, "no.such.item"], "leftShelf": "widget.color", "rightShelf": [[], "sep", "sep"]})",
+        R"({"leftTrayWidth": -50, "rightTrayWidth": 1e9, "consoleHeight": 0, "libraryTile": 99999, "libraryRows": -3})",
+        R"({"leftTray": ["palette.nope", 7], "rightTray": [], "openSubpalettes": [null, "tool.part"]})",
+    };
+    const float sizes[][2] = {{800, 600}, {1440, 900}, {2880, 1800}, {3840, 2160}};
+    for (int shell = 0; shell <= 1; ++shell) {
+        for (const char* text : files) {
+            Json j;
+            std::string err;
+            if (!Json::parse(text, j, err)) continue; // (a file that is not JSON never gets this far)
+            UiLayout layout = standardLayout(shell);
+            fromJson(j, layout, err, shell);
+            for (const auto& s : sizes) {
+                const ShellGeometry g = computeShell(layout, s[0], s[1], 1.0f);
+                CHECK(g.canvas.w > 0 && g.canvas.h > 0);
+            }
+            CHECK(layout.libraryTile >= kLibraryTileMin && layout.libraryTile <= kLibraryTileMax);
+            UiLayout again = standardLayout(shell);
+            CHECK(fromJson(toJson(layout), again, err, shell)); // what Save Layout writes reads back
+        }
+        // The Classic layout keeps the colour picker on a shelf (Reset Layout brings it back).
+        const UiLayout std_ = standardLayout(shell);
+        auto holds = [](const UiLayout& l, const char* id) {
+            for (const auto* shelf : {&l.topShelf, &l.leftShelf, &l.rightShelf, &l.bottomShelf})
+                if (std::find(shelf->begin(), shelf->end(), id) != shelf->end()) return true;
+            return false;
+        };
+        if (shell == 0) CHECK(holds(std_, "widget.color"));
+    }
+}

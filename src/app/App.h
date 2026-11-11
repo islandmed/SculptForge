@@ -124,6 +124,7 @@ struct AppOptions {
     std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
     std::string uiOutDir; // where UI tests save screenshots
     bool fullscreen = false; // start fullscreen (F11 toggles)
+    bool resetLayout = false; // --reset-layout: start with the standard layout and every panel in the main window (keys and preferences stay)
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
@@ -2317,6 +2318,16 @@ public:
     void savePrefsNow(); // config.store: write them at once
     void restartPrefsForTest(const std::string& uiJson = {}); // the UI test step `restart`: save, back to the defaults, read ui.json again
     void restoreStandardUi();
+    // Revert / Reset run at the top of the next frame (applyPendingLayoutOp, Shell.cpp), never inside the palette that
+    // asked: they swap the layout, the shell mode, the preferences and the fonts under the frame being drawn.
+    int pendingLayoutOp_ = 0;            // 1 Revert to Saved Layout, 2 Reset Layout, 3 Reset Layout and Shortcuts, 4 import
+    std::string pendingImportPath_;
+    void queueLayoutOp(int op) { pendingLayoutOp_ = op; redrawIn(0.0); }
+    void applyPendingLayoutOp();
+    bool autosaveNow(); // an autosave right now if there is unsaved work (before a risky step); true if one was written
+    void resetLayoutOnly();  // config.reset_layout: the built-in layout and every panel back in the main window; keys stay
+    std::vector<std::string> missingShelfWidgets() const; // the standard shelves' widgets (colour picker, tiles...) no shelf holds now
+    void addShelfWidget(const std::string& id);           // puts one back where the standard layout has it
     void restoreCustomUi();
     void saveUiDialog();
     void loadUiDialog();

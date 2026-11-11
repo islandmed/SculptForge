@@ -1318,6 +1318,10 @@ constexpr Entry kTraditionalChinese[] = {
     {"Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.",
      "立即將偏好設定與快速鍵寫入磁碟。通常不需要：每次變更後它們會在片刻後自動儲存。"},
     {"Reset Layout and Shortcuts", "重設版面配置與快速鍵"},
+    {"Reset Layout", "重設版面配置"},
+    {"Put back on the shelf: ", "放回工具架: "},
+    {"Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).",
+     "回到內建的工具架、工具匣與面板，所有面板都回到主視窗。快速鍵與偏好設定保留。無論版面配置處於什麼狀態都能使用（版面配置無法使用時：以 --reset-layout 啟動）。"},
     {"Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
      "the layout.",
      "回到內建的版面配置、快速鍵與圓餅選單。快速鍵會自動儲存；「儲存版面配置」會保留版面配置。"},

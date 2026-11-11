@@ -1064,6 +1064,7 @@ void App::drawCanvasFrame() {
 
 void App::drawShell() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    applyPendingLayoutOp(); // (Revert / Reset / Import asked last frame)
     if (lookDirty_) { // Preferences > Interface > Look changed: applied here, outside any pushed style
         lookDirty_ = false;
         applyLook();
@@ -3234,7 +3235,8 @@ void App::finishShelfDrag() {
                      : shelfDrag_.shelf == kShelfRight ? layout_.rightShelf
                                                        : layout_.bottomShelf;
         if (shelfDrag_.index >= 0 && shelfDrag_.index < int(list.size())) {
-            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf";
+            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf" +
+                      (list[size_t(shelfDrag_.index)].rfind("widget.", 0) == 0 ? " - Preferences > Saving & Layouts puts it back" : "");
             list.erase(list.begin() + shelfDrag_.index);
             noteLayoutChanged();
         }

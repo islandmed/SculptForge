@@ -32,6 +32,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cfloat>
 #include <cmath>
@@ -383,6 +384,12 @@ void App::initUiConfig(bool deterministic) {
     std::string err;
     if (fileExists(uiConfigPath())) {
         if (!readUiConfig(uiConfigPath(), err, true)) SDL_Log("%s", err.c_str());
+        if (options_.resetLayout) { // --reset-layout: the saved layout is dropped (the next save writes without it); keys and preferences stay
+            const bool customize = layout_.customize;
+            layout_ = standardLayout(uiPrefs_.shellLayout);
+            layout_.customize = customize;
+            storedLayout_ = Json();
+        }
     } else if (const std::string& studio = studioMode().profile.preferences; !studio.empty() && fileExists(studio)) {
         // A studio build's first start: the studio's layout, keys and scale (core/StudioProfile.h); saved as the
         // artist's own from the first change on.
@@ -892,11 +899,15 @@ void App::initActions() {
     add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
-    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { restoreStandardUi(); },
+    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(3); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
         "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
         "the layout.");
-    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { restoreCustomUi(); },
+    add("config.reset_layout", "Reset Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(2); },
+        ICON_LC_LAYOUT_TEMPLATE, nullptr, nullptr, nullptr,
+        "Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. "
+        "Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).");
+    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(1); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
         "Go back to the layout the last Save Layout kept.");
     add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
@@ -1236,6 +1247,67 @@ void App::restoreStandardUi() {
     status_ = "Standard layout and shortcuts restored - Save Layout keeps the layout";
 }
 
+void App::applyPendingLayoutOp() {
+    const int op = std::exchange(pendingLayoutOp_, 0);
+    if (op == 0) return;
+    autosaveNow(); // unsaved work first: whatever happens next, it is on disk
+    std::string err;
+    if (op == 1) restoreCustomUi();
+    else if (op == 2) resetLayoutOnly();
+    else if (op == 3) restoreStandardUi();
+    else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
+                                    ? std::string("Interface loaded - Save Layout keeps its layout") : err;
+}
+
+void App::resetLayoutOnly() {
+    const bool customize = layout_.customize;
+    layout_ = standardLayout(uiPrefs_.shellLayout);
+    layout_.customize = customize;
+    resetPanels();
+    dropdown_.clear();
+    layoutBaseline_ = layoutKey();
+    status_ = "Standard layout restored - Save Layout keeps it";
+}
+
+std::vector<std::string> App::missingShelfWidgets() const {
+    std::vector<std::string> missing;
+    const UiLayout standard = standardLayout(uiPrefs_.shellLayout);
+    for (const auto* list : {&standard.topShelf, &standard.leftShelf, &standard.rightShelf, &standard.bottomShelf})
+        for (const std::string& id : *list) {
+            if (id.rfind("widget.", 0) != 0 || std::find(missing.begin(), missing.end(), id) != missing.end()) continue;
+            bool held = false;
+            for (const auto* now : {&layout_.topShelf, &layout_.leftShelf, &layout_.rightShelf, &layout_.bottomShelf})
+                held = held || std::find(now->begin(), now->end(), id) != now->end();
+            if (!held) missing.push_back(id);
+        }
+    return missing;
+}
+
+// Where the standard layout has it: on that shelf, after the nearest item before it that the shelf still holds.
+void App::addShelfWidget(const std::string& id) {
+    UiLayout standard = standardLayout(uiPrefs_.shellLayout);
+    auto shelves = [](UiLayout& l) { return std::array<std::vector<std::string>*, 4>{&l.topShelf, &l.leftShelf, &l.rightShelf, &l.bottomShelf}; };
+    auto from = shelves(standard);
+    auto to = shelves(layout_);
+    for (size_t s = 0; s < 4; ++s) {
+        const auto at = std::find(from[s]->begin(), from[s]->end(), id);
+        if (at == from[s]->end()) continue;
+        size_t insert = 0;
+        for (auto it = at; it != from[s]->begin();) {
+            --it;
+            const auto held = std::find(to[s]->begin(), to[s]->end(), *it);
+            if (*it != "sep" && *it != "row" && held != to[s]->end()) {
+                insert = size_t(held - to[s]->begin()) + 1;
+                break;
+            }
+        }
+        to[s]->insert(to[s]->begin() + std::ptrdiff_t(std::min(insert, to[s]->size())), id);
+        noteLayoutChanged();
+        status_ = "Put back on the shelf";
+        return;
+    }
+}
+
 void App::restoreCustomUi() {
     std::string err;
     if (!fileExists(uiConfigPath())) {
@@ -1555,11 +1627,8 @@ void App::drawHelpConsoleUi() {
                 if (fsPath(path).extension().empty()) path += ".json";
                 status_ = writeUiConfig(path, err) ? "Interface exported to " + path : err;
             } else if (kind == kLoadUi) {
-                if (readUiConfig(path, err)) {
-                    status_ = "Interface loaded - Save Layout keeps its layout";
-                } else {
-                    status_ = err;
-                }
+                pendingImportPath_ = path; // applied at the top of the next frame (applyPendingLayoutOp)
+                queueLayoutOp(4);
             } else if (kind == kBlenderKeymap) {
                 importBlenderKeymap(path);
             } else if (kind == kRadialImport) {
@@ -1748,7 +1817,14 @@ void drawConfigSection(App& app) {
     ui::HelpAction(app, "config.customize");
     ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "config.reset_layout", full, ui::Look::IconLabel);
     ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
+    // Widgets (colour picker, brush tiles, sliders) dragged off a shelf can't be dragged back from a palette: put back here.
+    for (const std::string& id : app.missingShelfWidgets()) {
+        const std::string name = id.substr(7);
+        const std::string label = std::string(tr("Put back on the shelf: ")) + name + "##putback." + id;
+        if (ImGui::Button(label.c_str(), full)) app.addShelfWidget(id);
+    }
     ui::ActionButton(app, "panel.reset", full, ui::Look::IconLabel); // panels in windows of their own (PanelWindows.cpp)
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ui::ActionButton(app, "config.save", ImVec2(half, 0), ui::Look::IconLabel);
