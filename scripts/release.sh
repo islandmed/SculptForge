@@ -198,6 +198,8 @@ run_failed_where() {
 infra_retry() {
     local id=$1 n1 log=$HOME/Work/.sf/logs/infra-retries.log
     INFRA_WHERE=$(run_failed_where "$id")
+    # A cancelled run was stopped on purpose (someone, or a newer push): never rerun it.
+    [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = cancelled ] && { INFRA_WHERE="cancelled: $INFRA_WHERE"; return 1; }
     if grep -Eiq '(^|: )(Set up|Install|Download|Run actions/|Configure cache|Compiler cache|Initialize|Complete job|\(runner/setup\))' <<<"$INFRA_WHERE" ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -Eiq 'Temporary failure (in name )?resolving|Could not resolve|Failed to fetch|Unable to connect|Connection (timed out|reset)|runner .*lost|lost communication|shutdown signal' ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
