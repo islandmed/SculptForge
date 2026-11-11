@@ -23,6 +23,28 @@ namespace sf::i18n {
 namespace {
 
 constexpr Entry kTraditionalChinese[] = {
+    // --- The touch layout (TouchShell.cpp) ---
+    {"All brushes", "所有筆刷"},
+    {"Desktop panels", "桌面面板"},
+    {"Dock", "筆刷列"},
+    {"Every brush. Long-press a pinned slot to put the current brush there.", "所有筆刷。長按已釘選的格子，把目前的筆刷放到那裡。"},
+    {"History", "歷史記錄"},
+    {"Not saved", "未儲存"},
+    {"Or tap the canvas with three fingers.", "或用三指點按畫布。"},
+    {"Or tap the canvas with two fingers.", "或用雙指點按畫布。"},
+    {"Paint and UV rooms are coming", "繪製與 UV 工作區即將推出"},
+    {"Pinned", "已釘選"},
+    {"Projects", "專案"},
+    {"Rail: two sliders", "側欄：兩個滑桿"},
+    {"Room", "工作區"},
+    {"Sculpt. Paint and UV come next, on the same model.", "雕刻。接下來是繪製與 UV，在同一個模型上。"},
+    {"The tablet layout (a preview): the model fills the screen, with a thumb pad and hold keys beside your free hand and the brush dock down the pen hand's edge. Without a pen, one finger sculpts once it moves, two navigate, a two-finger tap undoes and three redo. Automatic turns it on for Android; On tries it on a desktop touch screen.", "平板版面（預覽）：模型佔滿螢幕，空著的手旁邊有拇指觸控板和按住鍵，筆刷列沿著持筆手的一側。沒有觸控筆時，一指移動後開始雕刻，兩指導覽，雙指點按復原，三指點按重做。自動會在 Android 上開啟；開啟可在桌面觸控螢幕上試用。"},
+    {"The tablet layout (a preview): the model fills the screen, a thumb pad and hold keys, the brush dock down the pen hand's edge (Preferences > Interface > Touch layout).", "平板版面（預覽）：模型佔滿螢幕，拇指觸控板和按住鍵，筆刷列沿著持筆手的一側（偏好設定 > 界面 > 觸控版面）。"},
+    {"Touch layout", "觸控版面"},
+    {"Touch layout:", "觸控版面："},
+    {"Turn the touch layout off", "關閉觸控版面"},
+    {"Your projects in the Library.", "你在資源庫中的專案。"},
+    {"pressure", "壓力"},
     // --- Palettes (the palette bar) and their sub-palettes ---
     {"Alpha", "Alpha"},
     {"Brush", "筆刷"},

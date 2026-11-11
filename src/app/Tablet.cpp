@@ -275,6 +275,7 @@ void App::handlePenEvent(const SDL_Event& e) {
         if (!penNoise_) penSeen_ = penInProximity_ = true; // (a resting pen doesn't take the cursor back)
         penId_ = e.pmotion.which;
         penTracker_.motion();
+        touchShellPenHover(e.pmotion.x, e.pmotion.y);
         break;
     case SDL_EVENT_PEN_AXIS:
         if (e.paxis.axis == SDL_PEN_AXIS_PRESSURE) {
@@ -311,6 +312,7 @@ void App::penButton(int button, bool down, float x, float y) {
     if (((penButtons_ & bit) != 0) == down) return;
     penButtons_ = down ? penButtons_ | bit : penButtons_ & ~bit;
     penSeen_ = true;
+    touchShellPenButton(down, x, y); // the touch layout: + hover drag sets size and strength (TouchShell.cpp)
     if (radialPenButton(button, down, x, y)) return; // a radial menu's button (RadialMenu.cpp)
     // Invert and Smooth need nothing here: inputMods() reports them as Alt / Shift while held.
     const PenAction a = penButtonAction(button);
@@ -465,6 +467,7 @@ SDL_Keymod App::inputMods(bool latch) const {
         if (a == PenAction::Invert) mods |= SDL_KMOD_LALT;
         else if (a == PenAction::Smooth) mods |= SDL_KMOD_LSHIFT;
     }
+    mods |= touchShellMods(); // the touch layout's hold keys (TouchShell.cpp)
     if (latch) { // the stroke popup's Smooth / Mask / Select (StrokePopup.cpp)
         const StrokeLatchKeys k = strokeLatchKeys(strokeLatch());
         // Mask latched: the mask is what a plain drag does, so a held Ctrl unmasks (as Ctrl+Alt; Discord 11-03).

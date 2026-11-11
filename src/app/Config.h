@@ -39,6 +39,12 @@ struct UiPrefs {
     std::string lengthUnit = "mm", fileUnit = "m";
     std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
+    // Preferences > Interface > Touch layout (TouchShell.cpp): 0 Auto (on for Android, off on the desktop), 1 On (a
+    // desktop touch screen as a testbed), 2 Off. touchRailSliders: the rail's two sliders instead of the thumb pad
+    // (the testers' A/B, from the overlay's More menu). touchPinned: the dock's 4 pinned brushes (BrushItem ids).
+    int touchLayout = 0;
+    bool touchRailSliders = false;
+    std::vector<std::string> touchPinned{"type:Clay", "type:Move", "type:Crease", "type:Inflate"};
     // View > Orbit lock (rotation): 0 free, about the screen axes; 1 turntable (Y up); 2 about world X only; 3 about
     // world Z only (Camera::orbitAbout). Saved as "orbitLock", and "turntable" for older versions.
     int orbitLock = 0;
