@@ -995,6 +995,11 @@ void App::drawQuickMenu() {
         ui::ActionButton(*this, "draw.rgb");
         ImGui::SameLine();
         ui::ActionButton(*this, "transform.symmetry_x");
+        if (oneSurface()) { // the secondary tools, at the pointer (OneSurface.cpp)
+            ImGui::Dummy(ImVec2(0.0f, 2.0f * s));
+            drawQuickMenuTools();
+            if (!quickMenu_.open) close = true;
+        }
         const bool clicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
         const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
         if (clicked && !hovered && ImGui::GetFrameCount() > quickMenu_.openedFrame + 1) close = true;
