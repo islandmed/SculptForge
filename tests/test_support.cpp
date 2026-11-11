@@ -171,7 +171,7 @@ TEST(social_links_are_the_websites_https_pages) {
     std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/index.html", std::ios::binary);
     CHECK(f.good());
     const std::string page{std::istreambuf_iterator<char>(f), {}};
-    CHECK(kSocialCount == 5);
+    CHECK(kSocialCount == 6);
     for (const SocialLink& link : kSocialLinks) {
         const std::string url = link.url, base = url.substr(0, url.find('?'));
         CHECK(url.rfind("https://", 0) == 0);

@@ -38,7 +38,7 @@ expect_value support_requests == 1
 key Escape
 wait 0.4
 expect_value support_card_open == 0
-# The community icons (Discord, GitHub, X, Bluesky, Instagram): a click opens that page, nothing before it.
+# The community icons (Discord, GitHub, X, Bluesky, Instagram, Facebook): a click opens that page, nothing before it.
 expect_value social_requests == 0
 click "Discord##welcome.social"
 expect_value social_requests == 1
@@ -50,6 +50,9 @@ expect_value social_requests == 2
 expect_value last_social == 3
 click "Instagram##welcome.social"
 expect_value last_social == 4
+click "Facebook##welcome.social"
+expect_value last_social == 5
+expect_value social_requests == 4
 shot welcome_socials
 expect_value welcome_open == 1
 click "Close##welcome"

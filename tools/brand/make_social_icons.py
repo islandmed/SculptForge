@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """assets/branding/social/social-icons.png: the community icons as one white-on-transparent strip, 64 px each, left to
-right in brand::Social order (Discord, GitHub, X, Bluesky, Instagram). The glyphs are the symbols of website/img/social.svg;
+right in brand::Social order (Discord, GitHub, X, Bluesky, Instagram, Facebook). The glyphs are the symbols of website/img/social.svg;
 the app tints them (Welcome dialog, App::drawSocialRow). Needs rsvg-convert and Pillow. Run from the repo root."""
 import io, re, subprocess
 from PIL import Image
 
-NAMES = ["discord", "github", "x", "bluesky", "instagram"]
+NAMES = ["discord", "github", "x", "bluesky", "instagram", "facebook"]
 SIZE = 64
 svg = open("website/img/social.svg").read()
 strip = Image.new("RGBA", (SIZE * len(NAMES), SIZE), (0, 0, 0, 0))

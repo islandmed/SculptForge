@@ -34,6 +34,7 @@ inline constexpr SocialLink kSocialLinks[] = {
     {"X", "https://x.com/SculptForgeApp?utm_source=app&utm_medium=welcome"},
     {"Bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=app&utm_medium=welcome"},
     {"Instagram", "https://www.instagram.com/sculptforge.app?utm_source=app&utm_medium=welcome"},
+    {"Facebook", "https://www.facebook.com/profile.php?id=61596196961617&utm_source=app&utm_medium=welcome"},
 };
 inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLinks[0]));
 

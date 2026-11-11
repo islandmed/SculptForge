@@ -18,7 +18,7 @@ extern const unsigned char appIconSmall[]; // its small cut, 32 px
 extern const unsigned long long appIconSmall_size;
 extern const unsigned char bustMark[]; // the bust illustration, 256 px
 extern const unsigned long long bustMark_size;
-extern const unsigned char socialIcons[]; // the community icons, 5 x 64 px in a row
+extern const unsigned char socialIcons[]; // the community icons, 6 x 64 px in a row
 extern const unsigned long long socialIcons_size;
 } // namespace assets
 

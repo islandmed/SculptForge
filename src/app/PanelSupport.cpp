@@ -466,7 +466,7 @@ void App::drawSupportUi() {
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::TextDisabled("%s", tr("Free for everyone. Members get betas and a vote on what's next."));
-            // The guide, the community (Discord, GitHub, X, Bluesky, Instagram) and, on the right, the memberships.
+            // The guide, the community (Discord, GitHub, X, Bluesky, Instagram, Facebook) and, on the right, the memberships.
             const float rightW = ImGui::CalcTextSize(tr("Support SculptForge")).x + ImGui::CalcTextSize(tr("Close")).x +
                                  4.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetStyle().ItemSpacing.x;
             if (ImGui::Button(tr("User Guide##welcome"))) {
