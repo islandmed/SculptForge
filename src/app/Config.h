@@ -105,6 +105,11 @@ struct UiPrefs {
     // Render, Help, a status bar, one-row shelf). Remembered in project.json too, on its own.
     theme::LookSettings look;
     int shellLayout = 1;
+    // The one-surface look (polyflow's idea, Preferences > Interface > Look > Classic look off): with the SculptForge
+    // layout, one calm top bar that is also the window's title bar, flat panels and Forge Night's colours. Classic
+    // look (off here) brings back the status bar and the system title bar; shelves, trays and keys are the same in both.
+    bool oneSurface = true;
+    bool systemTitleBar = false; // one surface under the system's own title bar (and window buttons) all the same
     bool lookSaved = false; // ui.json named the look or layout (not saved itself); one from before 0.10.7 didn't
     // Preferences > Cursor > Viewport cursor (#73): the system cursor over the 3D view, 0 = crosshair (the
     // default, as most sculpting apps), 1 = the arrow. Panels, menus and popups always show their own.

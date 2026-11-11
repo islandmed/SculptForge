@@ -2094,6 +2094,47 @@ private:
     // drop-down (its palettes as sections). Old palette ids keep working: a palette opens in its menu.
     void drawStatusBar(const ShellGeometry& g);
     void drawTaskMenu();
+    void openTaskMenuAt(int menu, float x); // menu `menu` (taskMenus) dropping from x: its last section, else the first
+    // OneSurface.cpp: the one-surface look (polyflow's idea): a calm top bar that is the window's caption (rooms, the
+    // brush, undo and redo, the stats chip and card, the window buttons), flat panels with a rounded viewport, the
+    // QuickMenu's tool rows, the "new look" toast. Preferences > Interface > Look > Classic look turns it off.
+    bool oneSurface() const { return sculptForgeLayout() && uiPrefs_.oneSurface; }
+    void registerOneSurfaceActions();
+    void drawOneSurfaceBar(const ShellGeometry& g);
+    void drawOneSurfaceStats(ImVec2 chipMin, ImVec2 chipMax, bool chipHovered);
+    void drawOneSurfaceCorners();
+    void drawOneSurfaceToast();
+    void drawQuickMenuTools(); // the QuickMenu's rows of secondary tools (one surface)
+    void openToolSection(const char* subpalette); // Mesh > Tool with that sub-palette open (Masking, Face Groups...)
+    void syncWindowCaption();  // the system title bar off while the top bar is the caption, and back (each frame: cheap)
+    bool captionOwned() const { return captionOwned_; }
+    void noteFrameTime(float seconds); // the slowest frame of the last second, for the stats card
+    bool captionOwned_ = false;   // the top bar is the caption: borderless window, hit test, our window buttons
+    bool captionTried_ = false;   // syncWindowCaption has run once
+    int captionForce_ = -1;       // SF_CAPTION or the UI tests' `caption`: 1 own, 0 system, -1 the desktop decides
+    bool oneSurfaceToast_ = false, oneSurfaceToastDone_ = false; // "New look": shown once after the update
+    double oneSurfaceToastAt_ = -1.0;
+    bool statsPinned_ = false;    // the stats card stays open
+    std::string statsChip_;       // "1.4M · 144 fps", refreshed twice a second
+    double statsChipAt_ = -1.0;
+    bool statsHover_ = false;     // the pointer was on the chip or the card last frame
+    float frameWorst_ = 0.0f, frameWorstShown_ = 0.0f, frameMeanShown_ = 0.0f; // seconds
+    double frameWindowAt_ = 0.0;
+    int frameWindowCount_ = 0;
+    float frameWindowSum_ = 0.0f;
+    // What the caption's hit test reads (it runs inside the event pump, on this thread): the bar's height and its
+    // widgets (window x from-to, last frame), the resize border, and a press's time for the double-click.
+    struct CaptionHit {
+        float barTop = 0.0f, barH = 0.0f, left = 0.0f, right = 0.0f; // the bar's draggable band
+        float edge = 5.0f;   // resize border, window px
+        std::vector<std::pair<float, float>> spans;
+        bool resizable = true;
+        bool buttonWasDown = false;
+        uint64_t lastPressNs = 0;
+        float lastPressX = 0.0f, lastPressY = 0.0f;
+        bool doubleClick = false; // set by the hit test (not on Windows: it maximises by itself), read by the frame
+    } captionHit_;
+    friend SDL_HitTestResult SDLCALL captionHitTest(SDL_Window*, const SDL_Point*, void*);
     void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
     ShellMetrics shellMetrics() const;
     bool sculptForgeLayout() const { return uiPrefs_.shellLayout == 1; }

@@ -441,6 +441,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Ui.cpp
     src/app/UserGlyphs.cpp
     src/app/Shell.cpp
+    src/app/OneSurface.cpp
     src/app/PanelWindows.cpp
     src/app/PanelMyPanel.cpp
     src/app/Palettes.cpp
@@ -1247,6 +1248,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
     sculptforge_ui_test(monkey_many nightly/monkey_many)
     set_tests_properties(ui_monkey_many PROPERTIES LABELS "ui;nightly" TIMEOUT 1800)
+    # The one-surface look (src/app/OneSurface.cpp) for the look review: 1440 px at 100 % and 200 %, and narrow.
+    sculptforge_ui_test(one_surface_1440 sizes/one_surface --size 1440x900)
+    sculptforge_ui_test(one_surface_2880 sizes/one_surface --size 2880x1800)
+    sculptforge_ui_test(one_surface_1024 sizes/one_surface --size 1024x768)
     # The Deform panel for the look review (tests/ui/sizes/: scripts only run at their own sizes).
     sculptforge_ui_test(deform_panel_1440 sizes/deform_panel --size 1440x900)
     sculptforge_ui_test(deform_panel_1024 sizes/deform_panel_1024 --size 1024x768)

@@ -103,6 +103,8 @@ Json toJson(const UiPrefs& p) {
     j.set("frameDoubleTapMs", double(p.frameDoubleTapMs));
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
     j.set("modifierBrushes", toJson(p.modifierBrushes));
+    j.set("oneSurface", p.oneSurface);
+    j.set("systemTitleBar", p.systemTitleBar);
     j.set("brushSort", p.brushSort);
     j.set("alphaSort", p.alphaSort);
     j.set("materialSort", p.materialSort);
@@ -204,6 +206,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.frameDoubleTapMs = std::clamp(int(j["frameDoubleTapMs"].asNumber(p.frameDoubleTapMs)), 0, 1000);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
     fromJson(j["modifierBrushes"], p.modifierBrushes);
+    p.oneSurface = j["oneSurface"].asBool(p.oneSurface); // (absent: from before it, the new look and its toast)
+    p.systemTitleBar = j["systemTitleBar"].asBool(p.systemTitleBar);
     for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
                           std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
@@ -387,7 +391,10 @@ void App::initUiConfig(bool deterministic) {
     uiConfigDeterministic_ = deterministic;
     configDir_ = userDataDir();
     layout_ = standardLayout(uiPrefs_.shellLayout);
-    if (deterministic) return; // tests, renders and recordings always use the standard layout
+    if (deterministic) { // tests, renders and recordings always use the standard layout
+        uiPrefs_.oneSurface = false; // ...and the Classic look's bars (a test turns it on with ui.classic_look)
+        return;
+    }
     std::string err;
     if (fileExists(uiConfigPath())) {
         if (!readUiConfig(uiConfigPath(), err, true)) SDL_Log("%s", err.c_str());
@@ -941,6 +948,7 @@ void App::initActions() {
     // The shell's actions (Shell.cpp: brushes, shelves, palettes, trays): they replace any of the above with
     // the same id and own P (Paint), the symmetry toggles and Tab.
     registerShellActions();
+    registerOneSurfaceActions(); // the rooms, Classic look (OneSurface.cpp)
     registerTextureUiActions(); // Tool > Texture Image, the Vertex / Texture paint target (PanelTexture.cpp)
     registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerStencilActions();   // Alpha > Stencil (StencilOverlay.cpp)
@@ -2375,6 +2383,23 @@ void App::drawLookSection() {
     }
     ui::HelpText("Classic layout", nullptr, "The alphabetical palette bar and the two-row top shelf.",
                  "Preferences > Interface > Look");
+    // The one-surface look (OneSurface.cpp): off here brings back the status bar, the tiles and the system title bar.
+    bool classic = !oneSurface();
+    if (ui::Checkbox("Classic look##look.classic_look", &classic))
+        if (const Action* a = actions_.find("ui.classic_look"); a && a->run) a->run();
+    ui::HelpText("Classic look", nullptr,
+                 "Off (the default): one calm top bar that is also the window's title bar, flat panels and Forge Night's "
+                 "colours, the stats behind a chip. On: the status bar, tiles and system title bar as before. Shelves, "
+                 "trays, menus and keys are the same in both.",
+                 "Preferences > Interface > Look");
+    if (oneSurface()) {
+        ImGui::SameLine();
+        if (ui::Checkbox("System title bar##look.system_title_bar", &uiPrefs_.systemTitleBar)) redrawIn(0.0);
+        ui::HelpText("System title bar", nullptr,
+                     "Keep the system's own title bar and window buttons above the top bar. Tiling desktops and macOS "
+                     "always keep theirs.",
+                     "Preferences > Interface > Look");
+    }
     tray::GroupLabel(*this, "Interface");
 }
 

@@ -1119,9 +1119,13 @@ void App::drawShell() {
         statusSince_ = ImGui::GetTime();
         if (!lastCommandOk_) redrawIn(6.05); // the error colour below goes after 6 s, idle or not
     }
+    noteFrameTime(ImGui::GetIO().DeltaTime); // (the stats card's slowest frame; a compare and an add)
+    syncWindowCaption();
     drawLookChrome();
-    drawCanvasFrame();
-    if (sculptForgeLayout()) drawStatusBar(shell_);
+    if (oneSurface()) drawOneSurfaceCorners();
+    else drawCanvasFrame();
+    if (oneSurface()) drawOneSurfaceBar(shell_);
+    else if (sculptForgeLayout()) drawStatusBar(shell_);
     else drawTitleStrip(shell_);
     if (layout_.paletteBarVisible && !sculptForgeLayout()) drawPaletteBar(shell_);
     if (shell_.shelves) {
@@ -1137,6 +1141,7 @@ void App::drawShell() {
     else drawPaletteDropdown();
     finishShelfDrag();
     finishMyPanelDrag();
+    drawOneSurfaceToast();
 }
 
 void App::drawTitleStrip(const ShellGeometry& g) {
@@ -1464,6 +1469,11 @@ void App::drawPaletteBar(const ShellGeometry& g) {
 
 ShellMetrics App::shellMetrics() const {
     const float gap = theme::look.tiled ? theme::look.gap : 0.0f;
+    if (oneSurface()) { // one flat surface: no gaps, a taller bar that is also the window's caption (OneSurface.cpp)
+        ShellMetrics m = sculptForgeMetrics(0.0f);
+        m.titleH = 44;
+        return m;
+    }
     if (sculptForgeLayout()) return sculptForgeMetrics(gap);
     ShellMetrics m;
     m.gap = gap;
@@ -1522,6 +1532,7 @@ void App::applyLook() {
     ImGui::GetStyle() = ImGuiStyle();
     ImGui::GetStyle().HoverDelayNormal = hoverDelay;
     theme::applyLook(uiPrefs_.look, &message);
+    if (oneSurface()) theme::applyOneSurface(uiPrefs_.look); // (flat, Forge Night's colours: Theme.h)
     ImGui::GetStyle().ScaleAllSizes(uiScale_);
     const bool mono = theme::look.monoLabels || theme::look.monoAll;
     if (fontInterSmall_) {
@@ -1745,24 +1756,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
 
     // The task menus. Opening one: the section shown last, else the first one; one that sits in a tray is already
     // on screen, so the menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
-    auto openTaskMenu = [&](int i, float atX) {
-        const TaskMenuDef& m = menus[i];
-        auto inTray = [&](const std::string& id) { return paletteInShownTray(id); };
-        std::string section = menuSection_[m.id];
-        if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
-            section.clear();
-            for (int k = 0; k < 6 && m.sections[k] && section.empty(); ++k)
-                if (!inTray(m.sections[k])) section = m.sections[k];
-        }
-        if (section.empty()) {
-            flashPalette_ = m.sections[0];
-            flashStart_ = ImGui::GetTime();
-        } else {
-            dropdown_ = section;
-            menuX_ = atX;
-            openDropdown_ = true;
-        }
-    };
+    auto openTaskMenu = [&](int i, float atX) { openTaskMenuAt(i, atX); };
     for (int i = 0; i < shownMenus; ++i) {
         const TaskMenuDef& m = menus[i];
         const std::string shown = style == Status::Modules ? std::string(tr(m.name)) : upper(tr(m.name));
@@ -2112,6 +2106,30 @@ void App::drawStatusBar(const ShellGeometry& g) {
 
 // A task menu's drop-down: its sections (palettes) down the left, the chosen one beside them, under its header (whose
 // tray icon still pins it to a tray). dropdown_ is the chosen palette, so ui.palette.* and F3 open it in its menu.
+// Opening task menu `i`: the section shown last, else the first one; one that sits in a tray is already on screen,
+// so the menu opens on the next one (a menu whose sections are all in trays flashes the tray instead).
+void App::openTaskMenuAt(int i, float atX) {
+    int count = 0;
+    const TaskMenuDef* menus = taskMenus(count);
+    if (i < 0 || i >= count) return;
+    const TaskMenuDef& m = menus[i];
+    auto inTray = [&](const std::string& id) { return paletteInShownTray(id); };
+    std::string section = menuSection_[m.id];
+    if (section.empty() || taskMenuOf(section) != i || inTray(section)) {
+        section.clear();
+        for (int k = 0; k < 6 && m.sections[k] && section.empty(); ++k)
+            if (!inTray(m.sections[k])) section = m.sections[k];
+    }
+    if (section.empty()) {
+        flashPalette_ = m.sections[0];
+        flashStart_ = ImGui::GetTime();
+    } else {
+        dropdown_ = section;
+        menuX_ = atX;
+        openDropdown_ = true;
+    }
+}
+
 void App::drawTaskMenu() {
     if (openDropdown_) {
         ImGui::OpenPopup("##palettedropdown");
@@ -2580,6 +2598,7 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
             continue;
         }
         if (!shelfItemShown(item)) continue;
+        if (item == "sep" && prevShown < 0) continue; // (what it separated from is hidden)
         if (!vertical && !lineStart && prevShown >= 0) {
             const std::string& prev = list[size_t(prevShown)];
             ImGui::SameLine(0.0f, prev == "sep" || item == "sep" ? 0.0f : segmentPair(prev, item) ? 1.0f * s : 4.0f * s);
@@ -2730,6 +2749,8 @@ bool App::shelfItemShown(const std::string& item) const {
     if (item == "draw.paint_vertex" || item == "draw.paint_texture") return hasTexture(doc_.mesh); // paint target
     if (item == "draw.new_texture") return !hasTexture(doc_.mesh) && (paintMode_ || paintRgb_ || autoUv_); // start one
     if (item == "widget.dyntopo_detail") return doc_.sculptor.dyntopo.enabled; // with Dynamic on
+    // One surface: the top bar has undo and redo, and its rooms are Sculpt and Paint (OneSurface.cpp).
+    if (oneSurface() && (item == "edit.undo" || item == "edit.redo" || item == "draw.sculpt" || item == "draw.paint")) return false;
     return true;
 }
 

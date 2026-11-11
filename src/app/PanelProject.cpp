@@ -182,6 +182,10 @@ void App::initProject() {
         }
         const bool onNewLook = uiPrefs_.look.look == int(looks::LookId::ForgeTerminal) && uiPrefs_.shellLayout == 1;
         newLookCard_ = !newLookCardDone_ && !onNewLook && !uiConfigDeterministic_;
+        // The one-surface look's line, once, for someone who had the bars before it (OneSurface.cpp).
+        oneSurfaceToastDone_ = prefs["one_surface_toast_done"].asBool(false);
+        oneSurfaceToast_ = !oneSurfaceToastDone_ && oneSurface() && !uiConfigDeterministic_;
+        if (oneSurfaceToast_) oneSurfaceToastDone_ = true; // (saved now: it never comes back, read or not)
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty() && !options_.benchmark; // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
@@ -192,6 +196,7 @@ void App::initProject() {
         if (showWelcome_ && !noScreen && !uiConfigDeterministic_ && !studioMembership() && !fileExists(uiConfigPath()))
             offerFirstRunLanguage(osLanguageTag());
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
+        oneSurfaceToastDone_ = true;
     }
     initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
@@ -290,6 +295,7 @@ void App::saveProjectPrefs() {
         prefs.set("ui_look", std::move(look));
     }
     prefs.set("new_look_card_done", newLookCardDone_);
+    prefs.set("one_surface_toast_done", oneSurfaceToastDone_);
     prefs.set("quick_tour_done", quickTourDone_);
     prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
     prefs.set("confirm_remesh_levels", uiPrefs_.confirmRemeshLevels);
