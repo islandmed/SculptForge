@@ -154,7 +154,7 @@ bench_take_sphere           sculpt
 ui_idle_*                   sculpt
 ui_calibrate_json           sculpt
 ui_monkey*                  ui
-ui_mode_matrix              ui
+ui_mode_matrix_*            ui
 ui_*                        ui
 sculptforge_tests_*         unit
 figure_pose_bench           mesh
@@ -446,6 +446,9 @@ ui_first_sculpt
 ui_idle_redraw
 ui_undo_session
 ui_parts_files
-ui_mode_matrix
+ui_mode_matrix_0of4
+ui_mode_matrix_1of4
+ui_mode_matrix_2of4
+ui_mode_matrix_3of4
 ui_monkey
 release_smoke

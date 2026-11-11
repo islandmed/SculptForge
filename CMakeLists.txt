@@ -1005,6 +1005,7 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(ui_${name} PROPERTIES LABELS ui TIMEOUT 300)
     endfunction()
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
+    list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
@@ -1204,11 +1205,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
-    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner, so it starts first.
-    if(TEST ui_mode_matrix)
-      set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 1200 COST 500)
-      set_property(TEST ui_mode_matrix APPEND PROPERTY ENVIRONMENT SF_UI_TIMEOUT=1190) # warm_ui.py's own limit
-    endif()
+    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one
+    # process, the longest test of every app T0, so it runs as four shards side by side (SF_MODE_MATRIX_SHARD), first.
+    foreach(k RANGE 3)
+      sculptforge_ui_test(mode_matrix_${k}of4 mode_matrix)
+      set_tests_properties(ui_mode_matrix_${k}of4 PROPERTIES TIMEOUT 600 COST 500)
+      set_property(TEST ui_mode_matrix_${k}of4 APPEND PROPERTY ENVIRONMENT SF_UI_TIMEOUT=590 SF_MODE_MATRIX_SHARD=${k}/4)
+    endforeach()
     # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
     sculptforge_ui_test(monkey_many nightly/monkey_many)
     set_tests_properties(ui_monkey_many PROPERTIES LABELS "ui;nightly" TIMEOUT 1800)

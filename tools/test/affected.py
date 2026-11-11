@@ -195,10 +195,12 @@ def regex_for(areas, amap, tests, full, cap=None):
     return "^(" + "|".join(sorted(names)) + ")$" if names else ""
 
 
-def merge(res, impacted_regex):
+def merge(res, impacted_regex, tier="ready"):
     """The area tests plus the direct picks of impacted.py (a script's own tests, a UI test sharing a word with the file ...):
     and `.` from either side stays the full suite. A broad area (over AREA_CAP tests) adds only its unit cases and the smoke
     set here: its UI tests are impacted.py's picks, and `affected.py --area X` / `ctest -L area_X` run them all."""
+    if tier == "push":  # the per-push smoke: impacted.py's picks alone (the build graph is exact for code); areas wait for READY
+        return impacted_regex
     if res["full"] or impacted_regex == "." or res["regex"] == ".":
         return "."
     picks = set(re.findall(r"[A-Za-z0-9_]+", impacted_regex))
@@ -285,6 +287,8 @@ def main():
     ap.add_argument("--area", help="comma list of areas: their tests, no git")
     ap.add_argument("--cmake-diff", help="git diff -U0 of CMakeLists.txt against the base (a tree without .git)")
     ap.add_argument("--merge", help="impacted.py's regex: its picks join the area tests (its '.' stays '.')")
+    ap.add_argument("--tier", choices=("push", "ready"), default="ready",
+                    help="push: the merged regex is impacted.py's alone (its --tier push picks); the unit areas still filter the shards")
     ap.add_argument("--print", default="regex", choices=("regex", "unit_areas"), help="what to print (default: the regex)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -313,12 +317,12 @@ def main():
                 spec = importlib.util.spec_from_file_location("impacted", os.path.join(os.path.dirname(os.path.abspath(__file__)), "impacted.py"))
                 imp = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(imp)
-                regs = imp.test_registrations(open(os.path.join(root, "CMakeLists.txt"), encoding="utf-8").read(), diff) if diff else None
+                regs = imp.test_registrations(open(os.path.join(root, "CMakeLists.txt"), encoding="utf-8").read(), diff, files) if diff else None
             except (OSError, ImportError, AttributeError):
                 regs = None
         res = affected(root, files, amap, tests, cmake_regs=regs)
     if a.merge is not None:
-        res["regex"] = merge(res, a.merge)
+        res["regex"] = merge(res, a.merge, a.tier)
     if a.verbose:
         print(f"areas: {' '.join(res['areas']) or '-'}", file=sys.stderr)
         for w in res["why"]:

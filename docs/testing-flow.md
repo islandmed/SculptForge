@@ -10,6 +10,20 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 | **T2 platforms** | once per merge batch | CI on the branch `staging` | every platform, VFX Reference Platform, Blender | the gate for main |
 | **T3 nightly** | once a day | CI (scheduled) + the PC | label `nightly`: benchmarks, stress, heavy meshes, floor-tier perf | |
 
+## Tiers: pay for accuracy where it decides something
+
+| tier | when | what | replay of 98 Actions T0s (11-11) |
+|---|---|---|---|
+| **push** | every push while working: `SF_T0_TIER=push ~/Work/.sf/t0.sh` (ref `t0/push/<branch>`) | impacted.py's direct picks (build graph, own files, hand map, name words) + `PUSH_SMOKE` (start, open a model and sculpt on the real frame loop, undo, save and open a project) + `marks` + `stale_tree` | tests 331 -> 161 s median; 0 failures left for READY |
+| **ready** | before READY (the default) | the T0 below: smoke incl. the mode matrix shards and the monkey, the changed areas, co-changed UI tests | the verdict a reviewer reads |
+| **batch** / **nightly** / **release** | T1 + T2, T3, release stage | the whole suite; nightly labels, floor benches; packages | unchanged |
+
+A push-tier result says "push tier: not a READY verdict" and is never cached as a verdict. A green READY verdict is
+kept by tree hash and base tree hash (`~/Work/.sf/state/t0-verdicts.tsv`): a squash, a reworded commit or a re-push
+of the same tree on the same base reuses it (`SF_T0_FRESH=1` runs it again). Known flakes go in
+`tests/quarantine.txt` with an owner and a date: they don't block until then, and block again after it.
+`tools/test/replay_selection.py ~/Work/.sf/t0-ci/results.tsv` replays past runs through a selection change before it lands.
+
 ## T0: what can this change break?
 
 `tools/test/impacted.py` turns the changed files (branch vs `origin/main`, plus uncommitted ones) into a
@@ -166,7 +180,7 @@ A mode that won't let go (Draw Tube or Append > Insert taking every drag after a
 app for the person using it, and a hand-written test only covers the modes someone thought of. Two generated UI tests
 cover the class (src/app/UiTestModes.cpp); both run in T0 whenever the app changes (tools/test/impacted.py SMOKE).
 
-- **`ui_mode_matrix`** (tests/ui/mode_matrix.sfui, about 30 s): every action in the registry is run on a small sphere.
+- **`ui_mode_matrix_0of4` .. `_3of4`** (tests/ui/mode_matrix.sfui in four shards side by side, `SF_MODE_MATRIX_SHARD=K/N`; about 30 s in all): every action in the registry is run on a small sphere.
   One that then latches something (`App::latchedForTest()`: a mode a drag goes to, input still captured, an overlay or
   modal) or stops a plain stroke from sculpting is a **mode**, and each way out is tried from it: Esc, a brush on the
   shelf, Draw, Move, Scale, Rotate, a palette action, undo. Afterwards the tool is the one picked, a plain stroke

@@ -20,6 +20,7 @@
 //                              brush on the shelf, Draw, Move, Scale, Rotate, a palette action, undo) is tried from it
 //                              and the invariants checked. A new mode is covered without a line here; a mode no
 //                              exit leaves fails with its id. Each case's script goes to --ui-out/replay-*.sfui.
+//                              SF_MODE_MATRIX_SHARD=K/N probes only every Nth entry from the Kth (ui_mode_matrix_KofN).
 //   monkey SEED STEPS [COUNT] [known=FILE]   COUNT (default 1) seeded random sequences of STEPS user actions (brushes, strokes,
 //                              undo / redo, panels, mode toggles, view changes) from a new sphere, then Esc and a
 //                              brush, and the invariants: nothing latched, a stroke sculpts, the mesh is valid, and
@@ -40,6 +41,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -571,6 +574,20 @@ bool Demo::buildModeMatrix(int line, const std::vector<std::string>& args, std::
     std::vector<Entry> entries;
     for (const Action* a : candidates) entries.push_back({a->id, a->label, {"action " + a->id}, {"try_action " + a->id}, true});
     for (const auto& [name, lines] : extraEntries_) entries.push_back({name, name, lines, lines, false});
+    // SF_MODE_MATRIX_SHARD=K/N: only every Nth entry from the Kth (CMake runs N shards side by side: one matrix took
+    // 3-10 min on a CI runner, the longest test of every app T0).
+    if (const char* sh = std::getenv("SF_MODE_MATRIX_SHARD"); sh && *sh) {
+        int k = -1, n = 0;
+        if (std::sscanf(sh, "%d/%d", &k, &n) != 2 || n < 1 || k < 0 || k >= n) {
+            error = std::string("mode_matrix: SF_MODE_MATRIX_SHARD=") + sh + " is not K/N with 0 <= K < N";
+            return false;
+        }
+        std::vector<Entry> mine;
+        for (size_t i = 0; i < entries.size(); ++i)
+            if (int(i % size_t(n)) == k) mine.push_back(std::move(entries[i]));
+        SDL_Log("mode_matrix: shard %d/%d: %zu of %zu entries", k, n, mine.size(), entries.size());
+        entries = std::move(mine);
+    }
     for (const Entry& en : entries) {
         const std::string id = en.id, label = en.label;
         std::vector<std::string> enter = kReset;
