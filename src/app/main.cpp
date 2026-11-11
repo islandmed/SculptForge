@@ -43,6 +43,7 @@ void usage() {
         "  --size WxH               Render size (default 1024x1024)\n"
         "  --measure-idle S         Sit idle, print the frames drawn per second over S seconds, exit\n"
         "                           (SF_CONTINUOUS_REDRAW=1 draws every frame, as before 0.9.5)\n"
+        "  --measure-key-nav        Tap and hold each pan / zoom key (default and rebound) in the interactive loop; exit 1 if the view stays\n"
         "  --measure-stroke S[,R]   Draw a fast scripted circle stroke for S seconds (brush radius R px),\n"
         "                           e.g. after --run \"new_sphere\"; print how far the dabs left the circle and the frame times, exit\n"
         "                           (SF_STROKE_IMMEDIATE=1 places every dab at once, as before 0.9.6)\n"
@@ -232,6 +233,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--log-dir") logDir = next();
         else if (a == "--crash-test") crashTest = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
+        else if (a == "--measure-key-nav") options.measureKeyNav = true;
         else if (a == "--measure-stroke") {
             const std::string v = next(); // S or S,RADIUS
             options.measureStroke = std::max(0.5f, float(std::atof(v.c_str())));
@@ -319,7 +321,7 @@ static int runMain(int argc, char** argv) {
     if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched
     if (!options.timelapsePath.empty() && !sizeGiven) options.width = 1920, options.height = 1080;
-    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
+    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f || options.measureKeyNav) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;
         options.height *= options.supersample;

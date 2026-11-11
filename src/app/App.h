@@ -129,6 +129,7 @@ struct AppOptions {
     bool resetLayout = false; // --reset-layout: start with the standard layout and every panel in the main window (keys and preferences stay)
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
+    bool measureKeyNav = false; // --measure-key-nav: tap and hold every pan / zoom key in the interactive loop, exit 1 if the view stays
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
     // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
     std::string timelapsePath;
@@ -2477,8 +2478,16 @@ private:
     ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
     std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
     std::map<std::string, KeyNavEase> keyNavEase_; // each pan / zoom key's eased speed (updateKeyNav)
-    std::map<std::string, bool> keyNavTapped_;     // pressed since the last frame (a tap shorter than a frame still moves)
+    std::map<std::string, float> keyNavTap_;      // seconds a pressed key still counts as down (a tap shorter than a frame still glides)
     bool keyNavMoving_ = false;
+    struct KeyNavProbe { // --measure-key-nav's state
+        int caseIndex = 0, failures = 0;
+        double stageAt = 0.0;
+        int stage = 0; // 0: press, 1: held (checked while down), 2: waiting after the release
+        glm::vec3 target{0.0f};
+        float distance = 0.0f;
+        bool rebound = false, movedWhileHeld = false;
+    } keyNavProbe_;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
     Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
@@ -2616,6 +2625,7 @@ private:
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
     void keyNavStep(const std::string& id);   // notes a press of a pan or zoom key
+    int measureKeyNavStep(bool& draw); // --measure-key-nav, once a loop pass: -1 running, else the exit code
     void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)

@@ -53,6 +53,7 @@
 //   axis_drag DX DY          left-drag from a spot on the axis gizmo's disc clear of its ends, by DX DY unscaled pixels
 //   axis_hover +x|...|-z|disc  rest the pointer on that end of the axis gizmo, or on its disc clear of the ends
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
+//   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
@@ -2024,6 +2025,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             else a->run();
         });
         wait(0.2f);
+    } else if (verb == "set_shortcut") { // set_shortcut ACTION KEYS
+        if (!need(2)) return false;
+        const std::string id = w[1], keys = restOf(lineText_, 2);
+        run([this, line, id, keys] {
+            if (!app_.actions_.find(id)) fail(line, "no action " + id);
+            else app_.actions_.assignShortcut(id, keys);
+        });
     } else if (verb == "expect_shortcut") { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
         if (!need(1)) return false;
         const std::string id = w[1], want = restOf(lineText_, 2);

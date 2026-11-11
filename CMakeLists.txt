@@ -1244,6 +1244,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # The pan and zoom keys in the interactive loop (0.12.5: updateKeyNav was only in the UI test loop, no key worked): tap and
+    # hold of each action on its default key and rebound (tests/ui/key_nav.sfui covers the logic in the test runner's loop).
+    add_test(NAME ui_key_nav_loop COMMAND sculptforge --run "new_sphere" --measure-key-nav)
+    set_tests_properties(ui_key_nav_loop PROPERTIES LABELS ui TIMEOUT 90 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # A benchmark take (--benchmark-script, src/app/BenchTake.cpp) on a sphere: played in real time, a CSV row per
     # frame with the strokes' lag, and a video as long as the take (within 5%).
     if(Python3_Interpreter_FOUND)

@@ -171,7 +171,7 @@ bool App::init(const AppOptions& options) {
     {
         splash::Setting setting;
         setting.interactive = !headless && options.demo.empty() && !sharedWindow_ && !options.benchmark &&
-                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f;
+                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f && !options.measureKeyNav;
         const char* off = std::getenv("SF_STARTUP_SPLASH"); // SF_STARTUP_SPLASH=0: not this run (comparisons, bug reports)
         if (off && *off == '0' && !splash::forcedFromEnv(std::getenv("SF_SPLASH"))) setting.interactive = false;
         const char* driver = SDL_GetCurrentVideoDriver();
@@ -634,7 +634,6 @@ int App::runUiTest(int w, int h, int fps) {
         pollSculptable();
         updateCameraAspect();
         updateSpaceMouse(dt);
-        keyNavMoving_ = false;
         updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
@@ -1168,6 +1167,8 @@ int App::run() {
         while (SDL_PollEvent(&e)) onEvent(e);
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
+        if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())
+            if (const int r = measureKeyNavStep(draw); r >= 0) return r; // (Input.cpp)
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)
@@ -1358,6 +1359,7 @@ int App::run() {
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
+        updateKeyNav(dt); // the held pan and zoom keys (runUiTest calls it too)
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
