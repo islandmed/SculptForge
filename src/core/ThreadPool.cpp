@@ -29,18 +29,23 @@ std::atomic<bool> g_sharedMade{false};
 } // namespace
 
 bool ThreadPool::setSharedThreadCount(int threads) {
-    g_sharedThreads.store(std::clamp(threads, 0, 64));
+    g_sharedThreads.store(std::clamp(threads, 0, kMaxThreads));
     return !g_sharedMade.load();
+}
+
+int ThreadPool::sharedSizeFor(int requested, int env, unsigned hardware) {
+    const int wanted = requested > 0 ? requested : env;
+    if (wanted > 0) return std::min(wanted, kMaxThreads);
+    return int(std::clamp(hardware, 1u, unsigned(kDefaultMaxThreads)));
 }
 
 ThreadPool& ThreadPool::shared() {
     static ThreadPool pool([] {
         g_sharedMade.store(true);
-        int wanted = g_sharedThreads.load();
         // SF_THREADS: a parallel test run (tools/test/run.py --threads-per-test) gives each process its share of
         // the cores; ten processes with a pool as big as the machine each spend their time waiting for a core.
-        if (const char* env = std::getenv("SF_THREADS"); wanted <= 0 && env) wanted = std::clamp(std::atoi(env), 0, 64);
-        return wanted > 0 ? wanted : int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u));
+        const char* env = std::getenv("SF_THREADS");
+        return sharedSizeFor(g_sharedThreads.load(), env ? std::atoi(env) : 0, std::thread::hardware_concurrency());
     }());
     return pool;
 }

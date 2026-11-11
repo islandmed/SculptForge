@@ -28,8 +28,14 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-    // The pool brushes use: one thread per hardware thread (up to 16), the caller included.
+    // The pool brushes use, the caller included: the count set below (the hardware profile's, a user's override up to
+    // every hardware thread), else one thread per hardware thread up to 16 (kDefaultMaxThreads).
     static ThreadPool& shared();
+    static constexpr int kDefaultMaxThreads = 16;
+    static constexpr int kMaxThreads = 256;
+    // The size shared() takes: `requested` (setSharedThreadCount) or `env` (SF_THREADS) when > 0, else the hardware
+    // threads up to kDefaultMaxThreads. Pure, for tests.
+    static int sharedSizeFor(int requested, int env, unsigned hardware);
     // Threads for shared() (the hardware profile's, core/HardwareProfile.h), honoured if called before its first
     // use; 0 = automatic. Returns false when the pool already exists (the count applies at the next start).
     static bool setSharedThreadCount(int threads);

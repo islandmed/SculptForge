@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Texture.h"
+#include "core/Parallel.h"
 
 #include "core/ThreadPool.h"
 
@@ -60,7 +61,7 @@ inline void putLinear(uint8_t* p, const glm::vec3& c) {
 // Runs fn(begin, end) over rows [0, n) on several threads for big jobs.
 template <class Fn>
 void parallelRows(int n, size_t work, Fn fn) {
-    const int threads = work < 500000 ? 1 : int(std::clamp<unsigned>(std::thread::hardware_concurrency(), 1u, 16u));
+    const int threads = work < 500000 ? 1 : parallelThreads();
     if (threads <= 1 || n < 2) {
         fn(0, n);
         return;

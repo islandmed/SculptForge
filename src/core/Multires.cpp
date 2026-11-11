@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Multires.h"
+#include "core/Parallel.h"
 #include "core/Micro.h"
 
 #include "core/BVH.h"
@@ -38,7 +39,7 @@ constexpr uint32_t kNone = SubdivTopology::kNone;
 // Runs fn(begin, end) over [0, n) on several threads for big meshes.
 template <class Fn>
 void parallelRange(size_t n, Fn fn) {
-    const size_t threads = n < 100000 ? 1 : std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16);
+    const size_t threads = n < 100000 ? 1 : size_t(parallelThreads());
     if (threads <= 1) {
         if (n) fn(size_t(0), n);
         return;
