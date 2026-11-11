@@ -50,34 +50,53 @@ p { margin: 0 0 1em; }
 .nav nav a { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .nav nav a:hover { color: var(--text); text-decoration: none; }
 .nav nav a.gh { color: var(--text); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; }
-/* Site menu (motion.js adds .compact when the links don't fit beside the logo). */
+/* Site menu: the bar keeps the logo, the social icons, Support and Download beside the menu button; every other link lives in
+   the menu panel (motion.js builds it from the links in the nav). Without JS the nav stays a plain row of links. */
 .nav-toggle { display: none; }
-.nav.compact nav a:not(.gh):not(.nav-dl):not(.nav-support), .nav.tight nav a.gh { display: none; }
+.nav-social { display: flex; align-items: center; gap: 14px; }
+.nav nav a.gh { display: inline-flex; border: 0; padding: 0; border-radius: 4px; color: var(--muted); }
+.nav nav a.gh svg, .footer .social a svg { width: 20px; height: 20px; fill: currentColor; display: block; }
+.nav nav a.gh:hover, .nav nav a.gh:focus-visible, .footer .social a:hover { color: var(--accent); }
+.nav nav a.gh:focus-visible, .footer .social a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.footer .social { display: flex; gap: 16px; margin-top: 6px; }
+.footer .links .social a { color: var(--muted); }
 .nav nav a.nav-support { color: #f6994d; border: 1px solid rgba(246, 153, 77, 0.55); padding: 6px 14px; border-radius: 999px;
                          font-weight: 600; }
 .nav nav a.nav-support:hover { color: #1a0d04; background: #f6994d; }
-.nav.tiny .brand-wordmark { display: none; }
-.nav.tiny .brand-cube { display: block; }
-.nav.compact nav a.nav-dl { color: #1a0d04; background: linear-gradient(180deg, #f6994d, #e2742a); padding: 6px 14px;
-                            border-radius: 999px; font-weight: 600; }
-.nav-menu .menu-gh { display: none; }
-.nav.tight .nav-menu .menu-gh { display: block; }
-.nav.compact .nav-toggle { display: inline-flex; flex-direction: column; justify-content: center; gap: 4px; width: 38px;
-                           height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 10px;
-                           background: none; cursor: pointer; }
+.nav nav a.nav-dl { color: #1a0d04; background: linear-gradient(180deg, #f6994d, #e2742a); padding: 6px 14px;
+                    border-radius: 999px; font-weight: 600; }
+.js .nav nav > a:not(.nav-support):not(.nav-dl) { display: none; }
+.js .nav-toggle { display: inline-flex; flex-direction: column; justify-content: center; gap: 4px; width: 38px;
+                  height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 10px;
+                  background: none; cursor: pointer; flex: none; margin-left: 4px; }
+.js .nav-toggle:hover { border-color: var(--accent); }
 .nav-toggle span { display: block; height: 2px; border-radius: 2px; background: var(--text);
                    transition: transform 0.2s, opacity 0.2s; }
 .nav.menu-open .nav-toggle span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
 .nav.menu-open .nav-toggle span:nth-child(2) { opacity: 0; }
 .nav.menu-open .nav-toggle span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 .nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.nav-menu { padding: 8px 0 14px; border-top: 1px solid var(--border);
-            animation: drawer-in 0.25s cubic-bezier(.2, .7, .2, 1); }
+/* The panel hangs under the bar at the right edge of the page column (phone: the full width). */
+.nav-menu { position: absolute; left: 0; right: 0; top: 100%; pointer-events: none; }
 .nav-menu[hidden] { display: none; }
-.nav-menu .wrap { display: flex; flex-direction: column; }
-.nav-menu a { padding: 11px 12px; margin: 0 -12px; border-radius: 10px; color: var(--text); font-size: 1.02rem; }
-.nav-menu a:hover, .nav-menu a:focus-visible { background: rgba(255, 255, 255, 0.05); text-decoration: none; }
-.nav-menu a[aria-current="page"] { color: var(--accent); }
+.nav-menu > .wrap { display: flex; justify-content: flex-end; }
+.menu-panel { pointer-events: auto; width: 270px; max-height: calc(100vh - 80px); overflow-y: auto; margin-top: 8px; padding: 8px;
+              display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border);
+              border-radius: 14px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+              animation: drawer-in 0.25s cubic-bezier(.2, .7, .2, 1); }
+.menu-panel a { padding: 10px 12px; border-radius: 10px; color: var(--text); font-size: 1rem; }
+.menu-panel a:hover, .menu-panel a:focus-visible { background: rgba(255, 255, 255, 0.05); color: var(--accent); text-decoration: none; }
+.menu-panel a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-panel a[aria-current="page"] { color: var(--accent); }
+.menu-panel .menu-social { display: none; gap: 6px; padding: 10px 6px 4px; margin-top: 6px; border-top: 1px solid var(--border); }
+.menu-panel .menu-social a { display: inline-flex; padding: 8px; color: var(--muted); }
+.menu-panel .menu-social svg { width: 20px; height: 20px; fill: currentColor; display: block; }
+@media (max-width: 760px) {
+  .nav-social { display: none; }
+  .js .menu-panel .menu-social { display: flex; }
+  .nav-menu > .wrap { justify-content: stretch; }
+  .menu-panel { width: 100%; }
+}
 
 /* Hero */
 .hero { padding: 36px 0 56px; background: radial-gradient(1200px 600px at 15% -10%, rgba(242, 140, 60, 0.16), transparent 60%); }
@@ -177,7 +196,7 @@ p { margin: 0 0 1em; }
   .downloads { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 620px) {
-  .nav nav a:not(.gh):not(.nav-dl):not(.nav-support) { display: none; }
+  .nav nav > a:not(.nav-support):not(.nav-dl) { display: none; }
   .footer-grid { grid-template-columns: 1fr; }
   .footer .links { align-items: flex-start; }
   .section { padding: 64px 0; }
@@ -208,8 +227,6 @@ p { margin: 0 0 1em; }
   .wrap { padding: 0 16px; }
   .nav-inner { height: 56px; }
   .nav nav { gap: 8px; }
-  .nav nav a.nav-dl { display: inline-block; color: #1a0d04; background: linear-gradient(180deg, #f6994d, #e2742a);
-                      padding: 6px 14px; border-radius: 999px; font-weight: 600; }
 
   /* Hero: headline, one-line pitch, then the video edge to edge. */
   .hero { padding: 28px 0 44px; }
@@ -260,7 +277,7 @@ p { margin: 0 0 1em; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .reveal, .reveal-media { opacity: 1; transform: none; filter: none; transition: none; }
-  .nav-menu { animation: none; }
+  .menu-panel { animation: none; }
   .nav-toggle span { transition: none; }
 }
 
@@ -797,7 +814,6 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .nav nav { gap: 6px; }
   .nav nav a.nav-support, .nav nav a.nav-dl { font-size: 0.85rem; padding: 6px 11px; }
   .nav .brand .brand-wordmark { height: 26px; }
-  .nav-toggle { flex: none; }
 }
 
 @media (max-width: 400px) {

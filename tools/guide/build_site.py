@@ -30,6 +30,60 @@ CALLOUTS = {"tip": "Tip", "note": "Note", "experienced": "Experienced sculptor?"
             "important": "Important"}
 
 # ---------------------------------------------------------------------------
+# Site header nav and footer social row: the hand-written pages carry the same markup; motion.js moves everything but
+# Support and Download into the menu panel.
+# ---------------------------------------------------------------------------
+
+NAV_SHOP = "https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav"
+
+# (label, path under the site root, extra attributes)
+NAV_MENU = [("Features", "index.html#features"), ("Demos", "index.html#demos"), ("Brushes", "brushes.html"),
+        ("Guide", "guide/index.html"), ("For studios", "studios.html"), ("About", "why.html"), ("Shop", NAV_SHOP)]
+
+NAV_SOCIALS = [("Discord", "discord", "https://discord.gg/gWrYkEmQhH"),
+           ("GitHub", "github", "https://github.com/islandmed/SculptForge"),
+           ("X", "x", "https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium={m}"),
+           ("Bluesky", "bluesky", "https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium={m}"),
+           ("Instagram", "instagram", "https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium={m}")]
+
+
+def social_links(prefix, medium):
+    out = []
+    for label, sym, url in NAV_SOCIALS:
+        out.append(f'<a class="gh" href="{url.format(m=medium)}" rel="noopener" aria-label="{label}" title="{label}">'
+                   f'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">'
+                   f'<use href="{prefix}img/social.svg#{sym}"/></svg></a>')
+    return out
+
+
+def header_nav(prefix, page="", indent="      ", index=False):
+    """prefix: '' for pages in the site root, '../' for guide chapters. page: this page's path under the root."""
+    def href(path):
+        if path.startswith("http"):
+            return path
+        if index and path.startswith("index.html#"):
+            return path[len("index.html"):]
+        return prefix + path
+
+    lines = []
+    for label, path in NAV_MENU:
+        cur = ' aria-current="page"' if page and (page == path or (label == "Guide" and page.startswith("guide/"))) else ""
+        rel = ' rel="noopener"' if path.startswith("http") else ""
+        lines.append(f'<a href="{href(path)}"{rel}{cur}>{label}</a>')
+    lines.append('<span class="nav-social">' + "".join(social_links(prefix, "nav")) + "</span>")
+    lines.append(f'<a class="nav-support" href="{prefix}support.html">Support</a>')
+    lines.append(f'<a class="nav-dl" href="{"#download" if index else prefix + "index.html#download"}">Download</a>')
+    lines.append('<button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" '
+                 'aria-label="Menu"><span></span><span></span><span></span></button>')
+    body = "\n".join(f"{indent}  {l}" for l in lines)
+    return f'{indent}<nav aria-label="Main">\n{body}\n{indent}</nav>'
+
+
+def footer_social(prefix, indent="        "):
+    return f'{indent}<div class="social" role="group" aria-label="Follow SculptForge">' + "".join(social_links(prefix, "footer")) + "</div>"
+
+
+# ---------------------------------------------------------------------------
 # Markdown subset -> HTML
 # ---------------------------------------------------------------------------
 
@@ -789,8 +843,9 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:description" content="{desc}">
   <meta property="og:image" content="{SITE}img/social-preview.png?v=5">
   <meta property="og:url" content="{url}">
-  <link rel="stylesheet" href="../style.css?v=35">
-  <script src="../motion.js?v=14" defer></script>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=36">
+  <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
 </head>
@@ -799,15 +854,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <header class="nav">
     <div class="wrap nav-inner">
       <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
-      <nav aria-label="Main">
-        <a href="../index.html#features">Features</a>
-        <a href="../index.html#demos">Demos</a>
-        <a href="../brushes.html">Brushes</a>
-        <a href="index.html" aria-current="page">Guide</a>
-        <a class="nav-dl" href="../index.html#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
-      </nav>
+{header_nav("../", "guide/index.html")}
     </div>
   </header>
   <div class="wrap guide-layout">
@@ -847,6 +894,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+{footer_social("../")}
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
     </div>
@@ -1054,7 +1102,8 @@ def supporters_html() -> str:
   <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
   <link rel="canonical" href="{SITE}supporters.html">
-  <link rel="stylesheet" href="style.css?v=35">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=36">
   <style>
     .supporters {{ columns: 3 14em; column-gap: 32px; padding: 0; list-style: none; }}
     .supporters li {{ break-inside: avoid; padding: 4px 0; }}
@@ -1065,12 +1114,7 @@ def supporters_html() -> str:
   <header class="nav">
     <div class="wrap nav-inner">
       <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
-      <nav aria-label="Main">
-        <a href="guide/index.html">Guide</a>
-        <a href="studios.html">For studios</a>
-        <a class="nav-support" href="support.html">Support</a>
-        <a class="nav-dl" href="index.html#download">Download</a>
-      </nav>
+{header_nav("", "supporters.html")}
     </div>
   </header>
   <main id="top">
@@ -1092,6 +1136,7 @@ def supporters_html() -> str:
         <a href="terms.html">Terms</a>
         <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
+{footer_social("")}
       </div>
       <p class="fine">Copyright © 2026 The SculptForge contributors.</p>
     </div>

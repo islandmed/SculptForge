@@ -280,6 +280,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
+## Simple Icons
+
+The social icons in the website header and footer (`website/img/social.svg`: Discord, GitHub, X, Bluesky, Instagram) are
+from Simple Icons 13.21.0 (https://simpleicons.org), CC0 1.0 (public domain). The logos themselves remain trademarks of
+their owners and only link to our own accounts.
+
 ## Lucide icons
 
 Icon font `assets/fonts/lucide.ttf` (lucide-static 1.52.0, https://lucide.dev), embedded in the app. The

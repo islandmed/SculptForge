@@ -72,64 +72,48 @@
     }
   }
 
-  // --- Site menu: when the header links don't fit beside the logo (a narrow window, a tablet or a phone), the
-  // secondary links move into a menu behind a button; Download, Discord and GitHub stay in the bar. Measured, not a fixed
-  // breakpoint, since pages have different links. ---
+  // --- Site menu: the bar keeps Support, Download and the social icons; every other link in the nav moves into a panel
+  // behind the menu button, on every width (one menu, built from the links in the page's own nav, so the two cannot drift).
+  // On a phone the social icons go into the panel too (style.css). Without this script the nav stays a plain row of links. ---
   const siteHeader = document.querySelector(".nav");
   const mainNav = siteHeader?.querySelector("nav");
-  if (siteHeader && mainNav) {
-    const inner = siteHeader.querySelector(".nav-inner"), brand = siteHeader.querySelector(".brand");
-    const items = [...mainNav.querySelectorAll("a:not(.gh):not(.nav-dl)")];
-    const ghs = [...mainNav.querySelectorAll("a.gh")]; // Discord and GitHub
+  const btn = mainNav?.querySelector(".nav-toggle");
+  if (siteHeader && mainNav && btn) {
+    const brand = siteHeader.querySelector(".brand");
     if (!brand.hasAttribute("aria-label")) brand.setAttribute("aria-label", brand.textContent.trim() || "SculptForge");
     const menu = document.createElement("div");
     menu.className = "nav-menu";
     menu.id = "site-menu";
     menu.hidden = true;
-    const list = document.createElement("div");
-    list.className = "wrap";
-    for (const a of items) list.append(a.cloneNode(true));
-    for (const gh of ghs) list.append(Object.assign(gh.cloneNode(true), { className: "menu-gh" }));
-    menu.append(list);
+    const outer = document.createElement("div");
+    outer.className = "wrap";
+    const panel = document.createElement("div");
+    panel.className = "menu-panel";
+    for (const a of mainNav.querySelectorAll(":scope > a:not(.nav-support):not(.nav-dl)")) panel.append(a.cloneNode(true));
+    const social = document.createElement("div");
+    social.className = "menu-social";
+    for (const a of mainNav.querySelectorAll(".nav-social a")) social.append(a.cloneNode(true));
+    panel.append(social);
+    outer.append(panel);
+    menu.append(outer);
     siteHeader.append(menu);
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "nav-toggle";
-    btn.setAttribute("aria-controls", "site-menu");
-    btn.setAttribute("aria-expanded", "false");
-    btn.setAttribute("aria-label", "Menu");
-    btn.innerHTML = "<span></span><span></span><span></span>";
-    mainNav.append(btn);
-    const setOpen = (open) => {
+    const setOpen = (open, refocus) => {
       menu.hidden = !open;
       btn.setAttribute("aria-expanded", String(open));
       siteHeader.classList.toggle("menu-open", open);
+      if (open) panel.querySelector("a")?.focus();
+      else if (refocus) btn.focus();
     };
     btn.addEventListener("click", () => setOpen(menu.hidden));
     menu.addEventListener("click", (e) => { if (e.target.closest("a")) setOpen(false); });
     document.addEventListener("click", (e) => { if (!menu.hidden && !siteHeader.contains(e.target)) setOpen(false); });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !menu.hidden) { setOpen(false); btn.focus(); }
+      if (e.key === "Escape" && !menu.hidden) { e.preventDefault(); setOpen(false, true); }
     });
-    // Compact: the secondary links go into the menu (too wide for the bar, or already hidden by the phone layout
-    // in style.css). Tight: on the narrowest screens Discord and GitHub go too, so Download and the button fit by the logo.
-    // Tiny: below that (the smallest phones) the logo drops its name.
-    const tooWide = () => {
-      const pad = getComputedStyle(inner);
-      const room = inner.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);
-      return brand.offsetWidth + mainNav.offsetWidth + 32 > room;
-    };
-    const fit = () => {
-      siteHeader.classList.remove("compact", "tight", "tiny");
-      const compact = tooWide() || items.some((a) => a.offsetWidth === 0);
-      siteHeader.classList.toggle("compact", compact);
-      siteHeader.classList.toggle("tight", compact && tooWide());
-      siteHeader.classList.toggle("tiny", siteHeader.classList.contains("tight") && tooWide());
-      if (!compact) setOpen(false);
-    };
-    new ResizeObserver(fit).observe(inner);
-    document.fonts?.ready.then(fit);
-    fit();
+    // Tabbing out of the bar and panel closes the panel.
+    siteHeader.addEventListener("focusout", (e) => {
+      if (!menu.hidden && e.relatedTarget && !siteHeader.contains(e.relatedTarget)) setOpen(false);
+    });
   }
 
   // --- Download counts: GoatCounter (loaded beside this script) records which file was downloaded, so the
