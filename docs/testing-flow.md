@@ -206,9 +206,26 @@ PC, and each is parallel-safe (UI tests use an isolated settings folder; `e2e_qu
 | prefs_threads | a threads override is kept for the next start |
 | e2e_quit_clean | quit by SIGTERM and SIGINT with a trainer running, and a trainer child's every end: nothing outside the app is signalled (#183) |
 
-**A bug fix adds or extends a scenario** that reproduces the reporter's steps (the `qa-e2e` skill says how). A bug whose fix
-isn't merged yet is written first with `# xfail: BUG-ID what` in the script's first lines: it logs `XFAIL` and passes while
-the bug stands, and logs `XPASS` when the fix lands (delete the line then). `# xfail` never blocks a batch either way.
+**The rule: every bug fix adds or extends a scenario** that reproduces the reporter's steps, with the issue or Discord link
+in the script's first comment. A bug whose fix isn't merged yet is written first with `# xfail: BUG-ID what` in the
+script's first 40 lines: it logs `XFAIL` and passes while the bug stands, and logs `XPASS` when the fix lands (delete the
+line then). A script that names a hook its fix adds (it doesn't parse yet) is XFAIL too. `# xfail` never blocks a batch,
+and it hides any failure in that script, so keep such a script to the one bug.
+
+Run one: `build/sculptforge --ui-test tests/e2e/NAME.sfui --ui-out DIR` (a failure prints `FAIL file:line: why` and
+saves `FAIL-line-N.png` in DIR: read the shot first), or `ctest -R ui_e2e_NAME` / `ctest -L e2e` in a build.
+
+Add one:
+
+1. `tests/e2e/NAME.sfui`, started from a neighbour. The steps and `expect_value` names are listed in the header comment of
+   `src/app/UiTest.cpp`; `run COMMAND` takes any `sculptforge-cli -l` command. Useful: `snapshot` and `moved*`,
+   `remember X name` and `$name`, `expect_mesh_valid`, `open_edges`, `solid_volume`, and `longest_frame_ms` (reset on read;
+   scale its cap by `$scale` after `remember time_limit_scale scale`: 4 on CI).
+2. Write a number that fails when the bug is back, and run the script against the unfixed build to see it fail.
+3. CMake picks the file up. `tests/areas.map` gives it an area by name (the `ui_e2e_*` lines); add a line for a new family.
+4. A new test hook is one line in `UiTest.cpp` (the value, plus its header comment). No other app code for a test.
+5. A scenario that needs its own process (the thread pool, quit paths) is a script plus a small driver, like
+   `tests/e2e/quit_clean.py`. The language has no loops: generate repeated blocks and commit the result.
 
 ## T3 nightly
 
