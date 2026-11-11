@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.5
+
+```features
+date: unreleased
+tagline: Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.
+highlight: Rgb lays colour on Sub strokes too, for every brush and stroke type
+highlight: Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)
+highlight: Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)
+highlight: Thread counts above 16 set in Preferences > Performance apply at the next start (#184)
+highlight: A startup splash shows the bust and version while SculptForge starts
+```
+
 ## Version 0.12.4
 
 ```features
