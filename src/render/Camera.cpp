@@ -70,6 +70,23 @@ void Camera::setOrientation(const glm::quat& q) {
     if (std::abs(roll) < 1e-6f) roll = 0.0f;
 }
 
+void Camera::turnAbout(const glm::quat& q, const glm::vec3& pivot) {
+    const glm::quat before = glm::normalize(orientation());
+    const glm::vec3 eye = position();
+    setOrientation(q);
+    const glm::quat after = glm::normalize(orientation()); // (as stored: through yaw / pitch / roll)
+    target = pivot + after * (glm::conjugate(before) * (eye - pivot)) - after * glm::vec3(0, 0, distance);
+}
+
+void Camera::targetDepthOf(const glm::vec3& point) {
+    if (ortho) return; // (the distance sets an orthographic view's size)
+    const glm::vec3 eye = position(), f = forward();
+    const float depth = glm::dot(point - eye, f);
+    if (!(depth > nearPlane()) || !std::isfinite(depth)) return; // behind or at the eye
+    distance = depth;
+    target = eye + f * depth;
+}
+
 glm::quat Camera::snapped(const glm::quat& q) {
     auto nearestAxis = [](const glm::vec3& v, const glm::vec3* avoid) {
         glm::vec3 best(0.0f);

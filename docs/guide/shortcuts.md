@@ -338,6 +338,9 @@ long as <kbd>Alt</kbd> is the only key held:
 The roll needs <kbd>Alt</kbd> first: press <kbd>Ctrl</kbd> first (or both together) and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>
 masks as before, on the model, and clears the mask beside it.
 
+**Edit > Preferences > Input > Orbit around the pointer** (on for new installs, every style) turns the view about the point
+of the model under the pointer when a rotation starts over it; over the background, about the middle of the view.
+
 **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134) keeps the point of the model under the pointer
 where it is while the wheel zooms; beside the model it zooms toward the pointer at the model's depth. Choosing the Maya
 style turns it on and the other styles turn it off (they zoom toward the middle of the view); the box changes it in

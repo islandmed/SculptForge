@@ -215,6 +215,7 @@ private:
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
     void orbitBy(float x, float y, float dx, float dy);
+    std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod);
@@ -391,8 +392,12 @@ private:
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.
     Camera orbitRaw_;
     bool orbitStarted_ = false;
+    // Orbit around the pointer: the surface point under the pointer as the drag began (picked once per drag; none
+    // over the background or the axis gizmo's disc: the view turns about its target).
+    std::optional<glm::vec3> orbitPivot_;
+    bool orbitPivotPicked_ = false;
     bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms
-    bool forceTurntable_ = false;   // demos orbit like a turntable whatever the preference
+    bool forceTurntable_ = false;   // demos orbit like a turntable about the target whatever the preferences
     float mouseX_ = 0.0f, mouseY_ = 0.0f;
     float lastX_ = 0.0f, lastY_ = 0.0f;
     // Dabs are placed along the pointer's path (strokePath_), queued, and worked through for a limited time per

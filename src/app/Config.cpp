@@ -112,6 +112,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
+    j.set("orbitAtPointer", p.orbitAtPointer);
     j.set("invertZoom", p.invertZoom);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("quickRemesh", p.quickRemesh);
@@ -211,6 +212,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
+    p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
@@ -1243,6 +1245,9 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     }
     // The prefs first: they name the shell layout, whose standard shelves fill in what the file didn't store.
     UiPrefs prefs = uiPrefs_;
+    // Orbit around the pointer is on for new installs; our own settings saved before it existed keep orbiting the
+    // target, as those users know it.
+    if (own && !j["prefs"]["orbitAtPointer"].isBool()) prefs.orbitAtPointer = false;
     fromJson(j["prefs"], prefs);
     UiLayout layout = standardLayout(prefs.shellLayout);
     if (hasLayout && !fromJson(layouts.current, layout, err, prefs.shellLayout)) return false;

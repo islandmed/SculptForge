@@ -2268,6 +2268,11 @@ void App::orbitBy(float x, float y, float dx, float dy) {
         camera_.ortho = false;
         autoOrtho_ = false;
     }
+    if (!orbitPivotPicked_) { // once per drag, where it began: no readback while the view turns
+        orbitPivotPicked_ = true;
+        orbitPivot_ = orbitPivotAt(x - dx, y - dy);
+        if (orbitPivot_) camera_.targetDepthOf(*orbitPivot_);
+    }
     if (!orbitStarted_) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
@@ -2278,8 +2283,20 @@ void App::orbitBy(float x, float y, float dx, float dy) {
     else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
-    if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
-    else camera_.setOrientation(orbitRaw_.orientation());
+    const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();
+    if (orbitPivot_) camera_.turnAbout(q, *orbitPivot_);
+    else camera_.setOrientation(q);
+}
+
+// Orbit around the pointer: the nearest visible Part's surface under (x, y), in world space; none over the background,
+// with the preference off, in demos (their scripted moves turn about the target), or while the mesh is busy
+// (mid-stroke, a preview level).
+std::optional<glm::vec3> App::orbitPivotAt(float x, float y) {
+    if (!uiPrefs_.orbitAtPointer || forceTurntable_ || solverBusy() || previewLod_ >= 0) return std::nullopt;
+    doc_.syncBvh();
+    RayHit hit;
+    if (pickPart(x, y, &hit) < 0) return std::nullopt;
+    return hit.position;
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
@@ -2308,6 +2325,8 @@ void App::onMouseUp() {
     rightClick_.pending = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;
+    orbitPivotPicked_ = false;
+    orbitPivot_.reset();
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
@@ -4623,6 +4642,7 @@ bool App::axisGizmoMouseDown(float x, float y) {
     const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
     if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
+        orbitPivotPicked_ = true; // (about the target: the gizmo's disc is not a point on the model)
         rightClick_.pending = false;
         return true;
     }

@@ -554,6 +554,7 @@ void Demo::orbit(float dx, float dy, float seconds) {
             e.button.x = at->x;
             e.button.y = at->y;
             app_.handleEvent(e);
+            if (down) app_.orbitPivotPicked_ = true; // a scripted orbit turns about the target, wherever the cursor is
         };
         if (t == 0.0f) {
             const CanvasRect r = app_.canvasRect();
