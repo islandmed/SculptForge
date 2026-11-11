@@ -273,11 +273,12 @@ TEST(part_project_version1_still_loads) {
     checkSameMesh(back.mesh, doc.mesh);
     CHECK(back.activeLayer == 0 && !back.dirty());
 
-    // A version 2 file without Parts, or with a broken one, is refused and leaves the scene alone.
+    // A version 2 file whose Part list is not a list, or with a broken Part, is refused and leaves the scene alone.
+    // (An empty list is an empty scene: project_empty_part_list_loads_and_round_trips.)
     Document keep = makeDoc(makePlane(4));
     const size_t tris = keep.mesh.triangleCount();
     CHECK(saveProject(path, doc, err));
-    CHECK(editManifest(path, [](Json& j) { j.set("parts", Json::array()); }));
+    CHECK(editManifest(path, [](Json& j) { j.set("parts", "none"); }));
     err.clear();
     CHECK(!loadProject(path, keep, err) && !err.empty());
     CHECK(saveProject(path, makeScene(), err));

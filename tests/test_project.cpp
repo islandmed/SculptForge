@@ -295,6 +295,38 @@ TEST(project_version_handling) {
     std::filesystem::remove(path);
 }
 
+// A project with an empty Part list (the scene settings, lights and views, no models) opens as an empty scene.
+TEST(project_empty_part_list_loads_and_round_trips) {
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.projectSettings.set("future_feature", "kept");
+    const std::string path = tempPath("sf_project_no_parts.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    CHECK(editManifest(path, [](Json& j) { j.set("parts", Json::array()); }));
+    Document back = makeDoc(makePlane(4));
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partCount() == 1 && back.mesh.triangleCount() == 0 && back.mesh.positions.empty());
+    CHECK(back.projectSettings["future_feature"].asString() == "kept");
+    CHECK(!back.dirty());
+
+    // Saved again, it comes back the same.
+    const std::string again = tempPath("sf_project_no_parts_again.sfproj");
+    CHECK(saveProject(again, back, err));
+    Document twice;
+    CHECK(loadProject(again, twice, err));
+    CHECK(twice.partCount() == 1 && twice.mesh.triangleCount() == 0);
+    CHECK(twice.projectSettings["future_feature"].asString() == "kept");
+
+    // A Part list that is missing or not a list is still refused.
+    CHECK(editManifest(path, [](Json& j) { j.set("parts", "none"); }));
+    Document keep = makeDoc(makePlane(4));
+    err.clear();
+    CHECK(!loadProject(path, keep, err) && !err.empty());
+    CHECK(keep.mesh.triangleCount() == makePlane(4).triangleCount());
+    std::filesystem::remove(path);
+    std::filesystem::remove(again);
+}
+
 TEST(project_dirty_tracking) {
     CommandRegistry reg;
     Document doc;
