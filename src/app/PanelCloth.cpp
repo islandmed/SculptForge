@@ -130,7 +130,9 @@ bool App::clothUiValue(const std::string& name, double& out) const {
     if (name == "cloth_soft") return out = double(doc_.sculptor.cloth.softBody), true;
     if (name == "cloth_self") return out = doc_.sculptor.cloth.selfCollide ? 1.0 : 0.0, true;
     if (name == "cloth_region") return out = double(doc_.sculptor.clothRegion()), true;
+    if (name == "drape_scale") return out = double(drapeRequest_.scale), true;
     if (name == "drape_running") return out = drape_ ? 1.0 : 0.0, true;
+    if (name == "drape_frame") return out = double(drapeFrame()), true;
     if (name == "cloth_colliders") return out = clothColliders_ ? double(clothColliders_->triangles()) : 0.0, true;
     return false;
 }

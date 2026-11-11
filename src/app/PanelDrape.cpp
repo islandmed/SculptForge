@@ -6,6 +6,7 @@
 #include "app/App.h"
 #include "app/Palettes.h"
 #include "app/Ui.h"
+#include "core/Units.h"
 
 #include <algorithm>
 #include <chrono>
@@ -105,6 +106,12 @@ void App::pollDrape() {
     else wakeMainLoop(); // (keep drawing while it moves)
 }
 
+int App::drapeFrame() const {
+    if (!drape_) return 0;
+    std::lock_guard g(drape_->lock);
+    return drape_->frame;
+}
+
 void App::finishDrape(bool keep) {
     if (!drape_) return;
     std::shared_ptr<DrapeJob> job = std::move(drape_);
@@ -146,11 +153,17 @@ void App::drawDrapeSection() {
                  "How the cloth hangs: Silk flows into many fine folds, Cotton medium ones, Denim holds broad folds, "
                  "Leather barely folds.",
                  help);
+    if (!drapeScaleTouched_ && !running && drapeScalePart_ != doc_.activePartInfo().id) {
+        drapeScalePart_ = doc_.activePartInfo().id;
+        drapeRequest_.scale = sceneUnitsPerMetre(doc_);
+    }
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##drapescale", &drapeRequest_.scale, 0.01f, 100.0f, "Units per metre %.2f", ImGuiSliderFlags_Logarithmic);
+    if (ui::SliderInside("##drapescale", &drapeRequest_.scale, 0.01f, 1000.0f, "Units per metre %.2f", ImGuiSliderFlags_Logarithmic))
+        drapeScaleTouched_ = true;
     ui::HelpText("Units per metre", nullptr,
                  "How big the sculpt is in real life: 1 when it is modelled at real size (a SculptForge unit is a "
-                 "metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size.",
+                 "metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size. The value was guessed "
+                 "from the size of the scene (centimetres above 20 units, millimetres above 600); move it to set it yourself.",
                  help);
     ImGui::Checkbox(tr("Pins from mask"), &drapeRequest_.useMask);
     ui::HelpText("Pins from mask", nullptr, "Masked areas hold still, like pins (a waistband, a collar).", help);

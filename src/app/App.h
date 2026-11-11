@@ -1052,10 +1052,13 @@ private:
     struct DrapeJob;
     std::shared_ptr<DrapeJob> drape_;
     DrapeRequest drapeRequest_;
+    bool drapeScaleTouched_ = false; // the user moved the slider: stop guessing
+    uint32_t drapeScalePart_ = 0xffffffffu;       // the active Part the guess was made for
     void drawDrapeSection();
     void startDrape();
     void pollDrape();
     void finishDrape(bool keep);
+    int drapeFrame() const; // the running Drape's frame count (0 when none; the UI tests read it)
     // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);

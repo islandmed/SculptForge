@@ -1076,7 +1076,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Clone follows stroke", "複製跟隨筆畫"},
     {"Drape", "垂墜"},
     {"Drops the active Part as cloth under gravity until it rests on the other Parts. It shows live; at rest the result is kept as one undo step.", "讓目前的 Part 像布料一樣受重力落下，直到停在其他 Part 上。過程即時顯示；靜止後結果保留為一個復原步驟。"},
-    {"How big the sculpt is in real life: 1 when it is modelled at real size (a SculptForge unit is a metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size.", "雕塑在現實中的大小：以實際尺寸建模時為 1（SculptForge 的一個單位是一公尺）。高 2 個單位、應為 1.8 公尺的人體：1.11。布料依實際尺寸垂墜。"},
+    {"How big the sculpt is in real life: 1 when it is modelled at real size (a SculptForge unit is a metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size. The value was guessed from the size of the scene (centimetres above 20 units, millimetres above 600); move it to set it yourself.", "雕塑在現實中的大小：以實際尺寸建模時為 1（SculptForge 的一個單位是一公尺）。高 2 個單位、應為 1.8 公尺的人體：1.11。布料依實際尺寸垂墜。該值是依場景大小預設的（超過 20 個單位按公分，超過 600 按 mm）；移動滑桿即可自行設定。"},
     {"How the cloth hangs: Silk flows into many fine folds, Cotton medium ones, Denim holds broad folds, Leather barely folds.", "布料如何垂下：絲綢形成許多細皺褶，棉形成中等皺褶，丹寧保持寬皺褶，皮革幾乎不起皺。"},
     {"Masked areas hold still, like pins (a waistband, a collar).", "遮罩區域固定不動，就像大頭針（腰帶、衣領）。"},
     {"Pins from mask", "以遮罩作為固定點"},
