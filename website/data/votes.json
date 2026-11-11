@@ -13,11 +13,9 @@
      "title": "Brush size preview",
      "line": "See the brush circle at its real size and falloff before you stroke.",
      "where": "Brush settings and the canvas cursor",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831001658753054"
+     "shipped": ""
     },
     {
      "slug": "brush-accumulate-on-off",
@@ -25,11 +23,9 @@
      "title": "Brush Accumulate on/off",
      "line": "Turn it off so a stroke does not pile up over itself.",
      "where": "Brush settings",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831003600723998"
+     "shipped": ""
     },
     {
      "slug": "brush-auto-masking",
@@ -37,11 +33,9 @@
      "title": "Brush auto-masking",
      "line": "Directional, cavity, backface and other auto-masks set per brush.",
      "where": "Brush settings",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831005848731678"
+     "shipped": ""
     },
     {
      "slug": "smooth-peaks-brush",
@@ -49,11 +43,9 @@
      "title": "Smooth-peaks brush",
      "line": "Smooths only the high points and leaves the valleys alone.",
      "where": "Brush picker",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831008470302780"
+     "shipped": ""
     },
     {
      "slug": "kitbash-insert-library",
@@ -61,11 +53,9 @@
      "title": "Kitbash insert library",
      "line": "A library of ready-made pieces you stamp onto the surface.",
      "where": "Brush picker, new pack",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831051528765534"
+     "shipped": ""
     },
     {
      "slug": "wood-detail-brush-pack",
@@ -73,11 +63,9 @@
      "title": "Wood detail brush pack",
      "line": "Weathered grain and splinter brushes from scanned planks, with random stamps.",
      "where": "Brush picker, new pack",
-     "credit": "Hameron (FXiT)",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.12.2",
-     "url": "https://discord.com/channels/1566592020024266812/1569831007056699492"
+     "shipped": "0.12.2"
     }
    ]
   },
@@ -92,11 +80,9 @@
      "title": "Noise panel",
      "line": "A pop-up to add procedural or alpha noise to the whole model with curves, live preview, mask by noise and presets, then apply.",
      "where": "a small sidebar panel whose Make Noise button opens the pop-up",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569559022644764772"
+     "shipped": ""
     }
    ]
   },
@@ -111,11 +97,9 @@
      "title": "Split cut mode",
      "line": "Cut new face groups along a line or shape without removing anything.",
      "where": "Cut tool",
-     "credit": "@ThinkingPolygons",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831011225964617"
+     "shipped": ""
     },
     {
      "slug": "stored-masks",
@@ -123,11 +107,9 @@
      "title": "Stored masks",
      "line": "Store, load, merge, rename and reorder masks.",
      "where": "Masking panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.10.5",
-     "url": "https://discord.com/channels/1566592020024266812/1569831009892044941"
+     "shipped": "0.10.5"
     }
    ]
   },
@@ -142,11 +124,9 @@
      "title": "Polygon modelling mode",
      "line": "Beginner-friendly Points, Edges and Polygons panels: extrude, smart bevel, bridge, circle from edges, for hard-surface work next to sculpting.",
      "where": "a new Model mode with its own panels",
-     "credit": "Foirgair Wolf and Hameron (FXiT)",
      "votes": 2,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569559008417939509"
+     "shipped": ""
     },
     {
      "slug": "edit-base-mesh-keep-detail",
@@ -154,11 +134,9 @@
      "title": "Edit base mesh, keep detail",
      "line": "Step down to the low-resolution cage, move, extrude or add loops, then step back up with all your detail re-applied.",
      "where": "the Subdivide levels in the Topology panel",
-     "credit": "Foirgair Wolf",
      "votes": 1,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569559011726987286"
+     "shipped": ""
     },
     {
      "slug": "panel-tool",
@@ -166,11 +144,9 @@
      "title": "Panel tool",
      "line": "Turn a selection or face group into a thin panel with thickness and edge loops.",
      "where": "Model tools",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825900655026458"
+     "shipped": ""
     },
     {
      "slug": "quad-remesh-options-incl-fusing-pieces",
@@ -178,11 +154,9 @@
      "title": "Quad Remesh options (incl. fusing pieces)",
      "line": "Adaptive density, Repeat, Retry and curve strength for guides, plus fusing overlapping pieces into one clean mesh in a single step.",
      "where": "Topology panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825911249969152"
+     "shipped": ""
     },
     {
      "slug": "mesh-bridge",
@@ -190,11 +164,9 @@
      "title": "Mesh Bridge",
      "line": "Bridge between regions with standard, smooth and slime types and tensions.",
      "where": "Geometry panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825921211432992"
+     "shipped": ""
     },
     {
      "slug": "tessellation-panel",
@@ -202,11 +174,9 @@
      "title": "Tessellation panel",
      "line": "Pre-subdivision, thickness and shape input with preview.",
      "where": "Geometry > Tessellation",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825931395211337"
+     "shipped": ""
     },
     {
      "slug": "blend-across-parts",
@@ -214,11 +184,9 @@
      "title": "Blend across Parts",
      "line": "Let smoothing and dynamic topology blend an added Part into the surface.",
      "where": "Topology panel",
-     "credit": "GABO",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825953025359902"
+     "shipped": ""
     },
     {
      "slug": "retopology-draw-quads-over-a-sculpt",
@@ -226,11 +194,9 @@
      "title": "Retopology (draw quads over a sculpt)",
      "line": "Draw quads, strips and loops on the surface to get a clean low-poly mesh that keeps the detail.",
      "where": "New Retopo mode",
-     "credit": "@jhonathanl360-art",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825973971587082"
+     "shipped": ""
     },
     {
      "slug": "micro-levels-rebuild-and-merge",
@@ -238,11 +204,9 @@
      "title": "Micro levels: rebuild and merge",
      "line": "Rebuild subdivision levels from a micro level, or turn the top levels into one.",
      "where": "Topology panel",
-     "credit": "@RodTDai",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825983945646272"
+     "shipped": ""
     },
     {
      "slug": "sculpt-layers-on-micro-levels",
@@ -250,11 +214,9 @@
      "title": "Sculpt layers on micro levels",
      "line": "Keep sculpt layers working on micro levels.",
      "where": "Layers panel",
-     "credit": "@RodTDai",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825994599047312"
+     "shipped": ""
     },
     {
      "slug": "voxel-remesh-minimum-thickness",
@@ -262,11 +224,9 @@
      "title": "Voxel Remesh minimum thickness",
      "line": "Keep thin tips from vanishing when you Voxel Remesh.",
      "where": "Topology panel",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569826005756158013"
+     "shipped": ""
     },
     {
      "slug": "divide-levels-to-blender-as-multires",
@@ -274,11 +234,9 @@
      "title": "Divide levels to Blender as Multires",
      "line": "Send your subdivision levels to Blender as Multires.",
      "where": "Bridge > Blender",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831013771903016"
+     "shipped": ""
     },
     {
      "slug": "confirm-before-destructive-remesh",
@@ -286,11 +244,9 @@
      "title": "Confirm before destructive remesh",
      "line": "A pop-up before Voxel Remesh, Quad Remesh or Decimate drops subdivision levels.",
      "where": "Topology panel",
-     "credit": "@TheLycanFenrir",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.12.1",
-     "url": "https://discord.com/channels/1566592020024266812/1569825942333952040"
+     "shipped": "0.12.1"
     },
     {
      "slug": "voxel-remesh-above-512",
@@ -298,11 +254,9 @@
      "title": "Voxel Remesh above 512",
      "line": "Go up to 4096 with a polygon estimate and a one-time warning.",
      "where": "Topology panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.12.1",
-     "url": "https://discord.com/channels/1566592020024266812/1569825963720843357"
+     "shipped": "0.12.1"
     }
    ]
   },
@@ -317,11 +271,9 @@
      "title": "Save a project with only some Parts",
      "line": "Slim a file down by saving only the visible Parts.",
      "where": "File > Save",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825848448647371"
+     "shipped": ""
     },
     {
      "slug": "mesh-boolean-preview",
@@ -329,11 +281,9 @@
      "title": "Mesh Boolean preview",
      "line": "Live Union, Subtract and Intersect preview, then Make Boolean Mesh.",
      "where": "Parts panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825858837811322"
+     "shipped": ""
     },
     {
      "slug": "primitive-blockout-kit",
@@ -341,11 +291,9 @@
      "title": "Primitive blockout kit",
      "line": "Cylinder, capsule, cone and torus, click to place, then merge.",
      "where": "Create menu",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825869587939518"
+     "shipped": ""
     },
     {
      "slug": "new-parts-land-on-the-origin",
@@ -353,11 +301,9 @@
      "title": "New Parts land on the origin",
      "line": "New Parts and tools land exactly on the world origin so symmetry works.",
      "where": "Parts list and tools",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825879490699264"
+     "shipped": ""
     },
     {
      "slug": "morph-panel",
@@ -365,11 +311,9 @@
      "title": "Morph panel",
      "line": "Store, Delete, Apply and Accumulate morphs, separate from Sculpt layers.",
      "where": "New Morph panel",
-     "credit": "Foirgair Wolf",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825890764849254"
+     "shipped": ""
     },
     {
      "slug": "pose-with-a-simple-rig",
@@ -377,11 +321,9 @@
      "title": "Pose with a simple rig",
      "line": "Pose a Part with a quick skeleton, then bake the pose into the mesh.",
      "where": "Parts panel",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831050677452920"
+     "shipped": ""
     }
    ]
   },
@@ -396,11 +338,9 @@
      "title": "Draw and move in one mode",
      "line": "Drag a sphere to move it and draw new ones without switching.",
      "where": "Forge Spheres tool",
-     "credit": "@tristratos",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.12.1",
-     "url": "https://discord.com/channels/1566592020024266812/1569825838688509962"
+     "shipped": "0.12.1"
     }
    ]
   },
@@ -415,11 +355,9 @@
      "title": "Tube that subtracts",
      "line": "Carve a tube stroke into the surface like a boolean subtract.",
      "where": "Tool > Tube",
-     "credit": "GABO",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825828890476649"
+     "shipped": ""
     },
     {
      "slug": "tube-profiles",
@@ -427,11 +365,9 @@
      "title": "Tube profiles",
      "line": "Square, disc and other cross-sections for the Tube tool.",
      "where": "Tool > Tube > Profile",
-     "credit": "GABO",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.12.2",
-     "url": "https://discord.com/channels/1566592020024266812/1569825818631213088"
+     "shipped": "0.12.2"
     }
    ]
   },
@@ -446,11 +382,9 @@
      "title": "Cloth panel",
      "line": "One place for the Cloth brush settings and for running a simulation.",
      "where": "New Cloth panel",
-     "credit": "Hameron (FXiT)",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825798347825203"
+     "shipped": ""
     },
     {
      "slug": "wind-for-drape",
@@ -458,11 +392,9 @@
      "title": "Wind for Drape",
      "line": "Direction and turbulence so cloth can blow in the wind, still or live.",
      "where": "Drape tool settings",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825808606830693"
+     "shipped": ""
     }
    ]
   },
@@ -477,11 +409,9 @@
      "title": "More lights and soft shadows",
      "line": "More lights, ambient occlusion and soft shadows in the render.",
      "where": "Render panel",
-     "credit": "@KKolombre",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825767536197754"
+     "shipped": ""
     },
     {
      "slug": "lit-sphere-material-per-part",
@@ -489,11 +419,9 @@
      "title": "Lit Sphere material per Part",
      "line": "Give each Part its own Lit Sphere material.",
      "where": "Render > Materials",
-     "credit": "GABO",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825778365898852"
+     "shipped": ""
     },
     {
      "slug": "paint-layers",
@@ -501,11 +429,9 @@
      "title": "Paint layers",
      "line": "Stack paint in layers with blend modes and opacity, like sculpt layers, and export each layer as its own colour attribute.",
      "where": "Paint panel and File > Export",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825788277039144"
+     "shipped": ""
     }
    ]
   },
@@ -520,11 +446,9 @@
      "title": "Clickable orientation widget",
      "line": "Click a 3D widget at the top right to jump to front, side or top.",
      "where": "Top right of the canvas",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825727308632154"
+     "shipped": ""
     },
     {
      "slug": "split-view",
@@ -532,11 +456,9 @@
      "title": "Split view",
      "line": "A second live view, for example side view while you sculpt the front.",
      "where": "View menu",
-     "credit": "GABO, @lostpackets",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825736926175322"
+     "shipped": ""
     },
     {
      "slug": "frozen-multi-angle-view",
@@ -544,11 +466,9 @@
      "title": "Frozen multi-angle view",
      "line": "Stamp the current view onto the canvas as a flat picture to turn the model against.",
      "where": "View menu",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825746732716143"
+     "shipped": ""
     },
     {
      "slug": "view-figure-choices",
@@ -556,11 +476,9 @@
      "title": "View Figure choices",
      "line": "A built-in skull plus your own model as the corner figure.",
      "where": "Draw > Camera > View Figure",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825757436452947"
+     "shipped": ""
     },
     {
      "slug": "turntable-video-export",
@@ -568,11 +486,9 @@
      "title": "Turntable video export",
      "line": "Render a turntable of your sculpt to a video file in one click.",
      "where": "File > Export",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831047250706476"
+     "shipped": ""
     },
     {
      "slug": "reference-image-board",
@@ -580,11 +496,9 @@
      "title": "Reference image board",
      "line": "Pin reference images next to the canvas and pick colours from them.",
      "where": "View menu",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831048978767972"
+     "shipped": ""
     }
    ]
   },
@@ -599,11 +513,9 @@
      "title": "Custom quick panel",
      "line": "Drag any buttons and sections from any palette into your own panel; float it on a key or dock it.",
      "where": "Customize Shelves, then a new panel you build",
-     "credit": "Hameron (FXiT)",
      "votes": 1,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569559028189626378"
+     "shipped": ""
     },
     {
      "slug": "tab-hides-one-shelf",
@@ -611,11 +523,9 @@
      "title": "Tab hides one shelf",
      "line": "Tab over a shelf hides only that shelf.",
      "where": "Shelves",
-     "credit": "@ebarranco",
      "votes": 1,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825634077773824"
+     "shipped": ""
     },
     {
      "slug": "rooms",
@@ -623,11 +533,9 @@
      "title": "Rooms",
      "line": "Separate workspaces for Sculpt, Model, Paint and UV, each with its own tools, panels and keys, and a clean hand-off of the model; also the backbone of the coming tablet and phone app.",
      "where": "a workspace switcher at the top of the window",
-     "credit": "Artizmo",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569559004206731335"
+     "shipped": ""
     },
     {
      "slug": "one-click-update-on-macos",
@@ -635,11 +543,9 @@
      "title": "One-click Update on macOS",
      "line": "Update from the banner in one click, as on Linux and Windows.",
      "where": "Update banner",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825582231978074"
+     "shipped": ""
     },
     {
      "slug": "startup-splash-screen",
@@ -647,11 +553,9 @@
      "title": "Startup splash screen",
      "line": "A splash with the first-run welcome card.",
      "where": "App start",
-     "credit": "@lowenski",
      "votes": 0,
      "status": "in progress",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825592134729851"
+     "shipped": ""
     },
     {
      "slug": "screencast-overlay",
@@ -659,11 +563,9 @@
      "title": "Screencast overlay",
      "line": "Show pressed keys and mouse buttons for talks and tutorials.",
      "where": "View menu",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825602922483712"
+     "shipped": ""
     },
     {
      "slug": "touch-navigation-on-desktop",
@@ -671,11 +573,9 @@
      "title": "Touch navigation on desktop",
      "line": "Pen sculpts, fingers orbit, pan and zoom, with an option to lock touch.",
      "where": "Preferences > Input",
-     "credit": "@lostpackets",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825612867309590"
+     "shipped": ""
     },
     {
      "slug": "custom-interface-colours",
@@ -683,11 +583,9 @@
      "title": "Custom interface colours",
      "line": "Pick your own accent and panel colours.",
      "where": "Preferences > Interface",
-     "credit": "GABO",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825623654924428"
+     "shipped": ""
     },
     {
      "slug": "separate-pan-keys",
@@ -695,11 +593,9 @@
      "title": "Separate Pan keys",
      "line": "Bind pan left, right, up and down separately for game pads.",
      "where": "Preferences > Input",
-     "credit": "Artizmo",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825643909218506"
+     "shipped": ""
     },
     {
      "slug": "multi-key-shortcut-sequences",
@@ -707,11 +603,9 @@
      "title": "Multi-key shortcut sequences",
      "line": "Bind sequences like A then A for more keys.",
      "where": "Preferences > Input",
-     "credit": "Artizmo",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825654034268344"
+     "shipped": ""
     },
     {
      "slug": "shortcut-conflict-warning",
@@ -719,11 +613,9 @@
      "title": "Shortcut conflict warning",
      "line": "Warn when a key is already used, plus a per-shortcut reset.",
      "where": "Preferences > Input",
-     "credit": "Artizmo",
      "votes": 0,
      "status": "in progress",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825665019289760"
+     "shipped": ""
     },
     {
      "slug": "tablet-and-mobile-app-ipad-android",
@@ -731,11 +623,9 @@
      "title": "Tablet and mobile app (iPad, Android)",
      "line": "SculptForge on iPad and Android tablets, with pen pressure and a touch-first layout.",
      "where": "New platform",
-     "credit": "@tristratos, @git-tiger",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825674959527969"
+     "shipped": ""
     },
     {
      "slug": "vr-sculpting",
@@ -743,11 +633,9 @@
      "title": "VR sculpting",
      "line": "Sculpt in VR (later and large).",
      "where": "New VR mode",
-     "credit": "Hameron (FXiT)",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825706471591978"
+     "shipped": ""
     },
     {
      "slug": "simpler-app-icon",
@@ -755,11 +643,9 @@
      "title": "Simpler app icon",
      "line": "A simpler icon that reads well when small.",
      "where": "App icon",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825717078728836"
+     "shipped": ""
     },
     {
      "slug": "discord-rich-presence",
@@ -767,11 +653,9 @@
      "title": "Discord Rich Presence",
      "line": "Opt-in status in Discord while you sculpt, off by default.",
      "where": "Preferences",
-     "credit": "",
      "votes": 0,
      "status": "shipped",
-     "shipped": "0.11.0",
-     "url": "https://discord.com/channels/1566592020024266812/1569825695935365192"
+     "shipped": "0.11.0"
     }
    ]
   },
@@ -786,11 +670,9 @@
      "title": "Render bridge",
      "line": "Send a quick render, or the scene with its materials and vertex paint, to an external renderer or image editor in one click.",
      "where": "Render panel and File menu",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825518877024286"
+     "shipped": ""
     },
     {
      "slug": "houdini-link-via-usd",
@@ -798,11 +680,9 @@
      "title": "Houdini link via USD",
      "line": "Watch a USD file and reload it when it changes.",
      "where": "File > Bridge",
-     "credit": "Hameron (FXiT)",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825529375363082"
+     "shipped": ""
     },
     {
      "slug": "blender-bridge-round-trip",
@@ -810,11 +690,9 @@
      "title": "Blender Bridge round trip",
      "line": "Update the base mesh and keep detail layers; shape keys come back as layers.",
      "where": "Bridge > Blender",
-     "credit": "@hmh426",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825539634634792"
+     "shipped": ""
     },
     {
      "slug": "spacemouse-on-macos",
@@ -822,11 +700,9 @@
      "title": "SpaceMouse on macOS",
      "line": "Use a SpaceMouse next to the 3Dconnexion driver on macOS.",
      "where": "Preferences > Input",
-     "credit": "@fenixpoints",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825550027989032"
+     "shipped": ""
     },
     {
      "slug": "one-export-panel",
@@ -834,11 +710,9 @@
      "title": "One export panel",
      "line": "A format drop-down plus an OBJ and displacement preset.",
      "where": "File > Export",
-     "credit": "@RodTDai",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569825561063329803"
+     "shipped": ""
     },
     {
      "slug": "uv-unwrap-with-seams",
@@ -846,11 +720,9 @@
      "title": "UV unwrap with seams",
      "line": "Mark seams, unwrap and pack UVs without leaving SculptForge.",
      "where": "New UV mode",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831044625211532"
+     "shipped": ""
     },
     {
      "slug": "3d-print-prep",
@@ -858,11 +730,9 @@
      "title": "3D print prep",
      "line": "Hollow, add escape holes and split with keys, ready for printing.",
      "where": "File > Export > Print",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831053168869578"
+     "shipped": ""
     }
    ]
   },
@@ -877,14 +747,12 @@
      "title": "Local-only AI",
      "line": "Run Brush Lab and image-to-3D fully on your machine, nothing sent to the cloud.",
      "where": "AI Tools panel",
-     "credit": "",
      "votes": 0,
      "status": "open",
-     "shipped": "",
-     "url": "https://discord.com/channels/1566592020024266812/1569831054569898084"
+     "shipped": ""
     }
    ]
   }
  ],
- "updated": "2026-11-11T00:09:14Z"
+ "updated": "2026-11-11T00:17:31Z"
 }
