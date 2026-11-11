@@ -2742,6 +2742,15 @@ private:
     // macro lists tagged with the pack's name. Macros: Record (the commands run between Start and Stop), the
     // editor (plain text, checked as you type), and one action per macro ("macro.<pack or user>.<name>") for F3, keys
     // and pie menus. A macro shows its whole command list and asks before it first runs (again after it changed).
+    // Help > Create bug report pack... (PanelReproPack.cpp, core/ReproPack.h): a local .zip that is safe to post, a
+    // preview of every file in it (each can be left out) before saving. Nothing reaches the network.
+public:
+    void registerReproPack();
+    void openReproPack();
+    void drawReproPack();
+    double reproTestValue(const std::string& name) const; // NaN: not a bug report pack value (UiTest.cpp)
+private:
+    std::shared_ptr<struct ReproPackUi> reproPack_;
 public:
     void drawPacksTab(float height);                // Library > Packs (Library.cpp)
     double packsTestValue(const std::string& name) const; // NaN: not a pack value (UiTest.cpp)

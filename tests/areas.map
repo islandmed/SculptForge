@@ -38,6 +38,8 @@ ui_cloth*                   cloth
 ui_garment*                 cloth
 ui_drape*                   cloth
 ui_ai_*                     ai
+ui_studio_kit               ai
+ui_repro_pack*              io
 ui_generate_*               ai
 ui_comfyui                  ai
 ui_connect_ai               ai
@@ -229,6 +231,7 @@ test_project                io
 test_malformed_files        io
 test_texture_io             io
 test_packs                  io
+test_repro_pack             io
 test_plugins                io
 test_part_io                io
 test_map_export             io
@@ -292,6 +295,7 @@ src/app/PanelBlender*              io
 src/app/PanelMaya*                 io
 src/app/PanelBridge*               io
 src/app/PanelPacks*                io
+src/app/PanelReproPack*            io
 src/app/PanelPlugins*              io
 src/app/PanelIntegrations*         io
 src/app/PanelBake*                 io
@@ -363,6 +367,7 @@ src/core/WhatsNew*                 site
 src/core/LegacyNames*              site
 src/core/Project*                  io
 src/core/Pack*                     io
+src/core/ReproPack*                io
 src/core/Plugin*                   io
 src/core/MapExport*                io
 src/core/Bake*                     io
@@ -416,6 +421,7 @@ docs/*                             site
 website/*                          site
 changes/*                          site
 scripts/*                          site
+packaging/studio-kit/*             ai
 packaging/*                        site
 install/*                          site
 .github/*                          site

@@ -272,7 +272,9 @@ automatically.
 
 ## Studio builds
 
-A Studio member's build is public SculptForge at a pinned tag with the studio's profile baked in (docs/guide/studios.md
+Most studios build their own with the studio kit (packaging/studio-kit, docs/studios.md "The studio kit"): on their
+machines, from the signed release, with nothing sent to us. The rest of this section is the build we make for a
+studio that asks us to. A Studio member's build is public SculptForge at a pinned tag with the studio's profile baked in (docs/guide/studios.md
 "Your studio build"; src/core/StudioProfile.h). The code is the public, GPL code; only the studio's own files are
 private, in one private repository per studio.
 

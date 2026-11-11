@@ -250,6 +250,8 @@
 //   answer_dialog PATH|cancel   what the open pack or macro file dialog answers (Install Pack, Save Pack, a
 //                            macro's "?"); values: packs_installed, pack_review_open, pack_review_brush, macros,
 //                            macro_recording, macro_recorded, macro_confirm_open, macro_ran, macro_one_step ...
+//   expect_value repro_open (Help > Create bug report pack's preview is open), repro_items (files ticked),
+//                            repro_saved (bytes of the last pack saved from it)
 // A scripted phone for File > Capture from phone (link/PhoneLink.h), over real HTTP to the link on 127.0.0.1:
 //   phone_upload KIND FILE... send files as the capture page does (KIND splat / photo / ply; FILE relative to the
 //                            script), in 64 KB chunks with one lost chunk resumed, then finish the capture
@@ -860,6 +862,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "radial_menus") return double(app_.radialMenus_.size());
     if (name == "memory_confirm_open") return app_.memoryConfirm_.open ? 1.0 : 0.0; // "Not enough free memory"
     if (const double v = app_.packsTestValue(name); !std::isnan(v)) return v; // packs_installed, macro_recording, ...
+    if (const double v = app_.reproTestValue(name); !std::isnan(v)) return v; // repro_open, repro_items, repro_saved
     if (name.rfind("radial_slots_", 0) == 0) { // radial_slots_N: menu N's items (1-based), -1: no such menu
         const size_t i = size_t(std::max(0, std::atoi(name.c_str() + 13) - 1));
         return i < app_.radialMenus_.size() ? double(app_.radialMenus_[i].slots.size()) : -1.0;

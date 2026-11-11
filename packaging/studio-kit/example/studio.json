@@ -1,0 +1,9 @@
+{
+  "format": "sculptforge-studio", "version": 1,
+  "id": "example", "name": "Example Studio",
+  "updates": {"feed": "https://sw.example.internal/sculptforge/latest.json"},
+  "allow": [],
+  "localNetwork": false,
+  "ai": false,
+  "branding": {"title": "Example"}
+}

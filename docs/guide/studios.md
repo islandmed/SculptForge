@@ -207,7 +207,15 @@ Your build is SculptForge with a **studio profile** baked in: one `studio.json` 
 Paths are relative to the profile's folder, and the profile is data only: nothing in it runs. An unknown key is an
 error, so a typo never quietly drops a setting.
 
-To request your build, send in one email or a message in your team channel:
+### Build it yourself: the studio kit
+
+You don't have to send us anything. The studio kit (`packaging/studio-kit` in the source repository) builds your
+studio's SculptForge on your own CI or an air-gapped machine, from an official signed release and a folder of your
+files: brushes, alphas, keymaps, pie menus, macros, plugins, preferences and your logo. It makes no network calls,
+checks the release's signature and checksums, pins the version you choose, and writes byte-identical archives with
+an SBOM and checksums every time. Its README is written for studio IT.
+
+To have us make it instead, send in one email or a message in your team channel:
 
 - **What to bake in:** your exported keymap and layout, brush presets and packs (`.sfbrush`, `.sfpack`), and the
   pipeline defaults you want.

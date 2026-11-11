@@ -1,0 +1,28 @@
+# Help > Create bug report pack (core/ReproPack.h, PanelReproPack.cpp): the preview lists every file the .zip will
+# hold, each can be left out and shown in full, Save asks where (a cancelled dialog keeps the preview), and nothing
+# is sent. Registered at 1440 and 2880 px (CMakeLists.txt).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Help##palette.help"
+click "Create bug report pack...##help.repro_pack"
+expect_value repro_open == 1
+expect_value repro_items == 6
+expect_text Nothing is sent
+expect_text mesh.json
+expect_text proxy.ply
+expect_text none of your shapes
+shot repro_pack_preview
+click "Log##repro.log"
+expect_value repro_items == 5
+click "Show what's inside##repro.show.mesh"
+expect_text totalVertices
+shot repro_pack_mesh
+dialog_answer cancel
+click "Save...##repro.save"
+expect_value dialog_kind == 2
+expect_value repro_open == 1
+click "Cancel##repro.cancel"
+expect_value repro_open == 0
+run bug_report_pack path="$LIBRARY/report.zip"
+expect_value repro_saved > 1000
+expect_status Wrote the bug report pack

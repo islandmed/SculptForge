@@ -851,6 +851,7 @@ void App::initActions() {
         ICON_LC_BOOK_OPEN, nullptr, nullptr, nullptr, "Open the SculptForge website and user guide in your browser.");
     add("help.report", "Report a problem", "Help", nullptr, [] { sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/issues"); },
         ICON_LC_CIRCLE_ALERT, nullptr, nullptr, nullptr, "Open the issue tracker in your browser.");
+    registerReproPack(); // help.repro_pack and bug_report_pack (PanelReproPack.cpp)
     add("help.log", "Open log folder", "Help", nullptr,
         [this] {
             const std::string url = crashlog::folderUrl();

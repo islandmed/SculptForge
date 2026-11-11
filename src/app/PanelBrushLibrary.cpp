@@ -12,6 +12,7 @@
 #include "app/Pickers.h"
 #include "core/BrushLibrary.h"
 #include "core/ListSort.h"
+#include "core/StudioProfile.h"
 
 #include <imgui.h>
 
@@ -108,6 +109,10 @@ void App::initBrushLibrary() {
         setUserMacroDir(utf8(base / "macros"));
         fs::remove_all(base / "packs", ec);
         fs::remove_all(base / "macros", ec);
+        // A studio's packs went into the folder before this one: again into the test's own (core/StudioProfile.h).
+        std::vector<std::string> messages;
+        if (!studioMode().profile.packs.empty()) installStudioPacks(studioMode().profile, messages);
+        for (const std::string& m : messages) SDL_Log("%s", m.c_str());
     } else if (!options_.recordPath.empty() || !options_.renderPath.empty()) {
         paths = {}; // demo videos and renders: built-in brushes only, nothing saved
         setPacksSafeMode(true);

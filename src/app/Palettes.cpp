@@ -658,6 +658,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.discord");
     menuAction(*this, "help.report");
     menuAction(*this, "help.log");
+    menuAction(*this, "help.repro_pack");
     menuAction(*this, "help.perf_trace");
     menuAction(*this, "help.feedback");
     menuAction(*this, "help.benchmark");

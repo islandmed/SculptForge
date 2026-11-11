@@ -13,6 +13,7 @@
 
 #include "core/Micro.h"
 #include "core/PerfTrace.h"
+#include "core/ReproPack.h"
 #include "core/Sculpt.h"
 #include "core/TierConfig.h"
 
@@ -412,6 +413,7 @@ void App::finishStrokeNow() {
     // Preferences > Performance shows what the stroke cost (and Help > Record a performance trace writes it).
     const bool traceStroke = doc_.sculptor.timings.dabs > 0 && perftrace::on();
     if (doc_.sculptor.timings.dabs > 0) {
+        repro::noteStroke(brushName(brush_), doc_.sculptor.timings.dabs, doc_.sculptor.timings.vertices);
         perf_.lastStroke = doc_.sculptor.timings;
         perf_.lastStrokeSyncMs = perf_.strokeSyncMs;
         perf_.lastStrokeFrames = perf_.strokeFrames;

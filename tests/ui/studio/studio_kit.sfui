@@ -1,0 +1,14 @@
+# A studio kit build (packaging/studio-kit, tests/studio_kit_test.py): the public app unpacked from a release
+# archive the kit rebuilt, started with no --studio flag. It finds share/sculptforge/studio beside itself, installs
+# the overlay's pack (its brush, keymap and macro) and shows the studio's branding.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value packs_installed == 1
+expect_value pack_brushes == 1
+expect_value pack_keymaps == 1
+expect_value macros == 1
+click "Help##palette.help"
+click "About SculptForge##help.about"
+expect_text "Studio build for Example Studio"
+expect_text "Offline: no outside connections."
+shot about_studio_kit

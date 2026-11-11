@@ -93,6 +93,7 @@ add_library(sculptforge_core STATIC
   src/core/Plugin.cpp
   src/core/NetworkPolicy.cpp
   src/core/StudioProfile.cpp
+  src/core/ReproPack.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/StudioBuild.cpp
   src/core/Json.cpp
   src/core/BrushRecipe.cpp
@@ -467,6 +468,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
     src/app/PanelPacks.cpp
+    src/app/PanelReproPack.cpp
     src/app/PanelPlugins.cpp
     src/app/PanelBrushSets.cpp
     src/app/MemoryConfirm.cpp
@@ -1081,6 +1083,17 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
+    # Help > Create bug report pack: the preview of what the .zip holds, at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(repro_pack_1440 studio/repro_pack --size 1440x900)
+    sculptforge_ui_test(repro_pack_2880 studio/repro_pack --size 2880x1800)
+    # The studio kit (packaging/studio-kit): signed, pinned, byte-identical rebuilds, and the real app unpacked from
+    # a kit-rebuilt release archive finds the overlay (brush, keymap, branding) on its own (tests/studio_kit_test.py).
+    if(Python3_Interpreter_FOUND AND NOT APPLE)
+      add_test(NAME ui_studio_kit COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/studio_kit_test.py
+               --cli $<TARGET_FILE:sculptforge-cli> --app $<TARGET_FILE:sculptforge>
+               --sfui ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/studio/studio_kit.sfui --out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/studio_kit)
+      set_tests_properties(ui_studio_kit PROPERTIES LABELS ui TIMEOUT 300)
+    endif()
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)

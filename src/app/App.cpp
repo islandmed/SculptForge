@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ExitWatchdog.h"
+#include "core/ReproPack.h"
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "core/FocusDetail.h"
@@ -2937,6 +2938,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (name == "save_project") storeProjectSettings();
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
+    repro::noteCommand(name, args); // (Help > Create bug report pack: numbers and on/off values only)
     const auto commandStart = std::chrono::steady_clock::now();
     // OBJ and PLY have no units: read them in the Preferences > Interface > OBJ/PLY in unit unless the call says.
     Args withUnit;
@@ -3378,6 +3380,7 @@ void App::drawUi() {
     drawBrushLibraryPopups();
     autosaveBrush();
 
+    drawReproPack();
     if (showAbout_) {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));

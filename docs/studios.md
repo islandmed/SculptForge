@@ -138,8 +138,66 @@ $150 for the first 5 studios) includes a custom build with your own assets and d
 studio mode (no outside connections), a pinned version with security backports to the current release and one LTS
 line, and an offline signed installer. The build is GPL-3.0 like every SculptForge build; your assets, settings
 and network stay private. See the user guide's
-[Your studio build](guide/studios.md#your-studio-build) and [Offline deployment](guide/studios.md#offline-deployment),
-and docs/releasing.md for how studio builds are made.
+[Your studio build](guide/studios.md#your-studio-build) and [Offline deployment](guide/studios.md#offline-deployment).
+
+## The studio kit: your build, on your machines
+
+`packaging/studio-kit/` makes that build on the studio's side, so we never need your files. Copy the folder into a
+repository of your own and fill an overlay: `studio.json` (id, name, update channel, allow list), `brushes/`,
+`alphas/`, `litspheres/`, `materials/`, `vdms/`, `keymaps/`, `piemenus/`, `macros/` (your scripts),
+`plugins/` (sandboxed), `preferences/ui.json` and `branding/logo.png`. Then, on your CI or an air-gapped box:
+
+```sh
+python3 build.py check overlay                                   # mistakes first, nothing written
+python3 build.py pin --release releases/0.12.6                   # signature + checksums checked, pin.json written
+python3 build.py build --overlay overlay --release releases/0.12.6 --pin pin.json --out dist
+python3 build.py feed --version 0.12.6 --download https://sw.acme.internal/sculptforge/   # latest.json for your channel
+```
+
+- **No calls to us.** The kit is one Python file (standard library only) and `openssl`. You download the release
+  files once (`SHA256SUMS.txt`, its `.sig`, the SBOM and the archives) to any folder or mirror; `pin` checks the
+  Ed25519 signature with the key shipped in the kit (the one the app checks its updates with) and every checksum.
+- **Our binaries, unchanged.** The kit adds your folder at `share/sculptforge/studio/` inside the Linux `.tar.gz`
+  (including the VFX Reference Platform builds) and the Windows `.zip`; the program finds it beside itself and starts
+  in studio mode. Nothing is recompiled, so the release signatures stay valid. On macOS the folder goes beside
+  SculptForge.app. `build.py source` compiles from a tag instead, with the profile built in.
+- **Reproducible, with an SBOM.** Same overlay + release + pin = byte-identical outputs (same Python version):
+  fixed entry order and times, no owners. Each output has a CycloneDX SBOM (our release's components, the release
+  archive's hash, every one of your files with its hash) and `SHA256SUMS.txt` covers everything.
+- **Pinned, with an update flow.** `pin.json` names the release and its hashes; a build refuses any other file. A
+  patch release is: download, `pin` (review the diff), `build`, deploy, `feed`.
+- **Your files stay data.** Brushes, keymaps, macros and plugins become one pack, checked at start-up as any pack
+  (docs/pack-format.md). Macros run only when an artist runs them; plugins only see the mesh they are given.
+
+CI runs the whole kit against a throwaway signing key (`ctest -R studio_kit`, tests/studio_kit_test.py): tampered
+archives, signatures and pins are refused, two builds are byte-identical, and the real app unpacked from a rebuilt
+archive starts with the overlay's brush, keymap, macro and branding.
+
+## Bug report packs
+
+**Help > Create bug report pack...** writes one `.zip` on the artist's computer for a bug report, safe to post on a
+public tracker by default. Before saving, a preview lists every file and shows its text; any of them can be left out.
+
+| File | What's in it |
+|---|---|
+| `system.txt` | App version, studio build or not, OS, CPU, memory, GPU, driver, UI scale |
+| `settings.json` | The preferences that differ from a fresh install; text values become `<text>` |
+| `log.txt` | The last 200 log lines, with paths, file names, URLs, e-mail addresses, quoted text and known names replaced |
+| `actions.txt` | The last 200 commands and strokes: command names with only their number and on/off values, brush types |
+| `mesh.json` | Per Part: vertex and triangle counts, pieces, genus, holes, open and non-manifold edges, subdivision levels, layers, which attributes it has; the scene's overall size |
+| `proxy.ply` | A generated stand-in: spheres, tori and sheets with those counts (up to 400,000 vertices), inside the scene's size |
+
+### What never leaves the building
+
+- **No model:** no vertex position, normal, UV, colour or mask value goes in. The stand-in is built from the counts
+  alone; Part names, positions and transforms are left out.
+- **No textures or images**, no project files, no attachments.
+- **No names or places:** file names and paths, URLs and host names, e-mail addresses, Part, project and studio
+  names, and the user and computer names are replaced wherever they appear.
+- **No upload.** The pack is written where the artist chooses; there is no send button and no telemetry.
+
+tests/test_repro_pack.cpp checks that no source vertex (as bytes or as text) and no texture byte ends up in a pack,
+including a fuzz test over random multi-Part scenes with textures, colours and moved Parts.
 
 ## Roadmap items for pipelines
 

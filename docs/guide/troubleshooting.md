@@ -319,6 +319,12 @@ good report includes:
 6. **A file** if the problem is with a particular model (a small `.sfproj` or the original file), and a
    screenshot for display problems.
 
+**Can't share the model?** Choose **Help > Create bug report pack...** instead. It writes one `.zip` on your
+computer with the version, GPU and driver, the settings you changed, the end of the log, your last commands and
+a stand-in mesh with your model's counts (vertices, triangles, Parts, holes, levels) but none of its shape. No
+texture, image, name, path or link goes in. The window shows every file before you save, and you can untick any
+of them. Nothing is sent: attach the file to your report yourself.
+
 For a security problem, don't open a public issue; follow `SECURITY.md` in the repository instead.
 
 ## See also
