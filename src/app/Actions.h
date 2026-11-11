@@ -58,6 +58,7 @@ int brushSizeStep(const Action* a);
 // direction as pixels per second of panning at speed 1 and zoom steps per second, or false for any other action.
 bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps);
 constexpr float kKeyNavPanPixels = 600.0f, kKeyNavZoomSteps = 4.0f; // per second at speed 1.0 (Preferences > Input)
+constexpr float kKeyNavTapSeconds = 0.1f;  // a press counts as held at least this long: a tap moves about a tenth of a second's worth
 constexpr float kKeyNavEaseSeconds = 0.12f; // from standing to full speed on a press, and back to standing on a release
 
 // One pan / zoom key's speed, 0 (standing) to 1 (full), easing linearly over kKeyNavEaseSeconds. advance() moves it
