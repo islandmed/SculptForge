@@ -1,0 +1,74 @@
+# Orbit around the pointer (dm4nd on Discord, #ideas): a rotation that starts over the model turns the view about the
+# point under the pointer (the target moves there, to its depth); over the background it turns about the target, as
+# with the preference off (Preferences > Input).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+input_style maya
+expect_value orbit_at_pointer == 1
+mouse_move 0.5 0.5
+key alt+h
+expect_value camera_pan == 0
+
+# Frames for review: an Alt+left drag (Maya's orbit) of about 1 s, pressed (-0) and after each step (-1..-7), from the
+# model (the view turns about that point; nothing moves at the press) and from the empty background (about the target).
+hold alt
+drag_frames 0.37 0.52 0.57 0.52 7 frames-model
+hold none
+expect_value camera_pan > 0.01
+key alt+h
+hold alt
+drag_frames 0.12 0.85 0.32 0.85 7 frames-background
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < 0.0001
+key alt+h
+
+# Alt+left drag (Maya's orbit) starting on the side of the model: the target leaves the sphere's centre.
+snapshot
+remember camera_yaw y0
+hold alt
+stroke 0.78 0.5 0.88 0.5
+hold none
+expect_value camera_yaw != $y0
+expect_value camera_pan > 0.01
+expect_value masked == 0
+expect_value moved == 0
+shot over_model
+
+# Started beside the model: about the target, which stays where it is.
+key alt+h
+hold alt
+drag_path -0.4 0.5 -0.3 0.5
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < 0.0001
+
+# Off: over the model too, the view turns about the target.
+key alt+h
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+shot orbit_pref
+hover "Orbit around the pointer##input.orbit_at_pointer"
+shot orbit_pref_100
+ui_scale 200
+hover "Orbit around the pointer##input.orbit_at_pointer"
+shot orbit_pref_200
+ui_scale 100
+click "Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 0
+click "Preferences##palette.preferences"
+mouse_move 0.5 0.5
+hold alt
+stroke 0.78 0.5 0.88 0.5
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < 0.0001
+
+# Defaults: a new install (no ui.json yet) has it on, as at the top of this script; settings saved by a version
+# before it read as off, so existing users keep orbiting the target; once saved, the choice is kept.
+restart data/prefs/ui_0_11_0.json
+wait 0.2
+expect_value orbit_at_pointer == 0
+restart data/prefs/ui_orbit_at_pointer_on.json
+wait 0.2
+expect_value orbit_at_pointer == 1

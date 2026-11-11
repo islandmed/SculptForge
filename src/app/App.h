@@ -34,6 +34,7 @@
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Plugin.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Document.h"
 #include "core/Deform.h"
@@ -172,6 +173,7 @@ public:
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
     int run(); // returns the process exit code
+    static bool usesProfileThreads(const AppOptions& options); // a window run (not a test, render, recording or demo): the saved hardware profile's threads
     static std::string splashVersionLine(); // "Version 0.12.2 Beta 1" in the interface language
     void closeSplash(); // the start-up splash goes (the main window drew its first frame, or start-up failed)
     // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
@@ -181,6 +183,10 @@ public:
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
     ThumbnailCache& thumbnails() { return thumbs_; }
+    // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
+    // (true) instead of the main one (ModifierBrush.cpp).
+    bool modifierBrushClick(int type);
+    const ModifierBrushes& modifierBrushes() const { return uiPrefs_.modifierBrushes; }
     void shutdown();
     // The warm UI test server (sculptforge --ui-serve, UiServe.cpp): every App it makes draws in this one hidden
     // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
@@ -209,12 +215,21 @@ private:
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
     void orbitBy(float x, float y, float dx, float dy);
+    std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod);
 
     bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
+    // The Shift and Ctrl brushes (core/ModifierBrush.h, ModifierBrush.cpp): Shift+click / Ctrl+click a brush tile.
+    ModifierSlot heldSlot() const; // the rebound slot the keyboard's keys held now pick (None: the usual meanings)
+    void setModifierBrush(ModifierSlot slot, int type); // -1: back to Smooth / the mask
+    float& heldIntensity(); // the Intensity the next stroke (or the one going on) uses: what the U slider sets
+    std::string heldIntensityName(); // "Intensity", "Smooth Intensity", "Trim Intensity (Shift)"
+    float strokeStrength() const; // the stroke's Intensity outside Smooth: the main one or its slot's
+    ModifierSlot strokeSlot_ = ModifierSlot::None; // the slot the stroke going on began with
+    void registerModifierBrushCommands(); // set_modifier_brush, brush.shift_reset, brush.ctrl_reset
     void beginStroke(float x, float y, const RayHit& hit);
     // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
     // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
@@ -377,8 +392,12 @@ private:
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.
     Camera orbitRaw_;
     bool orbitStarted_ = false;
+    // Orbit around the pointer: the surface point under the pointer as the drag began (picked once per drag; none
+    // over the background or the axis gizmo's disc: the view turns about its target).
+    std::optional<glm::vec3> orbitPivot_;
+    bool orbitPivotPicked_ = false;
     bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms
-    bool forceTurntable_ = false;   // demos orbit like a turntable whatever the preference
+    bool forceTurntable_ = false;   // demos orbit like a turntable about the target whatever the preferences
     float mouseX_ = 0.0f, mouseY_ = 0.0f;
     float lastX_ = 0.0f, lastY_ = 0.0f;
     // Dabs are placed along the pointer's path (strokePath_), queued, and worked through for a limited time per
@@ -421,12 +440,13 @@ private:
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
         bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
         bool mask = false, paint = false, sculpt = true, visible = true;
-        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Scale / Position jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
         const BrushRecipe* recipe = nullptr;
         const BrushAlpha* alpha = nullptr;
+        std::shared_ptr<const AlphaPool> pool; // the alphas each dab picks from (alphaPool_; null: just `alpha`)
         Stencil stencil; // (a copy: its image is shared and never changes, so the solver thread can read it)
         const VectorDisplacement* vdm = nullptr;
         std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
@@ -526,6 +546,9 @@ private:
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
     void openSupportPage();
+    void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
+    void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
+    float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
     void drawSupportUi();               // the first-run welcome and the new-look note
@@ -569,6 +592,8 @@ private:
     size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
     void openPerformancePrefs();            // Preferences > Performance, opened and flashed
     void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
+    int socialRequests_ = 0;            // UI tests: how often a community icon was clicked
+    int lastSocial_ = -1;               // and which one (index into kSocialLinks)
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >
@@ -998,6 +1023,11 @@ private:
     AlphaOptions alphaOptions_;
     AlphaRake alphaRake_;
     uint32_t alphaSeed_ = 1;
+    // The alpha pool (Alpha palette > Pool; session only): each dab, and each Drag Stamp, takes one of its alphas at random.
+    // The seed starts from the stroke's number, so a stroke draws the same on every replay and no two look alike.
+    std::shared_ptr<const AlphaPool> alphaPool_;
+    uint32_t alphaStrokeSerial_ = 0;
+    std::shared_ptr<const BrushAlpha> stampAlpha_; // this Drag Stamp's pick from the pool (null: the brush's alpha)
     // Drag Stamp / Slide Stamp (#136): Angle jitter's turn for this stroke's one stamp, from a seed that carries on
     // from stroke to stroke (each stamp gets its own turn).
     float stampJitter_ = 0.0f;
@@ -1681,6 +1711,9 @@ private:
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
     bool tubeCurve_ = false;       // each stroke makes a Curve Part (a guide line; Tube from curve makes the tube)
     float tubeResampleEdit_ = -1.0f; // the Resample slider while held (the point count), else -1
+    float tubeStrandsEdit_ = -1.0f; // the Strands slider while held, else -1
+    uint32_t tubeRepeatPart_ = 0;   // Repeat along curve: the Part to repeat (its id; 0 = none picked)
+    float tubeRepeatSpacing_ = 1.0f, tubeRepeatTurn_ = 0.0f; // ... how far apart the copies are, how far each is turned
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
@@ -1987,6 +2020,17 @@ private:
     PartThumbnailSchedule partThumbSchedule_;
     std::unordered_map<uint32_t, unsigned> partThumbs_;
     bool partPanelShown_ = false; // drawn this frame
+    // The scene's Boolean (core/PartBoolean.h), shown in the view in place of its Parts while two or more take part
+    // (app/BooleanPreview.cpp): worked out on another thread whenever they change, live while they're sculpted or
+    // moved when that is quick, else on release.
+    std::unique_ptr<struct BooleanPreviewState> boolPreview_;
+    bool booleanPreview_ = true;         // Parts > Boolean > Preview
+    BooleanSceneOptions booleanOptions_; // Make Boolean Mesh's options
+    void updateBooleanPreview();         // syncScene, before the upload: takes a finished run, starts the next
+    bool booleanPreviewDrawn(uint32_t partId) const; // Part `partId` is drawn as part of the shown result
+    Mesh* booleanPreviewMesh();          // the result to draw (null: none, or the Parts are shown as they are)
+    void drawBooleanSection();           // the Parts panel's Boolean row (PanelParts.cpp)
+    Args booleanArgs() const;            // booleanOptions_ as make_boolean_mesh's arguments
     void updatePartThumbnails();  // after syncScene, GL current
     void clearPartThumbnails();
     bool focusRename_ = false;
@@ -2115,6 +2159,16 @@ private:
     void fillPanelHost(ImGuiWindowFlags& flags);
     void registerPanelActions();
     void finishShelfDrag();
+    std::string myPanelSection_;      // while drawMyPanelSection runs: the section whose body subpalette() lets through
+    bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
+    bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
+    std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
+    std::unordered_map<std::string, std::string> myPanelTitles_; // section id -> its title as the palette gives it (English)
+    bool myPanelProbe_ = false;       // drawMyPanelSection only learns the title
+    struct MyPanelDrag {
+        bool active = false, accepted = false, fromPanel = false;
+        std::string entry;
+    } myPanelDrag_;
     void noteLayoutChanged();
     void applyPreset(int preset);
     void updateCameraAspect(); // camera_.aspect from the canvas
@@ -2155,6 +2209,14 @@ private:
     void drawPalette_Stroke();
     void drawPalette_Tool();
     void drawPalette_Transform();
+    // My Panel (PanelMyPanel.cpp): buttons and whole sections dragged in from any palette, in a tray or a drop-down
+    // like the others, or floating at the cursor on a key (ui.my_panel).
+    void drawPalette_MyPanel();
+    void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
+    void drawMyPanelFloating();
+    void registerMyPanelActions();
+    void finishMyPanelDrag();
+    bool myPanelAdd(const std::string& entry, int at); // false when it is not an entry
     void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
     void drawLayersContents();
@@ -2453,9 +2515,10 @@ private:
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
     bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    void backUpUiConfigOnce();
     static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
     std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
-    bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_
+    bool saveUiPrefs(std::string& err);     // ui.json: them, the layout in use and storedLayout_
     void autosavePrefs(bool flush = false); // every frame: saves a moment after a change (flush: now, at quit)
     void noteLayoutStored();                // layout_ is what ui.json keeps now
     std::string layoutKey() const; // the layout without per-session state, to notice edits
@@ -2489,9 +2552,11 @@ private:
         bool rebound = false, movedWhileHeld = false;
     } keyNavProbe_;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
-    Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
+    Json storedLayout_;               // the layout Save Layout last kept ("layoutSaved"; Revert returns to it); null: none yet
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
+    std::string layoutSavedKey_;      // layoutKey() as ui.json's layout last has it (the autosave writes when it changes)
     bool prefsKeyKnown_ = false, actionsReady_ = false;
+    bool uiConfigBackedUp_ = false; // ui.json copied to ui.prev.json before this session's first write
     double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;
@@ -2681,8 +2746,8 @@ private:
     // sculpt Intensity.
     float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
     // What the running stroke sculpts with: Smooth's own Intensity when it smooths (Shift held at the press, #180),
-    // else the brush's. Every stroke type reads this, none reads strength_ itself.
-    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_; }
+    // else the brush's (the Shift / Ctrl brush's own, ModifierBrush.cpp). Every stroke type reads this, none reads strength_ itself.
+    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strokeStrength(); }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
@@ -2723,7 +2788,9 @@ private:
     void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)
     void registerPenPressureCommand(); // brush_pen_pressure (#122)
     void syncAlphaTile();     // the brush's Tile onto the current alpha
-    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76) and brush_alpha_pool
+    void registerAlphaPoolCommand();    // brush_alpha_pool
+    void drawAlphaPool();               // the Alpha palette's Pool row (PanelBrushes.cpp)
     std::string brushSettingsPath() const;
     BrushSettingsStore brushSettings_;
     std::string brushSettingsKey_; // the brush the live values belong to
@@ -3104,7 +3171,7 @@ private:
     // every frame, independently of the mouse and pen (held while a stroke runs, unless Hold during strokes is off),
     // its buttons run actions.
     void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
-    void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
+    void spaceMouseScan(bool retry = false);              // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
     bool keyNavMoving() const { return keyNavMoving_; }
@@ -3118,6 +3185,8 @@ private:
     std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    bool spaceMouseOpenFailed_ = false; // SDL listed a SpaceMouse it could not open: updateSpaceMouse tries again (#110)
+    double spaceMouseRetryAt_ = 0.0;
     bool spaceMouseReported_ = false; // an axis has moved since the device was opened (else 3DxWare may hold it, #104)
     // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
     // report a user can paste into an issue (#104).

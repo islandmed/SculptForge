@@ -66,7 +66,6 @@ SculptForge is young (version 0.10; see [What's new](whats-new.md)). Some things
 still on the roadmap:
 
 - Painting across UDIM tiles (the [UV Editor](uv-editor.md) lays them out; painting covers tile 1001).
-- Booleans and stencils.
 
 Others are not on the roadmap: poly modeling, the 2.5D canvas, and reading other sculpting apps' own project
 files directly.

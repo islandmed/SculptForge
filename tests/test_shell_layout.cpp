@@ -348,3 +348,83 @@ TEST(layout_from_corrupt_or_odd_json_still_lays_out) {
         if (shell == 0) CHECK(holds(std_, "widget.color"));
     }
 }
+
+// My Panel (PanelMyPanel.cpp): what was dragged in is saved with the layout; bad entries, repeats and extras are dropped.
+TEST(my_panel_layout_json) {
+    CHECK(!toJson(standardLayout()).has("myPanel")); // nothing stored for an empty panel
+    UiLayout l = standardLayout();
+    l.myPanel = {"action:view.wire", "section:tool.masking"};
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.myPanel == l.myPanel);
+    Json j;
+    CHECK(Json::parse(R"({"myPanel": ["action:a.b", "action:a.b", "bogus", "section:", "action:", "section:tool.part", 7]})", j, err));
+    CHECK(fromJson(j, back, err));
+    CHECK(back.myPanel.size() == 2 && back.myPanel[0] == "action:a.b" && back.myPanel[1] == "section:tool.part");
+    Json many = Json::array();
+    for (int i = 0; i < 100; ++i) many.push("action:x." + std::to_string(i));
+    Json big = Json::object();
+    big.set("myPanel", many);
+    CHECK(fromJson(big, back, err));
+    CHECK(back.myPanel.size() == kMyPanelMax);
+    CHECK(myPanelEntry("section:tool.geometry").section && myPanelEntry("section:tool.geometry").id == "tool.geometry");
+    CHECK(!myPanelEntry("tool.geometry").valid());
+}
+
+// ui.json keeps the layout in use ("layout", autosaved) and the one Save Layout kept ("layoutSaved", what Revert returns to).
+TEST(ui_json_layout_and_saved_layout) {
+    auto parse = [](const char* text) {
+        Json j;
+        std::string err;
+        Json::parse(text, j, err);
+        return j;
+    };
+    // A file from before the autosave: the one layout is both.
+    const UiLayoutPair old = layoutsFromUiJson(parse(R"({"version": 1, "layout": {"leftShelf": ["view.wire"]}, "prefs": {}})"));
+    CHECK(old.current.isObject() && old.saved.isObject());
+    CHECK(old.current.dump() == old.saved.dump());
+    // The new format: two layouts.
+    const UiLayoutPair two = layoutsFromUiJson(parse(R"({"layout": {"leftShelf": ["a"]}, "layoutSaved": {"leftShelf": ["b"]}})"));
+    CHECK(two.current.isObject() && two.saved.isObject());
+    CHECK(two.current.dump() != two.saved.dump());
+    // Autosaved before any Save Layout ("layoutSaved": null), or a file with no layout at all.
+    const UiLayoutPair none = layoutsFromUiJson(parse(R"({"layout": {"leftShelf": ["a"]}, "layoutSaved": null})"));
+    CHECK(none.current.isObject() && none.saved.isNull());
+    const UiLayoutPair empty = layoutsFromUiJson(parse(R"({"prefs": {}})"));
+    CHECK(empty.current.isNull() && empty.saved.isNull());
+    // Corrupt: never a layout, never a crash.
+    for (const char* text : {R"({"layout": 5, "layoutSaved": [1]})", R"([])", R"(null)", R"({"layout": "x", "layoutSaved": "y"})"}) {
+        const UiLayoutPair bad = layoutsFromUiJson(parse(text));
+        CHECK(bad.current.isNull());
+        CHECK(bad.saved.isNull());
+    }
+
+    // The round trip through the writer: both layouts come back, the runtime-only bits of the one in use are shut.
+    for (int shell = 0; shell <= 1; ++shell) {
+        UiLayout inUse = standardLayout(shell), kept = standardLayout(shell);
+        inUse.leftShelf.push_back("view.wire");
+        inUse.consoleOpen = true;
+        inUse.libraryOpen = true;
+        inUse.customize = true;
+        inUse.rightTrayOpen = false;
+        Json ui = Json::object();
+        layoutsToUiJson(ui, toAutosaveJson(inUse), toJson(kept));
+        Json again;
+        std::string err;
+        CHECK(Json::parse(ui.dump(true), again, err));
+        const UiLayoutPair back = layoutsFromUiJson(again);
+        UiLayout cur, sav;
+        CHECK(fromJson(back.current, cur, err, shell));
+        CHECK(fromJson(back.saved, sav, err, shell));
+        CHECK(!cur.consoleOpen && !cur.libraryOpen && !cur.customize);
+        CHECK(!cur.rightTrayOpen);
+        CHECK(cur.leftShelf == inUse.leftShelf);
+        CHECK(sav.leftShelf == kept.leftShelf && sav.rightTrayOpen == kept.rightTrayOpen);
+        // Never saved: "layoutSaved" is written as null, not left out (left out would read as the old format).
+        Json fresh = Json::object();
+        layoutsToUiJson(fresh, toAutosaveJson(inUse), Json());
+        CHECK(fresh.has("layoutSaved"));
+        CHECK(layoutsFromUiJson(fresh).saved.isNull());
+    }
+}

@@ -1,0 +1,100 @@
+# Crisp Flatten (Hard Surface pack; thanks _tfx on Discord): a flatten with a clean, sharp boundary. On a
+# Rounded Box the same stroke with Flatten and with Crisp Flatten (before / after shots), then a plane on a face's
+# cheek, at 100% and 200% UI scale. The brush picker shows it among the pack brushes.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_starter_mesh name=rounded-box levels=3
+camera 35 25
+key f
+brush_size 90
+wait_idle 30
+shot block_before
+
+# Flatten down the rounded edge: the soft falloff fades the plane into the form.
+click "Flatten##brush.flatten"
+snapshot
+stroke 0.63 0.30 0.63 0.70
+expect_value moved > 0
+wait_idle 30
+shot block_flatten
+key ctrl+z
+expect_value moved == 0
+
+# Crisp Flatten: the same stroke down the rounded edge cuts a flat chamfer with clean edges.
+run brush_use name="Crisp Flatten"
+stroke 0.63 0.30 0.63 0.70
+expect_value moved > 0
+wait_idle 30
+shot block_crisp
+# A second stroke along the bottom edge: a second chamfer, and a crisp corner where they meet.
+stroke 0.70 0.75 0.90 0.83
+wait_idle 30
+shot block_crisp_two
+
+# The same chamfer from a grazing angle (along the facet, then side-on): one flat facet, no channel or raised lip.
+camera 80 8
+wait_idle 30
+shot block_crisp_graze
+camera -10 8
+wait_idle 30
+shot block_crisp_graze_two
+camera 35 25
+wait_idle 30
+
+# The brush picker lists it with the Hard Surface brushes.
+click "Brush##palette.brush"
+wait_idle 30
+wait 0.5
+shot picker
+click "Brush##palette.brush"
+wait_idle 30
+
+ui_scale 200
+wait_idle 30
+wait 0.5
+shot block_crisp_200
+ui_scale 100
+
+# A face: a plane cut on the brow (symmetry X is on: both sides), a stylised planar look.
+run new_starter_mesh name=human-head levels=3
+camera 0 0
+key f
+brush_size 40
+wait_idle 30
+shot face_before
+run brush_use name="Crisp Flatten"
+snapshot
+stroke 0.40 0.40 0.44 0.41
+expect_value moved > 0
+wait_idle 30
+shot face_crisp
+key ctrl+z
+click "Flatten##brush.flatten"
+stroke 0.40 0.40 0.44 0.41
+wait_idle 30
+shot face_flatten
+ui_scale 200
+wait_idle 30
+wait 0.5
+shot face_flatten_200
+key ctrl+z
+run brush_use name="Crisp Flatten"
+stroke 0.40 0.40 0.44 0.41
+wait_idle 30
+shot face_crisp_200
+ui_scale 100
+
+# Brush Lab (opens from the top shelf; the right tray holds the Brush palette): Lock plane and Crisp edge are on.
+click "AI Brush"
+click "Brush##palette.brush"
+click "Brush/##totray"
+run brush_use name="Crisp Flatten"
+click "Recipe: Crisp Flatten"
+wait 1.2
+expect "Brush Lab/Lock plane"
+expect "Brush Lab/Crisp edge"
+shot brush_lab
+ui_scale 200
+wait_idle 30
+wait 0.5
+shot brush_lab_200
+ui_scale 100

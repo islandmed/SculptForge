@@ -414,7 +414,8 @@ void App::setFlatShading(bool flat) {
 }
 
 const BrushRecipe* App::strokeRecipe() const {
-    return strokeBrush_ == BrushType::Smooth || !strokeSculpt_ || strokeMask_ ? nullptr : activeRecipe();
+    return strokeBrush_ == BrushType::Smooth || strokeSlot_ != ModifierSlot::None || !strokeSculpt_ || strokeMask_ ? nullptr
+                                                                                                               : activeRecipe();
 }
 
 void App::paintAt(const DabParams& dab) {

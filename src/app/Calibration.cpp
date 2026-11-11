@@ -606,8 +606,9 @@ void applyCachedThreadCount() {
         return;
     }
     HardwareProfile cached;
-    if (loadHardwareProfile(hardwareProfilePath(), cached) && cached.settings.threads > 0)
-        ThreadPool::setSharedThreadCount(cached.settings.threads);
+    if (loadHardwareProfile(hardwareProfilePath(), cached) && cached.settings.threads > 0 &&
+        !ThreadPool::setSharedThreadCount(cached.settings.threads)) // (#184: the pool was made first, at the default 16)
+        SDL_Log("Threads: the pool started before the profile was read; %d apply at the next start", cached.settings.threads);
 }
 
 namespace {

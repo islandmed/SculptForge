@@ -51,6 +51,7 @@ are on the bottom shelf by default and in the brush picker.
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
 | **Cloth** | | Moves the surface like fabric: drag it and it folds where it bunches up (see [Cloth brush](#cloth-brush)). | Push mode: pulls out |
+| **Smooth Peaks** | | Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone. <kbd>Shift</kbd> still gives the plain Smooth. | No change |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Vertex Paint and materials](vertex-paint.md). | Paints back to white |
 
 Notes on particular brushes:
@@ -234,10 +235,30 @@ a million vertices takes about 10 ms, and about 16 ms with Connected only.
 | Hold | Effect |
 |---|---|
 | <kbd>Alt</kbd> | Inverts the brush for this stroke (see the table of brushes). For Move, Tendril, Elastic Tendril and KelvinGrab, which have nothing to invert, it moves the surface along the normal instead (below). |
-| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity. With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
+| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity (or uses your [Shift brush](#shift-and-ctrl-brushes)). With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
 | <kbd>Shift</kbd> (after the stroke started) | Draws a straight line from where you pressed <kbd>Shift</kbd>, snapped to 45 degree steps on screen. Let go of <kbd>Shift</kbd> to carry on freehand. |
-| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). |
+| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). With a [Ctrl brush](#shift-and-ctrl-brushes) set, <kbd>Ctrl</kbd> on the model sculpts with it instead. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> | Visibility gestures: isolate, hide and show face groups. See [Face Groups and visibility](face-groups.md). |
+
+### Shift and Ctrl brushes
+
+Holding <kbd>Shift</kbd> smooths and holding <kbd>Ctrl</kbd> masks, but either key can hold another brush, so you
+can switch between two or three brushes without leaving the one you are working with:
+
+- **Shift+click** a brush on the bottom shelf (or in the brush picker) and holding <kbd>Shift</kbd> sculpts with it,
+  for example Trim or Flatten. The status line says **Shift brush: Trim** and the tile gets a small **Shift** badge.
+  Your main brush stays as it was.
+- **Ctrl+click** a brush on the bottom shelf and holding <kbd>Ctrl</kbd> on the model sculpts with it instead of
+  masking (badge **Ctrl**). <kbd>Ctrl</kbd>+<kbd>Alt</kbd> still erases the mask, <kbd>Ctrl</kbd> beside the model
+  still draws the mask rectangle, and <kbd>Ctrl</kbd>+<kbd>Shift</kbd> keeps the visibility gestures.
+- Each key's brush keeps its own Intensity, as Smooth does: hold the key and the Intensity slider (or
+  <kbd>U</kbd>) shows and sets it, for example **Trim Intensity (Shift)**.
+- **Going back**: Shift+click Smooth, or **Reset Shift brush (Smooth)** in the command palette. For Ctrl, pick a
+  mask brush with <kbd>Ctrl</kbd> held (the left shelf's brush tile or <kbd>Ctrl</kbd>+<kbd>B</kbd>), or **Reset Ctrl
+  brush (Mask)**. Smooth on <kbd>Shift</kbd> works exactly as before, alternate smooth included.
+- The Paint brush keeps <kbd>Shift</kbd>'s smooth and <kbd>Ctrl</kbd>'s mask, and a pen button or eraser set to
+  Smooth still smooths. Only built-in brushes can be bound for now (not custom brushes).
+- The choice is kept in the preferences. Scripts: `set_modifier_brush shift=trim ctrl=flatten` (`default` goes back).
 
 ### Along the normal
 
@@ -515,6 +536,8 @@ Under the preview in **Sculpt > Alpha**:
 | **Follow stroke direction** | The alpha turns with the stroke, its top pointing the way you draw: scales, stitches and hair line up along the stroke. Small wobbles are smoothed out, as with Blender's Rake: the direction is taken again each time the cursor has gone 20 pixels. |
 | **Angle** | Turns the alpha by a fixed angle (-180 to 180 degrees, counter-clockwise), on its own or on top of the stroke's direction. |
 | **Angle jitter** | Turns each dab by a random angle, up to this many degrees either way, to break up repeats. |
+| **Scale jitter** | Makes each dab bigger or smaller by a random amount, up to this many percent either way (0 to 90). |
+| **Position jitter** | Moves each dab off the cursor by a random amount, up to this many percent of the brush radius (0 to 100), along the surface. |
 | **Tile across** / **Tile down** | Repeats the alpha 1 to 8 times across and down inside the brush; the preview shows the result. |
 
 They work with every brush, custom and Community brushes included, and each brush keeps its own (see
@@ -522,7 +545,29 @@ They work with every brush, custom and Community brushes included, and each brus
 also writes Follow stroke direction, Angle and Angle jitter into its brush file, so a brush you share (a brush code,
 a .sfpack) turns its alpha the same way for everyone. Vector displacement stamps have the same options: see
 [Stamp rotation](#stamp-rotation). From a script:
-`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
+`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 scale_jitter=20 position_jitter=30 tile_x=2 tile_y=2`.
+Scale and Position jitter are for the dots strokes; a Drag Stamp keeps the size and place you give it.
+
+### Alpha pool
+
+An **alpha pool** makes each dab draw with a different alpha, picked at random from a set: planks, pores or chips
+that never repeat. Together with Angle, Scale and Position jitter, a long stroke looks like many separate stamps.
+
+1. Put your images in a sub-folder of the Library's `Alphas` folder (for example `Alphas/Planks`); any PNG, JPG, BMP or
+   TGA works, and the **Alpha** tab shows the sub-folder as its own tile.
+2. In **Library > Alpha**, right-click the folder and choose **Use folder as alpha pool** (up to 32 images, taken
+   A-Z). Or right-click single alphas, in the Library or the alpha list, and choose **Add to alpha pool**.
+3. **Sculpt > Alpha** shows *Alpha pool: N* with a **Clear** button. Stroke as usual; a **Drag Stamp** takes one alpha
+   per stamp.
+
+A stroke repeats the same way when it is played back, and each new stroke picks a different order. The pool is kept
+until you quit and is not part of a brush or a project; Tile does not apply to pool alphas. Images are used at up to
+512 px. From a script: `brush_alpha_pool folder=...`, `brush_alpha_pool name=...`, `brush_alpha_pool path=...`,
+`brush_alpha_pool clear=true`.
+
+**Procedural wood grains.** Three alphas made in code come with the app: **Procedural Wood Straight**, **Procedural
+Wood Cathedral** and **Procedural Wood Weathered**. They are not scans and say so; they stand in until you have real
+scans of your own planks (scan or photograph boards you own, or use images you have the licence to use).
 
 ### Stencil
 
@@ -875,8 +920,8 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. **Edit > Preferences > Saving & Layouts > Save Layout** keeps
-them. See [The interface](interface.md) for more on customizing.
+Shelf changes save themselves. **Edit > Preferences > Saving & Layouts > Save Layout** marks the layout that
+**Revert to Saved Layout** returns to. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script
 

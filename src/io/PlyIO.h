@@ -21,8 +21,9 @@ enum class PlyContent { Mesh, Splats };
 bool loadPly(const std::string& path, Mesh& mesh, SplatCloud& splats, PlyContent& content, std::string& error);
 
 // Writes splats in the standard binary 3DGS layout (log scales, logit
-// opacity). The cloud's transform is baked in.
-bool saveSplatPly(const std::string& path, const SplatCloud& splats, std::string& error);
+// opacity). The cloud's transform is baked in, unless `bakePlacement` is false:
+// then the splats are written as they are (the Blender bridge sends the placement beside the file).
+bool saveSplatPly(const std::string& path, const SplatCloud& splats, std::string& error, bool bakePlacement = true);
 
 // The compact ".splat" format used by many web viewers (antimatter15/splat):
 // 32 bytes per splat - position, linear scale, RGBA8 colour/opacity and an

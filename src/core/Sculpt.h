@@ -45,6 +45,7 @@ enum class BrushType {
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
+    SmoothPeaks, // Smooth that only lowers the points above the local average along their normal; hollows stay
     Count
 };
 
@@ -363,7 +364,20 @@ private:
     std::vector<glm::vec3> morphMapped_;
     bool morphFits_ = false;
     void dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p);
-    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p);
+    // `copy`: the symmetry copy's index (Lock plane keeps one plane per copy).
+    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy);
+    // Lock plane (BrushRecipe::planeLock): each symmetry copy's plane (normal, point) from the stroke's first dab.
+    std::vector<std::pair<glm::vec3, glm::vec3>> lockedPlanes_;
+    // Crisp edge on a locked plane: how far toward it each vertex has gone this stroke (0..1; crispStamp_ = the
+    // stroke that wrote it), so overlapping dabs take the strongest pull instead of compounding theirs (which would
+    // wear the edge's band down to a cliff), as the Layer brush does with its height.
+    std::vector<uint32_t> crispStamp_; // (the stroke id's low 32 bits, as layerStamp_: 12 bytes a vertex in all)
+    std::vector<float> crispDone_;
+    std::vector<float> crispFacing_; // (the vertex normal's dot with the plane's, when the stroke found it)
+    std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
+    std::vector<glm::vec3> crispMoved_;
+    std::vector<uint32_t> crispSlideVerts_; // (its relax's)
+    std::vector<glm::vec3> crispSlide_;
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
     void dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float handedness);
     // Kelvinlet.cpp: the Kelvinlet brushes and Detail Clone.
@@ -391,7 +405,9 @@ private:
     float kelvinLastCut_ = 0.0f;
     uint64_t snakeStroke_ = 0;
     float snakeTravel_ = 0.0f;
-    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);
+    // `moved`: only those vertices moved (their rings' normals are updated, not the whole region's leaves).
+    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock,
+                   const std::vector<uint32_t>* moved = nullptr);
     void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().

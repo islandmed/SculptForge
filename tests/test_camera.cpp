@@ -200,3 +200,66 @@ TEST(camera_frame_fits_the_free_area_and_rays_follow_the_shift) {
         CHECK(c.shift == glm::vec2(0.0f));
     }
 }
+
+namespace {
+
+// Where `p` is on a 900 x 600 window, and its depth.
+glm::vec3 onScreen(const Camera& c, const glm::vec3& p) {
+    const glm::vec4 clip = c.projection() * c.view() * glm::vec4(p, 1.0f);
+    return glm::vec3(clip.x / clip.w * 450.0f + 450.0f, 300.0f - clip.y / clip.w * 300.0f, glm::dot(p - c.position(), c.forward()));
+}
+
+} // namespace
+
+TEST(camera_orbit_around_the_pointer_keeps_the_point_put) {
+    // Preferences > Input > Orbit around the pointer (dm4nd on Discord): a rotation drag that starts over the model
+    // turns the view about the surface point under the pointer. Picking it moves the target to its depth without
+    // the view jumping; every turn after that (free, turntable, Shift-snapped) leaves the point where it was on screen.
+    for (bool ortho : {false, true}) {
+        Camera c;
+        c.aspect = 1.5f;
+        c.ortho = ortho;
+        c.shift = glm::vec2(0.0f, -0.4f); // (framed into the free area under the Library)
+        c.target = glm::vec3(0.2f, -0.1f, 0.0f);
+        c.distance = 6.0f;
+        c.setOrientation(glm::angleAxis(glm::radians(30.0f), glm::vec3(0, 1, 0)) *
+                         glm::angleAxis(glm::radians(-20.0f), glm::vec3(1, 0, 0)));
+        const glm::vec3 pivot(1.1f, 0.6f, 0.9f); // off the view axis: a point at the side of the model
+        const glm::vec3 seen = onScreen(c, pivot);
+        const glm::mat4 before = c.view();
+        const glm::vec3 corner = onScreen(c, glm::vec3(-1.0f, 1.0f, -0.5f));
+        c.targetDepthOf(pivot);
+        for (int i = 0; i < 4; ++i) CHECK(near(glm::vec3(before[i]), glm::vec3(c.view()[i]), 1e-4f)); // no jump
+        CHECK(near(onScreen(c, glm::vec3(-1.0f, 1.0f, -0.5f)), corner, 1e-2f)); // (only the clip planes follow the depth)
+        if (!ortho) {
+            CHECK(std::abs(c.distance - seen.z) < 1e-4f); // zooming to the middle now works at the point's depth
+            CHECK(near(c.target, c.position() + c.forward() * seen.z));
+        } else {
+            CHECK(c.distance == 6.0f); // (it sets an orthographic view's size)
+        }
+        Camera raw = c;
+        raw.orbitFree(140.0f, -60.0f);
+        c.turnAbout(raw.orientation(), pivot);
+        CHECK(near(c.orientation() * glm::vec3(0, 0, 1), raw.orientation() * glm::vec3(0, 0, 1), 1e-5f));
+        CHECK(near(onScreen(c, pivot), seen, 2e-2f));
+        raw.orbit(-90.0f, 35.0f); // turntable
+        c.turnAbout(raw.orientation(), pivot);
+        CHECK(near(onScreen(c, pivot), seen, 2e-2f));
+        c.turnAbout(Camera::snapped(raw.orientation()), pivot); // Shift: the nearest axis view
+        CHECK(near(onScreen(c, pivot), seen, 2e-2f));
+        CHECK(std::abs(std::abs(glm::dot(glm::normalize(c.orientation()), Camera::snapped(raw.orientation()))) - 1.0f) < 1e-5f);
+        // A long drag in small steps doesn't drift.
+        for (int i = 0; i < 500; ++i) {
+            raw.orbitFree(1.3f, -0.4f);
+            c.turnAbout(raw.orientation(), pivot);
+        }
+        CHECK(near(onScreen(c, pivot), seen, 5e-2f));
+    }
+}
+
+TEST(camera_orbit_around_the_pointer_ignores_points_behind_the_eye) {
+    Camera c;
+    const Camera keep = c;
+    c.targetDepthOf(c.position() - c.forward()); // behind the eye
+    CHECK(near(c.target, keep.target) && c.distance == keep.distance);
+}

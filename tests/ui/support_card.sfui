@@ -47,7 +47,7 @@ expect_value support_requests == 0
 # Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.
 click "Become a member##card.member"
 expect_value support_requests == 1
-expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201
+expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card
 wait 0.4
 expect_value support_card_open == 0
 
@@ -61,7 +61,7 @@ expect_value support_card_open == 1
 wait 0.8
 click "Member, $48 a year##card.member_yearly"
 expect_value support_requests == 2
-expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206
+expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card
 wait 0.4
 click "Preferences##palette.preferences"   # (Support stays expanded)
 click "Show the memberships"

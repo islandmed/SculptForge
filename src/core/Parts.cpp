@@ -652,6 +652,7 @@ void registerPartCommands(CommandRegistry& reg) {
                      if (const int links = doc.linkCount(i); links > 1) out += ", linked x" + std::to_string(links);
                      if (i == doc.activePart) out += ", active";
                      if (!s.visible) out += ", hidden";
+                     if (s.boolean != PartBoolean::None) out += std::string(", Boolean ") + partBooleanName(s.boolean);
                      if (const int f = doc.partFolderIndex(s.folder); f >= 0) out += ", in " + doc.partFolders[size_t(f)].name;
                      out += ")";
                  }
@@ -838,10 +839,12 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
+                 const PartBoolean boolean = doc.parts[size_t(i)].boolean;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
+                 doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
