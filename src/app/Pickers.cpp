@@ -1452,14 +1452,16 @@ void drawPickers(App& app) {
             // (before any move) still drags it as before; a click after moving keeps the value (nothing starts a stroke).
             const bool leftDown = ImGui::GetIO().MouseDown[ImGuiMouseButton_Left];
             const bool following = PickerUi::sliderFollowing(app);
-            // Off the canvas (a shelf, a panel: going for another control) it is not adjusting: the old value shows, and
-            // a click there cancels and goes to what it hit.
+            // The pointer going past the canvas edge (growing a brush at the right side) keeps the value of the edge. A
+            // click on a control there (a shelf tile, a panel button: going for another tool) cancels and goes on to it;
+            // a click on nothing in particular keeps the value, as on the canvas.
             const CanvasRect canvas = app.canvasRect();
-            const bool onCanvas = canvas.contains(app.mouseX_, app.mouseY_);
-            const bool confirmClick = following && onCanvas && !first && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-            if (following && !onCanvas && !leftDown && !first) *d.value = s.sliderBase;
-            if (following && onCanvas && !leftDown && !first) {
-                const float dx = app.mouseX_ - s.sliderAt.x;
+            const float edgeX = std::clamp(app.mouseX_, canvas.x, canvas.x + canvas.w);
+            const bool overControl = ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+            const bool leftClicked = following && !first && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            const bool confirmClick = leftClicked && !overControl;
+            if (following && !leftDown && !first) {
+                const float dx = edgeX - s.sliderAt.x;
                 const float delta = which == PickerUi::Slider::DrawSize ? dx : dx / app.uiScale_ * kFollowPerPx / d.shownScale;
                 *d.value = std::clamp(s.sliderBase + delta, d.lo, d.hi);
             }
@@ -1537,8 +1539,8 @@ void drawPickers(App& app) {
             const bool clicked =
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
             if (confirmClick) close = true;
-            if (following && !onCanvas && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !first) {
-                *d.value = s.sliderBase; // a click off the canvas cancels
+            if (leftClicked && overControl) {
+                *d.value = s.sliderBase; // a click on another control cancels (and that control gets it)
                 close = true;
             }
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !first) { // a right click cancels, like Esc
