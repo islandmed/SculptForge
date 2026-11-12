@@ -1,0 +1,276 @@
+// R&D spike S6 (rnd/moved-vertex, never merged): sf_rnd_proxy_bench <project> [radius fraction] [dabs] [cells per radius...]
+// runs one Standard stroke exactly (every dab on the dense mesh), then the same stroke on a coarse proxy (vertex clustering
+// on a grid of cell h = r / cells: one vertex per occupied cell, at the mean) and propagates the proxy's displacement to
+// the dense vertices once at the end (trilinear over the 8 surrounding cells, empty ones dropped). Prints per dab the
+// vertices touched and ms, the dense pass, and the error at full resolution vs the exact stroke (max, p99.9, RMS / r).
+#include "core/Document.h"
+#include "core/Mesh.h"
+#include "core/Project.h"
+#include "core/Sculpt.h"
+#include "core/ThreadPool.h"
+#include <algorithm>
+#include <atomic>
+#include <tuple>
+#include <bit>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <unordered_map>
+#include <vector>
+
+using namespace sf;
+
+namespace {
+
+using Clock = std::chrono::steady_clock;
+double msSince(Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); }
+
+size_t dirtyCount(const Mesh& m) {
+    size_t n = 0;
+    for (uint64_t w : m.dirtyBits) n += size_t(std::popcount(w));
+    return n;
+}
+
+uint64_t cellKey(int64_t x, int64_t y, int64_t z, uint32_t bin = 0) {
+    return uint64_t(x & 0xfffff) | uint64_t(y & 0xfffff) << 20 | uint64_t(z & 0xfffff) << 40 | uint64_t(bin) << 60;
+}
+// SF_RND_NBIN=1: cells split by the vertex normal's dominant axis and sign (6 bins), so the two sides of a thin part or a fold
+// fall in different proxy vertices and the field doesn't carry one side's move to the other.
+uint32_t normalBin(glm::vec3 n) {
+    const glm::vec3 a = glm::abs(n);
+    const int k = a.x >= a.y && a.x >= a.z ? 0 : a.y >= a.z ? 1 : 2;
+    return uint32_t(k * 2 + (n[k] < 0.0f ? 1 : 0));
+}
+
+struct Stroke {
+    glm::vec3 mid, dir, across, lo;
+    float step, radius, depthSize, sideSize;
+    int depth;
+    // The dab i ray: from in front of the mesh along `dir` (the same rays in every mode).
+    glm::vec3 origin(int i) const {
+        glm::vec3 o = mid + across * (-sideSize * 0.1f + step * float(i));
+        o[depth] = lo[depth] - depthSize;
+        return o;
+    }
+};
+
+struct Run {
+    std::vector<glm::vec3> centers; // each dab's surface point
+    double dabMs = 0.0;
+    size_t touched = 0;
+    int hits = 0;
+};
+
+Run stroke(Document& d, const Stroke& s, int dabs, const std::vector<glm::vec3>* given = nullptr) {
+    Run r;
+    d.sculptor.analyticNormals = false;
+    d.sculptor.adaptiveDabs = false;
+    d.sculptor.beginStroke(d.mesh, "Standard");
+    d.mesh.clearDirty();
+    for (int i = 0; i < dabs; ++i) {
+        RayHit h;
+        if (!d.bvh.raycast(d.mesh, s.origin(i), s.dir, h)) continue;
+        DabParams p;
+        p.center = given && size_t(r.hits) < given->size() ? (*given)[size_t(r.hits)] : h.position; // (SF_RND_SAME_CENTERS: the exact stroke's)
+        r.centers.push_back(p.center);
+        ++r.hits;
+        p.viewDir = s.dir;
+        p.radius = s.radius;
+        p.strength = 0.5f;
+        p.strokeDelta = i == 0 ? glm::vec3(0.0f) : s.across * s.step;
+        const auto t0 = Clock::now();
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+        r.dabMs += msSince(t0);
+        r.touched += dirtyCount(d.mesh);
+        d.mesh.clearDirty();
+    }
+    return r;
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    if (argc < 2) return 2;
+    const float frac = argc > 2 ? float(std::atof(argv[2])) : 0.15f;
+    const int dabs = argc > 3 ? std::atoi(argv[3]) : 12;
+    std::vector<float> cellsPerRadius;
+    for (int a = 4; a < argc; ++a) cellsPerRadius.push_back(float(std::atof(argv[a])));
+    if (cellsPerRadius.empty()) cellsPerRadius = {16.0f, 32.0f, 64.0f};
+
+    Document d;
+    std::string err;
+    if (!loadProject(argv[1], d, err)) { std::printf("load: %s\n", err.c_str()); return 1; }
+    const std::vector<glm::vec3> orig = d.mesh.positions, origN = d.mesh.normals;
+    const bool nbin = std::getenv("SF_RND_NBIN") && std::getenv("SF_RND_NBIN")[0] == '1';
+    const bool nbin2 = std::getenv("SF_RND_NBIN") && std::getenv("SF_RND_NBIN")[0] == '2';
+    const size_t nv = orig.size();
+    const AABB b = d.mesh.bounds();
+    const glm::vec3 size = b.max - b.min;
+    int up = 0, depth = 0;
+    for (int k = 1; k < 3; ++k) { if (size[k] > size[up]) up = k; if (size[k] < size[depth]) depth = k; }
+    const int side = 3 - up - depth;
+    Stroke s;
+    s.mid = (b.min + b.max) * 0.5f;
+    s.dir = glm::vec3(0.0f), s.across = glm::vec3(0.0f);
+    s.dir[depth] = 1.0f;
+    s.across[side] = 1.0f;
+    s.lo = b.min;
+    s.radius = frac * size[up];
+    s.step = s.radius * 0.15f;
+    s.depthSize = size[depth];
+    s.sideSize = size[side];
+    s.depth = depth;
+
+    // The exact stroke: the reference.
+    const Run ex = stroke(d, s, dabs);
+    const std::vector<glm::vec3>& exact = d.mesh.positions;
+    std::printf("rnd proxy: %zu verts, threads %d, r %.4g, %d dabs | exact: %.0f verts touched/dab, %.1f ms/dab\n", nv,
+                ThreadPool::shared().threads(), double(s.radius), ex.hits, double(ex.touched) / std::max(1, ex.hits),
+                ex.dabMs / std::max(1, ex.hits));
+
+    for (float cpr : cellsPerRadius) {
+        const float h = s.radius / cpr;
+        // Proxy: vertex clustering of the ORIGINAL surface.
+        const auto tb = Clock::now();
+        std::unordered_map<uint64_t, uint32_t> cellOf;
+        cellOf.reserve(nv / 4 + 1024);
+        std::vector<uint32_t> proxyOf(nv);
+        std::vector<glm::dvec3> sum;
+        std::vector<uint32_t> count;
+        // SF_RND_NBIN=2: a cell's two sides (vertex normal against the cell's mean normal) are separate proxy vertices.
+        std::unordered_map<uint64_t, glm::vec3> cellNormal;
+        const auto plainKey = [&](glm::vec3 x) {
+            const glm::vec3 g = (x - b.min) / h;
+            return cellKey(int64_t(std::floor(g.x)), int64_t(std::floor(g.y)), int64_t(std::floor(g.z)));
+        };
+        if (nbin2) {
+            cellNormal.reserve(nv / 4 + 1024);
+            for (size_t v = 0; v < nv; ++v) cellNormal[plainKey(orig[v])] += origN[v];
+        }
+        const auto side = [&](uint64_t plain, glm::vec3 n) -> uint32_t {
+            if (!nbin2) return 0;
+            const auto it = cellNormal.find(plain);
+            return it != cellNormal.end() && glm::dot(it->second, n) < 0.0f ? 8 : 0;
+        };
+        for (size_t v = 0; v < nv; ++v) {
+            const glm::vec3 g = (orig[v] - b.min) / h;
+            const uint64_t pk = plainKey(orig[v]);
+            const uint64_t k = nbin ? cellKey(int64_t(std::floor(g.x)), int64_t(std::floor(g.y)), int64_t(std::floor(g.z)), normalBin(origN[v]))
+                                    : pk | uint64_t(side(pk, origN[v])) << 60;
+            auto [it, fresh] = cellOf.try_emplace(k, uint32_t(sum.size()));
+            if (fresh) sum.emplace_back(0.0), count.push_back(0);
+            sum[it->second] += glm::dvec3(orig[v]);
+            ++count[it->second];
+            proxyOf[v] = it->second;
+        }
+        Mesh pm;
+        pm.positions.resize(sum.size());
+        for (size_t i = 0; i < sum.size(); ++i) pm.positions[i] = glm::vec3(sum[i] / double(count[i]));
+        pm.triangles.reserve(d.mesh.triangles.size() / 8);
+        for (const glm::uvec3& t : d.mesh.triangles) {
+            const glm::uvec3 q(proxyOf[t.x], proxyOf[t.y], proxyOf[t.z]);
+            if (q.x != q.y && q.y != q.z && q.x != q.z) pm.triangles.push_back(q);
+        }
+        std::sort(pm.triangles.begin(), pm.triangles.end(), [](glm::uvec3 a, glm::uvec3 c) {
+            auto key = [](glm::uvec3 t) { // (the same triangle in any rotation)
+                uint32_t m[3] = {t.x, t.y, t.z};
+                std::sort(m, m + 3);
+                return std::tuple(m[0], m[1], m[2]);
+            };
+            return key(a) < key(c);
+        });
+        pm.triangles.erase(std::unique(pm.triangles.begin(), pm.triangles.end(), [](glm::uvec3 a, glm::uvec3 c) {
+            uint32_t x[3] = {a.x, a.y, a.z}, y[3] = {c.x, c.y, c.z};
+            std::sort(x, x + 3), std::sort(y, y + 3);
+            return x[0] == y[0] && x[1] == y[1] && x[2] == y[2];
+        }), pm.triangles.end());
+        const std::vector<glm::vec3> proxyStart = pm.positions;
+        const size_t np = pm.positions.size(), ntp = pm.triangles.size();
+        pm.rebuildTopology();
+        pm.recomputeAllNormals();
+        Document p;
+        p.setMesh(std::move(pm));
+        const double buildMs = msSince(tb);
+
+        const bool same = std::getenv("SF_RND_SAME_CENTERS") != nullptr;
+        const Run pr = stroke(p, s, dabs, same ? &ex.centers : nullptr);
+        double centerOff = 0.0;
+        for (size_t i = 0; i < std::min(pr.centers.size(), ex.centers.size()); ++i) centerOff = std::max(centerOff, double(glm::distance(pr.centers[i], ex.centers[i])));
+        std::printf("  dab centres vs exact: max %.2e r\n", centerOff / s.radius);
+
+        // The dense pass: every vertex whose own cell moved takes the trilinear field of the cell displacements.
+        const auto tf = Clock::now();
+        std::vector<glm::vec3> disp(np);
+        std::vector<uint8_t> moved(np, 0);
+        for (size_t i = 0; i < np; ++i) {
+            disp[i] = p.mesh.positions[i] - proxyStart[i];
+            moved[i] = disp[i] != glm::vec3(0.0f);
+        }
+        std::vector<glm::vec3> dense = orig;
+        std::atomic<size_t> densePassed{0};
+        poolFor(nv, [&](size_t v0, size_t v1) {
+            size_t n = 0;
+            for (size_t v = v0; v < v1; ++v) {
+                if (!moved[proxyOf[v]]) continue;
+                ++n;
+                const glm::vec3 g = (orig[v] - b.min) / h - 0.5f;
+                const glm::vec3 g0 = glm::floor(g), f = g - g0;
+                const uint32_t bin = nbin ? normalBin(origN[v]) : 0;
+                glm::vec3 acc(0.0f);
+                float w = 0.0f;
+                for (int c = 0; c < 8; ++c) {
+                    const int dx = c & 1, dy = (c >> 1) & 1, dz = (c >> 2) & 1;
+                    const uint64_t pk = cellKey(int64_t(g0.x) + dx, int64_t(g0.y) + dy, int64_t(g0.z) + dz);
+                    const auto it = cellOf.find(nbin ? cellKey(int64_t(g0.x) + dx, int64_t(g0.y) + dy, int64_t(g0.z) + dz, bin)
+                                                     : pk | uint64_t(side(pk, origN[v])) << 60);
+                    if (it == cellOf.end()) continue;
+                    const float wc = (dx ? f.x : 1.0f - f.x) * (dy ? f.y : 1.0f - f.y) * (dz ? f.z : 1.0f - f.z);
+                    acc += wc * disp[it->second];
+                    w += wc;
+                }
+                if (w > 1e-6f) dense[v] += acc / w;
+            }
+            densePassed += n;
+        });
+        const double flushMs = msSince(tf);
+
+        // Error at full resolution vs the exact stroke, over the vertices either moved.
+        std::vector<float> e;
+        e.reserve(nv / 8);
+        double sq = 0.0;
+        for (size_t v = 0; v < nv; ++v) {
+            if (exact[v] == orig[v] && dense[v] == orig[v]) continue;
+            const float dv = glm::distance(exact[v], dense[v]);
+            e.push_back(dv);
+            sq += double(dv) * dv;
+        }
+        { // where the big errors are: exact move vs propagated move, and the vertex's facing (normal . -ray)
+            size_t big = 0, exactOnly = 0, denseOnly = 0, backFacing = 0;
+            double exSum = 0.0, deSum = 0.0;
+            for (size_t v = 0; v < nv; ++v) {
+                const float dv = glm::distance(exact[v], dense[v]);
+                if (dv < 0.01f * s.radius) continue;
+                ++big;
+                const float me = glm::distance(exact[v], orig[v]), md = glm::distance(dense[v], orig[v]);
+                exSum += me, deSum += md;
+                exactOnly += md < 0.1f * me;
+                denseOnly += me < 0.1f * md;
+                backFacing += glm::dot(origN[v], -s.dir) < 0.0f;
+            }
+            std::printf("  errors > 1%% r: %zu verts, mean exact move/r %.2e, propagated/r %.2e, exact-only %zu, propagated-only %zu, back-facing %zu\n",
+                        big, big ? exSum / double(big) / s.radius : 0.0, big ? deSum / double(big) / s.radius : 0.0, exactOnly, denseOnly, backFacing);
+        }
+        std::sort(e.begin(), e.end());
+        const auto at = [&](double q) { return e.empty() ? 0.0f : e[std::min(e.size() - 1, size_t(q * double(e.size() - 1)))]; };
+        const double rr = double(s.radius);
+        double exactMax = 0.0; // (the stroke's own size: the biggest exact move)
+        for (size_t v = 0; v < nv; ++v) exactMax = std::max(exactMax, double(glm::distance(exact[v], orig[v])));
+        std::printf("rnd proxy h=r/%.0f: proxy %zu verts %zu tris (build %.0f ms) | %.0f verts touched/dab, %.2f ms/dab (%d hits) |"
+                    " dense pass %zu verts %.0f ms | error/r max %.2e p99.9 %.2e p99 %.2e RMS %.2e (n %zu; biggest exact move/r %.2e)\n",
+                    double(cpr), np, ntp, buildMs, double(pr.touched) / std::max(1, pr.hits), pr.dabMs / std::max(1, pr.hits), pr.hits,
+                    densePassed.load(), flushMs, at(1.0) / rr, at(0.999) / rr, at(0.99) / rr,
+                    e.empty() ? 0.0 : std::sqrt(sq / double(e.size())) / rr, e.size(), exactMax / rr);
+    }
+}
