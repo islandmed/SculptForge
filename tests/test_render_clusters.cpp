@@ -11,6 +11,7 @@
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
 #include "render/Clusters.h"
+#include "render/Renderer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -540,4 +541,19 @@ TEST(coarse_still_frame_estimate_survives_a_slow_frame) {
     CHECK(nextGpuMsPerTriangle(settled, 50.0, 0.5, 100000) == settled);
     CHECK(nextGpuMsPerTriangle(settled, 50.0, 60.0, top) == settled);
     CHECK(nextGpuMsPerTriangle(0.0, 6.0, 0.5, top) > 0.0);
+}
+
+// A mesh shader variant a driver won't build falls back to a simpler one instead of leaving the mesh undrawn.
+// (Feature bits as in Renderer.h: paint 1, per-triangle data 2, texture 4, normal map 8, flat 16, micro 32, ghost 64, PBR 128.)
+TEST(mesh_shader_fallback_walks_down_to_a_plain_variant) {
+    int f = 1 | 2 | 4 | 8 | 16 | 64 | 128; // every bit a view can ask for
+    std::vector<int> seen{f};
+    for (int next = Renderer::simplerMeshFeatures(f); next != f; f = next, next = Renderer::simplerMeshFeatures(f))
+        seen.push_back(next);
+    CHECK(seen.size() == 7);    // six drops, each removing one bit
+    CHECK(f == 1);              // what the start-up check already built (paint) is where it ends
+    CHECK(seen[1] == (seen[0] & ~64) && seen[2] == (seen[1] & ~128)); // ghost first, then PBR
+    CHECK(Renderer::simplerMeshFeatures(0) == 0);
+    CHECK(Renderer::simplerMeshFeatures(32) == 32);                 // a micro level with nothing to drop
+    CHECK(Renderer::simplerMeshFeatures(32 | 16 | 128) == (32 | 16)); // micro keeps its own bits, drops PBR first
 }

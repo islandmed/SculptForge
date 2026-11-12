@@ -1043,6 +1043,15 @@ void Renderer::keepPrograms(bool keep) {
 }
 
 bool Renderer::init(std::string& error) {
+    {   // (the lines a graphics-driver report needs: who made it, which shader language, the limits the renderer leans on)
+        GLint samples = 0, texels = 0, vecs = 0;
+        gl::GetIntegerv(GL_MAX_SAMPLES, &samples);
+        gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+        gl::GetIntegerv(0x8DFD /* GL_MAX_FRAGMENT_UNIFORM_VECTORS */, &vecs);
+        const auto str = [](GLenum n) { const GLubyte* v = gl::GetString(n); return v ? reinterpret_cast<const char*>(v) : "?"; };
+        SDL_Log("GL vendor %s, GLSL %s, max samples %d, texture buffer %d texels, fragment uniforms %d", str(0x1F00),
+                str(0x8B8C), samples, texels, vecs);
+    }
     for (int f : {0, kPaint}) // the common ones up front, so a broken driver fails here rather than mid-session
         if (!meshProgram(f)) {
             error = programError_;
@@ -1098,6 +1107,11 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
+    const auto simpler = [&]() -> const MeshProgram* {
+        const int next = simplerMeshFeatures(features);
+        return next == features ? nullptr : meshProgram(next);
+    };
+    if (p.failed) return simpler(); // (not every frame again)
     std::string prefix = "#version 330 core\n";
     if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
@@ -1110,7 +1124,13 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
-    if (!p.id) return nullptr;
+    if (!p.id) {
+        // A mesh variant the driver won't build (a mobile GLSL compiler's limit, say) used to leave the mesh undrawn
+        // with nothing in the log; now it says so once and the next simpler variant draws.
+        p.failed = true;
+        SDL_Log("Mesh shader variant %d failed to build, drawing with a simpler one: %.400s", features, programError_.c_str());
+        return simpler();
+    }
     auto at = [&](const char* name) { return gl::GetUniformLocation(p.id, name); };
     p.view = at("uView");
     p.proj = at("uProj");
