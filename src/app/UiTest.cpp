@@ -111,7 +111,8 @@
 //                            supporter (the membership cards, Support.h),
 //                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
 //                            welcome_open (the first-run welcome shown), welcome_outside_px (how far its window sticks out of
-//                            the 3D view's area, 0: inside; a phone screen cut its X and Close off), new_look_card_open (the one-time
+//                            the screen, 0: inside; a phone screen cut its X and Close off), welcome_overflow_px (how far its
+//                            content runs past its right edge), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
@@ -1224,12 +1225,14 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
-    if (name == "welcome_outside_px") {
+    if (name == "welcome_outside_px" || name == "welcome_overflow_px") {
         const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
         if (!w || !w->WasActive) return -1.0;
-        const CanvasRect c = app_.canvasRect();
-        const double out = std::max({double(c.x - w->Pos.x), double(c.y - w->Pos.y), double(w->Pos.x + w->Size.x - (c.x + c.w)),
-                                     double(w->Pos.y + w->Size.y - (c.y + c.h)), 0.0});
+        if (name == "welcome_overflow_px") // content wider than the window: a button cut off at its right edge
+            return std::ceil(std::max(double(w->ContentSize.x + 2.0f * w->WindowPadding.x - w->InnerRect.GetWidth()), 0.0) - 0.5);
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const double out = std::max({double(-w->Pos.x), double(-w->Pos.y), double(w->Pos.x + w->Size.x - screen.x),
+                                     double(w->Pos.y + w->Size.y - screen.y), 0.0});
         return std::ceil(out - 0.5); // (rounding noise)
     }
     if (name == "featured_shown") return app_.featuredCard() ? 1.0 : 0.0;       // the welcome's featured creator card has an entry

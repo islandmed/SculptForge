@@ -293,16 +293,24 @@ void App::drawSupportUi() {
     drawMemberCard();
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
-        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        // Never wider or taller than the room: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the
+        // screen, its X and Close with it. Between a phone's two shelves the 3D view is too narrow, so there it takes the
+        // whole screen below the status bar, and the text and rows shrink to fit (`fit`); a window taller than that scrolls.
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const float margin = 16.0f * uiScale_;
+        CanvasRect room = c;
+        if (c.w < 500.0f * uiScale_ + margin) room = {0.0f, topInset(), screen.x, std::max(screen.y - topInset(), 1.0f)};
+        const float fit = std::clamp((room.w - margin) / (500.0f * uiScale_), 0.4f, 1.0f);
+        const float s = uiScale_ * fit; // (this window's own scale, below the outer one)
+        ImGui::SetNextWindowPos(ImVec2(room.x + room.w * 0.5f, room.y + room.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         // Height 0 every frame: the window fits its content, so the featured creator card arriving after the first frame
         // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold.
-        // Never wider or taller than the view: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the
-        // screen, its X and Close with it; a window taller than the view scrolls.
-        ImGui::SetNextWindowSize(ImVec2(std::min(500.0f * s, c.w - 16.0f * s), 0.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(c.h - 16.0f * s, 100.0f)));
+        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(room.h - margin, 100.0f)));
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         const bool welcomeOpen = ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags);
-        keepWindowInView(c); // (title bar and X inside the view, however the window was placed)
+        keepWindowInView(room); // (title bar and X inside the view, however the window was placed)
+        if (fit < 1.0f) ImGui::SetWindowFontScale(fit);
         if (welcomeOpen) {
             // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
             drawLanguageRow();
