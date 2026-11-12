@@ -141,20 +141,31 @@ Path pathFromEnv(const char* value) {
 
 namespace {
 
-// A hidden, borderless, floating utility window in the middle of the screen, with its own app id (so a window manager rule can
-// name it: sculptforge-splash; the main window keeps the app's). Hidden until the picture is on it.
+// The splash's own app id (a window manager rule can name it: `sculptforge-splash`; the main window keeps the app's). SDL reads the
+// id when the window system surface is made, which for a hidden window is at SDL_ShowWindow, so it is set for all of open().
+struct AppIdScope {
+    std::string previous;
+    bool had;
+    AppIdScope() {
+        const char* before = SDL_GetHint(SDL_HINT_APP_ID);
+        had = before != nullptr;
+        if (had) previous = before;
+        SDL_SetHint(SDL_HINT_APP_ID, "sculptforge-splash");
+    }
+    ~AppIdScope() {
+        if (had) SDL_SetHint(SDL_HINT_APP_ID, previous.c_str());
+        else SDL_ResetHint(SDL_HINT_APP_ID);
+    }
+};
+
+// A hidden, borderless, floating utility window in the middle of the screen. Hidden until the picture is on it.
 SDL_Window* makeWindow() {
     // A software window surface: with the default SDL may back it with an accelerated renderer, i.e. its own OpenGL context
     // made current on this thread, under the main window's (#192: the main shaders then compiled in the wrong context).
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-    const char* before = SDL_GetHint(SDL_HINT_APP_ID);
-    const std::string previous = before ? before : "";
-    SDL_SetHint(SDL_HINT_APP_ID, "sculptforge-splash");
     SDL_Window* w = SDL_CreateWindow("SculptForge", kLogicalWidth, kLogicalHeight,
                                      SDL_WINDOW_BORDERLESS | SDL_WINDOW_UTILITY | SDL_WINDOW_ALWAYS_ON_TOP |
                                          SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-    if (before) SDL_SetHint(SDL_HINT_APP_ID, previous.c_str());
-    else SDL_ResetHint(SDL_HINT_APP_ID);
     if (w) SDL_SetWindowPosition(w, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED); // (Wayland leaves the place to the compositor)
     return w;
 }
@@ -175,6 +186,7 @@ SDL_Renderer* makeRenderer(SDL_Window* w, bool software) {
 
 bool Window::open(const std::string& versionText, Path path) {
     if (window_) return true;
+    const AppIdScope appId;
     for (Path attempt : {Path::Surface, Path::Renderer, Path::Software}) {
         if (path != Path::Auto && path != attempt) continue;
         SDL_Window* w = makeWindow();
