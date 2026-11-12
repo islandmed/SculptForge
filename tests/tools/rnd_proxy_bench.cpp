@@ -8,6 +8,7 @@
 #include "core/Project.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
+#include "../GeomInvariants.h"
 #include <algorithm>
 #include <atomic>
 #include <tuple>
@@ -21,6 +22,7 @@
 #include <vector>
 
 using namespace sf;
+using namespace sf::geom;
 
 namespace sf { extern const float* gRndAreaWeight; }
 
@@ -129,11 +131,20 @@ int main(int argc, char** argv) {
 
     // The exact stroke: the reference.
     const Run ex = stroke(d, s, dabs);
-    const std::vector<glm::vec3>& exact = d.mesh.positions;
+    const std::vector<glm::vec3> exact = d.mesh.positions;
     std::printf("rnd proxy: %zu verts, threads %d, r %.4g, %d dabs | exact: %.0f verts touched/dab, %.1f ms/dab\n", nv,
                 ThreadPool::shared().threads(), double(s.radius), ex.hits, double(ex.touched) / std::max(1, ex.hits),
                 ex.dabMs / std::max(1, ex.hits));
 
+    // The brush promises (tests/GeomInvariants.h) on the exact stroke: the proxy must not add to them.
+    const float edge = meanEdge(d.mesh);
+    const auto promises = [&](const char* what) {
+        const EdgeReport er = edgeOutliers(d.mesh, orig, ex.centers, s.radius, edge);
+        std::printf("  %s promises: flipped %zu, inverted %zu, non-finite %zu, edge spikes %d (worst %.2f edges, ring %d)\n", what,
+                    flippedFaces(orig, d.mesh), invertedFaces(orig, d.mesh), nonFinite(d.mesh), er.spikes, double(er.worst), er.ring);
+    };
+    promises("exact");
+    const std::vector<glm::vec3> exactKeep = d.mesh.positions;
     for (float cpr : cellsPerRadius) {
         const float h = s.radius / cpr;
         // Proxy: vertex clustering of the ORIGINAL surface.
@@ -245,6 +256,23 @@ int main(int argc, char** argv) {
             densePassed += n;
         });
         const double flushMs = msSince(tf);
+        // SF_RND_FOLD_TAU=t: cells whose dense normals disagree (|sum n| / count < t: a fold, a thin part) take the exact path
+        // (simulated: the exact stroke's positions for their vertices); their count per dab is the fallback's cost.
+        size_t foldVerts = 0;
+        if (const char* ft = std::getenv("SF_RND_FOLD_TAU")) {
+            const float tau = float(std::atof(ft));
+            std::vector<glm::vec3> nsum(np, glm::vec3(0.0f));
+            for (size_t v = 0; v < nv; ++v) nsum[proxyOf[v]] += origN[v];
+            for (size_t v = 0; v < nv; ++v) {
+                const uint32_t c = proxyOf[v];
+                if (glm::length(nsum[c]) >= tau * float(count[c])) continue;
+                if (exact[v] == orig[v] && dense[v] == orig[v]) continue;
+                dense[v] = exact[v];
+                ++foldVerts;
+            }
+            std::printf("  fold fallback (tau %.2f): %zu verts exact over the stroke (%.0f per dab)\n", double(tau), foldVerts,
+                        double(foldVerts) / std::max(1, pr.hits));
+        }
 
         // Error at full resolution vs the exact stroke, over the vertices either moved.
         std::vector<float> e;
@@ -282,5 +310,8 @@ int main(int argc, char** argv) {
                     double(cpr), np, ntp, buildMs, double(pr.touched) / std::max(1, pr.hits), pr.dabMs / std::max(1, pr.hits), pr.hits,
                     densePassed.load(), flushMs, at(1.0) / rr, at(0.999) / rr, at(0.99) / rr,
                     e.empty() ? 0.0 : std::sqrt(sq / double(e.size())) / rr, e.size(), exactMax / rr);
+        d.mesh.positions = dense;
+        promises("proxy");
+        d.mesh.positions = exactKeep;
     }
 }
