@@ -1376,6 +1376,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                             $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
                                             ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
       set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+      add_test(NAME bench_scene_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_scene_names.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-scene-names)
+      set_tests_properties(bench_scene_names PROPERTIES LABELS ui TIMEOUT 900 RUN_SERIAL TRUE)
     endif()
     # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
     # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.

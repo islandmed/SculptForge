@@ -7,7 +7,7 @@ website's [benchmarks page](../website/benchmarks/index.html) lists them.
 
 ## Standard scenes (what the website lists)
 
-`sculptforge --benchmark standard-15m` (or `standard-33m`, or `standard` for both; Help > Benchmark offers the
+`sculptforge --benchmark standard-15m` (or `standard-33m`, `standard-100m` (the same head at 104 million triangles; about 16 GB of free memory), or `standard` for 15M + 33M; Help > Benchmark offers the
 same choice) runs the **standard scene**: a procedural head (`makeBenchHead` in `src/core/Benchmark.cpp`: skull,
 brow, eye sockets, nose, cheekbones, jaw, ears and neck as a displacement of a cube-sphere, then divided into
 subdivision levels like the spheres below) of about 15.0 or 33.2 million triangles. It is built from a formula,
@@ -29,7 +29,7 @@ Each run adds `worst_stall_ms` (the longest frame, or lifting the pen if that to
 phase too), `gpu_buffers_mb` (the most the renderer's vertex and index buffers held, an estimate that works on
 every GPU) and, where the driver reports free graphics memory (`GL_NVX_gpu_memory_info`, `GL_ATI_meminfo`),
 `vram_used_mb` (how far it dropped from before the mesh was built; on unified-memory GPUs this is system memory
-and other programs move it). `peak_ram_mb` is as below. The JSON's `settings.scene` names the scene.
+and other programs move it). `peak_ram_mb` is as below. The JSON's `settings.scene` names the scene; `settings.hw_simulate` holds the value of `SF_HW_SIMULATE` when it was set (a simulated hardware tier such as `floor`), so a simulated result says so.
 
 The sphere sweep below is what `sculptforge --benchmark` with no scene name runs.
 

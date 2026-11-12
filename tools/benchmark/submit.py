@@ -128,7 +128,7 @@ def compact(doc, name, video, machine=None):
     }
     if machine:
         entry["machine"] = machine
-    for k in ("scene", "stroke_set"):
+    for k in ("scene", "stroke_set", "hw_simulate"):
         if k in settings:
             entry[k] = settings[k]
     if video:

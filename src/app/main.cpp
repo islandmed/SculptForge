@@ -91,7 +91,7 @@ void usage() {
         "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
-        "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
+        "                           brush (standard-33m: 33M; standard-100m: 104M, needs ~16 GB free; standard: 15M + 33M). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
         "  --benchmark core-100m    The same at 100 million micro triangles\n"
@@ -251,9 +251,9 @@ static int runMain(int argc, char** argv) {
             if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]).rfind("core-", 0) == 0)) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-100m" && options.benchmarkScene != "standard-1b" &&
                     options.benchmarkScene != "core-200m" && options.benchmarkScene != "core-100m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
                     return 1;
                 }
             }
