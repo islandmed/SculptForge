@@ -1,0 +1,23 @@
+# Sculpt to splats with the capture loaded (Splats palette): the test head capture -> Make sculptable -> one click
+# brings the splats back, most of them the capture's own (kept, same colour), the Splats palette shows the button.
+# CMake runs it at 1440 and 2880 px wide (ui_splat_color_1440 / _2880). 30k splats keep it quick.
+run splat_test_capture kind=head count=30000
+wait 0.5
+expect_value splats > 30000
+expect "Sculpt to splats"
+shot capture
+
+click "Make sculptable/Make sculptable"
+wait_idle 120
+expect_status "Made sculptable"
+expect_value show_splats == 0
+
+click "Sculpt to splats"
+wait_idle 60
+expect_status "kept from the capture"
+expect_value splats > 20000
+click "Show##splats"
+expect_value show_splats == 1
+click "Show mesh"
+camera 0 0
+shot result

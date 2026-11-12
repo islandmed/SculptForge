@@ -4829,6 +4829,9 @@ constexpr Entry kSpanish[] = {
      "Esculpe un trazo para ver lo que cuesta."},
     {"Sculpt expressions & correctives;\nexported as glTF morph targets.",
      "Esculpe expresiones y correctivos;\nse exportan como morph targets de glTF."},
+    {"Splats from your sculpt. With the capture still loaded, its own splats stay where you did "
+     "not touch the surface (colour and shine untouched) and new surface gets your vertex paint.",
+     "Splats de tu escultura. Con la captura aún cargada, sus propios splats permanecen donde no tocaste la superficie (color y brillo intactos) y la nueva superficie recibe tu pintura de vértices."},
     {"Sculpt to splats",
      "Esculpir sobre splats"},
     {"SculptForge has a new look",

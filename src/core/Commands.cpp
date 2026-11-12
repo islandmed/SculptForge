@@ -847,21 +847,40 @@ CommandRegistry::CommandRegistry() {
     // splat_to_mesh (Make sculptable) and face_guides: core/Sculptable.cpp.
 
     add({"mesh_to_splats",
-         "Turn the visible Parts into Gaussian splats (flat oriented surfels with baked clay shading), replacing any "
-         "loaded splats - for splat viewers, web scenes and engines that render 3DGS.",
-         {{"count", T::Number, "Number of splats (1000-5000000). Default 250000.", false},
-          {"shading", T::Bool, "Bake soft lighting and cavity darkening into the colour. Default true.", false}},
+         "Turn the visible Parts into Gaussian splats, replacing any loaded splats - for splat viewers, Blender, web scenes "
+         "and engines that render 3DGS. A sculpt made from a capture comes back in the capture's own colour: its splats "
+         "that still lie on the surface are kept as they are (colour, view-dependent colour, shape), and surface that was "
+         "sculpted or is new gets flat oriented splats in the Part's vertex paint. A mesh with no colour gets Soft Clay.",
+         {{"count", T::Number, "Number of splats (1000-5000000). Default: as many as the loaded capture has, else 250000.", false},
+          {"from_capture", T::Bool, "Keep the loaded capture's splats where the surface is untouched. Default true.", false},
+          {"shading", T::Bool, "Soft Clay only: bake soft lighting and cavity darkening into the colour. Default true.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              Mesh merged; // no copy for a single Part
              const Mesh& visible = doc.partCount() == 1 ? doc.mesh : (merged = mergedVisibleMesh(doc));
              if (visible.triangleCount() == 0) return {false, "The mesh is empty"};
              MeshToSplatsOptions o;
-             o.count = size_t(std::clamp(argNumber(a, "count", 250000), 1000.0, 5000000.0));
+             o.count = a.count("count") ? size_t(std::clamp(argNumber(a, "count", 250000), 1000.0, 5000000.0)) : 0;
+             if (doc.splats.empty() || !argBool(a, "from_capture", true)) o.count = o.count ? o.count : 250000;
+             else {
+                 o.reference = &doc.splats;
+                 // Make sculptable keeps its scan as a hidden Part "<capture> Scan": the sculpt is compared against it.
+                 const std::string scanName = (doc.splats.name.empty() ? std::string("Scan") : doc.splats.name) + " Scan";
+                 for (int i = 0; i < doc.partCount() && !o.baseline; ++i) {
+                     const std::string& n = doc.parts[size_t(i)].name;
+                     if (!doc.parts[size_t(i)].visible && n.compare(0, scanName.size(), scanName) == 0 &&
+                         doc.partMesh(i).triangleCount() > 0)
+                         o.baseline = &doc.partMesh(i);
+                 }
+             }
              o.shading = argBool(a, "shading", true);
-             doc.splats = meshToSplats(visible, o);
-             doc.splats.name = doc.assetName();
+             MeshToSplatsStats st;
+             SplatCloud made = meshToSplats(visible, o, &st); // (before the old cloud is replaced: it is the reference)
+             made.name = o.reference ? doc.splats.name : doc.assetName(); // (the capture keeps its name: Send to Blender updates its object)
+             doc.splats = std::move(made);
              doc.splatsChanged();
-             return {true, "Made " + std::to_string(doc.splats.size()) + " splats from the sculpt"};
+             std::string msg = "Made " + std::to_string(doc.splats.size()) + " splats from the sculpt";
+             if (st.kept > 0) msg += ": " + std::to_string(st.kept) + " kept from the capture, " + std::to_string(st.painted + st.clay) + " new";
+             return {true, msg};
          }});
 
     add({"splat_clear", "Remove the loaded Gaussian splats.", {},

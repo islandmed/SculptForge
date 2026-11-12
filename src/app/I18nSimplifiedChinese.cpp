@@ -4390,6 +4390,9 @@ constexpr Entry kSimplifiedChinese[] = {
      "雕刻一笔即可看到它的开销。"},
     {"Sculpt expressions & correctives;\nexported as glTF morph targets.",
      "雕刻表情和修正形状；\n以 glTF 变形目标导出。"},
+    {"Splats from your sculpt. With the capture still loaded, its own splats stay where you did "
+     "not touch the surface (colour and shine untouched) and new surface gets your vertex paint.",
+     "来自您雕刻的 Splat。捕获仍处于加载状态时，未触碰表面之处会保留其自身的 Splat（颜色与光泽不变），新表面则会获得您的顶点绘制。"},
     {"Sculpt to splats",
      "雕刻到 Splat"},
     {"SculptForge has a new look",

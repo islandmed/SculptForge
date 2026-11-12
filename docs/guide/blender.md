@@ -163,7 +163,9 @@ bridge works as before. The file formats and what SculptForge does with a captur
 
 **From SculptForge to Blender**
 
-1. With splats loaded (a capture, or **Sculpt to splats**), choose **File > Blender > Send to Blender**.
+1. With splats loaded (a capture, or **Sculpt to splats**), choose **File > Blender > Send to Blender**. A scan you
+   reshaped comes back in its own colour: with the capture still loaded, click **Sculpt to splats** first. It keeps
+   the capture's splats where you did not touch the surface and paints the new surface with your vertex paint.
 2. They arrive as a splat object named after the capture. Send again and the same object is updated in place, with
    its materials and modifiers; **Flip**, **Turn 90** and **Fit** in SculptForge move the object, not the splats.
 

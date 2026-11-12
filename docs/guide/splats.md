@@ -57,11 +57,20 @@ mouth when it is a head, and the capture's colours. The splats stay, hidden. It 
 
 ## Turn a sculpt into splats
 
-**Sculpt to splats** (in **Render > Gaussian Splats** when no splats are loaded, or from the command palette) covers
-the visible Parts with flat, oriented splats with soft clay shading baked in. Use it to show a sculpt in
-splat viewers, web scenes or engines that render 3D Gaussian splats. It replaces any loaded splats.
+**Sculpt to splats** (in **Render > Gaussian Splats**, or from the command palette) covers the visible Parts with
+splats. Use it to show a sculpt in splat viewers, web scenes, Blender or engines that render 3D Gaussian splats.
 
-From a script you can choose the number of splats and whether to bake shading:
+A scan comes back in its own colour. When the capture you made the sculpt from is still loaded, the splats that
+still lie on the surface are kept exactly as they were: colour, view-dependent colour (all spherical-harmonics bands),
+size and opacity. Surface you reshaped or added gets new flat splats painted with the Part's vertex paint, so paint
+over a new nose and the nose comes back that colour. Floaters and the splats inside the subject are not carried over.
+A model with no colour at all gets soft clay with the lighting baked in. The result keeps the capture's placement,
+so it goes back to Blender where the capture was.
+
+Two things to know: the capture has to be placed as it was when you made the sculptable mesh (**Flip**, **Turn 90**
+and **Fit** move it away from the sculpt), and the new splats carry the base colour only, no view-dependent shine.
+
+From a script you can choose the number of splats (default: as many as the capture has) (`from_capture=false` ignores the loaded capture):
 
 ```sh
 sculptforge-cli -c 'open path=bust.glb; mesh_to_splats count=500000 shading=true; splat_save path=bust.ply'
@@ -99,7 +108,7 @@ Splats go to Blender 5.3 and back with one click, view-dependent colour and plac
 | `splat_clean` | Removes faint splats and floaters | `min_opacity` (default 0.05), `keep` (0.5 to 1, default 0.98) |
 | `splat_to_mesh` | Make sculptable: a new Part with quads, face loops and colour ([details](scan-to-sculptable.md#from-scripts)) | `detail` (default 256), `preset` (game, film, sculpt), `color` (vertex paint, texture, none), `crop`, `face_guides` |
 | `splat_test_capture` | Loads a built-in test capture (a head or a mug) | `kind` |
-| `mesh_to_splats` | Turns the visible Parts into splats | `count` (default 250000), `shading` (default true) |
+| `mesh_to_splats` | Turns the visible Parts into splats, keeping the loaded capture's own splats where the surface is untouched | `count` (default: the capture's, else 250000), `from_capture` (default true), `shading` (soft clay only, default true) |
 | `splat_save` | Saves `.ply`, `.splat`, `.glb`, `.usda` or `.usdz` | `path` |
 | `splat_clear` | Removes the splats | |
 

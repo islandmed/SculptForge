@@ -249,6 +249,27 @@ def same_splats(a, b, what, atol=2e-5):
     check(ok, "%s (%s)" % (what, ", ".join("%s %.2g" % kv for kv in err.items()) if err else "sizes %s vs %s" % (a.sh.shape, b.sh.shape)))
 
 
+def test_sculpt_to_splats_colour():
+    """A scan reshaped in SculptForge goes back in its own colour: the real Make sculptable -> Sculpt to splats ->
+    save chain, then Blender's own import of that PLY (not the add-on's writer)."""
+    if not bridge.splats_supported():
+        return
+    scan = os.path.join(ROOT, "scan_capture.ply")
+    back = os.path.join(ROOT, "scan_back.ply")
+    sculptforge(["splat_test_capture kind=head count=30000 floaters=0", "splat_save path=" + scan,
+                 "splat_to_mesh detail=96 target=1500", "mesh_to_splats", "splat_save path=" + back])
+    ident = mathutils.Matrix.Identity(4)
+    a = bridge.splat_arrays(bridge.import_splat_ply(bpy.context, scan, "ScanCapture", ident)[0].data)
+    b = bridge.splat_arrays(bridge.import_splat_ply(bpy.context, back, "ScanBack", ident)[0].data)
+    check(0.9 < len(b) / len(a) < 1.1, "Sculpt to splats keeps the splat count (%d -> %d)" % (len(a), len(b)))
+    dc_a, dc_b = a.sh[:, 0, :], b.sh[:, 0, :]
+    # Colour, not one grey: the spread across the splats is the capture's, and so is the mean.
+    check(np.abs(dc_a.mean(axis=0) - dc_b.mean(axis=0)).max() < 0.08, "the mean colour is the capture's (%s vs %s)" % (dc_a.mean(axis=0), dc_b.mean(axis=0)))
+    check(dc_b.std(axis=0).min() > 0.5 * dc_a.std(axis=0).min(), "the splats are not one colour (spread %s vs %s)" % (dc_b.std(axis=0), dc_a.std(axis=0)))
+    for name in ("ScanCapture", "ScanBack"):
+        bpy.data.objects.remove(bpy.data.objects[name])
+
+
 def test_splats():
     import mathutils
     path = os.path.join(ROOT, "capture.ply")
@@ -417,6 +438,7 @@ def main():
           "Eyes: eyeLook shape keys")
 
     test_splats()
+    test_sculpt_to_splats_colour()
     test_classic_keys()
     test_vdm_exr()
 

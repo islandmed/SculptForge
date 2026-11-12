@@ -80,6 +80,7 @@ ui_figure_pose              mesh
 ui_insert_*                 mesh
 ui_linked_duplicate         mesh
 ui_make_sculptable          mesh
+ui_splat_color*             mesh
 ui_mesh_check*              mesh
 ui_mirror_stress            mesh
 ui_selection_sets           mesh
@@ -267,6 +268,7 @@ test_quick_remesh           mesh
 test_remesh_speed           mesh
 test_retopo*                mesh
 test_sculptable             mesh
+test_splat_color            mesh
 test_selection_sets         mesh
 test_starter_meshes         mesh
 test_transform              mesh

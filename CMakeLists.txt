@@ -1096,6 +1096,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
     sculptforge_ui_test(layout_revert_2880 layout_revert --size 2880x1800)
+    sculptforge_ui_test(splat_color_1440 splat_color --size 1440x900)
+    sculptforge_ui_test(splat_color_2880 splat_color --size 2880x1800)
     # The layout saves itself; Save Layout marks what Revert returns to (tests/ui/layout_autosave.sfui).
     sculptforge_ui_test(layout_autosave_1440 layout_autosave --size 1440x900)
     sculptforge_ui_test(layout_autosave_2880 layout_autosave --size 2880x1800)

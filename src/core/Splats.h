@@ -85,12 +85,27 @@ struct SplatToMeshOptions {
 Mesh splatsToMesh(const SplatCloud& cloud, const SplatToMeshOptions& options, std::string* error = nullptr);
 
 struct MeshToSplatsOptions {
-    size_t count = 250'000;
-    glm::vec3 color{0.72f, 0.68f, 0.62f}; // Soft Clay grey
-    bool shading = true;                  // bake soft light and cavity darkening into the colour
+    size_t count = 250'000;               // 0 with a `reference`: as many splats as the reference has
+    glm::vec3 color{0.72f, 0.68f, 0.62f}; // Soft Clay grey, only for a mesh with no colour at all
+    bool shading = true;                  // bake soft light and cavity darkening into the Soft Clay colour
+    // The capture the sculpt came from (Make sculptable), in the same space as the mesh once its placement is applied.
+    // Its splats lying on the sculpt's surface are carried over untouched (colour, view-dependent colour, opacity,
+    // shape); only surface that has no splat on it gets new ones, coloured from the mesh's vertex paint (or its texture).
+    const SplatCloud* reference = nullptr;
+    // The scan the sculpt started from (Make sculptable's hidden "Scan" Part), when it is still there: splats are kept
+    // wherever the sculpt still follows it, which also keeps thin detail the rebuilt surface smoothed away.
+    const Mesh* baseline = nullptr;
+    float tolerance = 0.0f;               // how far a reference splat may sit from the surface and stay; 0 = measured (a few times how far the rebuilt surface sits off the splats)
+    float minOpacity = 0.05f;             // fainter reference splats are not carried over
 };
-// Covers the surface with flat, oriented splats (surfels).
-SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& options);
+struct MeshToSplatsStats {
+    size_t kept = 0;      // reference splats carried over
+    size_t painted = 0;   // new splats coloured from the mesh's vertex paint or texture
+    size_t clay = 0;      // new splats in Soft Clay (the mesh has no colour)
+    float tolerance = 0;  // the distance used
+};
+// Covers the surface with flat, oriented splats (surfels). With a reference the result keeps its placement.
+SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& options, MeshToSplatsStats* stats = nullptr);
 
 template <class Pred> size_t SplatCloud::removeIf(Pred pred) {
     const size_t k = size_t(shCount());

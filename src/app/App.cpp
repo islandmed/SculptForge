@@ -4568,6 +4568,11 @@ void App::drawPalette_Splats() {
     if (ImGui::Button(tr("Fit"), ImVec2(third, 0))) runCommand("splat_transform", {{"fit", true}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Centre and scale to the sculpt"));
     if (ImGui::Button(tr("Clean floaters"), ImVec2(-1, 0))) runCommand("splat_clean", {{"min_opacity", 0.1}, {"keep", 0.97}});
+    if (ImGui::Button(tr("Sculpt to splats"), ImVec2(-1, 0))) runCommand("mesh_to_splats");
+    ui::HelpText("Sculpt to splats", nullptr,
+                 "Splats from your sculpt. With the capture still loaded, its own splats stay where you did not touch the "
+                 "surface (colour and shine untouched) and new surface gets your vertex paint.",
+                 "Splats");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button(tr("Save splats..."), ImVec2(half, 0))) saveFileDialog(FileAction::SaveSplats);
     ImGui::SameLine();

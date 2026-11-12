@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Splats.h"
 
+#include "core/Parallel.h"
+#include "core/SurfaceQuery.h"
+#include "core/Texture.h"
 #include "core/Voxel.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -29,6 +32,62 @@ glm::mat4 eulerXYZ(const glm::vec3& degrees) {
     r = glm::rotate(r, glm::radians(degrees.x), glm::vec3(1, 0, 0));
     return r;
 }
+
+// Points in a uniform grid (counting sort), to ask whether any lies within `radius` of a place.
+class PointGrid {
+public:
+    PointGrid(const std::vector<glm::vec3>& points, float radius) : points_(points), cell_(std::max(radius, 1e-9f)) {
+        AABB b;
+        for (const glm::vec3& p : points) b.expand(p);
+        if (points.empty()) return;
+        origin_ = b.min;
+        const glm::vec3 ext = b.extent() + glm::vec3(1e-6f);
+        while (double(std::ceil(ext.x / cell_) + 1) * double(std::ceil(ext.y / cell_) + 1) * double(std::ceil(ext.z / cell_) + 1) > 32e6)
+            cell_ *= 1.5f;
+        dims_ = glm::ivec3(glm::floor(ext / cell_)) + 1;
+        start_.assign(size_t(dims_.x) * size_t(dims_.y) * size_t(dims_.z) + 1, 0);
+        for (const glm::vec3& p : points) ++start_[cellOf(p) + 1];
+        for (size_t c = 0; c + 1 < start_.size(); ++c) start_[c + 1] += start_[c];
+        std::vector<uint32_t> fill(start_.begin(), start_.end() - 1);
+        order_.resize(points.size());
+        for (size_t i = 0; i < points.size(); ++i) order_[fill[cellOf(points[i])]++] = uint32_t(i);
+    }
+    bool anyWithin(const glm::vec3& p, float radius) const {
+        if (points_.empty()) return false;
+        const glm::ivec3 lo = glm::max(glm::ivec3(glm::floor((p - radius - origin_) / cell_)), glm::ivec3(0));
+        const glm::ivec3 hi = glm::min(glm::ivec3(glm::floor((p + radius - origin_) / cell_)), dims_ - 1);
+        const float r2 = radius * radius;
+        for (int z = lo.z; z <= hi.z; ++z)
+            for (int y = lo.y; y <= hi.y; ++y)
+                for (int x = lo.x; x <= hi.x; ++x) {
+                    const size_t c = (size_t(z) * size_t(dims_.y) + size_t(y)) * size_t(dims_.x) + size_t(x);
+                    for (uint32_t k = start_[c]; k < start_[c + 1]; ++k) {
+                        const glm::vec3 d = points_[order_[k]] - p;
+                        if (glm::dot(d, d) <= r2) return true;
+                    }
+                }
+        return false;
+    }
+
+private:
+    size_t cellOf(const glm::vec3& p) const {
+        const glm::ivec3 c = glm::clamp(glm::ivec3((p - origin_) / cell_), glm::ivec3(0), dims_ - 1);
+        return (size_t(c.z) * size_t(dims_.y) + size_t(c.y)) * size_t(dims_.x) + size_t(c.x);
+    }
+    const std::vector<glm::vec3>& points_;
+    float cell_;
+    glm::vec3 origin_{0.0f};
+    glm::ivec3 dims_{1};
+    std::vector<uint32_t> start_, order_;
+};
+
+float quantile(std::vector<float>& v, float q) {
+    if (v.empty()) return 0.0f;
+    const size_t at = std::min(v.size() - 1, size_t(q * float(v.size())));
+    std::nth_element(v.begin(), v.begin() + std::ptrdiff_t(at), v.end());
+    return v[at];
+}
+float median(std::vector<float>& v) { return quantile(v, 0.5f); }
 
 } // namespace
 
@@ -186,11 +245,13 @@ Mesh splatsToMesh(const SplatCloud& cloud, const SplatToMeshOptions& o, std::str
     return m;
 }
 
-SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& o) {
+SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& o, MeshToSplatsStats* statsOut) {
     SplatCloud cloud;
     cloud.name = "Sculpt";
+    MeshToSplatsStats st;
+    const SplatCloud* ref = o.reference && !o.reference->empty() ? o.reference : nullptr;
     const auto& P = mesh.positions;
-    if (mesh.triangleCount() == 0 || o.count == 0) return cloud;
+    if (mesh.triangleCount() == 0 || (o.count == 0 && !ref)) return cloud;
 
     // Per-vertex normals and a cavity estimate (how far the neighbour average
     // sits above the surface) from the triangle list alone.
@@ -212,11 +273,15 @@ SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& o) {
         total += 0.5 * double(glm::length(n));
         cumulative.push_back(total);
     }
+    // Colour: the texture or vertex paint when the mesh has any; else Soft Clay with baked shading.
+    const bool textured = mesh.paintToTexture && mesh.texture && mesh.hasUvs();
+    const bool painted = textured || mesh.hasColors();
+    const bool bake = !painted && o.shading;
     std::vector<float> shade(P.size(), 1.0f);
     for (size_t v = 0; v < P.size(); ++v) {
         const float len = glm::length(normals[v]);
         normals[v] = len > 0.0f ? normals[v] / len : glm::vec3(0, 1, 0);
-        if (!o.shading || ringCount[v] == 0.0f) continue;
+        if (!bake || ringCount[v] == 0.0f) continue;
         const glm::vec3 avg = ring[v] / ringCount[v];
         const float edge = std::max(edgeLen[v] / ringCount[v], 1e-12f);
         const float k = glm::dot(normals[v], avg - P[v]) / edge; // > 0 in creases
@@ -226,28 +291,171 @@ SplatCloud meshToSplats(const Mesh& mesh, const MeshToSplatsOptions& o) {
         shade[v] = cavity * (0.55f + 0.3f * sky + 0.25f * key);
     }
 
-    const float spacing = float(std::sqrt(total / double(o.count)));
-    cloud.resize(o.count, 0);
+    // The capture's splats that already sit on the surface stay as they are.
+    std::vector<uint32_t> keep;
+    std::vector<glm::vec3> keptWorld;
+    size_t target = o.count;
+    TriangleBVH baseBvh;     // the scan the sculpt started from, when given
+    bool hasBase = false;
+    float edited = 0.0f;     // how far the sculpt may lie from it and still count as untouched
+    if (ref) {
+        const float rs = ref->transformScale();
+        const glm::quat rq = ref->transformRotation();
+        std::vector<float> sizes;
+        const size_t stride = std::max<size_t>(1, ref->size() / 20000);
+        for (size_t i = 0; i < ref->size(); i += stride)
+            if (ref->opacities[i] >= o.minOpacity)
+                sizes.push_back(std::max({ref->scales[i].x, ref->scales[i].y, ref->scales[i].z}) * rs);
+        const float splatSize = median(sizes);
+        TriangleBVH bvh;
+        bvh.build(mesh);
+        // With the scan the sculpt started from (Make sculptable's), "untouched" is measured against it: a splat stays
+        // while the sculpt still follows that scan under it, however far the rebuilt surface sits from the splat (thin
+        // detail it smoothed away stays too). Without it, a splat stays when it lies on the sculpt's own surface.
+        hasBase = o.baseline && o.baseline->triangleCount() > 0;
+        if (hasBase) baseBvh.build(*o.baseline);
+        const TriangleBVH& surf = hasBase ? baseBvh : bvh;
+        std::vector<float> off;
+        for (size_t i = 0; i < ref->size(); i += stride) {
+            SurfaceHit hit;
+            if (ref->opacities[i] >= o.minOpacity && surf.closestPoint(ref->worldPosition(i), 8.0f * splatSize, hit))
+                off.push_back(hit.distance);
+        }
+        // The rebuilt surface (voxels, smoothing, remeshing) sits a little off the splats even where nobody touched it:
+        // measure how far (the median; an edit is a small part of the surface) and allow a margin over that.
+        st.tolerance = o.tolerance;
+        if (!(st.tolerance > 0.0f)) {
+            const float typical = median(off);
+            st.tolerance = hasBase ? std::max(2.5f * splatSize, 4.0f * typical) : std::max(1.5f * splatSize, 2.5f * typical);
+        }
+        // Edited = the sculpt has left the scan by more than it does where nobody worked.
+        if (hasBase) {
+            std::vector<float> dev;
+            for (size_t i = 0; i < ref->size(); i += stride) {
+                SurfaceHit hit, back;
+                if (ref->opacities[i] >= o.minOpacity && surf.closestPoint(ref->worldPosition(i), st.tolerance, hit))
+                    dev.push_back(bvh.closestPoint(hit.position, 8.0f * st.tolerance, back) ? back.distance : 8.0f * st.tolerance);
+            }
+            // (the 90th percentile: where nobody worked the sculpt follows the scan within the remesher's error)
+            edited = std::max(2.0f * quantile(dev, 0.9f), 2.0f * splatSize);
+        }
+        std::vector<uint8_t> on(ref->size(), 0);
+        std::vector<glm::vec3> onSurface(ref->size());
+        parallelFor(ref->size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                if (!(ref->opacities[i] >= o.minOpacity)) continue;
+                SurfaceHit hit;
+                const glm::vec3 p = ref->worldPosition(i);
+                if (!surf.closestPoint(p, st.tolerance, hit)) continue;
+                if (hasBase) {
+                    SurfaceHit now;
+                    if (!bvh.closestPoint(hit.position, edited, now)) continue; // the sculpt moved this part of the scan
+                }
+                // A flat splat lies along the surface; a round one (a blob) says nothing about direction.
+                glm::vec3 s = ref->scales[i];
+                const int thin = s.x <= s.y && s.x <= s.z ? 0 : s.y <= s.z ? 1 : 2;
+                const float thinS = s[thin];
+                s[thin] = 1e30f;
+                const float otherMin = std::min({s.x, s.y, s.z});
+                if (thinS < 0.5f * otherMin) {
+                    const glm::vec3 axis = glm::mat3_cast(glm::normalize(rq * ref->rotations[i]))[thin];
+                    if (std::abs(glm::dot(axis, surf.faceNormal(hit.prim))) < 0.5f) continue;
+                }
+                on[i] = 1;
+                onSurface[i] = hit.position;
+            }
+        }, 4096);
+        for (size_t i = 0; i < on.size(); ++i)
+            if (on[i]) keep.push_back(uint32_t(i));
+        keptWorld.reserve(keep.size());
+        // Where each sits on the surface: the rebuilt surface lies a little off the splats, but a new splat must
+        // only be skipped where a kept one covers that spot of the surface.
+        for (uint32_t i : keep) keptWorld.push_back(onSurface[i]);
+        if (target == 0) {
+            // As many as the capture's body has: its splats inside the surface's bounds (not the floaters around it).
+            AABB box = mesh.bounds();
+            box.min -= glm::vec3(st.tolerance);
+            box.max += glm::vec3(st.tolerance);
+            for (size_t i = 0; i < ref->size(); ++i) {
+                const glm::vec3 p = ref->worldPosition(i);
+                if (ref->opacities[i] >= o.minOpacity && !glm::any(glm::lessThan(p, box.min)) &&
+                    !glm::any(glm::greaterThan(p, box.max)))
+                    ++target;
+            }
+        }
+        st.kept = keep.size();
+    }
+    target = std::max<size_t>(target, 1);
+
+    // New splats where the surface has none: sample at the target density, skip what a kept splat already covers.
+    const float spacing = float(std::sqrt(total / double(target)));
+    const PointGrid covered(keptWorld, 1.2f * spacing);
+    const glm::mat4 toLocal = ref ? glm::inverse(ref->transform) : glm::mat4(1.0f);
+    const float invScale = ref ? 1.0f / std::max(ref->transformScale(), 1e-12f) : 1.0f;
+    const glm::quat invRot = ref ? glm::conjugate(ref->transformRotation()) : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    struct Fresh {
+        glm::vec3 position, color;
+        glm::quat rotation;
+    };
+    std::vector<Fresh> fresh;
+    fresh.reserve(target);
     std::mt19937 rng(12345);
     std::uniform_real_distribution<double> pick(0.0, total);
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
-    for (size_t i = 0; i < o.count; ++i) {
-        const size_t tri = size_t(std::upper_bound(cumulative.begin(), cumulative.end(), pick(rng)) - cumulative.begin());
-        const auto& t = mesh.triangles[std::min(tri, mesh.triangleCount() - 1)];
+    for (size_t i = 0; i < target; ++i) {
+        const size_t tri = std::min(size_t(std::upper_bound(cumulative.begin(), cumulative.end(), pick(rng)) - cumulative.begin()),
+                                    mesh.triangleCount() - 1);
+        const auto& t = mesh.triangles[tri];
         float a = unit(rng), b = unit(rng);
         if (a + b > 1.0f) {
             a = 1.0f - a;
             b = 1.0f - b;
         }
         const float c = 1.0f - a - b;
+        const glm::vec3 p = c * P[t.x] + a * P[t.y] + b * P[t.z];
+        if (covered.anyWithin(p, 1.2f * spacing)) continue;
+        // Where the sculpt still follows the scan, the capture is the truth, its gaps included: nothing new.
+        if (hasBase) {
+            SurfaceHit near;
+            if (baseBvh.closestPoint(p, edited, near)) continue;
+        }
         const glm::vec3 n = glm::normalize(c * normals[t.x] + a * normals[t.y] + b * normals[t.z] + glm::vec3(1e-9f));
-        cloud.positions[i] = c * P[t.x] + a * P[t.y] + b * P[t.z];
-        cloud.rotations[i] = rotationFromZ(n);
-        cloud.scales[i] = glm::vec3(spacing * 0.6f, spacing * 0.6f, spacing * 0.08f);
-        cloud.opacities[i] = 0.95f;
-        const float lit = c * shade[t.x] + a * shade[t.y] + b * shade[t.z];
-        cloud.setColor(i, glm::clamp(o.color * lit, glm::vec3(0.0f), glm::vec3(1.0f)));
+        glm::vec3 col;
+        if (textured) {
+            col = linearToSrgb(sampleTextureAt(mesh, uint32_t(tri), p));
+            ++st.painted;
+        } else if (painted) {
+            col = linearToSrgb(c * mesh.colorAt(t.x) + a * mesh.colorAt(t.y) + b * mesh.colorAt(t.z));
+            ++st.painted;
+        } else {
+            col = o.color * (c * shade[t.x] + a * shade[t.y] + b * shade[t.z]);
+            ++st.clay;
+        }
+        fresh.push_back({p, glm::clamp(col, glm::vec3(0.0f), glm::vec3(1.0f)), rotationFromZ(n)});
     }
+
+    const size_t k = ref ? size_t(ref->shCount()) : 1;
+    cloud.resize(keep.size() + fresh.size(), ref ? ref->shDegree : 0);
+    if (ref) {
+        cloud.transform = ref->transform;
+        for (size_t j = 0; j < keep.size(); ++j) {
+            const size_t i = keep[j];
+            cloud.positions[j] = ref->positions[i];
+            cloud.rotations[j] = ref->rotations[i];
+            cloud.scales[j] = ref->scales[i];
+            cloud.opacities[j] = ref->opacities[i];
+            for (size_t q = 0; q < k; ++q) cloud.sh[j * k + q] = ref->sh[i * k + q];
+        }
+    }
+    for (size_t f = 0; f < fresh.size(); ++f) {
+        const size_t j = keep.size() + f;
+        cloud.positions[j] = glm::vec3(toLocal * glm::vec4(fresh[f].position, 1.0f));
+        cloud.rotations[j] = glm::normalize(invRot * fresh[f].rotation);
+        cloud.scales[j] = glm::vec3(spacing * 0.6f, spacing * 0.6f, spacing * 0.08f) * invScale;
+        cloud.opacities[j] = 0.95f;
+        cloud.setColor(j, fresh[f].color);
+    }
+    if (statsOut) *statsOut = st;
     return cloud;
 }
 
