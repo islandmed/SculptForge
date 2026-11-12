@@ -597,8 +597,9 @@ PY
     python3 tools/guide/build_site.py --app-credits >/dev/null || die "build_site.py --app-credits failed" "fix website/members-live.json, $(resume bump)"
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
-    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md README.md website/index.html docs/guide/whats-new.md
+    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
+    [ ! -f README.md ] || git add README.md # build_site.py rewrites its "New in" line (a sparse test checkout has no README)
     git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
