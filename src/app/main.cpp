@@ -390,7 +390,25 @@ static int execCli(int argc, char** argv) {
 }
 #endif
 
+#ifdef __ANDROID__
+// Android: no HOME or XDG folders, and the working directory is "/". The app's own storage stands in for them, so
+// settings, the log, autosaves and the brush library land where the desktop code already looks (app/UserData.h).
+static void androidEnvironment() {
+    const std::string internal = SDL_GetAndroidInternalStoragePath() ? SDL_GetAndroidInternalStoragePath() : "";
+    if (internal.empty()) return;
+    setenv("HOME", internal.c_str(), 1);
+    setenv("XDG_DATA_HOME", (internal + "/share").c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (internal + "/config").c_str(), 1);
+    if (const char* cache = SDL_GetAndroidCachePath()) setenv("TMPDIR", cache, 1);
+    std::error_code ec;
+    std::filesystem::current_path(sf::dialogs::androidProjectsDir(), ec);
+}
+#endif
+
 int main(int argc, char** argv) {
+#ifdef __ANDROID__
+    androidEnvironment();
+#endif
 #ifndef _WIN32
     if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
 #endif
