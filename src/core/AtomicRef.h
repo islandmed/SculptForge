@@ -11,12 +11,11 @@
 
 namespace sf {
 
-#if defined(__cpp_lib_atomic_ref)
-template <typename T> using AtomicRef = std::atomic_ref<T>;
-#else
-template <typename T> class AtomicRef {
+#if defined(__GNUC__) || defined(__clang__)
+// (always built where the builtins exist, so a Linux build tests the fallback too: tests/test_atomic_ref.cpp)
+template <typename T> class AtomicRefBuiltin {
 public:
-    explicit AtomicRef(T& v) : p_(&v) {}
+    explicit AtomicRefBuiltin(T& v) : p_(&v) {}
     T load(std::memory_order = std::memory_order_seq_cst) const {
         T r;
         __atomic_load(p_, &r, __ATOMIC_RELAXED);
@@ -36,6 +35,12 @@ public:
 private:
     T* p_;
 };
+#endif
+
+#if defined(__cpp_lib_atomic_ref)
+template <typename T> using AtomicRef = std::atomic_ref<T>;
+#else
+template <typename T> using AtomicRef = AtomicRefBuiltin<T>;
 #endif
 
 } // namespace sf
