@@ -303,13 +303,13 @@ void App::drawPerformanceSection() {
     ImGui::TextUnformatted(tr("Memory"));
     ui::HelpText("Memory", nullptr,
                  "What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for "
-                 "stepping between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures "
+                 "stepping between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures "
                  "with their layers and material channels (only painted 64x64 tiles of a channel use memory), and the "
                  "GPU buffers of the visible Parts.",
                  kPath);
     const MemoryUse m = documentMemory(doc_);
     const std::string mem = "Meshes " + megabytes(m.mesh) + "  BVH " + megabytes(m.bvh) + "\nSubdivision levels " +
-                            megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.byteBudget) +
+                            megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.budget()) +
                             "\nTextures " + megabytes(m.textures) + " (material channels " + megabytes(m.channels) + ")" +
                             (m.paintCaches ? "\nTexture painting caches " + megabytes(m.paintCaches) : std::string()) +
                             "\nGPU buffers about " + megabytes(m.gpu);

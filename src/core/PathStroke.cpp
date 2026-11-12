@@ -163,6 +163,8 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
             glm::vec3 tip = hit.position;
             const glm::vec3 offset = hit.position - samples.front();
             for (size_t i = 1; i < samples.size(); ++i) {
+                if (stroke.pressureEnd >= 0.0f)
+                    p.pressure = std::clamp(glm::mix(stroke.pressure, stroke.pressureEnd, float(i) / float(samples.size() - 1)), 0.0f, 1.0f);
                 p.center = tip;
                 p.strokeDelta = samples[i] + offset - tip;
                 doc.sculptor.dab(mesh, doc.bvh, type, p, stroke.symmetry);
@@ -196,11 +198,15 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     } else {
         glm::vec3 last{0.0f};
         bool haveLast = false;
+        size_t at = 0;
         for (glm::vec3 s : samples) {
+            const size_t index = at++;
             if (recipe && recipe->jitter > 0.0f) s += (right * rnd() + up * rnd()) * (recipe->jitter * radius);
             RayHit hit;
             if (!project(s, hit)) continue;
             DabParams p = base;
+            if (stroke.pressureEnd >= 0.0f && samples.size() > 1)
+                p.pressure = std::clamp(glm::mix(stroke.pressure, stroke.pressureEnd, float(index) / float(samples.size() - 1)), 0.0f, 1.0f);
             p.center = hit.position;
             p.strokeDelta = haveLast ? hit.position - last : glm::vec3(0.0f);
             last = hit.position;

@@ -192,23 +192,50 @@ gh_watch() {
 run_failed_where() {
     gh run view "$1" -R "$REPO" --json jobs -q '[.jobs[] | select(.conclusion=="failure" or .conclusion=="cancelled") | .name as $j | ([.steps[]? | select(.conclusion=="failure") | .name] | (if length==0 then ["(runner/setup)"] else . end)[] | "\($j): \(.)")] | join("; ")' 2>/dev/null
 }
-# infra_retry ID: after a FAILED run, when a setup step broke (apt, network, DNS, checkout, cache, runner lost) or the failed log shows an
-# HTTP 5xx / DNS error: rerun its failed jobs ONCE, log it (~/Work/.sf/logs/infra-retries.log) and wait for the rerun. Returns 0 when it
-# reran (read the conclusion again), 1 when the failure is not an infra flake (INFRA_WHERE says where it failed).
+# flaky_note TEST WHERE: TEST failed, then passed on the stage's one rerun. One line here and one row in ~/Work/.sf/logs/flaky.md (the
+# stage summary reads them back); the second rerun of a test within 7 days puts it at the top of that file for a fix owner.
+flaky_note() {
+    local rep
+    echo "   flaky: $1 passed on rerun ($2)" >&2
+    rep=$(python3 "$PWD/tools/release/flaky_log.py" add --log "$HOME/Work/.sf/logs/flaky.md" \
+        --test "$1" --where "$2" --sha "$(git rev-parse --short HEAD 2>/dev/null)" --version "${V:-}" 2>/dev/null) || return 0
+    [ -z "$rep" ] || echo "   $rep: now at the top of ~/Work/.sf/logs/flaky.md for a fix owner" >&2
+}
+# infra_rerun ID KIND WHERE NAMES: the one rerun of a failed run's failed jobs (KIND setup|test; NAMES = the tests that failed first),
+# logged in ~/Work/.sf/logs/infra-retries.log. After a test rerun: green = every name logged by flaky_note; red again = named, not flaky.
+infra_rerun() {
+    local id=$1 kind=$2 where=$3 names=$4 n1 t log=$HOME/Work/.sf/logs/infra-retries.log
+    echo "   run $id failed in a $kind step (${where:-unknown}${names:+; failed first: $(tr '\n' ' ' <<<"$names")}): rerunning its failed jobs once" >&2
+    mkdir -p "$(dirname "$log")" && printf '%s\trelease.sh\t%s\t%s\trerun\t%s\n' "$(date '+%F %H:%M')" "$id" "$V" "$kind: $where" >> "$log"
+    n1=$("$HOME/Work/.sf/gh-wait.sh" --lines "$id" 2>/dev/null || echo 0)
+    gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || return 1
+    sleep 20
+    SF_GH_WAIT_SKIP=${n1:-0} gh_watch "$id" >/dev/null 2>&1 || true
+    [ $kind = test ] || return 0
+    if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = success ]; then
+        for t in ${names:-unnamed-test-step}; do flaky_note "$t" "CI run $id, job rerun"; done
+    else
+        echo "   still red after the rerun, so not flaky: $(gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -oE '(FAILED|TIMEOUT): [A-Za-z0-9_:.-]+' | sort -u | tr '\n' ' ')" >&2
+    fi
+}
+# infra_retry ID: after a FAILED run, when a setup step broke (apt, network, DNS, checkout, cache, runner lost), the failed log shows an
+# HTTP 5xx / DNS error, or a test step failed: rerun its failed jobs ONCE (infra_rerun), wait for the rerun. Returns 0 when it
+# reran (read the conclusion again), 1 when the failure is not retried (INFRA_WHERE says where it failed).
 infra_retry() {
-    local id=$1 n1 log=$HOME/Work/.sf/logs/infra-retries.log
+    local id=$1
     INFRA_WHERE=$(run_failed_where "$id")
     # A cancelled run was stopped on purpose (someone, or a newer push): never rerun it.
     [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = cancelled ] && { INFRA_WHERE="cancelled: $INFRA_WHERE"; return 1; }
     if grep -Eiq '(^|: )(Set up|Install|Download|Run actions/|Configure cache|Compiler cache|Initialize|Complete job|\(runner/setup\))' <<<"$INFRA_WHERE" ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -Eiq 'Temporary failure (in name )?resolving|Could not resolve|Failed to fetch|Unable to connect|Connection (timed out|reset)|runner .*lost|lost communication|shutdown signal' ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
-        echo "   run $id failed in a setup step (${INFRA_WHERE:-unknown}): rerunning its failed jobs once" >&2
-        mkdir -p "$(dirname "$log")" && printf '%s\trelease.sh\t%s\t%s\trerun\t%s\n' "$(date '+%F %H:%M')" "$id" "$V" "$INFRA_WHERE" >> "$log"
-        n1=$("$HOME/Work/.sf/gh-wait.sh" --lines "$id" 2>/dev/null || echo 0)
-        gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || return 1
-        sleep 20
-        SF_GH_WAIT_SKIP=${n1:-0} gh_watch "$id" >/dev/null 2>&1 || true
+        infra_rerun "$id" setup "$INFRA_WHERE" "" || return 1
+        return 0
+    fi
+    # A test step failed (run.py already reran the failed tests inside the job): the job's one rerun, then red naming the test.
+    if grep -Eq ': Test' <<<"$INFRA_WHERE"; then
+        infra_rerun "$id" test "$INFRA_WHERE" "$(gh run view "$id" -R "$REPO" --log-failed 2>/dev/null |
+            grep -oE 'rerunning [0-9]+ failed test\(s\) once: .*' | sed 's/^[^:]*: //' | tr ' ' '\n' | sort -u)" || return 1
         return 0
     fi
     return 1
@@ -300,12 +327,39 @@ stage_fix() { echo "stage $V: in the merger's batch checkout, scripts/release.sh
 
 # --- preconditions: what the steps after the tag need, checked before anything is tagged --------------------------
 
-# The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
+# The home page's "new in X.Y.Z" card in #whats-new and the announcement bar for X.Y.Z (the one place the page says the
+# release news; the section lede carries no tagline), written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
-card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
+card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"news-bar\" data-version=\"$V\"" website/index.html; }
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
+# headline_check: the launch headline the CMO picked for this version (~/Work/.sf/launch.py headline: state/launch/X.Y.Z.json,
+# {"line", "keywords"}) must show in what the release publishes: HIGHLIGHTS line 1 (Discord post, latest.json lead) and the What's
+# New tagline (site bar, README). Every keyword, case-insensitive. Warnings only, never a failed stage (0.12.7 led with the wrong story).
+headline_check() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json kws k line tag miss said
+    if [ ! -f "$f" ]; then
+        printf '   WARNING: no launch headline for %s (%s missing): the CMO picks it with launch.py headline %s "..." KEYWORD...\n' "$V" "$f" "$V"
+        # In the background, not under timeout(1): macOS has none, and a stuck herdr must not hold the stage.
+        { herdr agent prompt cmo "pick the $V headline: ~/Work/.sf/launch.py headline $V \"<one line>\" KEYWORD... (the release stage is running)" >/dev/null 2>&1 & } 2>/dev/null || true
+        return 0
+    fi
+    kws=$(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1])).get("keywords", [])))' "$f" 2>/dev/null) ||
+        { printf '   WARNING: %s is not valid launch JSON ({"line", "keywords"})\n' "$f"; return 0; }
+    if [ -n "${HIGHLIGHTS:-}" ] && [ -f "$HIGHLIGHTS" ]; then line=$(grep -m1 '[^[:space:]]' "$HIGHLIGHTS" || true)
+    else line=$(python3 tools/release/assemble_notes.py "$BASE" --highlights 2>/dev/null | grep -m1 '[^[:space:]]' || true); fi
+    tag=$(awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f&&/^tagline:/{sub(/^tagline: */,""); print; exit}' docs/guide/whats-new.md || true)
+    said=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("line", ""))' "$f" 2>/dev/null || true)
+    while IFS= read -r k; do
+        [ -n "$k" ] || continue
+        miss=""
+        grep -qiF -- "$k" <<<"$line" || miss="HIGHLIGHTS line 1"
+        grep -qiF -- "$k" <<<"$tag" || miss="${miss:+$miss and }the What's New tagline"
+        [ -z "$miss" ] || printf '   WARNING: launch keyword "%s" (headline "%s") is missing from %s\n' "$k" "$said" "$miss"
+    done <<<"$kws"
+    return 0
+}
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
@@ -574,6 +628,7 @@ PY
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
+    [ ! -f README.md ] || git add README.md # build_site.py rewrites its "New in" line (a sparse test checkout has no README)
     git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
@@ -593,12 +648,36 @@ PY
     ok "version files at $V, guide rebuilt, pushed main $(git rev-parse --short HEAD)"
 }
 
+# The stage summary's line: tests that passed on a rerun in this stage (rows flaky_note wrote for $V).
+stage_flaky_summary() {
+    local f=$HOME/Work/.sf/logs/flaky.md n t
+    n=$({ [ -f "$f" ] && grep -E "^\| 20[0-9-]+ \| .* \| ${V//./\\.} \|$" "$f" | cut -d'|' -f3 | sort -u | tr -d ' ' | tr '\n' ' '; } || true)
+    [ -z "$n" ] || printf '   %s\n' "passed on rerun in this stage: $n(~/Work/.sf/logs/flaky.md)"
+    # A recurring one (2+ reruns in 7 days, the file's "Fix owner needed" list) is said out loud, so the release owner sees it.
+    for t in $n; do
+        sed -n "s/^- \*\*${t}\*\*: \([0-9]*\) reruns in 7 days.*/REPEAT flaky: ${t} (\1 in 7 days)/p" "$f" | sed 's/^/   /'
+    done
+    return 0
+}
 # --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
 # and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
+# signing_state RUN: prints "Windows: signed (SignPath, <subject>)" or "Windows: unsigned (SIGNING off)", the notice the Windows job of
+# packages.yml leaves (check-run annotation "Windows signing"). Fails when the repository variable SIGNING is signpath and the packages
+# are not signed (verify_staged.py --require-signed refuses them at promotion too).
+signing_state() {
+    local jid line="" want
+    jid=$(gh run view "$1" -R "$REPO" --json jobs -q '.jobs[] | select(.name | startswith("Windows x64")) | .databaseId' 2>/dev/null | head -1)
+    [ -z "$jid" ] || line=$(gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1)
+    want=$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)
+    ok "${line:-Windows: signing state unknown (no note in the Windows job: its packages were reused from an earlier run?)}"
+    case "$line" in "Windows: test-signed"*) return 1 ;; esac # SignPath's self-signed test certificate never goes into a release
+    [ "$want" != signpath ] || case "$line" in "Windows: signed"*) ;; *) return 1 ;; esac
+}
 step_stage() {
     local sha c with=${STAGE_WITH-}
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
+    headline_check
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
     # The full suite runs once, on the batch (docs/testing-flow.md "Areas"): t1.sh logged that commit green, and the bump
     # on top only adds paperwork (as CI's reuse, ci_reused), so the PC doesn't run the whole suite a second time.
@@ -615,8 +694,14 @@ step_stage() {
         reused=""
     fi
     # The release's own suite goes first on the PC (pc.sh priority lane), not behind benches (0.11.14 waited for one).
-    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
-        die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
+    # A failed staging CI run gets one rerun of its failed jobs (merge-queue.sh wait_ci calls the exported infra_retry); a PC test that
+    # failed, then passed on run.py's rerun is logged below. Red twice stays red, named.
+    export REPO V; export -f infra_retry infra_rerun flaky_note run_failed_where server_error gh_watch
+    local mq_rc=0 t
+    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" || mq_rc=$?
+    for t in $(sed -n 's/^flaky: \([^ ]*\).*/\1/p' "/tmp/merge-queue-with-${sha:0:8}.log" 2>/dev/null | sort -u); do flaky_note "$t" "PC suite, ctest --rerun-failed"; done
+    stage_flaky_summary
+    [ $mq_rc = 0 ] || die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
     # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:
     # 0.11.10's std::to_chars(float) passed CI and failed only there, noticed by hand). Wait for it here.
@@ -642,6 +727,7 @@ step_stage() {
             "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
     fi
     ok "Packages run $id built every package for ${sha:0:8}"
+    signing_state "$id" || die "the Windows packages of run $id are not release-signed (SIGNING=signpath wants \"Windows: signed\"; a test-signed run never ships)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
     echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
 }
 
@@ -721,6 +807,39 @@ step_tag() {
     ok "pushed $T"
 }
 
+# release_body_headline: the launch headline as the first line of the GitHub release body, from the CMO's
+# ~/Work/.sf/state/launch/X.Y.Z.json ("line", optional "lede" and "link"): "**<line>.** <lede> [How it works](<link>?utm...)".
+# Skipped when the file or "line" is missing or the body already leads with it; a failure only warns, never fails the release.
+release_body_headline() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json first body
+    [ -f "$f" ] || return 0
+    first=$(python3 - "$f" "$BASE" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    line = str(d.get("line") or "").strip().rstrip(".")
+    if line:
+        out = f"**{line}.**"
+        if str(d.get("lede") or "").strip():
+            out += " " + str(d["lede"]).strip()
+        link = str(d.get("link") or "").strip()
+        if link:
+            base, hash_, frag = link.partition("#")
+            utm = "utm_source=github&utm_campaign=" + sys.argv[2].replace(".", "")
+            out += f" [How it works]({base}{'&' if '?' in base else '?'}{utm}{hash_}{frag})"
+        print(out)
+except Exception:
+    pass
+PY
+)
+    [ -n "$first" ] || return 0
+    body=$(gh release view "$T" -R "$RELEASE_REPO" --json body -q .body 2>/dev/null) || return 0
+    case $(grep -m1 '[^[:space:]]' <<<"$body" || true) in "${first%%\*\* *}"**) return 0 ;; esac
+    { printf '%s\n\n%s\n' "$first" "$body" > "$work/body.md" && gh release edit "$T" -R "$RELEASE_REPO" --notes-file "$work/body.md" >/dev/null 2>&1; } ||
+        printf '   WARNING: could not put the launch headline at the top of the %s release body\n' "$T"
+    return 0
+}
+
 step_release() {
     local assets
     assets=$(gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' 2>/dev/null || true)
@@ -745,6 +864,52 @@ step_release() {
     n=$(wc -l < "$work/assets")
     [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
+    release_body_headline
+    release_apk
+}
+
+# release_apk: a beta's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
+# PRIVATE Insiders release, from the android.yml run of the beta's commit. Never the public release: only when a beta
+# publishes to $INSIDERS_REPO. Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
+# beta ships without APKs (scripts/release.sh $V --from release adds them later). SHA256SUMS.txt (signed) is left alone;
+# the APKs' sums are SHA256SUMS-android.txt.
+release_apk() {
+    [ -n "$PRE" ] && [ "$RELEASE_REPO" = "$INSIDERS_REPO" ] || return 0
+    local sha id c dir="$work/apk" abi f n=0 sums
+    if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
+    sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { printf '   WARNING: no APKs on %s: %s is not a commit here\n' "$T" "$T"; return 0; }
+    id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+    if [ -z "$id" ]; then
+        printf '   WARNING: no Android run for %s: the beta ships without APKs; gh workflow run android.yml -R %s --ref %s, then %s\n' \
+            "${sha:0:8}" "$REPO" "$T" "$(resume release)"
+        return 0
+    fi
+    if [ "$(gh run view "$id" -R "$REPO" --json status -q .status 2>/dev/null)" != completed ]; then
+        echo "   waiting for the Android run $id ..."
+        gh_watch "$id" >/dev/null 2>&1 || true
+    fi
+    c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null || true)
+    if [ "$c" != success ]; then
+        printf '   WARNING: the Android run %s is "%s": the beta ships without APKs (https://github.com/%s/actions/runs/%s)\n' "$id" "${c:-unknown}" "$REPO" "$id"
+        return 0
+    fi
+    mkdir -p "$dir"
+    for abi in arm64-v8a x86_64; do
+        gh run download "$id" -R "$REPO" -n "sculptforge-android-test-$abi" -D "$dir/$abi" >/dev/null 2>&1 ||
+            printf '   WARNING: no %s APK from run %s (an artifact expires after 14 days)\n' "$abi" "$id"
+    done
+    local files=()
+    while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -name '*.apk' | sort)
+    [ "${#files[@]}" -gt 0 ] || { printf '   WARNING: no APK files from run %s: the beta ships without them\n' "$id"; return 0; }
+    sums="$dir/SHA256SUMS-android.txt"
+    : > "$sums"
+    for f in "${files[@]}"; do printf '%s  %s\n' "$(sha256 "$f")" "$(basename "$f")" >> "$sums"; n=$((n + 1)); done
+    if gh release upload "$T" -R "$INSIDERS_REPO" --clobber "${files[@]}" "$sums" >/dev/null 2>&1; then
+        ok "$n Android APK(s) from run $id on $INSIDERS_REPO $T (private; SHA256SUMS-android.txt)"
+    else
+        printf '   WARNING: the APK upload to %s %s failed: the beta ships without them; %s\n' "$INSIDERS_REPO" "$T" "$(resume release)"
+    fi
+    return 0
 }
 
 # website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
@@ -794,6 +959,29 @@ website_run() {
     done
 }
 
+# release_card: the release card the CMO built (launch.py card: ~/Work/.sf/state/launch/X.Y.Z.card.jpg) goes to website/media/
+# release-X.Y.Z.jpg, which the Discord post attaches. It must pass tools/check_marks_media.py (new file: OCR'd, its cache entry
+# staged with it), and is staged here to ride the site commit. Missing or flagged: a WARNING and no card, never a failed release.
+release_card() {
+    local src=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.card.jpg dst=website/media/release-$V.jpg out
+    git cat-file -e "HEAD:$dst" 2>/dev/null && return 0
+    if [ ! -f "$src" ]; then
+        printf '   WARNING: no release card for %s (%s missing): the Discord post goes out without it; launch.py card %s builds it\n' "$V" "$src" "$V"
+        return 0
+    fi
+    mkdir -p "${dst%/*}" && cp "$src" "$dst" && lockretry git add "$dst" || { printf '   WARNING: could not stage the release card %s\n' "$dst"; return 0; }
+    if out=$(python3 tools/check_marks_media.py 2>&1); then
+        for f in tools/marks_media_cache.json tools/marks_media_flagged.txt; do [ ! -f "$f" ] || lockretry git add "$f"; done
+        ok "release card $dst checked and staged"
+    else
+        printf '   WARNING: the release card is not clean or not checked (the Discord post goes out without it):\n%s\n' "$(tail -5 <<<"$out" | sed 's/^/      /')"
+        git rm -q -f --cached "$dst" >/dev/null 2>&1 || true
+        rm -f "$dst"
+        for f in tools/marks_media_cache.json tools/marks_media_flagged.txt; do git checkout -q -- "$f" 2>/dev/null || true; done
+    fi
+    return 0
+}
+
 step_site() {
     release_ready
     on_main
@@ -806,11 +994,12 @@ step_site() {
         ok "pushed the $ahead commit(s) on main a stopped run had made"
         git fetch -q origin main
     fi
+    release_card
     if git show origin/main:website/latest.json 2>/dev/null | grep -F "\"version\": \"$V\"" >/dev/null; then
         ok "origin/main's website/latest.json already says $V"
     else
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
-        card_ok || die "website/index.html has no 'new in $V' card and lede in What's new" "$card_fix"
+        card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
         python3 - "$V" "$HIGHLIGHTS" <<'PY'
 import json, sys
 v, notes = sys.argv[1], sys.argv[2]
@@ -834,12 +1023,19 @@ with open("website/latest.json", "w", encoding="utf-8") as f:
 PY
         sed -i.bak -E "s/\"softwareVersion\": \"[0-9.]+\"/\"softwareVersion\": \"$V\"/; s/Version [0-9]+\.[0-9]+\.[0-9]+\. All builds/Version $V. All builds/" website/index.html
         rm -f website/index.html.bak
+        sed -i -E "s/(Current version: )[0-9]+\.[0-9]+\.[0-9]+\./\1$V./" website/llms.txt # the AI-readable fact sheet
+        grep -qF "Current version: $V." website/llms.txt || die "website/llms.txt's 'Current version:' line didn't update" "set it by hand, commit, run again"
         grep -qF "\"softwareVersion\": \"$V\"" website/index.html && grep -qF "Version $V. All builds" website/index.html ||
             die "website/index.html's version text didn't update" "set softwareVersion and the 'Version X.Y.Z. All builds' line by hand, commit, run again"
-        lockretry git add website/latest.json website/index.html
+        lockretry git add website/latest.json website/index.html website/llms.txt
         commit -m "Website: $V is the current release (feed, download text)"
         push_main
         ok "pushed the feed and home page"
+    fi
+    if ! git diff --cached --quiet; then  # the card alone: the feed was already out (a re-run)
+        commit -m "Website: release card for $V"
+        push_main
+        ok "pushed the release card"
     fi
     # The Website workflow deploys main's site and the newest tag's guide. Its run for the feed commit can sit queued
     # longer than any fixed wait (0.11.7: past 10 minutes), so wait for that run, then check what visitors get.

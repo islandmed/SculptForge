@@ -65,6 +65,7 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    float twoKeyWindow = 0.4f; // seconds for the second key of a two-key shortcut (0.35 to 1, Preferences > Input)
     float keyNavSpeed = 1.0f; // the pan and zoom keys' speed, times 0.1 to 5 (Preferences > Input)
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
     // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
@@ -73,6 +74,9 @@ struct UiPrefs {
     // target to its depth); over the background, about the target as before. Every input style. On for new installs;
     // a ui.json saved before it existed reads as off, so existing users keep the orbit they know.
     bool orbitAtPointer = true;
+    // Mouse and trackpad rotation drags (every input style): the speed, times 0.1 to 2 (1 = as before; the pen has its
+    // own View speed in Preferences > Tablet).
+    float mouseOrbitSpeed = 1.0f;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;

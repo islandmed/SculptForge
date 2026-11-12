@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/MemoryGuard.h"
+
 #include "core/MeshTransform.h"
 #include "core/SelectionSets.h"
 
@@ -318,14 +320,30 @@ size_t UndoStack::undoBytes() const {
     return total;
 }
 
+size_t UndoStack::budget() const { return byteBudget ? byteBudget : undoBudgetBytes(undoBytes()); }
+
+UndoStack::Notice UndoStack::takeNotice() {
+    Notice n{droppedPending_, overPending_};
+    droppedPending_ = 0;
+    overPending_ = false;
+    return n;
+}
+
 void UndoStack::enforceBudget() {
     size_t total = 0;
     for (const auto& r : undo_) total += r.budgetBytes();
-    while (undo_.size() > 1 && total > byteBudget) {
+    const size_t limit = byteBudget ? byteBudget : undoBudgetBytes(total);
+    const size_t before = droppedPending_;
+    while (undo_.size() > 1 && total > limit) {
         total -= undo_.front().budgetBytes();
         undo_.pop_front();
+        ++droppedPending_;
+        ++droppedTotal_;
         if (listener) listener->undoDroppedOldest();
     }
+    const bool over = undo_.size() == 1 && total > limit;
+    if (over && (!lastStepOver_ || droppedPending_ != before)) overPending_ = true;
+    lastStepOver_ = over;
 }
 
 } // namespace sf

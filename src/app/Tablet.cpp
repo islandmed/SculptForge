@@ -180,6 +180,9 @@ bool App::penSoftCursor() const { return uiPrefs_.tablet.mouseMode && penInProxi
 void App::mapPenPosition(SDL_Event& e) {
     penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
     const Uint64 now = SDL_GetTicksNS();
+    if (e.type >= SDL_EVENT_PEN_PROXIMITY_IN && e.type <= SDL_EVENT_PEN_AXIS) { // (palmGuard, Touch.cpp)
+        palm_.pen(e.type != SDL_EVENT_PEN_PROXIMITY_OUT, double(now) * 1e-9);
+    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;
@@ -572,6 +575,11 @@ void App::drawTabletSection() {
                  "Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and "
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
                  "is where the pen is.",
+                 path);
+    ImGui::Checkbox(tr("Ignore fingers while the pen is near##tablet_palm"), &t.palmRejection);
+    ui::HelpText("Palm rejection", nullptr,
+                 "A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, "
+                 "and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
                  path);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ui::SliderInside("##tablet_view_speed", &t.viewSpeed, 0.1f, 2.0f, "View speed %.2f");

@@ -84,6 +84,7 @@ void usage() {
         "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
         "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
         "  --splash-shot out.png    The start-up splash as a PNG (size from --size, default 1440x810) and exit\n"
+        "  --splash-selftest        Open the splash by each way the window system allows, check its picture, exit\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
         "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
         "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
@@ -243,6 +244,7 @@ static int runMain(int argc, char** argv) {
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
         else if (a == "--splash-shot") options.splashShotPath = next();
+        else if (a == "--splash-selftest") return sf::splash::selfTest(); // (SDL_VIDEO_DRIVER=dummy in the test run)
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
         else if (a == "--benchmark") {
@@ -390,7 +392,25 @@ static int execCli(int argc, char** argv) {
 }
 #endif
 
+#ifdef __ANDROID__
+// Android: no HOME or XDG folders, and the working directory is "/". The app's own storage stands in for them, so
+// settings, the log, autosaves and the brush library land where the desktop code already looks (app/UserData.h).
+static void androidEnvironment() {
+    const std::string internal = SDL_GetAndroidInternalStoragePath() ? SDL_GetAndroidInternalStoragePath() : "";
+    if (internal.empty()) return;
+    setenv("HOME", internal.c_str(), 1);
+    setenv("XDG_DATA_HOME", (internal + "/share").c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (internal + "/config").c_str(), 1);
+    if (const char* cache = SDL_GetAndroidCachePath()) setenv("TMPDIR", cache, 1);
+    std::error_code ec;
+    std::filesystem::current_path(sf::dialogs::androidProjectsDir(), ec);
+}
+#endif
+
 int main(int argc, char** argv) {
+#ifdef __ANDROID__
+    androidEnvironment();
+#endif
 #ifndef _WIN32
     if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
 #endif

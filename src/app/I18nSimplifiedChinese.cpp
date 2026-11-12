@@ -483,6 +483,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"A folder of .obj, .ply or .glb files: insert them one at a time", "存放 .obj、.ply 或 .glb 文件的文件夹：逐个插入"},
     {"Insert set", "插入集"},
     {"[ / ] previous / next   Esc stops", "[ / ] 上一个 / 下一个   Esc 停止"},
+    {"Oldest undo step removed to free memory", "已移除最旧的撤销步骤以释放内存"},
+    {"Oldest %d undo steps removed to free memory", "已移除最旧的 %d 个撤销步骤以释放内存"},
+    {"The last step alone is over the undo budget, so it is kept", "最后一步本身就超过撤销上限，仍会保留"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "GPU 内存不足，无法显示所有部件：请隐藏部分部件或降低一级细分。"},
     {"%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename", "%s\n%zu 个顶点，%zu 个三角形%s%s%s\n点击以选择，双击以重命名"},
@@ -700,8 +703,8 @@ constexpr Entry kSimplifiedChinese[] = {
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "启动时显示"},
     {"Show startup splash", "显示启动画面"},
-    {"Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
-     "启动较慢时显示 SculptForge 标志。快速启动时不显示。下次启动时生效。"},
+    {"Show the SculptForge logo for half a second or more at every start. Turn it off for an instant start. Applies at the next start.",
+     "每次启动时显示 SculptForge 标志至少半秒。关闭后立即启动。下次启动时生效。"},
     {"Show Library at startup", "启动时显示资源库"},
     {"Placement", "位置"},
     {"Top", "上方"},
@@ -710,6 +713,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Library folder", "资源库文件夹"},
     {"Use the default folder", "使用默认文件夹"},
     {"Mouse & pen", "鼠标与笔"},
+    {"Ignore fingers while the pen is near", "笔靠近时忽略手指"},
+    {"Palm rejection", "防误触"},
+    {"A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
+     "绘画时手掌放在屏幕上并不是触控：笔在感应范围内以及离开后的片刻内，落下的手指不会产生任何操作。触控板不会被忽略。在 Android 上默认开启。"},
     {"Mouse mode (relative)", "鼠标模式（相对）"},
     {"Mouse mode", "鼠标模式"},
     {"View speed", "视图速度"},
@@ -1658,6 +1665,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Orbit around the pointer", "以指针为中心环绕"},
     {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
      "从模型上开始的旋转会以指针下的点为中心旋转视图，之后的缩放也在该深度进行。从背景开始时，照旧以视图中心旋转。适用于所有按键风格。"},
+    {"Mouse orbit speed", "鼠标环绕速度"},
+    {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "鼠标或触控板的旋转拖动每移动一个像素，视图转动的幅度，适用于所有按键风格。1x 为通常的转速；视图转得过快时可调低。画笔有自己的视图速度（偏好设置 > 数位板）。"},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
      "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
      "鼠标滚轮会朝指针下的模型位置缩放，该点维持在指针下，而不是朝视图中央。使用 Maya 按键时打开（选择风格时会自动设"
@@ -2436,10 +2445,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "上一笔触每个笔触（笔刷的一步，含所有对称侧）的耗时：查找并移动顶点、更新其法线与 BVH（选择结构），以及将更改"
      "发送到 GPU（每帧）。低于 16 ms 即可跟上 60 Hz 显示器。"},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
-     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their "
      "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
      "visible Parts.",
-     "场景包含的内容：网格与其拓扑、BVH、为了切换而保留的细分层级、撤销历史（编辑最多保留 1 GB，会丢弃最旧的步骤）"
+     "场景包含的内容：网格与其拓扑、BVH、为了切换而保留的细分层级、撤销历史（编辑按可用内存保留，会丢弃最旧的步骤）"
      "、含图层与材质通道的绘制贴图（通道中只有绘制过的 64x64 图块会占用内存），以及可见部件的 GPU 缓冲区。"},
     // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
     {"Measure this computer again (about 2 seconds): the GPU's triangle throughput and upload speed, brush speed and "
@@ -3412,6 +3421,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; the arrow beside it puts the default back.", "点一下，再按新的按键。Esc 取消，Backspace 清除。橙色：已更改；旁边的箭头可恢复默认值。"},
     {"How fast the view moves while a Pan or Zoom key is held (Ctrl+Numpad 4, 6, 8 and 2 pan; Numpad Plus and Minus zoom; rebind them in Hotkeys). 1x is a screen in about two seconds.", "按住平移或缩放键时视图移动的速度（Ctrl+数字键 4、6、8、2 平移；数字键加号与减号缩放；可在快捷键中重新指定）。1x 约两秒移动一个画面。"},
     {"Pan and zoom key speed", "平移与缩放按键速度"},
+    {"Two-key window", "双键时限"},
+    {"How long the second key of a two-key shortcut (\"C then V\") has after the first, whether you press the two together (either one first) or tap them in a row. A key that is part of a two-key shortcut runs its own action once this time is up; every other key runs at once.", "第一个键之后，双键快捷键（“C 然后 V”）的第二个键有多长时间。两个键可同时按下（先后顺序不限），也可以依次按下。属于双键快捷键的键会在这段时间结束后运行自己的操作；其他键则立即运行。"},
+    {"It also works with both keys pressed together.", "两个键同时按下也有效。"},
     {"Puts this action's default shortcut back.", "恢复此动作的默认快捷键。"},
     {"Replace", "替换"},
     {"Replace gives it to '%s' and takes it from there.", "替换会把它给“%s”，并从原来的动作移除。"},
@@ -3420,7 +3432,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"press 2 keys...", "请按两个键…"},
     {"Two different keys. Esc cancels, Backspace removes the two-key shortcuts.", "两个不同的键。Esc 取消，Backspace 删除双键快捷键。"},
     {"Two keys in a row", "连续两个键"},
-    {"Adds a second shortcut that takes two different keys one after the other, like A then S (within half a second). The first key still works alone if it is bound; it runs when no second key follows.", "添加一个需依次按下两个不同键的快捷键，例如先按 A 再按 S（半秒内）。第一个键若已绑定，仍可单独使用：没有第二个键时才会运行。"},
+    {"Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key window in Preferences > Input), or both pressed together. Each key still works alone if it is bound; it runs when the window is up and the other key did not come.", "添加一个需依次按下两个不同键的快捷键，例如先按 A 再按 S（在“偏好设置 > 输入”的双键时限内），也可以两个键同时按下。每个键若已绑定，仍可单独使用：时限结束且另一个键没有按下时才会运行。"},
     {"Reset to default", "恢复默认"},
     {"Pan left", "向左平移"},
     {"Pan right", "向右平移"},
@@ -4892,8 +4904,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "副本之间的间距，以该部件的长度计：1 为一个接一个，更小则像链环一样重叠。"},
     {"How many degrees each copy is turned about the curve more than the one before: 90 for chain links.",
      "每个副本绕曲线比前一个多转的角度：链环用 90。"},
-    {"How many strands the rope or braid has. One round strand is a spring; Spread opens it up.",
-     "绳子或辫子有几股。一股圆形绳股就是螺旋线；“展开”可把它拉开。"},
+    {"How many strands the rope or braid has (a braid starts with two). One round strand is a spring; Spread opens it up.",
+     "绳子或辫子有几股（辫子默认两股）。一股圆形绳股就是螺旋线；“展开”可把它拉开。"},
     {"Part to repeat",
      "要重复的部件"},
     {"Pick a Part...",
@@ -4916,12 +4928,12 @@ constexpr Entry kSimplifiedChinese[] = {
      "其副本沿曲线排列的部件：链环、圆球、鳞片。它最长的一边顺着曲线。"},
     {"Rope",
      "绳索"},
-    {"Rope and braid: how far apart the strands are (0.5: touching). Sleeve: how thick the wall is.",
-     "绳索与辫子：各股相距多远（0.5：相互接触）。袖管：管壁厚度。"},
+    {"Rope: how far apart the strands are (0.5: touching). Braid: how loose the weave is (0: strands packed together, 1: apart, long turns). Sleeve: how thick the wall is.",
+     "绳索：各股相距多远（0.5：相互接触）。辫子：编织有多松（0：各股紧贴，1：相距很远、绕距很长）。袖管：管壁厚度。"},
     {"Sleeve",
      "袖管"},
-    {"Three flat strands woven across each other: plaits, straps, braided hair (for new tubes, and the active Tube Part). Spread sets how far apart the strands are.",
-     "三股扁平的线相互交织：辫子、带子、编发（用于新管与当前的 Tube 部件）。“展开”设置各股相距多远。"},
+    {"Round strands twisted over and under each other, two by default: braided cord, plaits, hair (for new tubes, and the active Tube Part). Spread sets how tight the weave is: 0 packs the strands together, 1 opens it up.",
+     "圆形的股相互上下交缠，默认两股：编绳、辫子、编发（用于新管与当前的 Tube 部件）。“展开”设置编织的松紧：0 使各股紧贴，1 使其张开。"},
     {"Three strands wound round the curve: rope, cable, twine. Spread sets how far apart the strands are, Twist and Spin turn them (for new tubes, and the active Tube Part).",
      "三股线绕着曲线缠绕：绳索、缆线、细绳。“展开”设置各股相距多远，“扭转”和“旋转”使它们转动（用于新管与当前的 Tube 部件）。"},
     {"Tube from curve",
@@ -4946,6 +4958,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "厚度 %.2f"},
     {"Triangle",
      "三角形"},
+    {"Spin %.0f\xc2\xb0",
+     "旋转 %.0f\xc2\xb0"},
     {"Turn %.0f\xc2\xb0",
      "旋转 %.0f\xc2\xb0"},
     {"Turns the cross-section about the curve, in degrees.",

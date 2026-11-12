@@ -5,6 +5,58 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.11
+
+```features
+date: 2026-11-12
+tagline: Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.
+highlight: Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before
+highlight: The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy
+highlight: Inflate over a Crease no longer tears the surface (#194)
+highlight: Palette Knife and Nudge no longer fold the surface (#198, #199)
+highlight: The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)
+```
+
+- **Nudge and Palette Knife fold the surface less**: a second stroke across a dragged area leaves fewer creases, and
+  Nudge's two halves agree under symmetry.
+- **Startup splash on every start**: the logo and version now show at every start for at least half a second, centred,
+  then fade into the main window, and it now shows on Wayland, where it never appeared. **Preferences > Interface >
+  Show startup splash** turns it off for an instant start.
+- **Inflate over a Crease groove**: stacked Crease and Inflate strokes no longer tear needles and streaks into a
+  divided mesh.
+
+## Version 0.12.10
+
+```features
+date: 2026-11-11
+tagline: Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.
+highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
+highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
+highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)
+highlight: Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge
+```
+
+- **Crisp Flatten** only cuts now: it lowers what is above its plane and never raises or adds clay, and the edges of
+  its facets are clean; pen pressure no longer changes how deep it cuts.
+- **Mouse orbit speed** in **Preferences > Input**: slow the mouse or trackpad turn down (0.1x to 2x) if the view
+  spins too fast.
+- **Symmetry with textured brushes**: Dragon Scales, Skin Pores, Wood Grain and the other textured and turning-stamp
+  brushes now sculpt the same pattern on both sides of X symmetry.
+
+## Version 0.12.9
+
+```features
+date: 2026-11-11
+tagline: Brush Size and Intensity follow the mouse, and Undo is faster on dense models.
+highlight: Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live
+highlight: A click elsewhere after moving keeps the new Size or Intensity
+highlight: Faster Undo and Redo of a stroke on dense models of several million triangles (#181)
+```
+
+- **Faster Undo and Redo on dense models**: Ctrl+Z / Ctrl+Shift+Z of a brush stroke on a model of several million
+  triangles no longer stalls for half a second; it takes a few milliseconds. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
+
 ## Version 0.12.8
 
 ```features

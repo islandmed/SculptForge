@@ -10,6 +10,7 @@
 //  5. stitches: copies of a point on a shared edge or corner are averaged (they differ only where a brush read
 //     neighbours, like Smooth), so the surface stays closed.
 #include "core/Micro.h"
+#include "core/AtomicRef.h"
 #include "core/FocusDetail.h"
 
 #include "core/BVH.h"
@@ -240,7 +241,7 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
     const uint32_t epoch = dabEpoch_;
     auto inDab = [&](uint32_t t) { return dabStamp_[t] == epoch; };
     if (stitchStamp_.size() != mm.baseTriangles) stitchStamp_.assign(mm.baseTriangles, 0);
-    auto hit = [&](uint32_t t) { std::atomic_ref<uint32_t>(stitchStamp_[t]).store(epoch, std::memory_order_relaxed); };
+    auto hit = [&](uint32_t t) { AtomicRef<uint32_t>(stitchStamp_[t]).store(epoch, std::memory_order_relaxed); };
     // Edges: each shared edge once, by the lower triangle of the two (both in this dab), or copied from a hidden
     // neighbour (which brushes leave alone).
     poolFor(tris.size(), [&](size_t b, size_t e) {

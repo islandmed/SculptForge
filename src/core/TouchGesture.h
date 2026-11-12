@@ -49,4 +49,23 @@ private:
 // on screen by about the same factor. 0 for a scale that isn't finite and positive.
 float pinchZoomSteps(float scale);
 
+// Palm rejection: the hand holding a pen rests on the screen. A finger that lands while the pen is in range, or within
+// kAfterPen seconds of its leaving, is a palm, not a gesture. Seconds are any steady clock's.
+class PalmGuard {
+public:
+    static constexpr double kAfterPen = 0.3;
+    // A pen in range sends hover events all the while; none for this long means it left without telling us (a driver
+    // that never sends the proximity-out), and fingers count again.
+    static constexpr double kSilent = 3.0;
+    double afterPen = kAfterPen; // (a UI test stretches it: its frames run faster than the clock)
+    double silent = kSilent;
+    void pen(bool inRange, double now) { inRange_ = inRange; lastEvent_ = now; nearUntil_ = now + afterPen; } // any pen event
+    bool active(double now) const { return (inRange_ && now < lastEvent_ + silent) || now < nearUntil_; }
+
+private:
+    bool inRange_ = false;
+    double lastEvent_ = 0.0;
+    double nearUntil_ = 0.0;
+};
+
 } // namespace sf

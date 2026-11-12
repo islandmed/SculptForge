@@ -30,35 +30,28 @@ TEST(splash_only_for_a_person_with_a_window_system_and_the_preference_on) {
     CHECK(!splash::enabled(splash::Setting{})); // (the default is not interactive)
 }
 
-TEST(splash_is_due_only_after_300_ms_once_and_only_when_enabled) {
-    CHECK(!splash::due(true, false, 0.0));
-    CHECK(!splash::due(true, false, 299.0));
-    CHECK(!splash::due(true, false, splash::kShowAfterMs)); // (a start of exactly 300 ms is quick enough)
-    CHECK(splash::due(true, false, 301.0));
-    CHECK(splash::due(true, false, 5000.0));
-    CHECK(!splash::due(true, true, 5000.0));  // already open
-    CHECK(!splash::due(false, false, 5000.0)); // not enabled
+TEST(splash_is_due_at_the_first_checkpoint_of_every_interactive_start_once) {
+    CHECK(splash::due(true, false));  // every start: a brand moment, however fast the start-up is
+    CHECK(!splash::due(true, true));  // already open (or tried)
+    CHECK(!splash::due(false, false)); // not enabled
 }
 
-TEST(splash_can_be_forced_with_sf_splash_1_to_see_it_on_a_fast_machine) {
+TEST(splash_can_be_forced_with_sf_splash_1_whatever_the_preference) {
     CHECK(splash::forcedFromEnv("1"));
     CHECK(!splash::forcedFromEnv(nullptr));
     CHECK(!splash::forcedFromEnv(""));
     CHECK(!splash::forcedFromEnv("0"));
     CHECK(!splash::forcedFromEnv("yes"));
-    CHECK(splash::due(true, false, 5.0, 0.0)); // forced: due at the first checkpoint
-    CHECK(!splash::due(true, false, 5.0));     // normal: a start under 300 ms never shows it
-    CHECK(!splash::due(true, false, 0.0, 0.0));
 }
 
-TEST(splash_once_shown_stays_a_minimum_time_and_a_fast_start_is_never_held) {
+TEST(splash_stays_at_least_half_a_second_and_adds_nothing_to_a_slower_start) {
+    CHECK(splash::kMinVisibleMs == 500.0);
     CHECK(splash::holdMs(0.0) == splash::kMinVisibleMs); // opened and the first frame is already there: stays the minimum
     CHECK(splash::holdMs(100.0) == splash::kMinVisibleMs - 100.0);
     CHECK(splash::holdMs(splash::kMinVisibleMs) == 0.0);
     CHECK(splash::holdMs(5000.0) == 0.0); // a slow start that showed it for seconds: no extra wait
     CHECK(splash::holdMs(-3.0) == splash::kMinVisibleMs); // (a clock that stepped back never waits longer than the minimum)
-    // A start under the threshold never opens the splash, so holdMs is never asked: nothing is added to a fast start.
-    CHECK(!splash::due(true, false, 110.0));
+    CHECK(splash::kFadeMs > 0.0 && splash::kFadeMs <= 250.0); // the fade into the main window is short
 }
 
 TEST(splash_preference_is_on_unless_ui_json_turns_it_off) {

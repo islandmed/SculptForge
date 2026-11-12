@@ -157,6 +157,8 @@ jobs:
     with:
       ref: ${{ needs.locate.outputs.sha }}
       tag: ${{ needs.locate.outputs.tag }}
+    secrets:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }} # the build from the tag signs too (SIGNING=signpath); unused otherwise
 
   # Every package against its run's recorded SHA-256 and its attestation (tools/release/verify_staged.py). Dry runs
   # too; not for promote_run (a dry run's look at any run's packages).
@@ -191,7 +193,8 @@ jobs:
           SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
           STAGED: ${{ needs.locate.outputs.staged }}
           REF: ${{ needs.locate.outputs.built-ref }}
-        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
+          SIGNED: ${{ vars.SIGNING == 'signpath' && '1' || '' }} # signing is on: packages staged unsigned (built before it was turned on) are refused
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"} ${SIGNED:+--require-signed}
 
   smoke:
     name: Smoke test ${{ matrix.name }}
@@ -456,8 +459,11 @@ jobs:
           [ -n "$GH_TOKEN" ] || { echo "::error::No INSIDERS_REPO_TOKEN in the member-release environment"; exit 1; }
           pre=${TAG#*-}
           title="SculptForge ${TAG%%-*} $(sed -E 's/^rc/RC/; s/^./\U&/; s/\./ /g' <<<"$pre")" # v0.11.0-beta.1: "SculptForge 0.11.0 Beta 1"
+          # This checkout has the tag, the insiders repository does not: --target makes gh create the tag there (at that repository's
+          # default branch) instead of refusing with "tag exists locally but has not been pushed" (v0.12.11-beta.1). Same tag name.
+          branch=$(gh api "repos/$GH_REPO" --jq .default_branch) || { echo "::error::cannot read the default branch of $GH_REPO"; exit 1; }
           gh release view "$TAG" >/dev/null 2>&1 ||
-            gh release create "$TAG" --title "${title/SculptForge v/SculptForge }" --notes-file notes.md --prerelease --latest=false
+            gh release create "$TAG" --target "$branch" --title "${title/SculptForge v/SculptForge }" --notes-file notes.md --prerelease --latest=false
           gh release upload "$TAG" dist/* --clobber
       - name: Post the beta in #members
         env:

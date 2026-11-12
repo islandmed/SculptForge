@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge Benchmarks</title>
-  <meta name="description" content="Sculpting 15 and 33 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. One command reproduces it on yours.">
-  <meta property="og:title" content="SculptForge benchmarks: 15M and 33M triangles, measured">
-  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 15 and 33 million triangle head. Run sculptforge --benchmark standard-15m and compare for yourself.">
+  <meta name="description" content="Sculpting 33 to 201 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. One command reproduces it on yours.">
+  <meta property="og:title" content="SculptForge benchmarks: 33M to 201M triangles, measured, with raw results">
+  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 201 million. Run sculptforge --benchmark standard-33m and compare for yourself.">
   <meta property="og:url" content="https://sculptforge.app/benchmarks/">
   <link rel="canonical" href="https://sculptforge.app/benchmarks/">
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
@@ -67,10 +67,19 @@
 <body>
 <main>
   <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a> / <a href="../performance/">What we're building</a></p>
-  <h1>15 and 33 million triangles, measured</h1>
+  <h1>33 to 201 million triangles, measured</h1>
   <p class="lede muted">Can an open-source sculpting app handle high-poly work? Don't take our word for it. These are
-    SculptForge's own numbers on a 15 and a 33 million triangle head, from a benchmark anyone can run with one command,
+    SculptForge's own numbers on a 15 and a 33 million triangle head and on micro-level scenes up to 201 million triangles, from a benchmark anyone can run with one command,
     on the same scene with the same strokes. Run it on your computer and compare.</p>
+
+  <div class="card small" id="published">
+    <strong>What is listed below (2026-11-12, development build, commit 308f83c, after 0.12.10).</strong> Three runs each of
+    <code>--benchmark standard-33m</code>, <code>core-100m</code>, <code>core-200m</code> (micro levels, 104 and 201 million micro triangles)
+    and <code>--benchmark --benchmark-sizes 100</code> (a subdivided sphere of 104 million triangles), on the release package,
+    one at a time, no video. Every row has a <em>Raw</em> link to the JSON exactly as the program wrote it (the hardware fields are what the program reports;
+    nothing else is added). The simulated low-end rows were run with <code>SF_HW_SIMULATE=floor SF_GOVERNOR=0</code> on the laptop listed; that setting is not part of the JSON,
+    so those rows say it in their machine line. The headline figures on the <a href="../fast/">How fast?</a> page are the medians of these rows.
+  </div>
 
   <h2 id="run">Run it yourself in 3 steps</h2>
   <ol class="steps">
@@ -80,7 +89,8 @@
     <li><strong>Run the standard scene</strong>
       <p><strong>Help &gt; Benchmark</strong>, choose <em>Standard 15M</em> or <em>33M</em>, Start. Or from a terminal:</p>
       <pre><code>sculptforge --benchmark standard-15m
-sculptforge --benchmark standard-33m</code></pre></li>
+sculptforge --benchmark standard-33m
+sculptforge --benchmark core-100m</code></pre></li>
     <li><strong>Read the result</strong>
       <p>About a minute per size. A table shows the numbers; a JSON file and an MP4 of the run (with the numbers on
         screen) are saved. <a href="#submit">Send the JSON</a> to be listed here.</p></li>
@@ -115,14 +125,27 @@ sculptforge --benchmark standard-33m</code></pre></li>
         <th>Machine</th><th>OS</th><th>Processor</th><th>Graphics</th><th class="num">RAM</th><th>Build</th>
         <th class="num">fps</th><th class="num">Frame p50</th><th class="num">p95</th><th class="num">p99</th>
         <th class="num">Lag p50</th><th class="num">p95</th><th class="num">Worst stall</th>
-        <th class="num">Peak RAM</th><th class="num">GPU</th><th>Video</th>
+        <th class="num">Peak RAM</th><th class="num">GPU</th><th>Video</th><th>Raw</th>
       </tr></thead>
-      <tbody id="rows"><tr><td colspan="16" class="empty muted">Loading results...</td></tr></tbody>
+      <tbody id="rows"><tr><td colspan="17" class="empty muted">Loading results...</td></tr></tbody>
     </table>
   </div>
   <p class="small muted">Worst stall, peak RAM and GPU memory are for the whole run of that size (every stroke).
     Colours: green within a 60 Hz frame (16.7 ms), amber within two, red slower. Raw data:
     <a href="results.json">results.json</a>.</p>
+
+  <h2 id="sizes">Dab time and view speed by mesh size</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Mesh</th><th class="num">Dab, medium (ms)</th><th class="num">Dab, large (ms)</th><th class="num">View, 4% of triangles drawn, 4x AA (fps)</th><th class="num">View, 4% drawn, Fast Navigation (fps)</th></tr></thead>
+    <tbody>
+      <tr><td>4 million triangles</td><td class="num">2.9 (2.9 to 3.0)</td><td class="num">7.2</td><td class="num">1960 (1887 to 1980)</td><td class="num">5554 (5141 to 5584)</td></tr>
+      <tr><td>16 million triangles</td><td class="num">5.2 (5.0 to 5.3)</td><td class="num">18.3</td><td class="num">1137 (1129 to 1143)</td><td class="num">2633 (2553 to 2691)</td></tr>
+      <tr><td>33 million triangles</td><td class="num">8.3 (7.5 to 13.1)</td><td class="num">37.5</td><td class="num">724 (722 to 725)</td><td class="num">2345 (2238 to 2371)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="small muted">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="raw/bench-sizes-1.md">run 1</a>, <a href="raw/bench-sizes-2.md">run 2</a>, <a href="raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure. This is the laptop without the simulated entry-level limits, so it is not the entry-level tier; the simulated entry-level rows are on <a href="../fast/">How fast?</a>.</p>
 
   <h2 id="submit">Submit your result</h2>
   <div class="grid2">
@@ -160,9 +183,10 @@ python3 tools/benchmark/submit.py add result.json \
   const $ = (id) => document.getElementById(id);
   const rows = $("rows"), sceneSel = $("scene"), phaseSel = $("phase"), count = $("count");
   const SCENES = [["standard-15m", "Standard 15M (head)", "15M"], ["standard-33m", "Standard 33M (head)", "33M"],
-                  ["spheres", "Spheres, older runs", ""]];
+                  ["core-100m", "Core 100M (micro levels)", "100M micro"], ["core-200m", "Core 200M (micro levels)", "200M micro"], ["spheres", "Spheres (100M and older runs)", ""]];
   const STANDARD_PHASES = [["clay small", "Clay 25 px"], ["clay medium", "Clay 60 px"], ["clay large", "Clay 120 px"],
                            ["move", "Move 80 px"], ["smooth", "Smooth 60 px"], ["240 px brush", "Clay 240 px"], ["orbit", "Orbit"]];
+  const CORE_PHASES = [["clay small", "Clay small"], ["clay large", "Clay large"], ["240 px brush", "Clay 240 px"], ["orbit", "Orbit"], ["still", "Still view"]];
   const SPHERE_PHASES = [["stroke", "60 px brush"], ["large brush stroke", "240 px brush"], ["orbit", "Orbit"]];
   let results = [];
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -176,12 +200,12 @@ python3 tools/benchmark/submit.py add result.json \
   function runsFor(r, scene) {
     const runs = r.runs || [];
     if (scene === "spheres") return r.scene ? [] : runs;
-    if (r.scene !== scene && r.scene !== "standard") return [];
+    if (r.scene !== scene && !(r.scene === "standard" && scene.startsWith("standard-"))) return [];
     const label = SCENES.find((x) => x[0] === scene)[2];
     return runs.filter((x) => x.label === label);
   }
   function fillPhases() {
-    const list = sceneSel.value === "spheres" ? SPHERE_PHASES : STANDARD_PHASES, keep = phaseSel.value;
+    const list = sceneSel.value === "spheres" ? SPHERE_PHASES : sceneSel.value.startsWith("core-") ? CORE_PHASES : STANDARD_PHASES, keep = phaseSel.value;
     phaseSel.innerHTML = "";
     list.forEach(([v, t]) => phaseSel.add(new Option(t, v)));
     if (list.some(([v]) => v === keep)) phaseSel.value = keep;
@@ -208,7 +232,7 @@ python3 tools/benchmark/submit.py add result.json \
     out.sort((a, b) => (a.run.triangles - b.run.triangles) || (((a.ph.frame_ms || {}).p50 || 0) - ((b.ph.frame_ms || {}).p50 || 0)));
     count.textContent = out.length ? `${out.length} result${out.length === 1 ? "" : "s"}` : "";
     if (!out.length) {
-      rows.innerHTML = '<tr><td colspan="16" class="empty muted">No results for this scene yet. Run it and <a href="#submit">send yours</a>.</td></tr>';
+      rows.innerHTML = '<tr><td colspan="17" class="empty muted">No results for this scene yet. Run it and <a href="#submit">send yours</a>.</td></tr>';
       return;
     }
     rows.innerHTML = out.map(({ r, run, ph }) => {
@@ -218,23 +242,30 @@ python3 tools/benchmark/submit.py add result.json \
       const video = r.video && /^https:\/\//.test(r.video) ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-";
       const stall = num(run.worst_stall_ms) ? run.worst_stall_ms : ph.worst_stall_ms;
       const gpu = num(run.vram_used_mb) && !/Apple|unified/i.test(hw.gpu || "") ? run.vram_used_mb : run.gpu_buffers_mb;
+      const rawLink = r.raw && /^raw\/[a-z0-9._-]+\.json$/.test(r.raw) ? `<a href="${esc(r.raw)}">JSON</a>` : "-";
       return "<tr>" + machineCell(r, run) +
         `<td>${esc((hw.os || "").replace(/\s*\(.*\)$/, ""))}</td><td>${esc(hw.cpu)}</td><td>${esc((hw.gpu || "").split(",")[0])}</td>` +
         td(num(hw.ram_gb) ? esc(hw.ram_gb) + " GB" : "-") + `<td>${esc(app.version)}${commit}</td>` +
         td(num(ph.fps) ? ph.fps.toFixed(0) : "-") + td(ms(f.p50), cls(f.p50)) + td(ms(f.p95), cls(f.p95)) + td(ms(f.p99), cls(f.p99)) +
         td(phase === "orbit" ? "-" : px(lag.p50)) + td(phase === "orbit" ? "-" : px(lag.p95)) +
         td(ms(stall), num(stall) ? (stall <= 100 ? "ok" : stall <= 500 ? "meh" : "slow") : "") +
-        td(mb(run.peak_ram_mb)) + td(mb(gpu)) + `<td>${video}</td></tr>`;
+        td(mb(run.peak_ram_mb)) + td(mb(gpu)) + `<td>${video}</td><td>${rawLink}</td></tr>`;
     }).join("");
   }
   SCENES.forEach(([v, t]) => sceneSel.add(new Option(t, v)));
+  sceneSel.value = "standard-33m"; // the scene with the most published rows
   fillPhases();
+  try { // links like ?scene=core-100m&phase=orbit#results pick what the table shows
+    const q = new URLSearchParams(location.search), sc = q.get("scene"), ph = q.get("phase");
+    if (sc && SCENES.some(([v]) => v === sc)) { sceneSel.value = sc; fillPhases(); }
+    if (ph && [...phaseSel.options].some((o) => o.value === ph)) phaseSel.value = ph;
+  } catch (e) { /* the defaults */ }
   sceneSel.addEventListener("change", () => { fillPhases(); render(); });
   phaseSel.addEventListener("change", render);
   fetch("results.json", { cache: "no-cache" })
     .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
     .then((data) => { results = Array.isArray(data.results) ? data.results : []; render(); })
-    .catch(() => { rows.innerHTML = '<tr><td colspan="16" class="empty muted">The results could not be loaded.</td></tr>'; });
+    .catch(() => { rows.innerHTML = '<tr><td colspan="17" class="empty muted">The results could not be loaded.</td></tr>'; });
 })();
 </script>
 </body>

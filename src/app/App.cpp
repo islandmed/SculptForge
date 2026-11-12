@@ -253,7 +253,11 @@ bool App::init(const AppOptions& options) {
     }
     glContext_ = sharedContext_ ? sharedContext_ : SDL_GL_CreateContext(window_);
     if (!glContext_) {
+#ifdef SF_GLES
+        startError_ = std::string("OpenGL ES 3.2 is not available: ") + SDL_GetError();
+#else
         startError_ = std::string("OpenGL 3.3 is not available: ") + SDL_GetError();
+#endif
         SDL_Log("OpenGL 3.3 context creation failed: %s", SDL_GetError());
         return false;
     }
@@ -340,7 +344,11 @@ bool App::init(const AppOptions& options) {
     }
     applyLook(); // Preferences > Interface > Look (after the fonts it may switch to)
     ImGui_ImplSDL3_InitForOpenGL(window_, glContext_);
+#ifdef SF_GLES
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init("#version 330 core");
+#endif
 
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
@@ -348,6 +356,13 @@ bool App::init(const AppOptions& options) {
     splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
+    actions_.setAloneHook([this](SDL_Keycode key, bool begin) { // a first key that waited: a pie menu on it holds open only while it is down
+        if (!begin) keyDown_ = aloneSavedKey_;
+        else {
+            aloneSavedKey_ = keyDown_;
+            keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
+        }
+    });
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
@@ -466,13 +481,14 @@ void App::splashCheckpoint() {
         return;
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
-    if (!splash::due(true, splashShown_, ms, splashForced_ ? 0.0 : splash::kShowAfterMs)) return;
+    if (!splash::due(true, splashShown_)) return;
     splashShown_ = true; // (once: a window system that said no isn't asked again)
     auto window = std::make_unique<splash::Window>();
-    if (window->open(splashVersionLine())) {
+    if (window->open(splashVersionLine(), splash::pathFromEnv(std::getenv("SF_SPLASH_PATH")))) { // (SF_SPLASH_PATH: one way only, to check it)
         splash_ = std::move(window);
         splashOpenedAt_ = std::chrono::steady_clock::now();
-        SDL_Log("Start-up splash shown after %.0f ms", ms);
+        SDL_Log("Start-up splash shown after %.0f ms (%s)", ms,
+                splash_->usedPath() == splash::Path::Surface ? "window surface" : splash_->usedPath() == splash::Path::Renderer ? "renderer" : "software renderer");
     } else
         SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
     makeMainContextCurrent(true);
@@ -480,7 +496,7 @@ void App::splashCheckpoint() {
 
 void App::revealMainWindow() {
     mainWindowHidden_ = false;
-    if (splash_) { // up for at least kMinVisibleMs, so it is seen (only a start that showed it waits; a fast start never gets here)
+    if (splash_) { // up for at least kMinVisibleMs, so it is seen (a start slower than that waits for nothing)
         const double visible = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count();
         for (double left = splash::holdMs(visible); left > 0.0; left -= 16.0) {
             splash_->pump();
@@ -492,6 +508,7 @@ void App::revealMainWindow() {
         SDL_RaiseWindow(window_);
     }
     activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.5); // (a few frames for the window system to map it)
+    if (splash_) splash_->fadeOut(splash::kFadeMs); // (the main window is under it, already drawn: no black frame between)
     closeSplash();
 }
 
@@ -499,15 +516,25 @@ std::string App::splashVersionLine() { return std::string(tr("Version")) + " " +
 
 void App::closeSplash() {
     const bool wasOpen = splash_ != nullptr;
+    if (wasOpen)
+        SDL_Log("Start-up splash closed after %.0f ms on screen",
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count());
     splash_.reset();
     if (wasOpen) makeMainContextCurrent(true);
 }
 
 void App::glWindowAttributes() {
+#ifdef SF_GLES
+    // Android (SCULPTFORGE_GLES): OpenGL ES 3.2; render/GL.cpp compiles the shaders as GLSL ES 3.20.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+#endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     // No multisampling in the window: the 3D view antialiases in its own target (Renderer::drawView), so it can
@@ -1757,6 +1784,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
+    if (palmMouseEvent(e)) return; // a palm resting by the pen: not a click anywhere (Touch.cpp)
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
@@ -1771,6 +1799,16 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         requestQuit();
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_DID_ENTER_BACKGROUND:
+        // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
+        // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
+        autosaveRevision_ = ~uint64_t(0);
+        tickProject(0.0f);
+        autosavePrefs(true);
+        break;
+#endif
     case SDL_EVENT_JOYSTICK_ADDED:
     case SDL_EVENT_JOYSTICK_REMOVED:
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
@@ -1828,8 +1866,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
+        // (Nor while the S / U / I / O pop-up follows the pointer: that click keeps or cancels the value.)
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
-            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y))) {
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this)) {
             mouseClicks_ = e.button.clicks;
             onMouseDown(e.button.x, e.button.y, e.button.button);
             mouseClicks_ = 1;
@@ -1861,9 +1900,10 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
-            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
+            onKey(e.key.key, e.key.mod, true); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
+        actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
         std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
@@ -2210,7 +2250,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !fromPen); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2291,7 +2331,7 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float x, float y, float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2306,9 +2346,15 @@ void App::orbitBy(float x, float y, float dx, float dy) {
         orbitStarted_ = true;
     }
     const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    // Preferences > Input > Mouse orbit speed scales the angle per pixel in every input style; the pen's drags were
+    // scaled by its own View speed already. The roll's sweep is an angle about the view's centre: scaled the same.
+    const float speed = mouse && !forceTurntable_ ? clampMouseOrbitSpeed(uiPrefs_.mouseOrbitSpeed) : 1.0f;
+    const float roll = (lock == 2 || lock == 3) ? rollSweep(x, y, dx, dy) : 0.0f;
+    dx *= speed;
+    dy *= speed;
     if (lock == 1) orbitRaw_.orbit(dx, dy);
-    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
-    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, roll * speed);
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, roll * speed);
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
     const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();
@@ -2406,7 +2452,7 @@ void App::onMouseUp() {
     penNavButton_ = 0;
 }
 
-void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
@@ -2458,7 +2504,8 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
-    actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
     keyDown_ = SDLK_UNKNOWN;
 }
 
@@ -3335,6 +3382,7 @@ void App::syncScene() {
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;
 }
@@ -3367,9 +3415,32 @@ void App::generateLods() {
 }
 
 void App::clearLods() {
+    // The LODs go; the shown mesh changes only when one was previewed. Otherwise syncScene keeps sending just what
+    // changed (an undo on a 6M triangle mesh was a full upload and proxy rebuild each, half a second, #181).
+    const bool previewed = previewLod_ >= 0;
     lods_.clear();
     previewLod_ = -1;
-    lastDisplayed_ = nullptr;
+    if (previewed) lastDisplayed_ = nullptr;
+}
+
+void App::updateUndoNotice() {
+    size_t dropped = 0;
+    bool over = false;
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const UndoStack::Notice n = doc_.partUndo(i).takeNotice();
+        dropped += n.dropped;
+        over = over || n.lastStepOver;
+    }
+    if (!dropped && !over) return;
+    std::string msg;
+    if (dropped) {
+        char buf[160];
+        std::snprintf(buf, sizeof buf, dropped == 1 ? tr("Oldest undo step removed to free memory") : tr("Oldest %d undo steps removed to free memory"),
+                      int(dropped));
+        msg = buf;
+    }
+    if (over) msg += (msg.empty() ? "" : ". ") + std::string(tr("The last step alone is over the undo budget, so it is kept"));
+    status_ = msg;
 }
 
 void App::updateTitle() {
@@ -4866,8 +4937,11 @@ void App::drawBrushCursor() {
     if (sizeRingPreview_) {
         at = glm::vec2(opened.x, opened.y);
         if (which == PickerUi::Slider::DrawSize) r = value;
-        else focal = value;
+        else if (which == PickerUi::Slider::FocalShift) focal = value;
+        else r = radiusPx_; // Intensity: the ring keeps the size, the disc inside it is the strength
         sizeRingPreviewPx_ = r;
+        sizeRingPreviewValue_ = value;
+        sizeRingPreviewIntensity_ = which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity;
     }
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
@@ -4901,6 +4975,18 @@ void App::drawBrushCursor() {
             dl->AddCircle(c, r * focalRingFraction(focal), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
+        }
+    }
+    if (sizeRingPreview_) {
+        // While a pop-up sets it, the ring must read on any model and in both themes: a dark halo under a full-strength
+        // ring, flat on the screen (the surface ring above lies on the model and can be faint at a glancing angle).
+        const ImU32 solid = (col & 0x00ffffff) | 0xff000000;
+        dl->AddCircle(c, r, IM_COL32(0, 0, 0, 170), 64, 4.0f * uiScale_);
+        dl->AddCircle(c, r, solid, 64, 2.0f * uiScale_);
+        if (sizeRingPreviewIntensity_) { // Intensity: a disc whose radius is the strength, an opacity ring at its rim
+            const float rr = r * std::clamp(sizeRingPreviewValue_, 0.0f, 1.0f);
+            dl->AddCircleFilled(c, rr, (solid & 0x00ffffff) | (150u << 24), 64);
+            dl->AddCircle(c, rr, IM_COL32(255, 255, 255, 230), 64, 1.5f * uiScale_);
         }
     }
     // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of

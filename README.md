@@ -5,7 +5,7 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
-  <strong>New in 0.12.8:</strong> reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts (<a href="https://sculptforge.app/guide/reference-images.html">how it works</a>)
+  <strong>New in 0.12.11:</strong> braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less (<a href="https://sculptforge.app/guide/whats-new.html#version-01211">how it works</a>)
 </p>
 
 <p align="center">

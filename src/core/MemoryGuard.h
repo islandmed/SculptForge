@@ -18,8 +18,26 @@ class Mesh;
 // Memory the system can still hand out now: Linux MemAvailable, macOS free + inactive + purgeable pages, Windows
 // available physical memory. 0 = unknown. The override (or SF_AVAILABLE_MEMORY_MB) replaces it, for tests.
 size_t availableMemoryBytes();
+// availableMemoryBytes() as it was at most a second ago: for work that asks on every step (the undo budget).
+size_t availableMemoryBytesCached();
 // Tests: pretend this much memory is free; 0 goes back to asking the system.
 void setAvailableMemoryOverride(size_t bytes);
+
+// The computer's physical memory (0 = unknown). SF_TOTAL_MEMORY_MB or the override replaces it, for tests and for
+// checking an 8 GB machine on a bigger one.
+size_t totalMemoryBytes();
+void setTotalMemoryOverride(size_t bytes);
+
+// The undo history's byte budget (UndoStack::budget): clamp(a quarter of the total memory, 256 MB, what the history
+// holds now + the free memory beyond the margin; below the margin, what it holds minus the shortfall). The history's
+// own bytes count as room because they are what the free figure already lost: without them a growing history would
+// shrink its own budget. Free memory unknown (0) is
+// the fixed 1 GiB the history had before; a total that is unknown caps at 1 GiB too. The floor wins over the cap.
+inline constexpr size_t kUndoBudgetUnknown = size_t(1) << 30;
+inline constexpr size_t kUndoBudgetMin = size_t(256) << 20;
+size_t undoBudgetFor(size_t totalBytes, size_t availableBytes, size_t heldBytes);
+// ... with the system's figures (free memory read at most once a second).
+size_t undoBudgetBytes(size_t heldBytes);
 
 // Room kept on top of a need: max(512 MB, a tenth of it).
 size_t memoryMargin(size_t needBytes);

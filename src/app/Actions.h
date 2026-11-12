@@ -7,6 +7,7 @@
 // "cmd.<name>", so anything scriptable is reachable from the UI.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/Json.h"
@@ -52,7 +53,9 @@ std::vector<std::string> chordKeys(std::string_view chord);
 
 // Two keys in a row (Artizmo on Discord): "A then S". Two different keys, never the same key twice; each step is a
 // chord, so "Ctrl+K then C" works too. In an action's shortcut text a sequence is one more alternative ("A then S / F5").
-constexpr float kKeySequenceSeconds = 0.5f; // the second key must come within this long of the first
+// The second key must come within this long of the first, whether the first is already up (tap, tap) or still held
+// (the two pressed together, in either order: the key that ends a sequence waits too, for the key that begins it). Preferences > Input > Two-key window sets it between kKeySequenceMin and Max.
+constexpr float kKeySequenceSeconds = 0.4f, kKeySequenceMin = 0.35f, kKeySequenceMax = 1.0f;
 constexpr std::string_view kThen = " then ";
 struct KeySequence {
     Chord first, second;
@@ -110,7 +113,18 @@ public:
     // Runs the action bound to this chord; true if consumed. Callers skip it while ImGui wants the keyboard.
     // A key that starts a sequence waits for the second key: it is consumed, and if it is bound alone that action runs
     // when no second key comes in time (tick) or when another key that isn't the second one is pressed.
-    bool handleKey(SDL_Keycode key, SDL_Keymod mods);
+    // REPEAT: an OS key repeat of the key waiting for its second key changes nothing (it is not a new press).
+    bool handleKey(SDL_Keycode key, SDL_Keymod mods, bool repeat = false);
+    void setSequenceWindow(float seconds) { window_ = std::clamp(seconds, kKeySequenceMin, kKeySequenceMax); }
+    float sequenceWindow() const { return window_; }
+    // Every key-up: a waiting key let go is no longer "held", so a key that only ends a sequence (V of "C then V") pressed
+    // before C counts as the two pressed together only while it is still down.
+    void keyUp(SDL_Keycode key) { if (pending_.on && pending_.first.key == key) pending_.down = false; }
+    // Called with the key and true just before the action it waited with runs alone, and false right after (the app
+    // tells a pie menu whether that key is still down: a hold-open menu on a key that begins a two-key shortcut opens
+    // late, after the window).
+    void setAloneHook(std::function<void(SDL_Keycode, bool)> hook) { aloneHook_ = std::move(hook); }
+    bool isSequenceStartKey(SDL_Keycode key, SDL_Keymod mods) const { return isSequenceStart(chordFromEvent(key, mods)); }
     // Once a frame, DT seconds: runs a first key that waited its kKeySequenceSeconds out. The registry counts time
     // from these (no wall clock: scripted tests and the app step it the same way).
     void tick(float dt);
@@ -161,6 +175,7 @@ private:
     const std::vector<Chord>& chordsOf(size_t index) const;
     void rebuildChords() const;
     bool isSequenceStart(const Chord& chord) const;
+    bool isSequenceEnd(const Chord& chord) const;
     bool runAction(const Action* a); // the enabled check and a copy of run (running may register actions)
     void flushPending();             // the first key that waited alone: its own action now, if it has one
     std::vector<Action> actions_;
@@ -173,11 +188,14 @@ private:
     mutable std::vector<std::vector<KeySequence>> sequences_; // parsed effective two-key sequences, per action
     struct Pending {
         bool on = false;
-        Chord first;
+        Chord first;              // the key waiting (the sequence's first, or its second when pressed before the first)
+        bool down = true;         // still held
         double until = 0.0;       // clock_ time the wait ends
         std::string aloneId;      // the action the first key runs alone ("" = none)
     } pending_;
     double clock_ = 0.0;
+    float window_ = kKeySequenceSeconds;
+    std::function<void(SDL_Keycode, bool)> aloneHook_;
 };
 
 } // namespace sf

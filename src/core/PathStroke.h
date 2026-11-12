@@ -21,7 +21,8 @@ struct PathStroke {
     glm::vec3 view{0.0f, 0.0f, -1.0f}; // projection / camera direction (into the scene)
     float radius = 0.0f;   // world units; <= 0: 4% of the mesh's bounding box diagonal
     float strength = 0.5f; // 0..1
-    float pressure = 1.0f; // constant pen pressure, 0..1
+    float pressure = 1.0f; // pen pressure, 0..1 (at the start of the path when pressureEnd is set)
+    float pressureEnd = -1.0f; // >= 0: the pressure eases linearly from `pressure` to this along the path (a pen stroke)
     bool invert = false;
     bool curve = true;     // pass a smooth Catmull-Rom curve through the points (else straight segments)
     float spacing = -1.0f; // dab spacing as a fraction of the radius; < 0: the recipe's (0.15 for built-ins)

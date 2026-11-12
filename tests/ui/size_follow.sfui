@@ -1,0 +1,96 @@
+# The S / U pop-up follows the mouse (Discord #help: "doesn't follow the mouse direction, no preview of sizes or
+# intensity"): after the key, sideways motion with no button down sets the value live from where it opened, the ring is
+# drawn there at the live size, a click keeps it (and starts no stroke), Esc or a right click puts it back.
+run new_sphere subdivisions=4
+key f
+camera 0 0
+brush_size 60
+hover_window 0.4 0.5
+
+# Size: +100 px of motion = +100 px of radius; the ring (at the opening point) is exactly that size.
+key s
+expect_value size_popup_open == 1
+expect_value size_ring_px == 60
+mouse_by 100 0
+expect_value draw_size == 160
+expect_value size_ring_px == 160
+expect_value size_ring_preview == 1
+shot size_grown
+mouse_by -150 0
+expect_value draw_size == 10
+expect_value size_ring_px == 10
+# A click keeps it, and it does not begin a stroke.
+remember triangles tris
+click_here
+expect_value size_popup_open == 0
+expect_value draw_size == 10
+expect_value triangles == $tris
+
+# Esc restores what it was.
+brush_size 60
+hover_window 0.4 0.5
+key s
+mouse_by 80 0
+expect_value draw_size == 140
+key escape
+expect_value size_popup_open == 0
+expect_value draw_size == 60
+
+# A right click cancels too.
+key s
+mouse_by 50 0
+expect_value draw_size == 110
+click_here right
+expect_value size_popup_open == 0
+expect_value draw_size == 60
+
+# Enter keeps it.
+key s
+mouse_by 30 0
+key enter
+expect_value size_popup_open == 0
+expect_value draw_size == 90
+
+# Intensity (U): 200 unscaled px = the whole range (half a point per pixel, so it scales with the UI); the disc in the ring is its strength.
+brush_size 80
+hover_window 0.4 0.5
+remember z_intensity i0
+key u
+expect_value size_popup_open == 1
+expect_value size_ring_preview == 1
+expect_value size_ring_px == 80
+mouse_by 20 0
+expect_value z_intensity > $i0
+expect_value size_ring_px == 80
+shot intensity_up
+mouse_by -40 0
+expect_value z_intensity < $i0
+key escape
+expect_value z_intensity == $i0
+expect_value size_popup_open == 0
+
+# Past the canvas edge the size stays at the edge's value (growing a brush at the right side keeps it); Esc restores.
+brush_size 60
+hover_window 0.6 0.5
+key s
+mouse_by 90 0
+expect_value draw_size == 150
+hover_window 0.8 0.5
+expect_value draw_size > 150
+remember draw_size edge
+hover_window 0.9 0.5
+expect_value draw_size == $edge
+key escape
+expect_value draw_size == 60
+
+# A click on a control (a shelf brush) cancels, and goes on to that control.
+brush_size 60
+hover_window 0.4 0.5
+key s
+mouse_by 90 0
+expect_value draw_size == 150
+hover "Clay##brush.clay"
+click_here
+expect_value size_popup_open == 0
+expect_value draw_size == 60
+expect_value brush_type == 1

@@ -22,6 +22,8 @@
   <script src="motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <style>
+    .why-grid .card h3 a { color: var(--text); }
+    .why-grid .card h3 a:hover { color: var(--accent); text-decoration: none; }
     .why-hero { padding: 88px 0 24px; }
     .why-hero h1 { font-size: clamp(2.4rem, 6vw, 3.9rem); margin-bottom: 28px; }
     .why-copy { max-width: 760px; }
@@ -72,7 +74,22 @@
         <h1>I had to do something.</h1>
         <p class="big">I'm a technologist at heart, but I work with artists every day, and I hear how much this AI moment worries them. I've seen colleagues wonder whether their craft will still have a place. SculptForge was born from that.</p>
         <p class="big">We're here to change how software is built: we build the orchestration layer, and our agents build the software, openly, with the people who use it. New versions ship every few days, and bug fixes sooner.</p>
-        <p>Behind the scenes, the project really does use all this new technology: agents working around the clock, weighing every idea for both its technical and its artistic merit, so it grows faster than a small team ever could. But all that power has one purpose: to remove friction, to give people starting out a good baseline, and to leave more room for what matters.</p>
+        <p>Behind the scenes, the project really does use all this new technology: agents working around the clock, testing every idea for speed, stability and feel, while artists decide what's worth building, so it grows faster than a small team ever could. But all that power has one purpose: to remove friction, to give people starting out a good baseline, and to leave more room for what matters.</p>
+      </div>
+    </section>
+
+    <section id="built-in" class="why-block">
+      <div class="wrap">
+        <h2>Built in, today</h2>
+        <p class="lede">What you get in SculptForge now. Each one has a chapter in the guide.</p>
+        <div class="why-grid">
+          <div class="card"><h3><a href="guide/blender.html">Blender round-trip</a></h3><p>Send objects to SculptForge and back in one click; they update in place.</p></div>
+          <div class="card"><h3><a href="guide/blender.html#splats-with-blender">Gaussian splats, with Blender 5.3</a></h3><p>Send a splat from Blender, sculpt over it, send the splats back.</p></div>
+          <div class="card"><h3><a href="guide/scan-to-sculptable.html">Capture to sculptable mesh</a></h3><p>One click turns a splat capture into clean quads with its colours.</p></div>
+          <div class="card"><h3><a href="guide/retopology.html">Quad retopology and baking</a></h3><p>Quad Remesh with guide curves, then bake normal and displacement maps.</p></div>
+          <div class="card"><h3><a href="guide/garments.html">Garments and cloth</a></h3><p>Real-size sewing patterns from 8 templates, draped with a cloth brush.</p></div>
+          <div class="card"><h3><a href="guide/brush-lab.html">Optional AI brushes</a></h3><p>Describe a brush in words. Your own provider, no account, one switch turns AI off.</p></div>
+        </div>
       </div>
     </section>
 
@@ -104,7 +121,7 @@
         <ol class="why-steps">
           <li class="card"><p class="n">1</p><h3>You tell us</h3><p>Post in #ideas or #bug-reports on <a href="https://discord.gg/gWrYkEmQhH">Discord</a>, or open a <a href="https://github.com/islandmed/SculptForge/issues">GitHub issue</a>. Any language is fine.</p></li>
           <li class="card"><p class="n">2</p><h3>We answer and sort it</h3><p>You get a reply, usually within hours. Bugs go straight to a fix, free for everyone. Ideas go into the public <a href="queue.html">feature queue</a>, member requests at the top.</p></li>
-          <li class="card"><p class="n">3</p><h3>Agents build it</h3><p>Each fix or feature gets its own build, weighed for technical and artistic merit. It runs hundreds of automated tests and is checked for speed on ordinary hardware, and every release is built and tested on Windows, macOS and Linux.</p></li>
+          <li class="card"><p class="n">3</p><h3>Agents build it</h3><p>Each fix or feature gets its own build, shaped by the artists who asked for it. It runs hundreds of automated tests and is checked for speed on ordinary hardware, and every release is built and tested on Windows, macOS and Linux.</p></li>
           <li class="card"><p class="n">4</p><h3>A review, by eye</h3><p>Before it merges, every visible change is reviewed from screenshots: does it look right, read clearly and feel good to use? If not, it goes back.</p></li>
           <li class="card"><p class="n">5</p><h3>It ships, with your name</h3><p>New versions go out every few days, bug fixes sooner. We reply in your thread with the version it's in, and What's New credits you, if you'd like.</p></li>
         </ol>
