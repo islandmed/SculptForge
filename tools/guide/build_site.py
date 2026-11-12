@@ -777,6 +777,33 @@ def write_news_hero(t: str, page: "WhatsNewPage") -> str:
     return t
 
 
+README = ROOT / "README.md"
+README_NEWS = re.compile(r'^(  <strong>New in )([^:<]+)(:</strong> .*)$', re.M)
+
+
+def readme_news(page: "WhatsNewPage") -> str:
+    """The README's top "New in X" line for the newest version: its tagline, linked to the guide page of its first card
+    (else to its What's New entry), like the site's hero line."""
+    v = page.versions[0]
+    text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
+    card = next((c for c in v["cards"] if c.get("link") or c["action"].startswith("guide:")), None)
+    target = (card.get("link") or card["action"][len("guide:"):]) if card else f"whats-new.html#{v['anchor']}"
+    return (f'  <strong>New in {html.escape(v["version"])}:</strong> {text[:1].lower() + text[1:]} '
+            f'(<a href="https://sculptforge.app/guide/{target}">how it works</a>)')
+
+
+def write_readme_news(page: "WhatsNewPage") -> str:
+    """README.md's "New in X" line brought up to the newest version; the same version's (hand-edited) line stays.
+    No README, no line or no versions: unchanged (never blocks a release)."""
+    if not page.versions or not README.exists():
+        return ""
+    t = README.read_text(encoding="utf-8")
+    m = README_NEWS.search(t)
+    if not m or m.group(2) == page.versions[0]["version"]:
+        return t
+    return t[:m.start()] + readme_news(page) + t[m.end():]
+
+
 def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
     """Writes the release area into website/index.html; with CHECK_ONLY, True when it is already up to date. A beta
     leaves the home page alone: it keeps showing the stable release until that version ships."""
@@ -789,9 +816,12 @@ def write_home(page: "WhatsNewPage", check_only: bool) -> bool:
         sys.exit(f"{HOME}: no {HOME_START} ... {HOME_END} markers in #whats-new")
     a = t.index("\n", a) + 1
     new = write_news_hero(t[:a] + home_whats_new(page) + "\n        " + t[b:], page)
+    rd = write_readme_news(page)
     if check_only:
-        return new == t
+        return new == t and (not rd or rd == README.read_text(encoding="utf-8"))
     HOME.write_text(new, encoding="utf-8")
+    if rd:
+        README.write_text(rd, encoding="utf-8")
     return True
 
 # ---------------------------------------------------------------------------

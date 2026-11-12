@@ -5,7 +5,7 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
-  <strong>New in 0.12.7:</strong> bring Gaussian splat scans in from Blender 5.3, sculpt with them, and send splats back (<a href="https://sculptforge.app/guide/blender.html#splats-with-blender">how it works</a>)
+  <strong>New in 0.12.8:</strong> reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts (<a href="https://sculptforge.app/guide/reference-images.html">how it works</a>)
 </p>
 
 <p align="center">
