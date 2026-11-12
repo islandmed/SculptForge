@@ -1319,6 +1319,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     # Trays and columns never scroll sideways at auto scale on a 1920x1200 screen (dm4nd on Discord).
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
+    # The welcome window on a 1080x2400 phone at 300 %: inside the view, its X and Close reachable (Hameron, Pixel).
+    sculptforge_ui_test(welcome_phone hidpi/welcome_phone --size 1080x2400)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one

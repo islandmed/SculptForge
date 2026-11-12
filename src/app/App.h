@@ -554,6 +554,7 @@ private:
     float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
+    void keepWindowInView(const CanvasRect& c); // after Begin: the window inside the view (PanelSupport.cpp)
     void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
@@ -3263,6 +3264,13 @@ private:
     bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
     void touchTick();                          // once a frame: a held press that waited long enough goes through
     void touchFlushPress();
+    void fitStartView(bool resized); // the starting model fits a narrow view (Shell.cpp)
+    bool startFrameChecked_ = false;
+    bool autoFramed_ = false;              // the camera is still where fitStartView left it
+    glm::vec3 autoFramedTarget_{0.0f};
+    float autoFramedDistance_ = 0.0f;
+    void logWindowGeometry() const;            // one log line: window, pixels, density, safe area, UI scale (Android bug reports)
+    void touchReset();                         // every finger forgotten (focus lost, a resize): no gesture stays stuck
     void touchApply(const TwoFingerStep& step);
     TouchGesture touch_;
     bool touchNavigates_ = false;   // this touch began over the 3D view

@@ -930,6 +930,50 @@ float App::topInset() const {
     return appleLaptop && notched && coversDisplay ? band : 0.0f;
 }
 
+// The camera starts at Camera's defaults, made for a wide window: on a phone held upright the 3D view between the
+// shelves is narrower than the model, which then filled it edge to edge (Hameron, Pixel, 11-12: "nothing visible").
+// Once the first frame knows the view's shape the starting model is framed into it, when the default view would cut it
+// off (a wide desktop window keeps the view it always had). Turning the phone frames it again while nobody moved
+// the camera.
+void App::fitStartView(bool resized) {
+    if (resized) {
+        if (!autoFramed_ || camera_.distance != autoFramedDistance_ || camera_.target != autoFramedTarget_) return;
+    } else {
+        const Camera def;
+        if (camera_.distance != def.distance || camera_.target != def.target || camera_.shift != def.shift) return;
+    }
+    const AABB b = sceneBounds();
+    if (!b.valid()) return;
+    const glm::vec3 e = b.extent();
+    const float half = 0.5f * std::max(e.x, e.y);
+    const float halfH = camera_.distance * std::tan(camera_.fovY * 0.5f);
+    const float halfW = halfH * std::max(camera_.aspect, 1e-3f);
+    if (!resized && half * 1.05f <= std::min(halfH, halfW)) { // fits as it is: left alone, but watched for a turn
+        autoFramed_ = true;
+        autoFramedDistance_ = camera_.distance;
+        autoFramedTarget_ = camera_.target;
+        return;
+    }
+    frameView(b);
+    autoFramed_ = true;
+    autoFramedDistance_ = camera_.distance;
+    autoFramedTarget_ = camera_.target;
+}
+
+void App::logWindowGeometry() const {
+    int w = 0, h = 0, pw = 0, ph = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+    SDL_Rect safe{};
+    SDL_GetWindowSafeArea(window_, &safe);
+    const CanvasRect c = canvasRect();
+    SDL_Log("window %dx%d (%dx%d px, density %.2f, display scale %.2f), safe area %d,%d %dx%d, UI scale %.2f, canvas %.0f,%.0f %.0fx%.0f, "
+            "palm guard %s",
+            w, h, pw, ph, double(SDL_GetWindowPixelDensity(window_)), double(SDL_GetWindowDisplayScale(window_)), safe.x, safe.y,
+            safe.w, safe.h, double(uiScale_), double(c.x), double(c.y), double(c.w), double(c.h),
+            uiPrefs_.tablet.palmRejection ? "on" : "off");
+}
+
 ShellGeometry App::shellGeometry() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);

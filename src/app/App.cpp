@@ -338,6 +338,9 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
+#ifdef __ANDROID__
+    logWindowGeometry();
+#endif
     timer.step("ImGui, settings, fonts");
     splashCheckpoint();
     if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
@@ -1416,6 +1419,10 @@ int App::run() {
         if (measuring) cpuFrameStart = processCpuSeconds();
         tickKeySequence(dt);
         updateCameraAspect();
+        if (!startFrameChecked_) { // (the first frame that knows the 3D view's shape)
+            startFrameChecked_ = true;
+            fitStartView(false);
+        }
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
@@ -1812,6 +1819,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_DID_ENTER_BACKGROUND:
         // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
         // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        touchReset();
         autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
         autosaveRevision_ = ~uint64_t(0);
         tickProject(0.0f);
@@ -1829,6 +1837,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        touchReset(); // (a lift in another window never reaches us)
         keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
         actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
@@ -1836,6 +1845,17 @@ void App::dispatchEvent(const SDL_Event& event) {
         spaceHeld_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        if (e.window.windowID == SDL_GetWindowID(window_)) {
+            touchReset();
+            logWindowGeometry();
+            updateCameraAspect(); // (the turned view's shape, before the model is framed into it)
+            fitStartView(true);
+        }
+        break;
+#endif
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestUiScale();

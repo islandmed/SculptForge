@@ -110,7 +110,10 @@
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
 //                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
-//                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
+//                            model_side_clear (px between the model's projected box and the 3D view's nearer side, < 0: cut off),
+//                            welcome_open (the first-run welcome shown), welcome_outside_px (how far its window sticks out of
+//                            the screen, 0: inside; a phone screen cut its X and Close off), welcome_overflow_px (how far its
+//                            content runs past its right edge), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
@@ -347,6 +350,7 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
+//   start_view               the camera as a fresh start has it, then the first frame's fit into the view (a phone's narrow one)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
@@ -1223,6 +1227,16 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "welcome_outside_px" || name == "welcome_overflow_px") {
+        const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
+        if (!w || !w->WasActive) return -1.0;
+        if (name == "welcome_overflow_px") // content wider than the window: a button cut off at its right edge
+            return std::ceil(std::max(double(w->ContentSize.x + 2.0f * w->WindowPadding.x - w->InnerRect.GetWidth()), 0.0) - 0.5);
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const double out = std::max({double(-w->Pos.x), double(-w->Pos.y), double(w->Pos.x + w->Size.x - screen.x),
+                                     double(w->Pos.y + w->Size.y - screen.y), 0.0});
+        return std::ceil(out - 0.5); // (rounding noise)
+    }
     if (name == "featured_shown") return app_.featuredCard() ? 1.0 : 0.0;       // the welcome's featured creator card has an entry
     if (name == "featured_watch_requests") return double(app_.featuredWatchRequests_);
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
@@ -1388,6 +1402,24 @@ double Demo::query(const std::string& name, bool& known) const {
             bottom = std::max(bottom, y);
         }
         return name == "model_top_clear" ? double(top - (c.y + area.y * c.h)) : double(c.y + area.w * c.h - bottom);
+    }
+    // The model's projected bounding box against the 3D view's sides, px: >= 0 when it fits across (a phone held upright
+    // showed the middle of a model wider than the view: "nothing visible").
+    if (name == "model_side_clear") {
+        const auto c = app_.canvasRect();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::mat4 vp = app_.camera_.projection() * app_.camera_.view();
+        float left = 1e9f, right = -1e9f;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+            if (h.w <= 0.0f) return -1e9;
+            const float x = c.x + (h.x / h.w * 0.5f + 0.5f) * c.w;
+            left = std::min(left, x);
+            right = std::max(right, x);
+        }
+        return double(std::min(left - c.x, c.x + c.w - right));
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
@@ -2908,6 +2940,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.uiPrefs_.tablet.palmRejection = on;
             app_.palm_.afterPen = hold;
             app_.palm_.silent = silent;
+        });
+    } else if (verb == "start_view") { // start_view: the camera as a fresh start has it, then the first frame's fit (App::fitStartView)
+        run([this] {
+            app_.camera_ = Camera();
+            app_.autoFramed_ = false;
+            app_.updateCameraAspect();
+            app_.fitStartView(false);
         });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });

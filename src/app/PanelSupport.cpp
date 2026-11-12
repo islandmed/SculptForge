@@ -274,6 +274,15 @@ void App::drawLanguageBar(const CanvasRect& c) {
     if (!open) languageBar_ = false;
 }
 
+// The current window moved inside `c` (a window placed by its centre can have its top or right edge off a small
+// screen, where its close button can't be reached). Call after Begin; a window larger than `c` keeps its top left.
+void App::keepWindowInView(const CanvasRect& c) {
+    const ImVec2 pos = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
+    const ImVec2 to(std::clamp(pos.x, c.x, std::max(c.x, c.x + c.w - size.x)),
+                    std::clamp(pos.y, c.y, std::max(c.y, c.y + c.h - size.y)));
+    if (to.x != pos.x || to.y != pos.y) ImGui::SetWindowPos(to);
+}
+
 void App::drawSupportUi() {
     tickBigMeshTip(); // (here, not in tickProject: this runs every frame, UI tests included)
     const float s = uiScale_;
@@ -284,12 +293,27 @@ void App::drawSupportUi() {
     drawMemberCard();
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
-        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        // Never wider or taller than the room: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the
+        // screen, its X and Close with it. Between a phone's two shelves the 3D view is too narrow, so there it takes the
+        // whole screen below the status bar, and the text and rows shrink to fit (`fit`); a window taller than that scrolls.
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const float margin = 16.0f * uiScale_;
+        CanvasRect room = c;
+        if (c.w < 500.0f * uiScale_ + margin) room = {0.0f, topInset(), screen.x, std::max(screen.y - topInset(), 1.0f)};
+        const bool narrow = room.w - margin < 500.0f * uiScale_;
+        // (Paddings and spacing don't shrink with the text, so the rows need a tenth more room than the ratio.)
+        const float fit = narrow ? std::clamp((room.w - margin) / (500.0f * uiScale_) * 0.9f, 0.35f, 1.0f) : 1.0f;
+        const float s = uiScale_ * fit; // (this window's own scale, below the outer one)
+        ImGui::SetNextWindowPos(ImVec2(room.x + room.w * 0.5f, room.y + room.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         // Height 0 every frame: the window fits its content, so the featured creator card arriving after the first frame
         // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold.
-        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(narrow ? room.w - margin : 500.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(room.h - margin, 100.0f)));
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-        if (ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags)) {
+        const bool welcomeOpen = ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags);
+        keepWindowInView(room); // (title bar and X inside the view, however the window was placed)
+        if (fit < 1.0f) ImGui::SetWindowFontScale(fit);
+        if (welcomeOpen) {
             // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
             drawLanguageRow();
             ImGui::Spacing();
@@ -414,7 +438,7 @@ void App::drawSupportUi() {
     if (newLookCard_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !showWhatsNew_) {
         // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
-        ImGui::SetNextWindowSize(ImVec2(420.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(std::min(420.0f * s, c.w - 16.0f * s), 0.0f), ImGuiCond_Always);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;

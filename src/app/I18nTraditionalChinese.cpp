@@ -370,6 +370,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Join the Discord", "加入 Discord"},
     {"Join the community on Discord", "加入 Discord 社群"},
     {"Report a problem", "回報問題"},
+    {"Copy log to clipboard", "複製記錄檔到剪貼簿"},
     {"Open log folder", "開啟記錄檔資料夾"},
     {"Fixes & suggestions", "修正與建議"},
     {"Benchmark (proof mode)", "效能基準測試（證明模式）"},
@@ -1314,6 +1315,9 @@ constexpr Entry kTraditionalChinese[] = {
     {"The welcome note shown the first time SculptForge starts.", "第一次啟動 SculptForge 時顯示的歡迎訊息。"},
     {"Open the SculptForge website and user guide in your browser.", "在瀏覽器中開啟 SculptForge 網站與使用指南。"},
     {"Open the issue tracker in your browser.", "在瀏覽器中開啟問題追蹤系統。"},
+    {"Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+     "attached or found.",
+     "複製 sculptforge.log 的最後 60 行，方便在無法附加或找不到檔案時貼到問題回報中。"},
     {"Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
      "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.",
      "開啟含 sculptforge.log 的資料夾：記錄 SculptForge 做了什麼，當機後則記錄是什麼當機。旁邊的 "
