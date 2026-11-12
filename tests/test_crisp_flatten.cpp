@@ -509,5 +509,16 @@ TEST(crisp_flatten_invariant_overlap_with_pressure_cut_only_and_clean_edges) {
         CHECK(inv.moved > 150);
         CHECK(inv.raised < 1e-5f);
         CHECK(inv.spikes == 0);
+        // Pressure doesn't scale the cut: a pressure-scaled depth per dab left terraces (contour ridges) across the
+        // facet, so the same stroke at full pressure lands on the same surface.
+        std::vector<DabParams> full = dabs;
+        for (DabParams& p : full) p.pressure = 1.0f;
+        Document f = makeDoc(makeIcosphere(6));
+        strokeWithPlane(f, builtin("Crisp Flatten"), full);
+        float worst = 0.0f;
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v)
+            worst = std::max(worst, glm::distance(d.mesh.positions[v], f.mesh.positions[v]));
+        std::printf("  pressure %s vs full pressure: surfaces differ by at most %.2g\n", dir ? "1 to 0.2" : "0.2 to 1", worst);
+        CHECK(worst < 1e-5f);
     }
 }

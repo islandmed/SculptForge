@@ -1507,8 +1507,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         lastRegion_ = verts_.size();
         lastRegionRadius_ = p.radius;
     }
-    // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull).
-    const float planePull = r.crispEdge ? clayPull(s) : s;
+    // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull). Pen pressure
+    // doesn't scale the pull: each dab cutting to a pressure-scaled depth left a terrace (a contour ridge) at its rim
+    // across the facet, where the stroke has one plane (pressure still sizes the dab and the tip, if set to).
+    const float planePull = r.crispEdge ? clayPull(std::clamp(p.strength, 0.0f, 1.0f)) : s;
     const bool crispMax = r.crispEdge && r.planeLock && (r.plane == BrushRecipe::Plane::Flatten ||
                                                          r.plane == BrushRecipe::Plane::Fill ||
                                                          r.plane == BrushRecipe::Plane::Scrape);
