@@ -234,8 +234,9 @@ TEST(action_key_sequences) {
     CHECK(alone == 0 && reg.sequenceWaiting());
     reg.tick(kKeySequenceSeconds * 0.6f);
     CHECK(alone == 1 && !reg.sequenceWaiting() && ran == 1);
-    // S after the time is over is S alone, not the sequence.
+    // S after the time is over is S alone, not the sequence (S ends a sequence, so it waits its own window for an A).
     reg.handleKey(SDLK_S, SDL_KMOD_NONE);
+    reg.tick(kKeySequenceSeconds + 0.01f);
     CHECK(other == 1 && ran == 1);
 
     // A, then another key that isn't the second: A runs, then that key runs as usual.
@@ -251,6 +252,7 @@ TEST(action_key_sequences) {
     reg.handleKey(SDLK_A, SDL_KMOD_NONE);
     reg.tick(kKeySequenceSeconds + 0.01f);
     reg.handleKey(SDLK_S, SDL_KMOD_NONE);
+    reg.tick(kKeySequenceSeconds + 0.01f);
     CHECK(ran == 1 && other == 3);
 
     // A first key with no action of its own is only a prefix: nothing runs when it times out.
@@ -294,6 +296,112 @@ TEST(action_key_sequences) {
     // Reset gives the default back and takes it from the sequence's new holder.
     CHECK(reg.resetShortcut("tool.one") == "Cue");
     CHECK(reg.shortcutText("tool.one") == "A then S" && reg.shortcutText("tool.q") == "F5");
+}
+
+// Two keys pressed together (Artizmo on Discord): C = Pick colour, V = Switch Color, "C then V" = Fill. The second key
+// going down while the first is still held is the sequence, as tap, tap is, and V before C with V still held too; each
+// key alone waits the window out, other keys run at once.
+TEST(action_key_sequence_overlap) {
+    int fill = 0, pick = 0, swap = 0, other = 0;
+    ActionRegistry reg;
+    reg.add({"color.fill", "Fill", nullptr, "", "Color", "C then V", "", [&] { ++fill; }, nullptr, nullptr});
+    reg.add({"color.pick", "Pick", nullptr, "", "Color", "C", "", [&] { ++pick; }, nullptr, nullptr});
+    reg.add({"color.swap", "Swap", nullptr, "", "Color", "V", "", [&] { ++swap; }, nullptr, nullptr});
+    reg.add({"tool.x", "Ex", nullptr, "", "Tool", "X / Ctrl+C", "", [&] { ++other; }, nullptr, nullptr});
+    const float w = reg.sequenceWindow();
+    CHECK(w == kKeySequenceSeconds && w >= 0.35f && w <= 1.0f);
+
+    // Keys in no sequence run at once, with no added latency (also Ctrl+C: not C).
+    CHECK(reg.handleKey(SDLK_X, SDL_KMOD_NONE) && other == 1 && !reg.sequenceWaiting());
+    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_LCTRL) && other == 2 && !reg.sequenceWaiting());
+
+    // Overlap, C first: C down, V down with C still held (no key-up is ever sent): Fill, nothing else.
+    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE) && reg.sequenceWaiting() && pick == 0);
+    reg.tick(0.02f);
+    CHECK(reg.handleKey(SDLK_V, SDL_KMOD_NONE));
+    CHECK(fill == 1 && pick == 0 && swap == 0 && !reg.sequenceWaiting());
+    reg.tick(2.0f);
+    CHECK(fill == 1 && pick == 0 && swap == 0);
+
+    // Overlap, V first: V waits too (it ends a sequence); C goes down with V still held: the same Fill.
+    CHECK(reg.handleKey(SDLK_V, SDL_KMOD_NONE) && reg.sequenceWaiting() && swap == 0);
+    reg.tick(0.02f);
+    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE));
+    CHECK(fill == 2 && pick == 0 && swap == 0 && !reg.sequenceWaiting());
+
+    // V tapped, then C (V already up): that is V, C in a row, not "C then V": V alone, then C waits.
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
+    reg.keyUp(SDLK_V);
+    reg.tick(0.05f);
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    CHECK(fill == 2 && swap == 1 && reg.sequenceWaiting());
+    reg.tick(w + 0.01f);
+    CHECK(pick == 1 && !reg.sequenceWaiting());
+
+    // Tap, tap (C up, V down inside the window): Fill. Key-up of the first changes nothing for C then V.
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.keyUp(SDLK_C);
+    reg.tick(w - 0.05f);
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
+    CHECK(fill == 3 && pick == 1 && swap == 1);
+
+    // Too late: C alone, then V alone (each after its own window).
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.tick(w + 0.02f);
+    CHECK(pick == 2 && !reg.sequenceWaiting());
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
+    CHECK(fill == 3 && swap == 1 && reg.sequenceWaiting());
+    reg.tick(w + 0.02f);
+    CHECK(swap == 2 && !reg.sequenceWaiting());
+
+    // C alone: nothing before the window is up, then once.
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.tick(w * 0.5f);
+    CHECK(pick == 2 && reg.sequenceWaiting());
+    reg.tick(w);
+    reg.tick(1.0f);
+    CHECK(pick == 3 && !reg.sequenceWaiting());
+
+    // Key repeat of the waiting key is not a second press: no early run, no restart of the window, no second run.
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.tick(w * 0.75f);
+    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE, true) && reg.sequenceWaiting() && pick == 3);
+    reg.tick(w * 0.3f); // past the window counted from the real press: the repeat did not restart it
+    CHECK(pick == 4 && !reg.sequenceWaiting());
+    // ...and a repeat of a key that waits for nothing is an ordinary press (held brush size keys rely on that).
+    CHECK(reg.handleKey(SDLK_X, SDL_KMOD_NONE, true) && other == 3);
+
+    // Modifiers pressed on the way change nothing, before or after the first key.
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    CHECK(!reg.handleKey(SDLK_LSHIFT, SDL_KMOD_LSHIFT) && reg.sequenceWaiting() && pick == 4);
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
+    CHECK(fill == 4 && pick == 4);
+
+    // Another key while C waits: C alone first, then that key (not the sequence).
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.handleKey(SDLK_X, SDL_KMOD_NONE);
+    CHECK(pick == 5 && other == 4 && fill == 4 && !reg.sequenceWaiting());
+
+    // The window is a preference, 0.35 to 1 s: a full second works, and a press 0.9 s later is still the sequence.
+    reg.setSequenceWindow(0.1f);
+    CHECK(reg.sequenceWindow() == kKeySequenceMin);
+    reg.setSequenceWindow(5.0f);
+    CHECK(reg.sequenceWindow() == kKeySequenceMax);
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    for (int i = 0; i < 9; ++i) reg.tick(0.1f); // 0.9 s later
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
+    CHECK(fill == 5 && pick == 5);
+    reg.setSequenceWindow(0.4f);
+
+    // The hook: tells which key waited, around the action it runs alone (the app knows if that key is still down).
+    std::vector<std::pair<SDL_Keycode, bool>> calls;
+    reg.setAloneHook([&](SDL_Keycode k, bool begin) { calls.emplace_back(k, begin); });
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.tick(1.0f);
+    CHECK(calls.size() == 2 && calls[0] == std::make_pair(SDLK_C, true) && calls[1] == std::make_pair(SDLK_C, false));
+    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
+    reg.handleKey(SDLK_V, SDL_KMOD_NONE); // the sequence: no alone action, no hook
+    CHECK(calls.size() == 2 && fill == 6);
 }
 
 // The pan and zoom keys ease in and out and cover the same distance at any frame rate (no OS key repeat involved).
