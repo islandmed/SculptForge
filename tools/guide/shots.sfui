@@ -68,10 +68,10 @@ key escape
 key backtick
 expect_value console_open == 0
 
-# Preferences: Config and Interface open (Shift+click keeps both).
+# Preferences: Saving & Layouts and Interface open (Shift+click keeps both).
 click "Edit##menu.edit"
 click "Preferences##section.preferences"
-click "Preferences/Config"
+click "Preferences/Saving & Layouts"
 hold shift
 click "Preferences/Interface"
 hold none
