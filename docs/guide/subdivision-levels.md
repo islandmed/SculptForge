@@ -1,5 +1,12 @@
 # Subdivision levels
 
+![A head sculpted on subdivision levels](images/quick-tour/05-levels.jpg)
+
+> **In short:**
+> - Sculpt one model at several resolutions; every Part has its own levels.
+> - **Add Level** (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level with four times the polygons.
+> - <kbd>Shift</kbd>+<kbd>D</kbd> steps down and <kbd>D</kbd> steps up.
+
 Subdivision levels let you sculpt one model at several resolutions: block in the big
 forms on a light version of the mesh, add pores and wrinkles on a dense one, and go back down to change the
 silhouette without losing the detail. Every Part has its own levels.
@@ -79,10 +86,11 @@ Clearing the mask, removing a layer or deleting the paint layers does it on ever
 
 ## Remove Below and Remove Above
 
-**Remove Below** deletes the levels below the current one: the current level becomes the new base cage (Level 1).
-What is left of the edge creases from the deleted levels becomes the new base's own creases, so the levels
-above keep their shape. **Remove Above** deletes the levels above, and the detail sculpted on them. Both are
-undoable. Deleting down to a single level leaves an ordinary mesh.
+**Remove Below** deletes the levels below the current one: the current level becomes the new base cage (Level 1). What
+is left of the edge creases from the deleted levels becomes the new base's own creases, so the levels above keep their
+shape. **Remove Above** deletes the levels above, and the detail sculpted on them.
+
+Both are undoable. Deleting down to a single level leaves an ordinary mesh.
 
 ## Rebuild Lower Levels
 

@@ -93,6 +93,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 45. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
 46. [Glossary](glossary.md)
 47. [Show SculptForge on Discord](discord.md)
+48. [Support and membership](support.md)
 
 ## Getting help
 

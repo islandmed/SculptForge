@@ -1,5 +1,12 @@
 # Texture painting
 
+![A painted lion bust](images/paint-layers.jpg)
+
+> **In short:**
+> - Texture painting puts colour into an image on the UVs, not on the vertices.
+> - Detail comes from the texture's resolution, not the mesh density.
+> - Press <kbd>P</kbd> for the Paint brush; the same colours, fills and layers apply.
+
 Texture painting puts the colour into an image laid over the model's UVs, instead of on its vertices. The
 detail you can paint then comes from the texture's resolution, not from how dense the mesh is: a 4K texture on a
 light, game-ready mesh holds pores, freckles and sharp decals that vertex paint could only show on millions of
@@ -13,11 +20,12 @@ symmetry, mask and paint layers with blend modes.
 
 ## Start in one click
 
-Press <kbd>P</kbd> for the Paint brush (or turn on **Rgb**). While the Part has no texture, **New Texture**
-appears on the top shelf and in the **Paint** menu. Click it: if the model has no UVs, SculptForge runs **Auto
-UV** first (in the background; the status bar shows its progress), then gives it a white texture (2K, or the size
-chosen in Tool > Texture Image) and switches painting to **Texture**. Paint away. The steps below do the same thing
-by hand, with more choices.
+Press <kbd>P</kbd> for the Paint brush (or turn on **Rgb**). While the Part has no texture, **New Texture** appears on
+the top shelf and in the **Paint** menu. Click it: if the model has no UVs, SculptForge runs **Auto UV** first (in the
+background; the status bar shows its progress), then gives it a white texture (2K, or the size chosen in Tool >
+Texture Image) and switches painting to **Texture**.
+
+Paint away. The steps below do the same thing by hand, with more choices.
 
 ## Paint a texture in four steps
 
@@ -45,12 +53,13 @@ Paint Layers and Texture Image palettes). They choose where paint goes:
   the Paint Layers palette work on the texture.
 - **Vertex**: they work on the vertex paint, exactly as before.
 
-The model shows both: the vertex paint multiplied by the texture, over the material. If paint looks as coarse as
-the mesh's polygons, it is going into the vertices: check that **Texture** is lit, and that the Part carries no
-old vertex paint (Tool > Paint Layers, or **Vertex Paint > Texture** to move it into the texture). Texture paint itself
-is as sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh. Each Part keeps its own
-choice, saved in the project. **Show texture** (Texture Image, or the **Paint** menu) hides the texture in the
-viewport without deleting it.
+The model shows both: the vertex paint multiplied by the texture, over the material. If paint looks as coarse as the
+mesh's polygons, it is going into the vertices: check that **Texture** is lit, and that the Part carries no old vertex
+paint (Tool > Paint Layers, or **Vertex Paint > Texture** to move it into the texture). Texture paint itself is as
+sharp as the texture: a hard alpha gives the same texels on a two-triangle plane as on a dense mesh.
+
+Each Part keeps its own choice, saved in the project. **Show texture** (Texture Image, or the **Paint** menu) hides
+the texture in the viewport without deleting it.
 
 ## How texture painting works
 

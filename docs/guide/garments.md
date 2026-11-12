@@ -1,11 +1,19 @@
 # Garments: sewing patterns at real size
 
-A garment in SculptForge is made the way clothes are made: flat pattern panels at their real size in millimetres,
-sewn edge to edge. The same pattern prints on your home printer to cut real fabric, and drapes on your model ([Drape it on a
-body](#drape-it-on-a-body)).
-Open **Tool > Garments** (the **Pattern** window shows the panels flat): **Templates** starts a garment at your
-sizes, **Print** writes the pages. Everything here is also a `garment_*` command for **Scripting** and the AI
-assistant ("make me trousers for a 1000 mm hip").
+![Sewing patterns laid out flat](images/wn-0120-garments.jpg)
+
+> **In short:**
+> - Garments are flat pattern panels at real size in millimetres, sewn edge to edge.
+> - **Templates** starts a garment from your size chart; **Print** writes the pages.
+> - A sewn pattern drapes on a body and becomes a Part you can sculpt.
+
+A garment in SculptForge is made the way clothes are made: flat pattern panels at their real size in millimetres, sewn
+edge to edge. The same pattern prints on your home printer to cut real fabric, and drapes on your model ([Drape it on
+a body](#drape-it-on-a-body)).
+
+Open **Tool > Garments** (the **Pattern** window shows the panels flat): **Templates** starts a garment at your sizes,
+**Print** writes the pages. Everything here is also a `garment_*` command for **Scripting** and the AI assistant
+("make me trousers for a 1000 mm hip").
 
 ![The Pattern window: front and back panels of a top at real size, in millimetres](images/garments.jpg)
 
@@ -114,9 +122,11 @@ The last panel placed (or the one picked in the list) has three sliders:
 
 **Drape** sews every seam shut and lets the garment settle on the visible Parts, live (the body and anything else
 shown; hide Parts it shouldn't touch). It sews first with gravity off, then lets the cloth fall and stops on its own
-once it is still. **Pause** holds it, **Stop** keeps it as it is now, **Reset** goes back to the placed panels. When
-it stops, the view shows the garment as Convert will make it, and the status line says how many frames it took
-and the widest seam gap (a few millimetres is normal: Convert closes it).
+once it is still.
+
+**Pause** holds it, **Stop** keeps it as it is now, **Reset** goes back to the placed panels. When it stops, the view
+shows the garment as Convert will make it, and the status line says how many frames it took and the widest seam gap (a
+few millimetres is normal: Convert closes it).
 
 ### 4. Convert to Part
 

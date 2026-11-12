@@ -1,12 +1,17 @@
 # Facial shapes and live face
 
+![Tool > Facial Shapes, with the template head smiling](images/facial-shapes-panel.jpg)
+
+> **In short:**
+> - **Generate Facial Shapes** gives a head the 52 blend shapes face capture uses.
+> - They are fitted to the head's own proportions, as ordinary sculpt layers.
+> - Fix any by sculpting, export them as morph targets, or drive them live.
+
 **Generate Facial Shapes** gives a sculpted head the 52 blend shapes Apple ARKit and Google's MediaPipe use for
 face capture (`eyeBlinkLeft`, `jawOpen`, `mouthSmileRight` and the rest), fitted to that head's own proportions.
 They are ordinary [sculpt layers](layers.md): you fix any of them by sculpting, test them with expression presets,
 export them as morph targets to a rig, a game engine or Blender, and drive them live, so the character makes your
 expressions.
-
-![Tool > Facial Shapes, with the template head smiling](images/facial-shapes-panel.jpg)
 
 ## What you need
 
@@ -139,10 +144,11 @@ face_weights json={"jawOpen":0.4,"eyeBlinkLeft":1,"mouthSmileRight":0.6}
 ```
 
 It changes only the vertices those shapes move, re-uploads only those to the graphics card, makes no undo step and
-doesn't mark the project as changed. Names not given keep their weight; unknown names are reported. The whole face
-message from a phone, `{"type":"face","t":...,"weights":{...},"head":[...]}`, works as the JSON too. On a 700,000
-vertex head whose every vertex is face, a frame that changes all 52 weights takes about 9 ms on an M1 Pro (most of
-it updating normals); heads with a body or shoulders change only the face.
+doesn't mark the project as changed. Names not given keep their weight; unknown names are reported.
+
+The whole face message from a phone, `{"type":"face","t":...,"weights":{...},"head":[...]}`, works as the JSON too. On
+a 700,000 vertex head whose every vertex is face, a frame that changes all 52 weights takes about 9 ms on an M1 Pro
+(most of it updating normals); heads with a body or shoulders change only the face.
 
 The phone link points your phone's camera at your face and sends this feed, so the character makes your expressions
 (see the phone link's own chapter). Anything else that produces ARKit or MediaPipe blendshape weights can drive it

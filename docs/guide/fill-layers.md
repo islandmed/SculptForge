@@ -1,5 +1,12 @@
 # Fill layers, Mesh Maps and Material Recipes
 
+![A painted lion bust](images/paint-layers.jpg)
+
+> **In short:**
+> - A Fill layer lays a material over a Part through a mask built from effects.
+> - Masks read the Part's Mesh Maps, so wear lands where the form says.
+> - Material Recipes are ready-made stacks of Fill layers for any Part.
+
 A **Fill layer** lays a material over the whole Part, through a **mask** that you build from effects instead of
 painting it by hand: worn paint on the edges, dirt in the crevices, dust on the surfaces that face up. The mask
 reads the Part's **Mesh Maps** (its ambient occlusion, curvature, thickness and more, baked on its UVs), so the
