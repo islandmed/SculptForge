@@ -705,7 +705,7 @@ NEWS_START, NEWS_END = "<!-- news-hero:start", "<!-- news-hero:end -->"
 CHANGELOG_URL = "https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md"
 
 
-# The owner is removing two-key shortcuts: the home cards stop naming them (the guide's history is the removal branch's).
+# Two-key shortcuts stay off the home cards: the home page shows the broad features (the guide and the changelog still name them).
 HOME_HIDE = re.compile(r"two[- ]keys?\b|\bkeys? in a row", re.I)
 
 
