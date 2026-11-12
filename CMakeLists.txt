@@ -1161,6 +1161,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Tube strands (a spring) and Repeat along curve at 1440 and 2880 px (tests/ui/tube_modifiers.sfui).
     sculptforge_ui_test(tube_modifiers_1440 tube_modifiers --size 1440x900)
     sculptforge_ui_test(tube_modifiers_2880 tube_modifiers --size 2880x1800)
+    # Tube Braid: round woven strands, loose to tight, and the Twist / Spin / Spread / Strands order (tests/ui/tube_braid.sfui).
+    sculptforge_ui_test(tube_braid_1440 tube_braid --size 1440x900)
+    sculptforge_ui_test(tube_braid_2880 tube_braid --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
