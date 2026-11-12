@@ -79,7 +79,6 @@ const std::map<std::string, const char*> kKnown = {
     {"brush_tendril_invariant", "#198"},
     {"clay_big_brush_invariant_builds_a_mound_not_a_ring", "#196"},
     {"brush_nudge_invariant", "#199"},
-    {"brush_cloth_invariant", "#200"},
 };
 
 // A check that says what an artist would see when it fails.
