@@ -1,0 +1,28 @@
+# Strokes don't flip the surface between detail levels (Discord #help, 0.12.10: fast Clay strokes on a 5.18M-triangle
+# mesh alternated full detail and a smoother look, wrinkles on and off between frames; Wire on/off "fixed" it, as the
+# wireframe never uses the coarse levels). A mesh over the triangle budget whose full frame doesn't fit the still-frame
+# budget rests on its coarse levels; a stroke's edits used to wait for their levels and drew the WHOLE mesh in full
+# meanwhile, then back to coarse when the stroke ended: full / coarse / full for every quick stroke.
+# stroke_detail_switches: frames, during or just after a stroke, whose detail (full or the coarse level) differed from
+# the frame before. A held stroke and a run of quick ones must have none.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=6
+wait 0.6
+# (the case that flickered: the mesh at rest on its coarse levels)
+expect_value coarse_clusters > 0
+expect_value stroke_detail_switches == 0
+stroke 0.35 0.40 0.60 0.45 0.4 hold
+expect_value coarse_clusters > 0
+expect_value stroke_detail_switches == 0
+release
+stroke 0.40 0.55 0.62 0.60 0.15
+stroke 0.30 0.30 0.50 0.35 0.15
+stroke 0.45 0.60 0.30 0.40 0.15
+stroke 0.50 0.35 0.35 0.65 0.15
+expect_value stroke_detail_switches == 0
+wait 0.6
+expect_value coarse_clusters > 0
+expect_value coarse_pending == 0
+expect_value stroke_detail_switches == 0

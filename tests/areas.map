@@ -102,6 +102,8 @@ ui_space_camera             render
 ui_navigation               render
 ui_orbit_lock               render
 ui_timelapse_flicker        render
+ui_stroke_lod_flicker       render
+ui_stroke_lod_full          render
 ui_remove_flat_background   render
 ui_frame_free_area*         render
 ui_hover_pop                render
