@@ -356,6 +356,16 @@
      "shipped": ""
     },
     {
+     "slug": "mesh-array",
+     "anchor": "vote-mesh-array",
+     "title": "Mesh array",
+     "line": "Repeat and chain copies of a Part without merging: offset, scale, rotate and pivot per stage, mirror and align options, an on/off pattern, a live preview, then bake it to a mesh.",
+     "where": "Tool > Parts",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "save-a-project-with-only-some-parts",
      "anchor": "vote-save-a-project-with-only-some-parts",
      "title": "Save a project with only some Parts",
@@ -541,16 +551,6 @@
      "shipped": ""
     },
     {
-     "slug": "reference-image-board",
-     "anchor": "vote-reference-image-board",
-     "title": "Reference image board",
-     "line": "Pin reference images next to the canvas and pick colours from them.",
-     "where": "View menu",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "silhouette-view",
      "anchor": "vote-silhouette-view",
      "title": "Silhouette view",
@@ -559,6 +559,26 @@
      "votes": 0,
      "status": "in progress",
      "shipped": ""
+    },
+    {
+     "slug": "mouse-orbit-speed-and-smoothing",
+     "anchor": "vote-mouse-orbit-speed-and-smoothing",
+     "title": "Mouse orbit speed and smoothing",
+     "line": "A setting for how fast the mouse turns the view, with optional smoothing, so rotating with the middle button (for example in Blender style) feels slower and calmer.",
+     "where": "Preferences > Input",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "reference-image-board",
+     "anchor": "vote-reference-image-board",
+     "title": "Reference image board",
+     "line": "Pin reference images next to the canvas and pick colours from them.",
+     "where": "View menu",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.8"
     }
    ]
   },
@@ -628,16 +648,6 @@
      "shipped": ""
     },
     {
-     "slug": "multi-key-shortcut-sequences",
-     "anchor": "vote-multi-key-shortcut-sequences",
-     "title": "Multi-key shortcut sequences",
-     "line": "Bind sequences like A then A for more keys.",
-     "where": "Preferences > Input",
-     "votes": 0,
-     "status": "in progress",
-     "shipped": ""
-    },
-    {
      "slug": "tablet-and-mobile-app-ipad-android",
      "anchor": "vote-tablet-and-mobile-app-ipad-android",
      "title": "Tablet and mobile app (iPad, Android)",
@@ -688,6 +698,16 @@
      "shipped": ""
     },
     {
+     "slug": "hotkeys-in-categories",
+     "anchor": "vote-hotkeys-in-categories",
+     "title": "Hotkeys in categories",
+     "line": "Group the long alphabetical shortcut list into categories such as Sculpt (the brushes), Navigation and Modifier keys, starting with the sculpt shortcuts. Navigation would hold the pan and zoom keys; Modifiers the mask, smooth, gizmo and symmetry X, Y, Z commands.",
+     "where": "Preferences > Hotkeys",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "custom-quick-panel",
      "anchor": "vote-custom-quick-panel",
      "title": "Custom quick panel",
@@ -716,6 +736,16 @@
      "votes": 0,
      "status": "shipped",
      "shipped": "0.12.4"
+    },
+    {
+     "slug": "multi-key-shortcut-sequences",
+     "anchor": "vote-multi-key-shortcut-sequences",
+     "title": "Multi-key shortcut sequences",
+     "line": "Bind sequences like A then A for more keys.",
+     "where": "Preferences > Input",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.8"
     },
     {
      "slug": "shortcut-conflict-warning",
@@ -834,5 +864,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T22:30:01Z"
+ "updated": "2026-11-12T02:07:58Z"
 }
