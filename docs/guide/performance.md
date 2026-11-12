@@ -12,22 +12,27 @@ What we're building next, and how each piece works: [Performance: what we're bui
 
 ## What to expect
 
-On a 2021 laptop (Apple M1 Pro, 10 cores, integrated GPU), with X symmetry on and a medium Size:
+On a 2021 laptop (Apple M1 Pro, 10 cores, integrated GPU), with X symmetry on and a medium Size, measured with
+`sculptforge --bench` (median of three runs):
 
-| Mesh | One dab of a medium brush | Turning the view |
-|---|---|---|
-| 4 million triangles | about 2 ms | about 350 frames a second |
-| 16 million triangles | about 4.5 ms | about 170 frames a second |
-| 33 million triangles | about 7.5 ms | about 110 (4x antialiasing), 270 with Fast Navigation |
+| Mesh | One dab of a medium brush | Turning the view, 4% of triangles drawn, 4x antialiasing | Turning the view, 4% drawn, Fast Navigation |
+|---|---|---|---|
+| 4 million triangles | about 3 ms | about 1,900 frames a second | about 5,500 frames a second |
+| 16 million triangles | about 5 ms | about 1,100 frames a second | about 2,600 frames a second |
+| 33 million triangles | about 8 ms | about 720 frames a second | about 2,300 frames a second |
 
-Turning the view stays smooth at 100 million triangles: about 50 frames a second with 4x antialiasing, 100 with
-Fast Navigation. These figures are for closed models (no holes); see "Closed meshes draw faster" below.
+The view figures are the benchmark's orbit with only the part of the mesh in view drawn (about 4% of the
+triangles), for closed models (no holes); a model with holes draws more, see "Closed meshes draw faster" below.
+We have not measured 100 million triangles with this benchmark;
+the [benchmarks page](https://sculptforge.app/benchmarks/) lists the 100 million triangle runs we have, on a desktop
+with an RTX 3060.
 
 A dab is one step of the brush along the stroke; the app draws several per frame when you move fast. Under
 16 ms per dab a stroke keeps up with a 60 Hz display. Very large brushes cost more, since they move more
-vertices: a brush covering a tenth of a 33 million triangle sphere (about a million vertices per dab with
-symmetry) takes about 45 ms per dab with Standard, 21 ms with Smooth and 15 ms with Move, of which sending the
-change to the graphics card is about a third.
+vertices: on a 33 million triangle sphere a brush of radius 0.4 (about a million vertices per dab with symmetry)
+takes about 37 ms per dab with Standard and 32 ms with Smooth.
+
+Every figure comes with its raw output on the [benchmarks page](https://sculptforge.app/benchmarks/#sizes).
 
 [Performance figures](https://github.com/islandmed/SculptForge/blob/main/docs/performance.md) has the full
 measurements, and how to run the same benchmark on your own machine.
