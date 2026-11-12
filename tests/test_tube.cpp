@@ -694,7 +694,7 @@ bool insideStrand(const Mesh& m, const std::vector<uint32_t>& triangles, const v
 } // namespace
 
 // A braid's strands: round, two by default in the panel, winding round the centre line; Spread opens and closes the weave.
-TEST(tube_braid_round_strands_follow_spread) {
+TEST(tube_braid_invariant_round_strands_follow_spread) {
     const float R = 0.25f, L = 4.0f, pi = 3.14159265f;
     float lastOrbit = -1.0f, lastPitch = -1.0f;
     for (float spread : {0.0f, 0.25f, 0.5f, 1.0f}) {
@@ -730,7 +730,7 @@ TEST(tube_braid_round_strands_follow_spread) {
     }
 }
 
-TEST(tube_braid_strands_pass_over_and_under) {
+TEST(tube_braid_invariant_strands_pass_over_and_under) {
     // The strands of a braid weave: no vertex of one strand lies inside another (they interlock, they don't merge), at the
     // tightest spread (touching) as well as loose.
     for (int count : {2, 3, 5}) {
@@ -755,7 +755,7 @@ TEST(tube_braid_strands_pass_over_and_under) {
     }
 }
 
-TEST(tube_braid_on_a_bend_with_twist_and_taper) {
+TEST(tube_braid_invariant_bend_twist_taper_closed_and_finite) {
     // A curved, tapered, twisted braid stays closed, finite and inside the tube; old saves (no new fields) still load.
     TubeShape br;
     br.points = {{vec3(0, 0, 0), 0.2f}, {vec3(1, 0.6f, 0), 0.2f}, {vec3(2, 0.6f, 0.8f), 0.2f}, {vec3(3, 0, 1), 0.2f}};
