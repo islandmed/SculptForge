@@ -212,7 +212,6 @@ int App::viewSamples() {
 void App::noteStillness() {
     renderSettings_.stillSeconds = perf_.movingNow ? 0.0 : ImGui::GetTime() - perf_.stillSince;
     renderSettings_.stroking = doc_.sculptor.strokeActive() || strokeFinishing_ || !dabQueue_.empty();
-    renderSettings_.frameClock = ImGui::GetTime();
     renderer_.setStroking(renderSettings_.stroking);
 }
 

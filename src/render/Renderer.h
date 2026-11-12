@@ -48,7 +48,6 @@ struct RenderSettings {
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
     bool stroking = false;     // a stroke runs (its dabs still landing): coarse levels stay
-    double frameClock = 0.0;   // seconds on the frame clock (scripted in UI tests): the coarse levels follow edits after a rest
     // Offline frames (the timelapse, --render): always the full mesh, never its coarse levels. In the view a frame
     // too slow for the still budget stays coarse while edited clusters draw in full until their levels follow, so
     // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
@@ -283,12 +282,7 @@ public:
     // Coarse levels (tests): the clusters the last frame drew at a coarse level, and the edited clusters whose levels
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
-    size_t underlayDrawnClusters() const { return underlayClusters_.size(); } // (edited clusters in full over their coarse level, the last Part drawn)
     size_t coarsePendingClusters() const;
-    // How often the active Part's drawn detail (full, or the coarse level it drew) changed between two frames when
-    // either was a stroke frame: a stroke must not flip the surface between detail levels (#help: fast Clay strokes
-    // alternated full and coarse detail on a 5M mesh).
-    size_t strokeDetailSwitches() const { return strokeDetailSwitches_; }
     // Dynamic topology patches (tests): the triangles of mesh slot `id`'s uploaded patches whose indices on the GPU
     // (read back) aren't the mesh's triangles now.
     size_t patchErrors(uint32_t id, const Mesh& mesh);
@@ -439,9 +433,6 @@ private:
         std::vector<uint8_t> coarseDirty;
         std::vector<uint32_t> coarsePending; // the dirty clusters, to update
         bool coarseTried = false, coarseEdited = false; // (coarseEdited: this sync marked some)
-        std::vector<uint32_t> coarseFresh; // the clusters edits marked since the last sync (their cells follow at once)
-        double coarseEditAt = 0.0; // frame clock of the last edit that marked a cluster dirty (the levels follow after a rest)
-        mutable bool drewCoarse = false; // the last frame drew this Part on its coarse levels (a stroke keeps what it started on)
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
         size_t vertexCapacity = 0;
@@ -504,7 +495,6 @@ private:
     const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
     void markCoarseDirty(MeshSlot& s, uint32_t c);
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
-    void followEdits(MeshSlot& s, const Mesh& mesh); // the fresh clusters' cells, while the Part is on its coarse levels
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
     void uploadCoarsePoints(MeshSlot& s);
@@ -536,8 +526,6 @@ private:
     std::vector<uint8_t> staging_;                         // scratch for sync: gathered vertex data
     std::vector<uint8_t> blockChanged_, blockMoved_;      // scratch for uploadVertices, per block
     std::vector<std::pair<uint32_t, uint32_t>> movedRuns_; // the dirty runs whose positions moved
-    std::vector<std::pair<uint32_t, uint32_t>> regridRuns_; // the dirty runs before a new position grid re-sent everything
-    bool regridded_ = false;                               // this sync made a new grid (the coarse levels follow regridRuns_ only)
     void syncTexture(MeshSlot& s, Mesh& mesh, bool pbr);
     void uploadTangents(MeshSlot& s, const std::vector<glm::vec4>& all);
     // Image-based lighting (core/EnvironmentMath.h): the prefiltered environment (RGB16F, a mip per roughness
@@ -565,16 +553,7 @@ private:
     // (coarseClusters_, coarseLevel_), the finest that fits.
     void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
     std::vector<uint32_t> coarseClusters_;
-    // The edited clusters drawn in full beside the coarse rest also draw their coarse level, pushed back (cullCoarse): it
-    // closes the cracks between the full ones and their coarse neighbours, which meet at the cells' points.
-    std::vector<uint32_t> underlayClusters_;
-    float underlayPush_ = 0.0f;
-    int underlayLevel_ = 0;
     size_t lastCoarseClusters_ = 0;
-    size_t strokeDetailSwitches_ = 0;
-    double clock_ = 0.0;              // RenderSettings::frameClock of the last draw
-    int detailNow_ = 0;               // the active Part's last frame: 0 = full, else 1 + the coarse level
-    bool detailWasStroking_ = false;
     bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;
     uint64_t fullUploads_ = 0;
     double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
@@ -605,7 +584,7 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1, microWire = -1, pushBack = -1;
+              lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostD = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

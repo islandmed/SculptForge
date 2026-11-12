@@ -96,8 +96,7 @@ void App::drawGeometrySection() {
     {
         const size_t est = m.triangleCount() << (2 * int(microSlider_));
         char fmt[64];
-        // (before Add Micro the slider is only what the button would make: a level that isn't there reads as "New")
-        std::snprintf(fmt, sizeof fmt, micro ? "Micro %%.0f (%.0fM)" : "New Micro %%.0f (%.0fM)", double(est) / 1e6);
+        std::snprintf(fmt, sizeof fmt, "Micro %%.0f (%.0fM)", double(est) / 1e6);
         ui::SliderInside("##micro", &microSlider_, 1.0f, float(MicroMesh::kMaxLevel), fmt, ImGuiSliderFlags_AlwaysClamp);
         microSlider_ = std::round(microSlider_);
     }
