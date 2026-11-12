@@ -15,7 +15,8 @@ first time you open it, and how to build it from source.
 - **Network**: not needed for sculpting. The free AI features (Brush Lab and image or text to 3D) and the
   community brush gallery need an internet connection unless you run models on your own machine.
 
-> **Note:** SculptForge is a 64-bit desktop application. There is no web, iPad or Android version.
+> **Note:** SculptForge is a 64-bit desktop application. There is no web or iPad version; an early Android build
+> is described in [Android (early)](#android-early).
 
 ## Download
 
@@ -36,6 +37,20 @@ Each link below downloads the newest version. Pick the one for your system:
 
 Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Macs running Linux (it runs on 4,
 16 and 64 KiB memory pages). Older versions are on the [releases page](https://github.com/islandmed/SculptForge/releases).
+
+### Android (early)
+
+An early build for Android 9 or later: tablets, phones and Chromebooks (arm64 and x86_64), with touch and pen. It is
+not in an app store yet; you install the `.apk` from the
+[Android pre-release](https://github.com/islandmed/SculptForge/releases/tag/v0.12.11-beta.2) by hand.
+
+1. Download the `.apk` for your device (`arm64-v8a` for most phones and tablets, `x86_64` for Chromebooks with
+   Intel or AMD) and check it against `SHA256SUMS-android.txt`.
+2. Open it from your browser or file manager and allow installs from that app when Android asks.
+3. If you installed an earlier test APK, uninstall it first: it is signed with a different key, and Android won't
+   update over it. Copy projects out of its Projects folder before you do.
+
+It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 
 ### Install with one command
 
