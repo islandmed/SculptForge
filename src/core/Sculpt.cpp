@@ -25,6 +25,9 @@ const float* gRndAreaWeight = nullptr; // R&D spike rnd/moved-vertex (tests/tool
 // sum + (n - n0) * |sum| (the dense detail's average, turned as the proxy has turned since).
 const glm::vec3* gRndAreaNormalSum = nullptr;
 const glm::vec3* gRndAreaNormal0 = nullptr;
+std::vector<std::pair<glm::vec3, glm::vec3>>* gRndPlanes = nullptr; // spike: each dab's (area normal, area centre)
+bool gRndPlanesUse = false;
+size_t gRndPlaneAt = 0;
 
 
 const char* brushName(BrushType type) {
@@ -1063,6 +1066,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
+    if (gRndPlanes) { // spike rnd/moved-vertex: log each dab's plane, or (gRndPlanesUse) take the logged one
+        if (gRndPlanesUse && gRndPlaneAt < gRndPlanes->size()) {
+            areaNormal = (*gRndPlanes)[gRndPlaneAt].first, areaCenter = (*gRndPlanes)[gRndPlaneAt].second;
+            ++gRndPlaneAt;
+        } else if (!gRndPlanesUse) gRndPlanes->push_back({areaNormal, areaCenter});
+    }
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;

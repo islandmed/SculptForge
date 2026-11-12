@@ -18,13 +18,18 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 using namespace sf;
 using namespace sf::geom;
 
-namespace sf { extern const float* gRndAreaWeight; extern const glm::vec3 *gRndAreaNormalSum, *gRndAreaNormal0; }
+namespace sf {
+extern std::vector<std::pair<glm::vec3, glm::vec3>>* gRndPlanes;
+extern bool gRndPlanesUse;
+extern size_t gRndPlaneAt;
+extern const float* gRndAreaWeight; extern const glm::vec3 *gRndAreaNormalSum, *gRndAreaNormal0; }
 
 namespace {
 
@@ -72,7 +77,8 @@ Run stroke(Document& d, const Stroke& s, int dabs, const std::vector<glm::vec3>*
     Run r;
     d.sculptor.analyticNormals = false;
     d.sculptor.adaptiveDabs = false;
-    d.sculptor.beginStroke(d.mesh, "Standard");
+    const bool clay = std::getenv("SF_RND_BRUSH") && std::string(std::getenv("SF_RND_BRUSH")) == "clay"; // (the bench phases' brush)
+    d.sculptor.beginStroke(d.mesh, clay ? "Clay" : "Standard");
     d.mesh.clearDirty();
     for (int i = 0; i < dabs; ++i) {
         RayHit h;
@@ -84,10 +90,10 @@ Run stroke(Document& d, const Stroke& s, int dabs, const std::vector<glm::vec3>*
         ++r.hits;
         p.viewDir = s.dir;
         p.radius = s.radius;
-        p.strength = 0.5f;
+        p.strength = clay ? 0.35f : 0.5f; // (the bench phase: Clay 0.35)
         p.strokeDelta = i == 0 ? glm::vec3(0.0f) : s.across * s.step;
         const auto t0 = Clock::now();
-        d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+        d.sculptor.dab(d.mesh, d.bvh, clay ? BrushType::Clay : BrushType::Standard, p, Symmetry{false, false, false});
         r.dabMs += msSince(t0);
         r.touched += dirtyCount(d.mesh);
         d.mesh.clearDirty();
@@ -148,6 +154,7 @@ int main(int argc, char** argv) {
     for (float cpr : cellsPerRadius) {
         const float h = s.radius / cpr;
         // Proxy: vertex clustering of the ORIGINAL surface.
+        std::vector<glm::vec3> planeDense;
         const auto tb = Clock::now();
         std::unordered_map<uint64_t, uint32_t> cellOf;
         cellOf.reserve(nv / 4 + 1024);
@@ -216,9 +223,32 @@ int main(int argc, char** argv) {
         std::vector<glm::vec3> denseNormalSum(np, glm::vec3(0.0f)), proxyNormal0 = p.mesh.normals;
         for (size_t v = 0; v < nv; ++v) denseNormalSum[proxyOf[v]] += origN[v];
         if (std::getenv("SF_RND_AREA_NORMAL")) gRndAreaNormalSum = denseNormalSum.data(), gRndAreaNormal0 = proxyNormal0.data();
+        std::vector<std::pair<glm::vec3, glm::vec3>> planes;
+        gRndPlanes = &planes, gRndPlanesUse = false;
         const Run pr = stroke(p, s, dabs, same ? &ex.centers : nullptr);
+        gRndPlanes = nullptr;
         gRndAreaWeight = nullptr;
         gRndAreaNormalSum = gRndAreaNormal0 = nullptr;
+        // SF_RND_PLANES=1: the plane-kernel path instead of the field: each dab's plane (area normal + centre) from the proxy,
+        // the brush kernel evaluated per dense vertex (as the GPU preview does for plane brushes), from the original mesh.
+        const bool planesMode = std::getenv("SF_RND_PLANES") != nullptr;
+        if (planesMode) {
+            Document q;
+            {
+                Mesh m;
+                m.positions = orig;
+                m.triangles = d.mesh.triangles;
+                m.rebuildTopology();
+                m.normals = origN;
+                q.setMesh(std::move(m));
+            }
+            gRndPlanes = &planes, gRndPlanesUse = true, gRndPlaneAt = 0;
+            const Run qr = stroke(q, s, dabs, &pr.centers);
+            gRndPlanes = nullptr, gRndPlanesUse = false;
+            std::printf("  plane-kernel path: %zu planes from the proxy, dense kernel %.0f verts/dab (would run once per batch)\n",
+                        planes.size(), double(qr.touched) / std::max(1, qr.hits));
+            planeDense = q.mesh.positions;
+        }
         double centerOff = 0.0;
         for (size_t i = 0; i < std::min(pr.centers.size(), ex.centers.size()); ++i) centerOff = std::max(centerOff, double(glm::distance(pr.centers[i], ex.centers[i])));
         double angle = 0.0;
@@ -234,12 +264,13 @@ int main(int argc, char** argv) {
             disp[i] = p.mesh.positions[i] - proxyStart[i];
             moved[i] = disp[i] != glm::vec3(0.0f);
         }
-        std::vector<glm::vec3> dense = orig;
+        std::vector<glm::vec3> dense = planeDense.empty() ? orig : planeDense;
+        const bool fieldOn = planeDense.empty();
         std::atomic<size_t> densePassed{0};
         poolFor(nv, [&](size_t v0, size_t v1) {
             size_t n = 0;
             for (size_t v = v0; v < v1; ++v) {
-                if (!moved[proxyOf[v]]) continue;
+                if (!fieldOn || !moved[proxyOf[v]]) continue;
                 ++n;
                 const glm::vec3 g = (orig[v] - b.min) / h - 0.5f;
                 const glm::vec3 g0 = glm::floor(g), f = g - g0;
