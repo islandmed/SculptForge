@@ -6,6 +6,25 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.9] - 2026-11-11
+
+### Changed
+- **Tests** (contributors): a CMakeLists.txt edit that only adds new source files or a guarded `add_test` runs those
+  files' tests in T0, not the whole suite; the mode matrix runs as four shards side by side; `stale_tree` runs on
+  every change; a per-push tier (`SF_T0_TIER=push`: direct picks + start, sculpt, save and open) runs in about half
+  the test time and is never the READY verdict; known flakes go in `tests/quarantine.txt` with an owner and a date,
+  after which they block again.
+
+### Fixed
+- **Brush Size and Intensity** follow the mouse: press S (or F in the Blender style) or U, move the mouse sideways and
+  the value changes live, with the ring drawn at the live size where you started (Intensity shows a disc inside it).
+  Click or Enter keeps it, Esc or a right click puts it back (thanks hullalmiah on Discord).
+- **Undo / Redo of a stroke on a dense model (#181).** Every Undo and Redo made the viewport send the whole model to
+  the graphics card again and rebuild its distance-view cache, so the time grew with the model instead of the stroke
+  (5.4M triangles with 3 subdivision levels: 470-600 ms per Ctrl+Z, now 20-30 ms in the frame; the upload itself 500
+  ms, now 4-8 ms). Only the vertices the stroke changed are sent now. Thanks @TheLycanFenrir and @Devon0209 for the
+  reports.
+
 ## [0.12.8] - 2026-11-11
 
 ### Added

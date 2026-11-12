@@ -506,7 +506,7 @@ int Demo::openEdges() const {
 // The set-up every generated case starts from: a small sphere, the Standard brush, nothing latched.
 // (wait_idle: a background job an earlier case started, Quad Remesh, would write its progress over the status bar)
 static const std::vector<std::string> kReset = {"release", "hold none", "key escape", "unlatch", "wait_idle 120", "run new_sphere subdivisions=3",
-                                                "action brush.standard", "action tool.draw", "unlatch", "wait 0.1"};
+                                                "action brush.standard", "action tool.draw", "unlatch", "reset_sliders", "wait 0.1"};
 
 // tests/ui/mode_matrix_known.txt: "ID | EXIT | the fix task" per line. Those cases' failures are logged as KNOWN, not
 // failed; one that passes now (or whose action is no longer a mode) fails, so the line goes when the fix lands.

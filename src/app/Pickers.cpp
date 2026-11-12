@@ -115,6 +115,11 @@ struct State {
     int sliderFrame = -1;
     std::string sliderTyped;
     bool sliderWasActive = false;
+    // Follow mode (the Blender-style feel): after the key, moving the mouse sideways sets the value live from where it
+    // opened; a click or Enter keeps it, Esc or a right click puts back what it was.
+    bool sliderBaseSet = false;
+    float sliderBase = 0.0f;
+    float* sliderValue = nullptr; // the value being set (the preview reads it), as last drawn
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
@@ -1275,6 +1280,22 @@ void PickerUi::sizePopup(App& app, Slider which) {
     s.sliderFrame = ImGui::GetFrameCount();
     s.sliderTyped.clear();
     s.sliderWasActive = false;
+    s.sliderBaseSet = false;
+    s.sliderValue = nullptr;
+}
+
+namespace {
+// Sideways motion that moves a slider: Size one pixel per pixel (the ring's edge follows the pointer), the others
+// half a point (of the shown 0-100) per unscaled pixel, so 200 px cover the range.
+constexpr float kFollowPerPx = 0.5f;
+constexpr float kFollowSlopPx = 2.0f; // less than this is a click on the knob, not a move
+} // namespace
+
+bool PickerUi::sliderFollowing(const App& app) {
+    const State& s = st();
+    // (Not with a pen in range: it keeps dragging the knob, and a driver's stray mouse events would move the value.)
+    return s.slider >= 0 && !s.sliderWasActive && s.sliderTyped.empty() && !app.penInProximity_ &&
+           std::fabs(app.mouseX_ - s.sliderAt.x) > kFollowSlopPx;
 }
 
 void drawPickers(App& app) {
@@ -1422,6 +1443,27 @@ void drawPickers(App& app) {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_AlwaysAutoResize)) {
             const bool first = ImGui::GetFrameCount() < s.sliderFrame + 2; // the S / U / I / O key itself
+            if (!s.sliderBaseSet) {
+                s.sliderBase = *d.value;
+                s.sliderBaseSet = true;
+            }
+            s.sliderValue = d.value;
+            // Follow: the pointer's sideways distance from where it opened sets the value, live. A press on the knob
+            // (before any move) still drags it as before; a click after moving keeps the value (nothing starts a stroke).
+            const bool leftDown = ImGui::GetIO().MouseDown[ImGuiMouseButton_Left];
+            const bool following = PickerUi::sliderFollowing(app);
+            // Off the canvas (a shelf, a panel: going for another control) it is not adjusting: the old value shows, and
+            // a click there cancels and goes to what it hit.
+            const CanvasRect canvas = app.canvasRect();
+            const bool onCanvas = canvas.contains(app.mouseX_, app.mouseY_);
+            const bool confirmClick = following && onCanvas && !first && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            if (following && !onCanvas && !leftDown && !first) *d.value = s.sliderBase;
+            if (following && onCanvas && !leftDown && !first) {
+                const float dx = app.mouseX_ - s.sliderAt.x;
+                const float delta = which == PickerUi::Slider::DrawSize ? dx : dx / app.uiScale_ * kFollowPerPx / d.shownScale;
+                *d.value = std::clamp(s.sliderBase + delta, d.lo, d.hi);
+            }
+            const float keptValue = *d.value;
             // Typing a number sets it (Enter applies, Esc cancels); dragging the slider works too.
             if (!first) {
                 for (int k = 0; k <= 9; ++k)
@@ -1446,7 +1488,11 @@ void drawPickers(App& app) {
                     }
                     close = true;
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) close = true;
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    *d.value = s.sliderBase; // Esc cancels: back to what it was
+                    s.sliderTyped.clear();
+                    close = true;
+                }
             }
             ImGui::SetNextItemWidth(w);
             char fmt[64];
@@ -1463,6 +1509,7 @@ void drawPickers(App& app) {
                 if (ImGui::SliderFloat("##cursorvalue", &shown, d.lo * d.shownScale, d.hi * d.shownScale, fmt))
                     *d.value = std::clamp(shown / d.shownScale, d.lo, d.hi);
             }
+            if (confirmClick) *d.value = keptValue; // (the click's own jump on the knob does not count)
             ImGui::LogText("%s %.0f", d.name, double(*d.value * d.shownScale));
             {
                 // The knob's centre as ImGui's slider draws it (2 px padding, GrabMinSize wide; Size is logarithmic).
@@ -1489,6 +1536,16 @@ void drawPickers(App& app) {
             // hovered while its own slider is active, and that used to close the slider as soon as it was dragged, #9.)
             const bool clicked =
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+            if (confirmClick) close = true;
+            if (following && !onCanvas && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !first) {
+                *d.value = s.sliderBase; // a click off the canvas cancels
+                close = true;
+            }
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !first) { // a right click cancels, like Esc
+                *d.value = s.sliderBase;
+                s.sliderTyped.clear();
+                close = true;
+            }
             if (clicked && !first && !dragging && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
                 close = true;
         }
@@ -1501,13 +1558,21 @@ void drawPickers(App& app) {
 
 bool PickerUi::sliderPreview(const App& app, ImVec2& at, Slider& which, float& value) {
     const State& s = st();
-    if (s.slider != int(Slider::DrawSize) && s.slider != int(Slider::FocalShift)) return false;
+    if (s.slider < 0) return false;
     which = Slider(s.slider);
     at = s.sliderAt;
-    value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
+    const bool intensity = which == Slider::ZIntensity || which == Slider::RgbIntensity;
+    if (intensity) {
+        if (!s.sliderValue) return false; // (the first frame, before the pop-up has drawn)
+        value = *s.sliderValue; // the ring shows it as a disc: 0..1
+    } else {
+        value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
+    }
     if (!s.sliderTyped.empty() && s.sliderTyped != "-" && s.sliderTyped != ".") {
         const float v = std::strtof(s.sliderTyped.c_str(), nullptr); // as Enter would apply it
-        value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx) : std::clamp(v / 100.0f, -1.0f, 1.0f);
+        value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx)
+                : intensity               ? std::clamp(v > 1.0f ? v / 100.0f : v, 0.01f, 1.0f)
+                                          : std::clamp(v / 100.0f, -1.0f, 1.0f);
     }
     return true;
 }
