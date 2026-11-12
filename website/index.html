@@ -108,8 +108,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
             <a class="btn" href="why.html">Why we're doing this</a>
           </div>
           <p class="hero-note">Linux, macOS and Windows. No account, no subscription.</p>
-          <p class="speed-line">On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right
-            after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
+          <p class="speed-line">Orbiting 104 million micro triangles, drawn at the detail the view allows, runs at 208 frames a second on our simulated entry-level tier and 657 on an RTX 3060. The raw results are published. <a href="benchmarks/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
             <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
@@ -265,9 +264,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="grid">
           <article class="card">
             <h3>Dense scans that keep up</h3>
-            <p>On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right after a big stroke.
-              On our simulated entry-level tier, the slowest frames orbiting a 28-million-triangle scan went from 24 to
-              12 ms in 0.11.7.</p>
+            <p>Orbiting 104 million micro triangles, drawn at the detail the view allows, averages 208 frames a second on our simulated entry-level tier (a capped M1 Pro laptop) and 657 on an RTX 3060. A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on the 3060. Big brushes still trail the pen. Every number is the median of three runs, with the raw results published.</p>
           </article>
           <article class="card">
             <h3>Open file formats</h3>
@@ -632,7 +629,7 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="links">
         <a href="performance/">Performance</a>
         <a href="guide/index.html">User guide</a>
-        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="benchmarks/">Benchmarks: 33M, 104M, 201M</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="why.html">Why SculptForge</a>
