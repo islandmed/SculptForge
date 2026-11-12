@@ -21,6 +21,7 @@
 
 #include "core/BVH.h"
 #include "core/MeshBoolean.h"
+#include "core/PathStroke.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
 
@@ -30,7 +31,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <functional>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -141,6 +145,43 @@ inline size_t flippedFaces(const std::vector<glm::vec3>& before, const Mesh& aft
         n += glm::dot(a, b) < 0.0f;
     }
     return n;
+}
+// The artist close-up's fold count (tools/qa/closeup.py): triangles that touch a moved vertex and lie against a neighbour
+// across an edge (their normals more than 120 degrees apart), after the strokes less before them. Stricter than
+// invertedFaces: one bad neighbour is enough, the dark crease lines of a crumpled drag count as well as the lone specks.
+inline size_t foldedFaces(const std::vector<glm::vec3>& before, const Mesh& m) {
+    std::vector<uint8_t> moved(m.vertexCount(), 0);
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) moved[v] = m.positions[v] != before[v];
+    std::vector<uint32_t> tris;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 f = m.triangles[t];
+        if (moved[f.x] || moved[f.y] || moved[f.z]) tris.push_back(t);
+    }
+    auto count = [&](const std::vector<glm::vec3>& pos) {
+        std::vector<glm::vec3> nrm(tris.size());
+        std::unordered_map<uint64_t, uint32_t> first;
+        std::vector<uint8_t> bad(tris.size(), 0);
+        for (uint32_t i = 0; i < tris.size(); ++i) {
+            const glm::uvec3 f = m.triangles[tris[i]];
+            const glm::vec3 n = glm::cross(pos[f.y] - pos[f.x], pos[f.z] - pos[f.x]);
+            const float l = glm::length(n);
+            nrm[i] = l > 0.0f ? n / l : glm::vec3(0.0f);
+            const uint32_t c[3] = {f.x, f.y, f.z};
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t a = std::min(c[k], c[(k + 1) % 3]), b = std::max(c[k], c[(k + 1) % 3]);
+                const uint64_t key = (uint64_t(a) << 32) | b;
+                auto it = first.find(key);
+                if (it == first.end()) { first.emplace(key, i); continue; }
+                const uint32_t j = it->second;
+                if (nrm[i] != glm::vec3(0.0f) && nrm[j] != glm::vec3(0.0f) && glm::dot(nrm[i], nrm[j]) < -0.5f) bad[i] = bad[j] = 1;
+            }
+        }
+        size_t n = 0;
+        for (uint8_t b : bad) n += b;
+        return n;
+    };
+    const size_t after = count(m.positions), start = count(before);
+    return after > start ? after - start : 0;
 }
 // Triangles of a closed mesh around the origin that face inwards (after a remesh, where the topology changed).
 inline size_t inwardFaces(const Mesh& m, glm::vec3 centre = glm::vec3(0.0f)) {
@@ -344,4 +385,71 @@ inline std::vector<glm::vec3> centersOf(const std::vector<std::vector<DabParams>
     return c;
 }
 
+// --- strokes as the app lays them ---
+// A brush's own dabs are not enough for the brushes that drag the surface: in the app each dab lands where the cursor's ray
+// meets the surface the earlier dabs left, so a stroke feeds on its own result (and the next stroke on the last one's).
+// `replayStrokes` plays recorded cursor paths (tests/data/drag_paths/*.txt: the samples of a close-up session, with its
+// brush radius, pen pressure and symmetry) through core's strokePath, which does the same ray projection, and reports
+// after each stroke. An invariant test of a dragging brush uses this, never dabs placed on the unmoved surface (11-11: a
+// Tendril and a Nudge test on such arcs said 0 folds while the app folded thousands).
+struct StrokeFixture {
+    float radius = 0.2f, strength = 0.5f;
+    Symmetry symmetry{false, false, false};
+    glm::vec3 view{0.0f, 0.0f, -1.0f};
+    struct One { std::vector<glm::vec3> points; float p0 = 1.0f, p1 = 1.0f; };
+    std::vector<One> strokes;
+};
+inline StrokeFixture loadStrokeFixture(const std::string& name) {
+    StrokeFixture f;
+    std::ifstream in(std::string(SF_TEST_DATA_DIR) + "/drag_paths/" + name + ".txt");
+    std::string line;
+    f.strokes.resize(8);
+    size_t count = 0;
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        const size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+        const std::string key = line.substr(0, colon), value = line.substr(colon + 1);
+        std::istringstream v(value);
+        if (key == "radius_world") v >> f.radius;
+        else if (key == "strength") v >> f.strength;
+        else if (key == "symmetry") f.symmetry.x = value.find('X') != std::string::npos;
+        else if (key.rfind("stroke", 0) == 0 && key.size() > 6) {
+            const size_t k = size_t(key[6] - '1');
+            if (k >= f.strokes.size()) continue;
+            count = std::max(count, k + 1);
+            if (key.find("_points") != std::string::npos) {
+                std::string tok;
+                while (v >> tok) {
+                    glm::vec3 p;
+                    if (std::sscanf(tok.c_str(), "%f,%f,%f", &p.x, &p.y, &p.z) == 3) f.strokes[k].points.push_back(p);
+                }
+            } else if (key.find("_pressure") != std::string::npos) {
+                v >> f.strokes[k].p0 >> f.strokes[k].p1;
+            }
+        }
+    }
+    f.strokes.resize(count);
+    return f;
+}
+// Plays the fixture's strokes on `d` (one undo step each); `after(k)` runs after stroke k (0-based).
+inline void replayStrokes(Document& d, const BrushRecipe* recipe, BrushType type, const StrokeFixture& f,
+                          const std::function<void(size_t)>& after = {}) {
+    for (size_t k = 0; k < f.strokes.size(); ++k) {
+        PathStroke s;
+        s.points = f.strokes[k].points;
+        s.view = f.view;
+        s.radius = f.radius;
+        s.strength = f.strength;
+        s.pressure = f.strokes[k].p0;
+        s.pressureEnd = f.strokes[k].p1;
+        s.curve = false;
+        s.symmetry = f.symmetry;
+        std::string error;
+        strokePath(d, recipe, type, s, error);
+        if (after) after(k);
+    }
+}
+
 } // namespace sf::geom
+
