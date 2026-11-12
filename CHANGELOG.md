@@ -6,6 +6,19 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
+  resting palm and do nothing; a trackpad's fingers are never ignored. Off on desktop touch screens.
+
+### Changed
+- **Braid** (Tool > Tube) now builds round strands (two to begin with) that twist over and under each other round the
+  curve, instead of flat ribbons. **Spread** sets the weave: 0 packs the strands together so they touch, 1 opens them
+  up with longer turns. Saved braids look different. Requested by Artizmo on Discord.
+- Tool > Tube sliders for Rope, Braid and the other profiles are now Twist, Spin, Spread, Strands. **Turn** is gone:
+  **Spin** does what Turn did (turns the cross-section about the curve). A saved Turn loads as Spin; a Spin saved
+  before this (degrees per radius of length) is dropped. `tube_set` and `tube_new` take `spin` (`turn` still works).
+  Requested by Artizmo on Discord.
+
 ## [0.12.10] - 2026-11-11
 
 ### Added
