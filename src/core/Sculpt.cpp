@@ -21,6 +21,10 @@
 namespace sf {
 
 const float* gRndAreaWeight = nullptr; // R&D spike rnd/moved-vertex (tests/tools/rnd_proxy_bench.cpp)
+// Spike: the dense normals' sum per proxy vertex at the stroke's start and the proxy normals then: the area sums take
+// sum + (n - n0) * |sum| (the dense detail's average, turned as the proxy has turned since).
+const glm::vec3* gRndAreaNormalSum = nullptr;
+const glm::vec3* gRndAreaNormal0 = nullptr;
 
 
 const char* brushName(BrushType type) {
@@ -1045,6 +1049,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
         if (gRndAreaWeight) w *= gRndAreaWeight[v]; // spike rnd/moved-vertex: a proxy vertex stands for this many dense ones
+        if (gRndAreaNormalSum) {
+            const glm::vec3& sum = gRndAreaNormalSum[v];
+            acc.normal += (sum + (nrm[v] - gRndAreaNormal0[v]) * glm::length(sum)) * (w / std::max(1.0f, gRndAreaWeight ? gRndAreaWeight[v] : 1.0f));
+        } else
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
         acc.weight += w;

@@ -24,7 +24,7 @@
 using namespace sf;
 using namespace sf::geom;
 
-namespace sf { extern const float* gRndAreaWeight; }
+namespace sf { extern const float* gRndAreaWeight; extern const glm::vec3 *gRndAreaNormalSum, *gRndAreaNormal0; }
 
 namespace {
 
@@ -212,8 +212,13 @@ int main(int argc, char** argv) {
         const bool same = std::getenv("SF_RND_SAME_CENTERS") != nullptr;
         std::vector<float> weight(count.begin(), count.end()); // SF_RND_AREA_WEIGHT=1: area sums weighted by the dense vertices per proxy vertex
         if (std::getenv("SF_RND_AREA_WEIGHT")) gRndAreaWeight = weight.data();
+        // SF_RND_AREA_NORMAL=1: the area sums use the dense normals' sum per proxy vertex (turned with the proxy).
+        std::vector<glm::vec3> denseNormalSum(np, glm::vec3(0.0f)), proxyNormal0 = p.mesh.normals;
+        for (size_t v = 0; v < nv; ++v) denseNormalSum[proxyOf[v]] += origN[v];
+        if (std::getenv("SF_RND_AREA_NORMAL")) gRndAreaNormalSum = denseNormalSum.data(), gRndAreaNormal0 = proxyNormal0.data();
         const Run pr = stroke(p, s, dabs, same ? &ex.centers : nullptr);
         gRndAreaWeight = nullptr;
+        gRndAreaNormalSum = gRndAreaNormal0 = nullptr;
         double centerOff = 0.0;
         for (size_t i = 0; i < std::min(pr.centers.size(), ex.centers.size()); ++i) centerOff = std::max(centerOff, double(glm::distance(pr.centers[i], ex.centers[i])));
         double angle = 0.0;
@@ -310,6 +315,24 @@ int main(int argc, char** argv) {
                     double(cpr), np, ntp, buildMs, double(pr.touched) / std::max(1, pr.hits), pr.dabMs / std::max(1, pr.hits), pr.hits,
                     densePassed.load(), flushMs, at(1.0) / rr, at(0.999) / rr, at(0.99) / rr,
                     e.empty() ? 0.0 : std::sqrt(sq / double(e.size())) / rr, e.size(), exactMax / rr);
+        { // In screen terms (CTO 11-12): r is the 240 px brush, viewed along the stroke's ray. Front-facing vertices only
+            // (what the view can show): the error across the screen (px) and along the view (depth, as px of the same scale).
+            const float pxPerUnit = 240.0f / s.radius;
+            std::vector<float> across, along;
+            for (size_t v = 0; v < nv; ++v) {
+                if (exact[v] == orig[v] && dense[v] == orig[v]) continue;
+                if (glm::dot(origN[v], -s.dir) <= 0.0f) continue;
+                const glm::vec3 dv = dense[v] - exact[v];
+                const float z = glm::dot(dv, s.dir);
+                along.push_back(std::abs(z) * pxPerUnit);
+                across.push_back(glm::length(dv - s.dir * z) * pxPerUnit);
+            }
+            std::sort(across.begin(), across.end()), std::sort(along.begin(), along.end());
+            const auto q = [](const std::vector<float>& x, double f) { return x.empty() ? 0.0f : x[std::min(x.size() - 1, size_t(f * double(x.size() - 1)))]; };
+            std::printf("  screen (240 px brush, front-facing %zu): across max %.2f p99.9 %.2f p99 %.2f px | depth max %.2f p99.9 %.2f px\n",
+                        across.size(), double(q(across, 1.0)), double(q(across, 0.999)), double(q(across, 0.99)), double(q(along, 1.0)),
+                        double(q(along, 0.999)));
+        }
         d.mesh.positions = dense;
         promises("proxy");
         d.mesh.positions = exactKeep;
