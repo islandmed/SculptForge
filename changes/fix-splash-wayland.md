@@ -4,6 +4,7 @@ changed: The start-up splash shows on every interactive start for at least 0.5 s
 fixed: The start-up splash never appeared on Wayland ("Window framebuffer support not available"); it is now drawn through an SDL renderer when the window has no surface, and fully drawn before the window is shown.
 testers:
   - Linux Wayland (Hyprland or GNOME): start SculptForge; a centred splash with the version shows for half a second, then the main window appears. No empty flash.
+  - Linux Wayland on NVIDIA and on AMD (also the machines of #192 and #201): the splash shows, the main window's shaders still compile and the 3D view draws normally (the splash now uses a GL renderer when its window has no surface).
   - Windows at 150% and 200% scaling, macOS Retina: the splash is sharp (not blurry), centred, and fades into the main window.
   - Preferences > Interface > Show startup splash off: restart; the main window shows at once.
 ---
