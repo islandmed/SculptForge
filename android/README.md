@@ -46,6 +46,7 @@ need OpenGL ES 3.2, which every tablet of these families since about 2018 has.
 - **Files:** settings, the log, autosaves and the brush library live in the app's own storage. **Save** writes to
   the app's `Projects` folder (on the device: `Android/data/org.sculptforge.app/files/Projects`, reachable over USB);
   **Open** shows the system's document picker and opens a copy of the chosen file. No storage permission.
+- No cloud backup (`allowBackup="false"`, no backup rules): projects stay on the device until the user exports one.
 - **Left out:** the plugin runtime, the live face feed, the update check and the tools that run other programs
   (splat training, photo scans, video): starting one says it can't run on Android.
 - **Permissions:** none.

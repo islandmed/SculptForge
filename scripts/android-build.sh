@@ -14,6 +14,10 @@
 # SDK), Java 17, CMake 3.24+, Ninja and Gradle 8.9+ on PATH. GitHub's ubuntu-24.04 runners have all of them.
 # Prints the APK's path last.
 set -euo pipefail
+# Projects never go to Google's cloud backup unless the user chooses it (an explicit in-app backup, later).
+if grep -q 'android:allowBackup="true"\|fullBackupContent\|dataExtractionRules' android/app/src/main/AndroidManifest.xml; then
+  echo "AndroidManifest.xml: allowBackup must be false, with no backup rules (users' projects stay on the device)" >&2; exit 1
+fi
 cd "$(dirname "$0")/.."
 
 abis=() type=release out=build-android unsigned=
