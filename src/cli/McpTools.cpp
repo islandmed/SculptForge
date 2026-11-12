@@ -3,8 +3,10 @@
 #include "cli/McpTools.h"
 
 #include "ai/ImageTo3DService.h"
+#include "core/DetailPass.h"
 #include "core/Document.h"
 #include "core/Image.h"
+#include "core/PathStroke.h"
 
 #include <glm/glm.hpp>
 
@@ -34,6 +36,25 @@ struct Recipe {
     const char* text;
 };
 
+} // namespace
+
+const char* const kMcpSculptWorkflow =
+    "Sculpting to finished detail goes in stages, and each needs a denser mesh (sizes below are fractions of the "
+    "model's size, its bounding-box diagonal; scene_overview gives it, stroke radii are in scene units): "
+    "1. Block out the big forms (blockout, new_head or new_starter_mesh; Move, Clay Block, Inflate at radius 5-15%). "
+    "2. remesh to an even surface, subdivide to about 0.5-1M triangles, and shape the secondary forms (brow, "
+    "cheekbones, eyelids, lips, ear folds) at radius 1.5-4%, strength 0.3-0.6. "
+    "3. Before any fine detail, subdivide again to 3-6M triangles (edges under 0.15% of the size): on a coarser mesh "
+    "pores and wrinkles only roughen it. "
+    "4. Detail, region by region (forehead, around the eyes, nose, cheeks, lips, neck): detail_pass (pores, skin, "
+    "wrinkles, scales, scars) and strokes with the detail presets (Detail Crease for eyelids, lips, nostrils and "
+    "folds; Detail Wrinkle; Detail Scar) at radius 0.3-1%, strength 0.2-0.5. "
+    "Judge detail with view_closeup on the spot (span about 10% of the size): a whole-model view is too far away to "
+    "show it. Several dozen detail strokes and passes is normal for a finished head: keep about a third of your "
+    "steps for stages 3 and 4, and don't restart the block-out once the forms read.";
+
+namespace {
+
 // Every recipe ends with the same working rules.
 constexpr const char* kRules =
     "\n\nWorking rules: call viewport_image after each step to check the result before going on. Every tool call is "
@@ -48,14 +69,17 @@ const std::vector<Recipe>& recipes() {
          {{"description", "What the creature looks like, e.g. \"an old swamp troll with heavy brows\".", true},
           {"output", "Where to save the result (a .glb or .sfproj path). Optional.", false}},
          "Sculpt a creature head: {description}.\n"
-         "1. Block out the big forms with blockout (spheres for skull, jaw, brow, nose, ears; symmetry x) or "
-         "forgesphere_* commands, then make the mesh.\n"
-         "2. Remesh to an even surface (remesh) and subdivide two or three levels.\n"
-         "3. Shape the primary forms with stroke (Move, Clay Block, Smooth), checking front and side views.\n"
-         "4. Add secondary forms (wrinkles, brow folds, lips) at the higher levels, then fine detail (micro_noise or "
-         "small strokes).\n"
-         "5. Optionally paint it (set_color, paint_from_cavity).\n"
-         "6. Save to {output|a file the user names} and say what you made."},
+         "1. Block out the big forms with blockout (spheres for skull, jaw, brow, nose, ears; symmetry x) or start "
+         "from new_head, then shape the primary forms with stroke (Move, Clay Block, Inflate at radius 5-15% of the "
+         "head's size), checking front and side views.\n"
+         "2. Remesh to an even surface (remesh), subdivide to about 0.5-1M triangles and sculpt the secondary forms "
+         "(brow folds, cheekbones, eyelids, lips, nostrils, ear folds) at radius 1.5-4%, symmetry x.\n"
+         "3. Subdivide to 3-6M triangles, then detail region by region: detail_pass kind=pores and kind=skin on the "
+         "cheeks, nose and forehead; kind=wrinkles around the eyes, on the brow and the neck; Detail Crease strokes on "
+         "the eyelids, lips and nostrils; Detail Scar or kind=scars where the design wants them; kind=scales for scaly "
+         "hide. Look at each region with view_closeup (span about 10% of the head) and redo what reads weak.\n"
+         "4. Optionally paint it (set_color, paint_from_cavity).\n"
+         "5. Save to {output|a file the user names} and say what you made."},
         {"stylised_bust", "Stylised bust from a reference image",
          "Turn a reference picture into a stylised bust: generate or block out, then refine by eye.",
          {{"image", "Path to the reference image on the user's computer.", true},
@@ -140,16 +164,21 @@ constexpr int kDefaultSize = 768, kMinSize = 256, kMaxSize = 1536;
 struct View {
     glm::vec3 center{0.0f}, right{1, 0, 0}, up{0, 1, 0}, forward{0, 0, -1};
     float halfExtent = 1.0f; // world units from the centre to the image edge
+    float nearClip = std::numeric_limits<float>::max(); // nothing nearer the viewer than this (world units in front of the centre)
+    bool raking = false;     // a low key light that makes fine relief show (close-ups)
 };
 
-void drawMesh(const Mesh& mesh, const View& view, int size, std::vector<float>& depth, std::vector<glm::vec3>& color) {
+void drawMesh(const Mesh& mesh, const glm::mat4& place, const View& view, int size, std::vector<float>& depth,
+              std::vector<glm::vec3>& color) {
     const glm::vec3 clay(0.78f, 0.74f, 0.70f);
-    const glm::vec3 light = glm::normalize(-view.forward + 0.6f * view.up + 0.5f * view.right); // key light, upper right
+    const glm::vec3 light = view.raking ? glm::normalize(-0.45f * view.forward + 0.8f * view.up + 0.4f * view.right)
+                                        : glm::normalize(-view.forward + 0.6f * view.up + 0.5f * view.right); // key light, upper right
     const bool smooth = mesh.normals.size() == mesh.positions.size();
+    const glm::mat3 turn(place);
     const float toPixels = 0.5f * float(size) / view.halfExtent;
     std::vector<glm::vec3> screen(mesh.positions.size()); // x, y in pixels (y down), z = depth toward the viewer
     for (size_t v = 0; v < mesh.positions.size(); ++v) {
-        const glm::vec3 d = mesh.positions[v] - view.center;
+        const glm::vec3 d = glm::vec3(place * glm::vec4(mesh.positions[v], 1.0f)) - view.center;
         screen[v] = {0.5f * float(size) + glm::dot(d, view.right) * toPixels,
                      0.5f * float(size) - glm::dot(d, view.up) * toPixels, -glm::dot(d, view.forward)};
     }
@@ -157,8 +186,9 @@ void drawMesh(const Mesh& mesh, const View& view, int size, std::vector<float>& 
         const glm::vec3 &a = screen[t.x], &b = screen[t.y], &c = screen[t.z];
         const float area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
         if (std::abs(area) < 1e-12f) continue;
-        const glm::vec3 faceN = glm::normalize(glm::cross(mesh.positions[t.y] - mesh.positions[t.x],
-                                                          mesh.positions[t.z] - mesh.positions[t.x]));
+        if (std::min({a.z, b.z, c.z}) > view.nearClip) continue;
+        const glm::vec3 faceN = glm::normalize(turn * glm::cross(mesh.positions[t.y] - mesh.positions[t.x],
+                                                                 mesh.positions[t.z] - mesh.positions[t.x]));
         const int x0 = std::max(0, int(std::floor(std::min({a.x, b.x, c.x}))));
         const int x1 = std::min(size - 1, int(std::ceil(std::max({a.x, b.x, c.x}))));
         const int y0 = std::max(0, int(std::floor(std::min({a.y, b.y, c.y}))));
@@ -171,10 +201,11 @@ void drawMesh(const Mesh& mesh, const View& view, int size, std::vector<float>& 
                 const float w2 = 1.0f - w0 - w1;
                 if (w0 < 0.0f || w1 < 0.0f || w2 < 0.0f) continue;
                 const float z = w0 * a.z + w1 * b.z + w2 * c.z;
+                if (z > view.nearClip) continue;
                 float& stored = depth[size_t(y) * size_t(size) + size_t(x)];
                 if (z <= stored) continue;
                 stored = z;
-                glm::vec3 n = smooth ? w0 * mesh.normals[t.x] + w1 * mesh.normals[t.y] + w2 * mesh.normals[t.z] : faceN;
+                glm::vec3 n = smooth ? turn * (w0 * mesh.normals[t.x] + w1 * mesh.normals[t.y] + w2 * mesh.normals[t.z]) : faceN;
                 n = glm::length(n) > 0.0f ? glm::normalize(n) : faceN;
                 if (glm::dot(n, view.forward) > 0.0f) n = -n; // back faces lit like front faces
                 const glm::vec3 base = mesh.hasColors()
@@ -185,6 +216,61 @@ void drawMesh(const Mesh& mesh, const View& view, int size, std::vector<float>& 
                 color[size_t(y) * size_t(size) + size_t(x)] = base * (0.25f + 0.75f * diffuse) + glm::vec3(0.15f * rim);
             }
     }
+}
+
+void aim(View& view, const glm::vec3& eyeDir) {
+    view.forward = -glm::normalize(eyeDir);
+    const glm::vec3 worldUp = std::abs(view.forward.y) > 0.999f ? glm::vec3(0, 0, -1) : glm::vec3(0, 1, 0);
+    view.right = glm::normalize(glm::cross(view.forward, worldUp));
+    view.up = glm::cross(view.right, view.forward);
+}
+
+Json imageContent(const std::vector<uint8_t>& png) {
+    Json image = Json::object();
+    image.set("type", "image");
+    image.set("data", ai::base64Encode(png.data(), png.size()));
+    image.set("mimeType", "image/png");
+    return image;
+}
+
+Json textContent(const std::string& text) {
+    Json note = Json::object();
+    note.set("type", "text");
+    note.set("text", text);
+    return note;
+}
+
+// Every visible Part, drawn as `view` sees it, as a PNG.
+bool drawPng(const Document& doc, const View& view, int size, std::vector<uint8_t>& png, size_t& triangles,
+             std::string& error) {
+    const size_t pixels = size_t(size) * size_t(size);
+    std::vector<float> depth(pixels, -std::numeric_limits<float>::max());
+    std::vector<glm::vec3> color(pixels);
+    for (int y = 0; y < size; ++y) // background: a quiet vertical gradient
+        std::fill_n(color.begin() + std::ptrdiff_t(y) * size, size,
+                    glm::mix(glm::vec3(0.20f, 0.21f, 0.23f), glm::vec3(0.11f, 0.11f, 0.12f), float(y) / float(size)));
+    triangles = 0;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (!doc.parts[size_t(i)].visible) continue;
+        drawMesh(doc.partMesh(i), doc.parts[size_t(i)].transform, view, size, depth, color);
+        triangles += doc.partMesh(i).triangles.size();
+    }
+
+    Image img;
+    img.width = img.height = size;
+    img.rgba.resize(pixels * 4);
+    for (size_t p = 0; p < pixels; ++p) {
+        const glm::vec3 c = glm::clamp(color[p], 0.0f, 1.0f);
+        img.rgba[p * 4 + 0] = uint8_t(std::lround(std::pow(c.x, 1.0f / 2.2f) * 255.0f)); // linear-ish to sRGB
+        img.rgba[p * 4 + 1] = uint8_t(std::lround(std::pow(c.y, 1.0f / 2.2f) * 255.0f));
+        img.rgba[p * 4 + 2] = uint8_t(std::lround(std::pow(c.z, 1.0f / 2.2f) * 255.0f));
+        img.rgba[p * 4 + 3] = 255;
+    }
+    if (!img.encodePng(png)) {
+        error = "Couldn't encode the picture.";
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -302,7 +388,10 @@ bool renderViewportImage(const Document& doc, const Json& args, Json& content, s
     }
     glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
     for (const int i : framed)
-        for (const glm::vec3& p : doc.partMesh(i).positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+        for (const glm::vec3& p : doc.partMesh(i).positions) {
+            const glm::vec3 w = glm::vec3(doc.parts[size_t(i)].transform * glm::vec4(p, 1.0f)); // (a moved linked copy)
+            lo = glm::min(lo, w), hi = glm::max(hi, w);
+        }
     if (lo.x > hi.x) {
         error = "Nothing to show: the scene has no visible mesh (start with new_sphere or open).";
         return false;
@@ -313,51 +402,98 @@ bool renderViewportImage(const Document& doc, const Json& args, Json& content, s
     view.halfExtent = std::max(1e-6f, 0.55f * glm::length(hi - lo)) / zoom; // the bounding sphere, with a margin
     // The model faces +Z, so the front view looks down -Z; yaw 90 looks at the model's right side (-X), elevation
     // raises the camera.
-    const glm::vec3 eyeDir(-std::sin(yaw) * std::cos(pitch), std::sin(pitch), std::cos(yaw) * std::cos(pitch));
-    view.forward = -eyeDir;
-    view.right = glm::normalize(glm::cross(view.forward, glm::vec3(0, 1, 0)));
-    view.up = glm::cross(view.right, view.forward);
-
-    const size_t pixels = size_t(size) * size_t(size);
-    std::vector<float> depth(pixels, -std::numeric_limits<float>::max());
-    std::vector<glm::vec3> color(pixels);
-    for (int y = 0; y < size; ++y) // background: a quiet vertical gradient
-        std::fill_n(color.begin() + std::ptrdiff_t(y) * size, size,
-                    glm::mix(glm::vec3(0.20f, 0.21f, 0.23f), glm::vec3(0.11f, 0.11f, 0.12f), float(y) / float(size)));
-    size_t triangles = 0;
-    for (const int i : drawn) {
-        drawMesh(doc.partMesh(i), view, size, depth, color);
-        triangles += doc.partMesh(i).triangles.size();
-    }
-
-    Image img;
-    img.width = img.height = size;
-    img.rgba.resize(pixels * 4);
-    for (size_t p = 0; p < pixels; ++p) {
-        const glm::vec3 c = glm::clamp(color[p], 0.0f, 1.0f);
-        img.rgba[p * 4 + 0] = uint8_t(std::lround(std::pow(c.x, 1.0f / 2.2f) * 255.0f)); // linear-ish to sRGB
-        img.rgba[p * 4 + 1] = uint8_t(std::lround(std::pow(c.y, 1.0f / 2.2f) * 255.0f));
-        img.rgba[p * 4 + 2] = uint8_t(std::lround(std::pow(c.z, 1.0f / 2.2f) * 255.0f));
-        img.rgba[p * 4 + 3] = 255;
-    }
+    aim(view, glm::vec3(-std::sin(yaw) * std::cos(pitch), std::sin(pitch), std::cos(yaw) * std::cos(pitch)));
     std::vector<uint8_t> png;
-    if (!img.encodePng(png)) {
-        error = "Couldn't encode the picture.";
+    size_t triangles = 0;
+    if (!drawPng(doc, view, size, png, triangles, error)) return false;
+    content = Json::array();
+    content.push(imageContent(png));
+    content.push(textContent(std::to_string(size) + " px, yaw " + std::to_string(int(std::lround(glm::degrees(yaw)))) +
+                             ", elevation " + std::to_string(int(std::lround(glm::degrees(pitch)))) + ", " +
+                             std::to_string(drawn.size()) + " visible Part(s), " + std::to_string(triangles) +
+                             " triangles (headless clay view)."));
+    return true;
+}
+
+Json viewCloseupTool() {
+    auto prop = [](const char* type, const char* description) {
+        Json p = Json::object();
+        p.set("type", type);
+        p.set("description", description);
+        return p;
+    };
+    Json props = Json::object();
+    props.set("point", prop("string", "\"x,y,z\" in scene units: the spot to look at (the nearest surface point is "
+                                      "used; scene_overview and measure give the model's centre and size)."));
+    props.set("span", prop("number", "How wide the picture is, in scene units (default 10% of the model's size; "
+                                     "about 0.05-0.15 of a head's height shows pores and wrinkles)."));
+    props.set("direction", prop("string", "\"x,y,z\": look from this side (pointing from the surface toward the "
+                                          "camera). Default: straight at the surface, along its normal."));
+    props.set("size", prop("number", "Image width and height in pixels (256 to 1536, default 768)."));
+    Json schema = Json::object();
+    schema.set("type", "object");
+    schema.set("properties", props);
+    Json required = Json::array();
+    required.push("point");
+    schema.set("required", required);
+    Json tool = Json::object();
+    tool.set("name", "view_closeup");
+    tool.set("description",
+             "A close-up picture of one spot of the model, lit low from the side so fine relief shows, to judge "
+             "detail (pores, wrinkles, creases, scales) the way an artist zooms in. It also says how many triangles "
+             "are in view and the finest detail the mesh can hold there. Doesn't move the view.");
+    tool.set("inputSchema", schema);
+    return tool;
+}
+
+bool closeupArgs(const Document& doc, const Json& args, Closeup& c, float& span, int& size, std::string& error) {
+    glm::vec3 point(0.0f), eye(0.0f);
+    if (!args["point"].isString() || !parseVec3(args["point"].asString(), point)) {
+        error = "point must be \"x,y,z\" (scene units)";
         return false;
     }
-    Json image = Json::object();
-    image.set("type", "image");
-    image.set("data", ai::base64Encode(png.data(), png.size()));
-    image.set("mimeType", "image/png");
-    Json note = Json::object();
-    note.set("type", "text");
-    note.set("text", std::to_string(size) + " px, yaw " + std::to_string(int(std::lround(glm::degrees(yaw)))) +
-                         ", elevation " + std::to_string(int(std::lround(glm::degrees(pitch)))) + ", " +
-                         std::to_string(drawn.size()) + " visible Part(s), " + std::to_string(triangles) +
-                         " triangles (headless clay view).");
+    if (args["direction"].isString() && !parseVec3(args["direction"].asString(), eye)) {
+        error = "direction must be \"x,y,z\"";
+        return false;
+    }
+    glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
+    for (int i = 0; i < doc.partCount(); ++i)
+        if (doc.parts[size_t(i)].visible)
+            for (const glm::vec3& p : doc.partMesh(i).positions) {
+                const glm::vec3 w = glm::vec3(doc.parts[size_t(i)].transform * glm::vec4(p, 1.0f));
+                lo = glm::min(lo, w), hi = glm::max(hi, w);
+            }
+    if (lo.x > hi.x) {
+        error = "Nothing to show: the scene has no visible mesh.";
+        return false;
+    }
+    const float modelSize = std::max(glm::length(hi - lo), 1e-6f);
+    span = float(args["span"].asNumber(0.1 * modelSize));
+    if (!(span > modelSize * 1e-4f && span <= modelSize * 2.0f)) {
+        error = "span must be between " + std::to_string(modelSize * 1e-4f) + " and " + std::to_string(modelSize * 2.0f);
+        return false;
+    }
+    size = std::clamp(int(args["size"].asNumber(kDefaultSize)), kMinSize, kMaxSize);
+    return closeupFraming(doc, point, span, eye, c, error);
+}
+
+bool renderCloseup(const Document& doc, const Json& args, Json& content, std::string& error) {
+    Closeup c;
+    float span = 0.0f;
+    int size = kDefaultSize;
+    if (!closeupArgs(doc, args, c, span, size, error)) return false;
+    View view;
+    view.center = c.point;
+    view.halfExtent = 0.5f * span;
+    view.nearClip = span; // (what stands between: the nose in front of a cheek)
+    view.raking = true;
+    aim(view, c.eye);
+    std::vector<uint8_t> png;
+    size_t triangles = 0;
+    if (!drawPng(doc, view, size, png, triangles, error)) return false;
     content = Json::array();
-    content.push(image);
-    content.push(note);
+    content.push(imageContent(png));
+    content.push(textContent(closeupText(c, span) + " (headless clay view, " + std::to_string(size) + " px)"));
     return true;
 }
 

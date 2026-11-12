@@ -1,0 +1,16 @@
+# mcp-detail benchmark (run.sh): live mode on, the proxy's connection approved, then wait for the agent to finish
+# (its client closes the connection), approve the finisher's (the final pictures) and save what it made for metric.py.
+run ui_look look=classic layout=classic
+click "Preferences##palette.preferences"
+click "AI##preferences.ai"
+click "Let AI tools control this window##prefs.ai_live"
+click "Preferences##palette.preferences"
+wait_value ai_link_state == 2 60
+click "Approve##ailink"
+wait_value ai_link_state == 3 10
+wait_value ai_link_state <= 1 2400
+wait_value ai_link_state == 2 120
+click "Approve##ailink"
+wait_value ai_link_state == 3 10
+wait_value ai_link_state <= 1 600
+run save_obj path=@OUT@/final.obj

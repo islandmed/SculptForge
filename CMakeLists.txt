@@ -179,7 +179,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
+  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
