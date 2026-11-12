@@ -483,6 +483,7 @@ private:
     const BVH* lazyBvh_ = nullptr;
     std::vector<uint32_t> curvatureStamp_;
     bool adaptiveDab_ = false; // the dab dabSingle is placing takes the adaptive path
+    bool earlyNormals_ = false; // dab(): this copy's normals go ahead (analytically) for the next mirror copy that meets it
     // Fused batches: the dabs waiting, and the last unmirrored region's size and radius (whether the next dab
     // is big enough to wait), and the place a batch's vertices are kept while it is applied.
     struct PendingDab {

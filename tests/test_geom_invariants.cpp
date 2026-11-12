@@ -45,7 +45,6 @@ constexpr Symmetry kMirrorX{true, false, false};
 // Reds on main, filed (test name -> issue). Remove a line in the branch that fixes it.
 const std::map<std::string, const char*> kKnown = {
     {"crisp_flatten_invariant", "fix/crisp-flatten-cut (rises, edge spikes)"},
-    {"clay_big_brush_invariant_builds_a_mound_not_a_ring", "#196"},
     {"brush_cloth_invariant", "#200"},
 };
 

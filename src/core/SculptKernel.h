@@ -31,6 +31,20 @@ struct PlaneKernel {
 
     static glm::vec3 flat(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); } // onto the plane
 
+    // Clay's plane: `standoff` (r * 0.05 * s) above the area's centre, but never below the surface under the cursor,
+    // and the factor `k` its pull gets. On a form that curves away faster than the plane stands off (a big brush on a
+    // sphere: the middle of the dab is above the mean of the area) the middle was above the plane and stayed
+    // untouched, the dab lifted a ring, and the plane's edge on the surface was a crease: one ring edge per dab along
+    // a stroke (#196). Now the plane reaches the cursor, and the pull is scaled down by how much higher that is
+    // (k = standoff / height), so the dab lifts its middle by what it does on a flat surface and no more.
+    static glm::vec3 clayPlaneAt(const glm::vec3& areaCenter, const glm::vec3& areaNormal, const glm::vec3& center, float sign,
+                                 float standoff, float& k) {
+        const float up = std::max(standoff, sign * glm::dot(center - areaCenter, areaNormal));
+        k = up > 1e-12f ? standoff / up : 1.0f;
+        return areaCenter + areaNormal * (sign * up);
+    }
+    glm::vec3 clayPlane(float& k) const { return clayPlaneAt(areaCenter, areaNormal, center, sign, r * 0.05f * s, k); }
+
     // The offset of a point x with falloff f there.
     glm::vec3 offsetWith(const glm::vec3& x, float f) const {
         glm::vec3 d(0.0f);
@@ -45,9 +59,10 @@ struct PlaneKernel {
         }
         case BrushType::Clay: {
             // Raise a plane slightly above the surface and pull everything below up to it.
-            const glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.05f * s);
+            float k;
+            const glm::vec3 planePoint = clayPlane(k);
             const float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h < 0.0f) d = -areaNormal * (h * f * clayPull(s));
+            if (sign * h < 0.0f) d = -areaNormal * (h * f * clayPull(s) * k);
             break;
         }
         case BrushType::Crease: {
@@ -122,10 +137,11 @@ struct PlaneKernel {
                 return -areaNormal * (s * (invert ? -0.5f : 1.0f) * (f * glm::dot(areaNormal, tv) + h * gf));
             }
             case BrushType::Clay: {
-                const glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.05f * s);
+                float k;
+                const glm::vec3 planePoint = clayPlane(k);
                 const float h = glm::dot(x - planePoint, areaNormal);
                 if (!(sign * h < 0.0f)) return glm::vec3(0.0f);
-                return -areaNormal * (clayPull(s) * (f * glm::dot(areaNormal, tv) + h * gf));
+                return -areaNormal * (clayPull(s) * k * (f * glm::dot(areaNormal, tv) + h * gf));
             }
             case BrushType::Crease: {
                 const glm::vec3 q = flat(center - x, areaNormal);
