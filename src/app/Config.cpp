@@ -874,6 +874,30 @@ void App::initActions() {
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
         "Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
         "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.");
+    add("help.log_copy", "Copy log to clipboard", "Help", nullptr,
+        [this] {
+            // The end of the log as text, for a report where a file can't be attached or found (Android keeps the app's
+            // folder out of the Files app: a Pixel owner, 11-12).
+            std::ifstream f(fsPath(crashlog::path()), std::ios::binary | std::ios::ate);
+            if (!f) {
+                status_ = "There is no log file to copy.";
+                return;
+            }
+            constexpr std::streamoff kTail = 24 * 1024;
+            const std::streamoff size = f.tellg();
+            f.seekg(std::max<std::streamoff>(0, size - kTail));
+            std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            if (size > kTail) text.erase(0, text.find('\n') == std::string::npos ? 0 : text.find('\n') + 1); // (a whole first line)
+            size_t keep = text.size(), lines = 0; // the last 60 lines
+            while (keep > 0 && lines <= 60)
+                if (text[--keep] == '\n') ++lines;
+            if (lines > 60) text.erase(0, keep + 1);
+            SDL_SetClipboardText(text.c_str());
+            status_ = "Copied the end of the log: paste it into your report.";
+        },
+        ICON_LC_COPY, nullptr, nullptr, nullptr,
+        "Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+        "attached or found.");
     add("help.perf_trace", "Record a performance trace", "Help", nullptr, [this] { togglePerfTrace(); }, ICON_LC_ACTIVITY,
         nullptr, [] { return perftrace::on(); }, nullptr,
         "While on, sculptforge-trace.log in the log folder records what makes SculptForge slow: every frame over 33 ms "
