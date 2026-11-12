@@ -1100,6 +1100,12 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(e2e_quit_clean PROPERTIES LABELS "ui;e2e" TIMEOUT 600 ENVIRONMENT
         "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
     endif()
+    # --ui-test x.sfui --record out.mp4: the before/after clips of bug fixes (needs ffmpeg + ffprobe, else the test skips: exit 77).
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME e2e_record_clip COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/record_clip.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/record_clip.sfui ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/e2e_record_clip)
+      set_tests_properties(e2e_record_clip PROPERTIES LABELS "ui;e2e" TIMEOUT 300 SKIP_RETURN_CODE 77)
+    endif()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
       if(TEST ${t})

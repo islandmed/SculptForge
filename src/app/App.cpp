@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <csignal>
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
 #include "app/BooleanPreview.h"
@@ -638,8 +639,9 @@ int App::runUiTest(int w, int h, int fps) {
         }
         const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
                                 std::to_string(h) + " -r " + std::to_string(fps) +
-                                " -i - -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart " +
-                                shellQuote(options_.uiRecordPath);
+                                " -i - -c:v libx264 " +
+                                (options_.uiRecordClip ? "-preset veryfast -crf 23" : "-preset slow -crf 16") +
+                                " -pix_fmt yuv420p -movflags +faststart " + shellQuote(options_.uiRecordPath);
 #if defined(_WIN32)
         video = _popen(cmd.c_str(), "wb");
 #else
@@ -649,9 +651,13 @@ int App::runUiTest(int w, int h, int fps) {
             SDL_Log("Cannot start ffmpeg");
             return 1;
         }
+#if !defined(_WIN32)
+        std::signal(SIGPIPE, SIG_IGN); // ffmpeg missing or dead: the write fails (logged below) instead of killing the app
+#endif
     }
     const auto recordStart = std::chrono::steady_clock::now();
     int lateFrames = 0;
+    bool videoBroken = false;
     while (frames < fps * 60 * 30) {
         if (timed && (frames == 1 || frames == 5 || frames == 20)) {
             std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
@@ -745,11 +751,16 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         if (video) {
-            fwrite(rgba.data(), 1, rgba.size(), video);
-            const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                               std::chrono::duration<double>(double(frames) * double(dt)));
-            if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
-            else ++lateFrames;
+            if (fwrite(rgba.data(), 1, rgba.size(), video) != rgba.size() && !videoBroken) {
+                videoBroken = true; // (ffmpeg's own error is on stderr above; the verdict below fails the run)
+                SDL_Log("Recording stopped at frame %d: ffmpeg is not taking frames (is it installed? see its message above)", frames);
+            }
+            if (!options_.uiRecordClip) { // (a bug clip runs as fast as the frames come, not paced to the clock)
+                const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                                   std::chrono::duration<double>(double(frames) * double(dt)));
+                if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
+                else ++lateFrames;
+            }
         }
         if (shot.empty()) continue;
         Image img;
@@ -780,8 +791,8 @@ int App::runUiTest(int w, int h, int fps) {
         const double length = double(frames) * double(dt);
         SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
                 length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
-                status == 0 ? "" : " (ffmpeg failed)");
-        if (status != 0) return 1;
+                status == 0 && !videoBroken ? "" : " (ffmpeg failed)");
+        if (status != 0 || videoBroken) return 1;
     }
     demo_->printProfile();
     const std::string known = xfailLine(options_.uiTest);
