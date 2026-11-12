@@ -1,5 +1,12 @@
 # Keyboard and mouse
 
+![Turning the view around a sculpted head](images/hero-view-keys.jpg)
+
+> **In short:**
+> - Every default shortcut and mouse gesture; <kbd>F1</kbd> shows the same list in the app.
+> - Four key styles: SculptForge (default), Classic, Blender and Maya.
+> - Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button to reassign its key.
+
 This chapter is the reference for every default keyboard shortcut and mouse gesture in SculptForge. Inside the
 app, <kbd>F1</kbd> opens the same list as the Controls window, showing your own keys if you've changed any.
 
@@ -16,11 +23,13 @@ key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See 
 
 ### Two keys in a row
 
-An action can also take two different keys one after the other, like <kbd>A</kbd> then <kbd>S</kbd>, which
-gives you many more keys to bind. In **Edit > Preferences > Hotkeys** click the small **>>** button at the right of
-the action's key, then press the first key and the second. The sequence is added to the action's other keys, and a
-sequence another action already uses asks first (Replace / Cancel), like any key. <kbd>Backspace</kbd> in that box
-removes the action's two-key shortcuts and leaves its single keys.
+An action can also take two different keys one after the other, like <kbd>A</kbd> then <kbd>S</kbd>, which gives you
+many more keys to bind. In **Edit > Preferences > Hotkeys** click the small **>>** button at the right of the action's
+key, then press the first key and the second.
+
+The sequence is added to the action's other keys, and a sequence another action already uses asks first (Replace /
+Cancel), like any key. <kbd>Backspace</kbd> in that box removes the action's two-key shortcuts and leaves its single
+keys.
 
 - Press the two keys together (either one first) or one after the other. The second must come within the **Two-key
   window** (**Edit > Preferences > Input**, 0.35 to 1 second, 0.4 by default) of the first; when both are down together
@@ -36,11 +45,12 @@ On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kb
 <kbd>Alt</kbd>. Single-letter shortcuts don't fire while you type in a text field.
 
 Running the Windows version on a Mac through CrossOver or Wine? Their Mac driver sends <kbd>Cmd</kbd> as
-<kbd>Alt</kbd> and leaves <kbd>Option</kbd> unused. The macOS version needs none of this. To keep the Windows one,
-open the bottle's Registry Editor and, under `HKEY_CURRENT_USER\Software\Wine\Mac Driver`, add the strings
-`LeftOptionIsAlt` and `RightOptionIsAlt` set to `y` (Option becomes Alt), and `LeftCommandIsCtrl` and
-`RightCommandIsCtrl` set to `y` (Cmd becomes Ctrl). Restart SculptForge. The setting belongs to the bottle, so a
-new bottle needs it again.
+<kbd>Alt</kbd> and leaves <kbd>Option</kbd> unused. The macOS version needs none of this.
+
+To keep the Windows one, open the bottle's Registry Editor and, under `HKEY_CURRENT_USER\Software\Wine\Mac Driver`,
+add the strings `LeftOptionIsAlt` and `RightOptionIsAlt` set to `y` (Option becomes Alt), and `LeftCommandIsCtrl` and
+`RightCommandIsCtrl` set to `y` (Cmd becomes Ctrl). Restart SculptForge. The setting belongs to the bottle, so a new
+bottle needs it again.
 
 ## Keyboard shortcuts
 
@@ -400,23 +410,26 @@ change in the Blender style:
 | Wireframe | <kbd>Shift</kbd>+<kbd>Z</kbd> |
 
 Choosing the Blender style also sets **Rotation** to **Turntable**, as Blender orbits; change it back under
-**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
-nearest SculptForge brush. **Symmetry X**, **Paint** and the material picker have no key in the Blender style
-(they are on the shelves); give them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad:
-turn on **Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
+**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to
+the nearest SculptForge brush.
+
+**Symmetry X**, **Paint** and the material picker have no key in the Blender style (they are on the shelves); give
+them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad: turn on
+**Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
 
 The numpad views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>, <kbd>5</kbd> ...) work in every style.
 
 ### Your own Blender keymap
 
-If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button
-next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or
-at the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View
-and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
-and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things
-SculptForge doesn't have are left alone; the status bar says how many keys it took. The file is read as text and
-never run. The keys save themselves; **Reset Layout and Shortcuts**
-goes back to the defaults.
+If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button next
+to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or at
+the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View and
+Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius and
+strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things SculptForge doesn't
+have are left alone; the status bar says how many keys it took.
+
+The file is read as text and never run. The keys save themselves; **Reset Layout and Shortcuts** goes back to the
+defaults.
 
 ## Classic sculpting keys that work differently
 

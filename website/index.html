@@ -19,12 +19,12 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.10", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.11", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=39">
+  <link rel="stylesheet" href="style.css?v=40">
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -38,6 +38,8 @@
     .stand-lead strong, .stand-text strong { display: block; color: var(--text); font-weight: 600; }
     .standout { padding: 64px 0 72px; background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .stand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .stand-grid > li:empty { display: none; } /* a tile whose picture the deploy took down (media_takedown.py) */
+    .demo.clip:not(:has(video, img)) { display: none; } /* a clip the deploy took down (media_takedown.py) */
     .stand-tile { display: flex; flex-direction: column; height: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--muted); }
     .stand-tile:hover, .stand-tile:focus-visible { border-color: var(--accent); text-decoration: none; }
     .stand-img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #14141a; border-bottom: 1px solid var(--border); }
@@ -77,9 +79,9 @@
 
   <main id="top">
     <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
-    <aside class="news-bar" data-version="0.12.10" aria-label="Latest release">
+    <aside class="news-bar" data-version="0.12.12" aria-label="Latest release">
       <div class="wrap news-bar-inner">
-        <a class="news-bar-link" href="guide/whats-new.html#version-01210"><span class="news-pill">New</span><span class="news-bar-text">Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <a class="news-bar-link" href="guide/whats-new.html#version-01212"><span class="news-pill">New</span><span class="news-bar-text">The user guide is redesigned, with new pictures, and big Clay strokes no longer ring</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
         <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
     </aside>
@@ -92,7 +94,6 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
           <!-- hero-news:start -->
-          <p class="hero-news" data-version="0.12.10"><a href="guide/whats-new.html#version-01210"><strong>New in 0.12.10:</strong> mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.</a></p>
           <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
@@ -109,8 +110,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
             <a class="btn" href="why.html">Why we're doing this</a>
           </div>
           <p class="hero-note">Linux, macOS and Windows. No account, no subscription.</p>
-          <p class="speed-line">On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right
-            after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
+          <p class="speed-line">Orbiting 104 million micro triangles, drawn at the detail the view allows, runs at 208 frames a second on our simulated entry-level tier and 657 on an RTX 3060. The raw results are published. <a href="benchmarks/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
             <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
@@ -199,6 +199,10 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
             <blockquote><p>I'm primarily focused on digital sculpting and using SculptForge for my workflow as a multimedia freelancer. I was really happy to find software that lets me get into my creative flow. And boy does it handle the polygon counts.</p></blockquote>
             <figcaption><span class="voice-name">Hameron</span></figcaption>
           </figure>
+          <figure class="voice">
+            <blockquote><p>Thanks! The software rocks!!</p></blockquote>
+            <figcaption><span class="voice-name">Rand_Gogh</span><span class="voice-role">Concept Designer and Character Artist</span></figcaption>
+          </figure>
         </div>
       </div>
     </section>
@@ -266,9 +270,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="grid">
           <article class="card">
             <h3>Dense scans that keep up</h3>
-            <p>On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right after a big stroke.
-              On our simulated entry-level tier, the slowest frames orbiting a 28-million-triangle scan went from 24 to
-              12 ms in 0.11.7.</p>
+            <p>Orbiting 104 million micro triangles, drawn at the detail the view allows, averages 208 frames a second on our simulated entry-level tier (a capped M1 Pro laptop) and 657 on an RTX 3060. A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on the 3060. Big brushes still trail the pen. Every number is the median of three runs, with the raw results published.</p>
           </article>
           <article class="card">
             <h3>Open file formats</h3>
@@ -442,10 +444,10 @@ rez-env sculptforge -- sculptforge troll.usda \
         <h2>See it in action</h2>
         <p class="section-lede">Real recordings of the app at real speed, with nothing edited in.</p>
 
-        <div class="demo">
-          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/udim-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/udim.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/udim-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/udim.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>UDIM tiles in any grid</h3>
@@ -454,10 +456,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/layer-weight-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/layer-weight.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/layer-weight-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/layer-weight.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Move a feature on its own layer</h3>
@@ -466,10 +468,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo">
-          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/vdm-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/vdm.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/vdm-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/vdm.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Vector stamps that turn</h3>
@@ -478,10 +480,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/view-keys-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/view-keys.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/view-keys-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/view-keys.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>The view keys you already know</h3>
@@ -513,14 +515,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.12</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.10: Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede"><a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01210"><div class="wn-card-body"><h3>Mouse orbit speed, Symmetry with textured brushes, Crisp Flatten only cuts <small>new in 0.12.10</small></h3><p>Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.</p><ul><li>Preferences &gt; Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)</li><li>Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)</li><li>It never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)</li><li>Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0129"><div class="wn-card-body"><h3>Brush Size and Intensity follow the mouse <small>new in 0.12.9</small></h3><p>Brush Size and Intensity follow the mouse, and Undo is faster on dense models.</p><ul><li>Press S or F (or U, Shift+F), move sideways and the value changes live</li><li>A click elsewhere after moving keeps the new Size or Intensity</li><li>Faster Undo and Redo of a stroke on dense models of several million triangles (#181)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0128"><div class="wn-card-body"><h3>Reference images, Start-up fix, Two-key shortcuts <small>new in 0.12.8</small></h3><p>Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</p><ul><li>Your front and side drawings in the view while you sculpt (idea by Oslen on Discord)</li><li>SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)</li><li>Bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)</li><li>Shortcuts with two keys in a row</li><li>Reference images to sculpt against</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01212"><div class="wn-card-body"><h3>Version 0.12.12 <small>new in 0.12.12</small></h3><ul><li>The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips</li><li>25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded</li><li>The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)</li><li>Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)</li><li>Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01211"><div class="wn-card-body"><h3>Version 0.12.11 <small>new in 0.12.11</small></h3><p>Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.</p><ul><li>Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before</li><li>The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy</li><li>Inflate over a Crease no longer tears the surface (#194)</li><li>Palette Knife and Nudge no longer fold the surface (#198, #199)</li><li>The Undo memory budget follows free memory, shown live in Preferences &gt; Performance (#202)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01210"><div class="wn-card-body"><h3>Mouse orbit speed, Symmetry with textured brushes, Crisp Flatten only cuts <small>new in 0.12.10</small></h3><p>Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.</p><ul><li>Preferences &gt; Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)</li><li>Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)</li><li>It never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0127"><h3>0.12.0 to 0.12.7</h3><ul><li>Booleans between Parts</li><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0129"><h3>0.12.0 to 0.12.9</h3><ul><li>Reference images</li><li>Booleans between Parts</li><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011x"><h3>0.11.x</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
@@ -545,7 +547,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.12.10. All builds come from the
+        <p class="section-lede">Version 0.12.11. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
@@ -633,7 +635,7 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="links">
         <a href="performance/">Performance</a>
         <a href="guide/index.html">User guide</a>
-        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="benchmarks/">Benchmarks: 33M, 104M, 201M</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="why.html">Why SculptForge</a>

@@ -33,7 +33,7 @@ ROOT = check_marks.ROOT
 CACHE = ROOT / "tools" / "marks_media_cache.json"
 PENDING = ROOT / "tools" / "marks_media_pending.txt"
 FLAGGED = ROOT / "tools" / "marks_media_flagged.txt"  # what the deploy takes down (media_takedown.py), from the cache
-CACHE_VERSION = 2  # bump when the OCR or the patterns change in a way that should re-read every file
+CACHE_VERSION = 2  # bump when the OCR changes in a way that should re-read every file (the patterns re-read by themselves)
 IMAGES = (".png", ".jpg", ".jpeg", ".webp", ".avif", ".bmp", ".tif", ".tiff")
 VIDEOS = (".mp4", ".webm", ".mov", ".mkv", ".gif", ".m4v")
 SKIP_PREFIXES = check_marks.SKIP_PREFIXES
@@ -97,16 +97,22 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def load_cache():
+def cache_version(mark_re):
+    """CACHE_VERSION plus a hash of the patterns: a word added to docs/legal/trademarks.md re-reads every file (11-12:
+    37 shots cached clean before the old palette labels joined the patterns stayed on the site). A hash, never the words."""
+    return f"{CACHE_VERSION}-{hashlib.sha256(mark_re.pattern.encode()).hexdigest()[:12]}"
+
+
+def load_cache(version):
     try:
         data = json.loads(CACHE.read_text())
-        return data["files"] if data.get("version") == CACHE_VERSION else {}
+        return data["files"] if data.get("version") == version else {}
     except (OSError, ValueError, KeyError):
         return {}
 
 
-def save_cache(files):
-    CACHE.write_text(json.dumps({"version": CACHE_VERSION, "files": dict(sorted(files.items()))}, indent=0) + "\n")
+def save_cache(files, version):
+    CACHE.write_text(json.dumps({"version": version, "files": dict(sorted(files.items()))}, indent=0) + "\n")
     lines = FLAGGED.read_text().splitlines() if FLAGGED.exists() else []
     header = [l for l in lines if l.startswith("#")]
     hashes = {l.strip() for l in lines if l.strip() and not l.startswith("#")} | {h for h, hits in files.items() if hits}
@@ -145,7 +151,8 @@ def main(argv):
     mark_re = check_marks.load_marks()
     # --cached-only: as CI (no tesseract there), so a new image fails until its entry is committed, on every machine.
     have_ocr = "--cached-only" not in argv and bool(shutil.which("tesseract") and shutil.which("ffmpeg"))
-    cache = {} if explicit else load_cache()  # named files are read afresh, so their words can be shown
+    version = cache_version(mark_re)
+    cache = {} if explicit else load_cache(version)  # named files are read afresh, so their words can be shown
     if not explicit and check_marks.tracked_files() is None:
         print("check_marks_media: skipped, git can't list the tracked files here")
         return check_marks.SKIPPED
@@ -169,7 +176,7 @@ def main(argv):
     if todo and not explicit:  # a check that read nothing new writes nothing (release.sh preflight wants a clean tree)
         live = set(keys.values())
         # a flagged file stays flagged after it's replaced: a release tag's guide still has it (media_takedown.py)
-        save_cache({k: v for k, v in cache.items() if k in live or v})
+        save_cache({k: v for k, v in cache.items() if k in live or v}, version)
     pending = set() if explicit else {l.strip() for l in PENDING.read_text().splitlines() if l.strip() and not l.startswith("#")}
     errors, waiting = [], 0
     errors += [f"{p}: a scan whose terms bar commercial use (assets/demo/CREDITS.md); use the CC0 lion head"

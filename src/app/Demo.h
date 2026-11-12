@@ -129,6 +129,7 @@ private:
     double query(const std::string& name, bool& known) const;
     // Modes and the monkey (UiTestModes.cpp): their steps, values and generated cases.
     bool parseModeStep(int line, const std::vector<std::string>& words, std::string& error, bool& handled);
+    bool parseDragItemTo(int line, const std::vector<std::string>& words, std::string& error);
     double queryModes(const std::string& name, bool& known) const;
     int openEdges() const;
     bool buildModeMatrix(int line, const std::vector<std::string>& only, std::string& error);

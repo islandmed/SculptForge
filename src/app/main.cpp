@@ -94,6 +94,7 @@ void usage() {
         "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
         "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
         "  --splash-shot out.png    The start-up splash as a PNG (size from --size, default 1440x810) and exit\n"
+        "  --splash-selftest        Open the splash by each way the window system allows, check its picture, exit\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
         "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
         "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
@@ -101,7 +102,7 @@ void usage() {
         "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
-        "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
+        "                           brush (standard-33m: 33M; standard-100m: 104M, needs ~16 GB free; standard: 15M + 33M). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
         "  --benchmark core-100m    The same at 100 million micro triangles\n"
@@ -253,6 +254,7 @@ static int runMain(int argc, char** argv) {
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
         else if (a == "--splash-shot") options.splashShotPath = next();
+        else if (a == "--splash-selftest") return sf::splash::selfTest(); // (SDL_VIDEO_DRIVER=dummy in the test run)
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
         else if (a == "--benchmark") {
@@ -261,9 +263,9 @@ static int runMain(int argc, char** argv) {
             if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]).rfind("core-", 0) == 0)) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-100m" && options.benchmarkScene != "standard-1b" &&
                     options.benchmarkScene != "core-200m" && options.benchmarkScene != "core-100m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
                     return 1;
                 }
             }

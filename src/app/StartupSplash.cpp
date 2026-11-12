@@ -16,8 +16,8 @@ bool enabled(const Setting& s) {
     return s.videoDriver != "offscreen" && s.videoDriver != "dummy";
 }
 
-bool due(bool isEnabled, bool alreadyShown, double elapsedMs, double showAfterMs) {
-    return isEnabled && !alreadyShown && elapsedMs > showAfterMs;
+bool due(bool isEnabled, bool alreadyShown) {
+    return isEnabled && !alreadyShown;
 }
 
 double holdMs(double visibleMs) {

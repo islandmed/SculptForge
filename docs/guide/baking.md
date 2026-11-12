@@ -1,5 +1,13 @@
 # Baking normal and displacement maps
 
+![Baking maps from a sculpted head](images/quick-tour/09-bake.jpg)
+
+> **In short:**
+> - Baking turns high-poly detail into normal, displacement, AO, cavity and colour maps.
+> - **Tool > Bake** makes every map in one go, in the background.
+> - The normal map shows on the low-poly right away, to compare with the sculpt.
+> - A Part with levels can bake its own top level onto itself.
+
 Game engines and renderers want light meshes. Baking captures the detail of your high-poly sculpt as images
 laid over the UVs of a low-poly version: a **normal map** makes the low-poly shade as if it had every crease and
 pore, a **displacement map** stores how far the surface moves, and **ambient occlusion**, **cavity** and
@@ -78,10 +86,11 @@ map settings:
 ### Displacement: mid-grey is zero
 
 The 16-bit PNG stores zero displacement as mid-grey, the high-poly outside the low-poly as lighter and inside as
-darker. White means **+scale** and black **-scale** in world units; the scale is the largest distance found,
-shown under the Bake button ("Displacement: mid-grey = 0, white = +0.0143") and in the status line. Use it as the
-displacement strength in your renderer (with a midlevel of 0.5). With **EXR displacement** ticked, a 32-bit
-float OpenEXR holds the real distances in world units, with no scale to set.
+darker. White means **+scale** and black **-scale** in world units; the scale is the largest distance found, shown
+under the Bake button ("Displacement: mid-grey = 0, white = +0.0143") and in the status line.
+
+Use it as the displacement strength in your renderer (with a midlevel of 0.5). With **EXR displacement** ticked, a
+32-bit float OpenEXR holds the real distances in world units, with no scale to set.
 
 ## Settings
 

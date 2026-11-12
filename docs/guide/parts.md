@@ -1,5 +1,12 @@
 # Parts
 
+![The Parts sub-palette with several Parts, the active one highlighted](images/parts.jpg)
+
+> **In short:**
+> - A scene holds separate meshes called Parts: body, eyes, teeth, helmet, sword.
+> - Only the active Part is sculpted, painted or changed by a command.
+> - The Parts list is in **Tool > Parts**; <kbd>Alt</kbd>+click picks a Part on the canvas.
+
 A scene in SculptForge can hold several separate meshes, called Parts (experienced sculptors: Parts): a body, eyes, teeth,
 a helmet and a sword can each live in their own Part. This chapter covers the Parts list, selecting, adding,
 hiding, reordering, merging, combining with Booleans and splitting Parts, and how they travel through files.
@@ -20,8 +27,6 @@ hiding, reordering, merging, combining with Booleans and splitting Parts, and ho
 ## The Parts list
 
 The list is in **Tool > Parts**, which is open in the right tray by default.
-
-![The Parts sub-palette with several Parts, the active one highlighted](images/parts.jpg)
 
 Each row shows a small picture of the Part, its name, its triangle count, its [Boolean](#booleans), its shading and an eye. The pictures are drawn from
 the model the viewport already has on the graphics card, so they cost almost nothing even on very dense Parts,
@@ -84,11 +89,13 @@ start from: Skull, Jaw, Fang, Blade tooth, Swept horn, Spiral horn, Claw, Verteb
 Limb bone, Wing bone and Wing finger. Click one in the **Insert set** window and drag on the model, as with any set;
 horns, claws and teeth grow from where you drag. With **Symmetry** X on, a horn or a claw gets its mirrored twin.
 
-Each piece is a clean, closed quad mesh of 500 to 4,200 faces, so it takes **Add Level** and sculpting well: insert, then
-sculpt the joins smooth, or **Voxel Remesh** to fuse the piece into the model. Drag pieces onto an empty **Plane** or **Sphere**
-Part to build a skeleton of their own Part. The pieces were designed for SculptForge (tools/creature-bones in the
-source) and come under the app's licence, GPL-3.0. (Commands: `insert_set_items set=builtin:creature-bones`;
-`insert_mesh set=builtin:creature-bones index=<n>`.)
+Each piece is a clean, closed quad mesh of 500 to 4,200 faces, so it takes **Add Level** and sculpting well: insert,
+then sculpt the joins smooth, or **Voxel Remesh** to fuse the piece into the model. Drag pieces onto an empty
+**Plane** or **Sphere** Part to build a skeleton of their own Part.
+
+The pieces were designed for SculptForge (tools/creature-bones in the source) and come under the app's licence,
+GPL-3.0. (Commands: `insert_set_items set=builtin:creature-bones`; `insert_mesh set=builtin:creature-bones
+index=<n>`.)
 
 You can also add files as Parts from elsewhere:
 
@@ -134,11 +141,12 @@ together.
 | Remove it | Right-click the header > **Remove folder (keep its Parts)** |
 
 A Part that joins a folder moves to just below the folder's last Part, so a folder's Parts stay together. When the
-folder holding the active Part is folded, its header shows the accent bar. **Move with the gizmo** makes one of
-the folder's Parts active and turns on the gizmo's **Folder** option, so every visible Part in the folder moves
-together; see [All Parts and Folder](gizmo.md#all-parts). Duplicates and the pieces of a split stay in their
-Part's folder. Folders are saved in the project; older versions of SculptForge open the file and simply show no
-folders.
+folder holding the active Part is folded, its header shows the accent bar. **Move with the gizmo** makes one of the
+folder's Parts active and turns on the gizmo's **Folder** option, so every visible Part in the folder moves together;
+see [All Parts and Folder](gizmo.md#all-parts).
+
+Duplicates and the pieces of a split stay in their Part's folder. Folders are saved in the project; older versions of
+SculptForge open the file and simply show no folders.
 
 ## Reorder Parts
 
@@ -226,11 +234,11 @@ Part:
    and micro level following; the Pose Mesh goes away. The whole pose is **one undo step** across every Part.
    **Cancel Pose** removes the Pose Mesh and changes nothing.
 
-Only Gizmo moves carry over for now: a brush stroke on the Pose Mesh stops Apply until you undo it. A Part you
-edit while posing (by selecting it in the list) keeps your edit and is left out of the pose; the status line says
-which. A [linked copy](linked-duplicates.md) is left out too (shown, not posed): posing it would pose every copy; Make Unique
-first. Scripts: `figure_pose_begin triangles=300000`, `figure_pose_apply`, `figure_pose_cancel`,
-`figure_pose_info`.
+Only Gizmo moves carry over for now: a brush stroke on the Pose Mesh stops Apply until you undo it. A Part you edit
+while posing (by selecting it in the list) keeps your edit and is left out of the pose; the status line says which.
+
+A [linked copy](linked-duplicates.md) is left out too (shown, not posed): posing it would pose every copy; Make Unique
+first. Scripts: `figure_pose_begin triangles=300000`, `figure_pose_apply`, `figure_pose_cancel`, `figure_pose_info`.
 
 ## Split a Part
 
@@ -254,11 +262,13 @@ triangles back and removes the new Part.
 | **Split > Unmasked** | the triangles that are not masked; the masked ones stay | `part_split_unmasked` |
 | **Keep original** (checkbox below) | a **copy** of those triangles; the source Part stays as it is, levels and all, and undo just removes the copy | `keep=true` on any of the three |
 
-A triangle counts as **masked when the average mask of its three corners is above 50%**, so a soft mask edge
-splits along its middle and a single masked corner doesn't take its neighbours. UVs, face groups, vertex paint and
-sculpt layers carry over to both sides. [Subdivision levels](subdivision-levels.md) can't be cut: the split is
-made at the level the Part is on, which becomes its base (undo brings the levels back). To delete instead of
-split, use **Remove Hidden** or **Delete masked** in **Tool > Visibility**.
+A triangle counts as **masked when the average mask of its three corners is above 50%**, so a soft mask edge splits
+along its middle and a single masked corner doesn't take its neighbours. UVs, face groups, vertex paint and sculpt
+layers carry over to both sides.
+
+[Subdivision levels](subdivision-levels.md) can't be cut: the split is made at the level the Part is on, which becomes
+its base (undo brings the levels back). To delete instead of split, use **Remove Hidden** or **Delete masked** in
+**Tool > Visibility**.
 
 ## Extract a shell
 
@@ -279,11 +289,12 @@ top of a head, a strap, a sleeve, a piece of armour that fits the surface exactl
 
 ![A cap extracted from the masked top of a sphere, shown with its face groups: outer, inner and rim](images/extract.jpg)
 
-The new Part has three face groups, the outer surface, the inner one and the rim between them (a band of quads),
-so you can mask, hide or [split](#split-a-part) them apart. Vertex Paint comes with it; hidden faces are left out.
-Accept is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the source Part takes the extracted one away again,
-and redo brings it back. A preview you don't accept goes away as soon as you change the source Part or pick
-another one, and it is never saved.
+The new Part has three face groups, the outer surface, the inner one and the rim between them (a band of quads), so
+you can mask, hide or [split](#split-a-part) them apart. Vertex Paint comes with it; hidden faces are left out.
+
+Accept is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the source Part takes the extracted one away again, and redo
+brings it back. A preview you don't accept goes away as soon as you change the source Part or pick another one, and it
+is never saved.
 
 ## Delete a Part
 

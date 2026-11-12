@@ -530,6 +530,9 @@ constexpr Entry kSpanish[] = {
     {"A folder of .obj, .ply or .glb files: insert them one at a time", "Una carpeta de archivos .obj, .ply o .glb: insértalos de uno en uno"},
     {"Insert set", "Conjunto para insertar"},
     {"[ / ] previous / next   Esc stops", "[ / ] anterior / siguiente   Esc termina"},
+    {"Oldest undo step removed to free memory", "Se quitó el paso de deshacer más antiguo para liberar memoria"},
+    {"Oldest %d undo steps removed to free memory", "Se quitaron los %d pasos de deshacer más antiguos para liberar memoria"},
+    {"The last step alone is over the undo budget, so it is kept", "El último paso supera por sí solo el límite de deshacer y se conserva"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "No hay memoria de GPU suficiente para mostrar todas las piezas: oculta alguna o baja un nivel de "
      "subdivisión."},
@@ -849,8 +852,8 @@ constexpr Entry kSpanish[] = {
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
     {"Show startup splash", "Mostrar pantalla de inicio"},
-    {"Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
-     "Muestra el logotipo de SculptForge mientras el inicio es lento. Un inicio rápido no muestra nada. Se aplica en el próximo inicio."},
+    {"Show the SculptForge logo for half a second or more at every start. Turn it off for an instant start. Applies at the next start.",
+     "Muestra el logotipo de SculptForge medio segundo o más en cada inicio. Desactívalo para un inicio inmediato. Se aplica en el próximo inicio."},
     {"Show Library at startup", "Mostrar Biblioteca al iniciar"},
     {"Placement", "Ubicación"},
     {"Top", "Arriba"},
@@ -2730,11 +2733,11 @@ constexpr Entry kSpanish[] = {
      "vértices, actualizar sus normales y el BVH (la estructura de selección), y enviar el cambio a la GPU (por "
      "fotograma). Menos de 16 ms sigue el ritmo de una pantalla de 60 Hz."},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
-     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their "
      "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
      "visible Parts.",
      "Lo que contiene la escena: las mallas con su topología, los BVH, los niveles de subdivisión guardados para "
-     "pasar entre ellos, el historial de deshacer (Editar guarda hasta 1 GB, descartando los pasos más antiguos), "
+     "pasar entre ellos, el historial de deshacer (Editar guarda tanto como permita la memoria libre, descartando los pasos más antiguos), "
      "las texturas pintadas con sus capas y canales de material (solo los mosaicos pintados de 64x64 de un canal "
      "usan memoria), y los buffers de GPU de las Piezas visibles."},
     // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
@@ -5414,6 +5417,8 @@ constexpr Entry kSpanish[] = {
      "Tubo desde curva"},
     {"Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: twisted ribbons, beams and ropes.",
      "Gira la sección un poco más a lo largo del tubo, de modo que en el extremo final haya girado estos grados: cintas, vigas y cuerdas retorcidas."},
+    {"Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley twist.",
+     "Gira la sección de forma constante, estos grados por cada radio del tubo de longitud: una rosca, un fuste salomónico."},
     {"Spread", "Extensión"},
     {"Spread %.2f", "Extensión %.2f"},
     {"Wall", "Pared"},

@@ -1985,7 +1985,7 @@ void drawInterfaceSection(App& app) {
             "a part keeps its size. STL is always millimetres.");
     ImGui::Checkbox(tr("Show startup splash"), &p.startupSplash);
     ui::HelpText("Show startup splash", nullptr,
-                 "Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
+                 "Show the SculptForge logo for half a second or more at every start. Turn it off for an instant start. Applies at the next start.",
                  "Preferences > Interface");
     {
         // #173: Don't ask again in the pop-ups turns these off; this brings the asking back (or turns it off in one go).

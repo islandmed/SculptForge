@@ -6,6 +6,42 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.12] - 2026-11-12
+
+### Added
+- **Proof mode**: `sculptforge --benchmark standard-100m` runs the standard strokes on the same procedural head at 104
+  million triangles (about 16 GB of free memory), and a result made with `SF_HW_SIMULATE` set records it in
+  `settings.hw_simulate`, so a simulated hardware tier says so in its JSON.
+
+### Changed
+- 25 User Guide pictures re-taken on the current version, so they show today's panel names.
+- The User Guide (in the app and on the website) reads like the site: each chapter opens with a hero picture and an
+  "In short" box, long paragraphs are split into short ones, menu paths such as Edit > Preferences > Input show as
+  chips, and Welcome starts with a card grid (Your first sculpt, Quick tour, What's new, Install, Get help). The
+  membership details moved to a new Support and membership chapter. The guide's colours follow the current look, so
+  light desktop themes read too.
+- **Performance guide**: the "What to expect" table now shows dab times and view speeds measured with `sculptforge
+  --bench` (4, 16 and 33 million triangles, median of three runs on an Apple M1 Pro laptop) and links their raw
+  output; the figure for 100 million triangles is removed because it was not measured.
+- The four home-page demo clips (UDIM tiles, layer transform, vector stamps, view keys) are re-recorded on the current
+  version and back on the page.
+
+### Fixed
+- **Large Clay strokes showed each dab as a ring** (#196): on a form that curves away under the brush (a 120 px brush
+  on a sphere) the middle of the dab stood above Clay's plane and stayed untouched, the dab lifted a ring, and the
+  ring's edge was a crease, one per dab along the stroke. The plane now reaches the surface under the cursor and the
+  pull is scaled by how much higher that is, so the middle lifts as it does on a flat surface and a stroke builds up
+  about as much as before (a flat surface is unchanged). Light Clay strokes no longer leave a raised edge: on a
+  strongly curved form they build up a little more softly than they did, because the ring they used to lift is gone (a
+  heavy stroke moves the same amount of clay). Brush-pack Clay brushes follow the same plane.
+- **Symmetry strokes whose two sides overlap** (a big brush near the mirror plane): the second side's plane now reads
+  the surface the first side just left, so a Fast Big Brushes stroke matches the exact one.
+- **Voxel Resolution in Customize Shelves** (masterfull95 on Discord, #191): Ctrl+Alt+drag on the Remesh palette's
+  Resolution slider only moved the palette; it can now be dropped onto a shelf like any button, works there, and is
+  kept across restarts.
+
+## [0.12.11] - 2026-11-12
+
 ### Added
 - **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
   resting palm and do nothing; a trackpad's fingers are never ignored. Off on desktop touch screens.
@@ -23,13 +59,46 @@ All notable changes to SculptForge are listed here. The format follows
 - **Braid** (Tool > Tube) now builds round strands (two to begin with) that twist over and under each other round the
   curve, instead of flat ribbons. **Spread** sets the weave: 0 packs the strands together so they touch, 1 opens them
   up with longer turns. Saved braids look different. Requested by Artizmo on Discord.
-- Tool > Tube sliders for Rope, Braid and the other profiles are now Twist, Spin, Spread, Strands. **Turn** is gone:
-  **Spin** does what Turn did (turns the cross-section about the curve). A saved Turn loads as Spin; a Spin saved
-  before this (degrees per radius of length) is dropped. `tube_set` and `tube_new` take `spin` (`turn` still works).
-  Requested by Artizmo on Discord.
 - Release tooling: the members' beta is created in the insiders repository with its own tag target, so a beta no
   longer stops at "tag has not been pushed".
 - Why page: the agents are described as testing for speed, stability and feel, with artists deciding what gets built.
+- **Guide**: the install page now says Android is in early access for members, public on 26 November, instead of "no
+  Android version".
+- The start-up splash shows on every interactive start for at least 0.5 s (overlapped with start-up work), centred and
+  floating, and fades into the main window. Turn it off in Preferences > Interface > Show startup splash.
+- Four home-page demo clips and 25 guide screenshots showed old interface labels; the site leaves them out until they
+  are re-recorded on current main.
+- **Website home page**: a release's news appears once, in the announcement bar under the menu; the hero and the
+  What's new heading no longer repeat it. The release card check (scripts/release.sh) looks for the bar, and a
+  colon-chain tagline fails the guide check.
+- **Website**: the home page and the About page now show what is built in: Blender round-trip, Gaussian splats with
+  Blender 5.3, capture to sculptable mesh, quad retopology and baking, garments and cloth, and the optional AI
+  brushes. Blender and splats lead in the hero on desktop and phone, with a six-tile "Built in" band below it.
+
+### Fixed
+- **Nudge and Palette Knife folded the surface over itself** (#198, #199): a second stroke across an area they had
+  dragged, and a single Nudge stroke, left thousands of triangles folded over their neighbours (dark creases and
+  specks). The material they push is now spread out again behind the brush; Palette Knife drags a little less per dab
+  when its steps are long (at the default spacing it drags as far as before); Nudge slides along the plane of the
+  brush instead of each vertex's own, noisy normal (which also keeps the two halves of a mirrored stroke identical),
+  and holds back a move that would turn a triangle over while its brush covers up to about 12,000 vertices. In the
+  close-up session the folded triangles fall from 1,444 to 607 (Palette Knife) and Nudge adds none (it added 4,972);
+  on a replay of the same strokes Nudge goes from 5,347 to 0 and Palette Knife from 1,381 to about 620. Palette Knife
+  still leaves creases where two strokes overlap. Cost: Palette Knife takes about 0.2 ms more per dab with a small
+  brush and 40 to 50% more time with a very large one; Nudge about 1.2 ms more per dab with a small brush (the fold
+  check), little more with a large one. Nudge reaches about 6% less far on a long stroke. Tendril is unchanged.
+- The start-up splash never appeared on Wayland ("Window framebuffer support not available"); it is now drawn through
+  an SDL renderer when the window has no surface, and fully drawn before the window is shown.
+- **Spikes and streaks from stacked Crease and Inflate strokes** (#194): on a divided mesh (about 5 million triangles)
+  Crease packs the triangles across its line, and Inflate, moving every point along its own normal, then flipped them
+  (twenty overlapping strokes left about 2,000 folded triangles and needles). A dab that reaches such a packed grid
+  now swells along the brush's normal instead; Inflate on an ordinary surface is unchanged.
+- **Undo history and memory** (#202, slice 1; thanks @TheLycanFenrir): the undo history now fits the computer's free
+  memory (a quarter of its total memory, never below 256 MB) instead of a fixed 1 GB that could run an 8 GB computer
+  out of memory next to a very dense mesh, and a 64 GB computer keeps far more history. When steps must go, the status
+  line says "Oldest N undo steps removed to free memory" (English, Spanish and both Chinese) instead of dropping them
+  silently, and Preferences > Performance shows the live budget. Saving older steps to disk and unloading hidden Parts
+  are planned for the rest of #202.
 
 ## [0.12.10] - 2026-11-11
 

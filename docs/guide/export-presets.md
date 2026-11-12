@@ -1,5 +1,12 @@
 # Export presets
 
+![The Export panel](images/export.jpg)
+
+> **In short:**
+> - **Export Maps** writes a texture's channels as the image files an engine expects.
+> - Presets choose the files, their names and how channels are packed.
+> - Built-in presets cover the common targets; your own is a small JSON file.
+
 **Export Maps** writes a texture's channels ([Material painting](pbr-painting.md)) as the image files a game engine
 or DCC expects: which files, what they are called and how channels are packed into them come from an **export
 preset**. SculptForge has presets for the common targets, and you can write your own as a small JSON file.

@@ -1,12 +1,17 @@
 # Quad retopology and detail projection
 
+![A lion bust after Quad Remesh: 5,000 quads whose loops follow the mane, shown with Wire](images/qremesh.jpg)
+
+> **In short:**
+> - **Quad Remesh** rebuilds a sculpt as clean quads whose loops follow the forms.
+> - Quad Remesh Guides put an edge loop exactly where you draw.
+> - **Project Detail** brings the original sculpt's detail onto the new topology.
+
 **Quad Remesh** rebuilds a sculpt as clean, all-quad topology whose edge loops follow the forms.
 **Project Detail** then moves a mesh onto the surface of other Parts, so the detail of the original
 sculpt comes back onto the new topology. Together they turn a dense, messy sculpt
 (a voxel remesh, a scan, an AI-generated model) into a light quad mesh you can divide, sculpt on, unwrap and
 animate.
-
-![A lion bust after Quad Remesh: 5,000 quads whose loops follow the mane, shown with Wire](images/qremesh.jpg)
 
 ## The usual workflow
 
@@ -139,9 +144,10 @@ poles, and its result is extracted at twice the spacing and split, which shows a
 
 Draw curves on the sculpt and Quad Remesh puts an edge loop along each one, and turns the flow around it to follow,
 like quad remesh Guides brush. With Quad Remesh 2 an open curve is an exact edge loop: the grid line lies on it.
-Closed loops (round an eye) and loops across the symmetry plane are, for now, done by the legacy method for that
-piece (the status line says so). Use them where the topology has to work for animation: rings around the
-eyes and the mouth, loops around the shoulders, elbows and knees, a line down the middle of a muscle.
+
+Closed loops (round an eye) and loops across the symmetry plane are, for now, done by the legacy method for that piece
+(the status line says so). Use them where the topology has to work for animation: rings around the eyes and the mouth,
+loops around the shoulders, elbows and knees, a line down the middle of a muscle.
 
 ![Left: Quad Remesh on its own. Middle: loops drawn round the eyes and the mouth with Quad Remesh Guides. Right: Quad Remesh again, with an edge loop on every curve and rings around them](images/qremesh-guides.jpg)
 
@@ -182,13 +188,14 @@ Good to know:
 
 Each curve constrains Quad Remesh's cross field (the directions the edges take) to run along it, falling off over a
 few quads (**Guide Strength**), and adds a lattice line on the curve, so one edge loop lies on it. Along a closed
-curve the lattice corners are placed at even steps, an even number of them (a ring of quads round a disk always
-has an even number of sides), so the loop meets itself without a kink. With symmetry Quad Remesh remeshes one half,
-so a loop across the middle is cut there: its corners start on the seam, where it meets its mirror image.
-Quad Remesh then checks the loops and the quads near the guides; if a loop came out broken or a fan of seven or
-more edges sits by a guide, it tries again with a different start for the field and keeps the best. Measured on
-a sphere with a circular guide around an "eye", the edges near the curve are within about 2 to 8 degrees of its
-direction (about 22 degrees without the guide), and the loop closes.
+curve the lattice corners are placed at even steps, an even number of them (a ring of quads round a disk always has an
+even number of sides), so the loop meets itself without a kink. With symmetry Quad Remesh remeshes one half, so a loop
+across the middle is cut there: its corners start on the seam, where it meets its mirror image.
+
+Quad Remesh then checks the loops and the quads near the guides; if a loop came out broken or a fan of seven or more
+edges sits by a guide, it tries again with a different start for the field and keeps the best. Measured on a sphere
+with a circular guide around an "eye", the edges near the curve are within about 2 to 8 degrees of its direction
+(about 22 degrees without the guide), and the loop closes.
 
 ## Project Detail
 

@@ -5,7 +5,7 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
-  <strong>New in 0.12.10:</strong> mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts (<a href="https://sculptforge.app/guide/whats-new.html#version-01210">how it works</a>)
+  <strong>New in 0.12.12:</strong> the user guide is redesigned, with new pictures, and big Clay strokes no longer ring (<a href="https://sculptforge.app/guide/whats-new.html#version-01212">how it works</a>)
 </p>
 
 <p align="center">

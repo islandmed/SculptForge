@@ -1,5 +1,12 @@
 # Glossary
 
+![The lion head model (CC0, Poly Haven) in SculptForge](images/welcome-bust.jpg)
+
+> **In short:**
+> - The terms SculptForge uses: Parts, Forge Spheres, Vertex Paint, Library and more.
+> - <kbd>F3</kbd> finds a feature by what it does: try "remesh" or "groups".
+> - For where each thing lives, see the [Quick tour](quick-tour.md).
+
 This chapter explains the terms SculptForge uses (Parts, Forge Spheres, Vertex Paint, Library...). The command
 palette (<kbd>F3</kbd>) also finds a feature by what it does: type "remesh", "groups" or "folders". See also the
 [Quick tour for experienced sculptors](quick-tour.md).

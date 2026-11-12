@@ -1,15 +1,18 @@
 # Navigating the view
 
+![Turning the view around a sculpted head](images/hero-view-keys.jpg)
+
 This chapter explains how to rotate, pan and zoom the camera with a mouse, a pen, the right-shelf buttons or a
 3Dconnexion SpaceMouse, how to frame the model, and which display toggles help while you sculpt.
 
 ## How the camera works
 
-The camera orbits around a target point. By default rotation is **free**: dragging turns the
-model about the screen's own axes, so it follows the cursor and can roll right over the top. Hold
-<kbd>Shift</kbd> while rotating to snap to the nearest front, back, side, top or bottom view; let go of
-<kbd>Shift</kbd> and the drag carries on from where the cursor is. If you prefer the model to stay upright, as
-in Blender or Maya, set **Edit > Preferences > Interface > Rotation** to **Turntable**: sideways drags then turn the
+The camera orbits around a target point. By default rotation is **free**: dragging turns the model about the screen's
+own axes, so it follows the cursor and can roll right over the top.
+
+Hold <kbd>Shift</kbd> while rotating to snap to the nearest front, back, side, top or bottom view; let go of
+<kbd>Shift</kbd> and the drag carries on from where the cursor is. If you prefer the model to stay upright, as in
+Blender or Maya, set **Edit > Preferences > Interface > Rotation** to **Turntable**: sideways drags then turn the
 model around its vertical axis and up-down drags tilt it, stopping just short of looking straight down or up.
 
 ### Orbit lock
@@ -24,10 +27,11 @@ model around its vertical axis and up-down drags tilt it, stopping just short of
 | **Z** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | turns about the world Z axis only: from the front, a drag around the middle of the view turns the model like a wheel; from the side, an up or down drag tips it |
 
 With X or Z locked, only the part of the drag that moves across the axis on screen counts, so the axis itself never
-moves: nothing drifts, however long you drag. <kbd>Shift</kbd> still snaps to the nearest side view. The axis
-gizmo shows the lock: the locked axis runs through its disc in its colour, and a small lock with the axis letter sits
-at the disc's lower right. The lock is the same setting as **Edit > Preferences > Interface > Rotation**, saved
-with your preferences; scripts and the console use `orbit_lock axis=free|y|x|z`.
+moves: nothing drifts, however long you drag. <kbd>Shift</kbd> still snaps to the nearest side view.
+
+The axis gizmo shows the lock: the locked axis runs through its disc in its colour, and a small lock with the axis
+letter sits at the disc's lower right. The lock is the same setting as **Edit > Preferences > Interface > Rotation**,
+saved with your preferences; scripts and the console use `orbit_lock axis=free|y|x|z`.
 
 ![View > Orbit lock: the X lock picked in the View menu, the axis gizmo with X through its disc and the lock badge](images/orbit-lock.jpg)
 
@@ -36,13 +40,16 @@ view with a 35 degree field of view, or orthographic (<kbd>Numpad 5</kbd>): no f
 shrink with depth. The front, side and top views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>) switch to
 orthographic until you rotate again, as in Blender.
 
-The X / Y / Z gizmo in the top left of the canvas (**Sculpt > Draw & Tablet > Camera > Axes**) shows the world axes as the camera
-sees them, on a soft disc that keeps them readable on dark and light backgrounds. The positive ends are filled
-circles with their letter, the negative ends smaller rings; the ends pointing away from you are smaller and fainter,
-and the nearest is drawn on top. Click an end to look from that side, as in Blender: **X** the right view, **Y** the
-top, **Z** the front, and the ring at the other end of each axis the left, bottom or back view. Click the same end
-again for the opposite view (Front, then Back). These are orthographic like the numpad views. The end under the
-pointer gets a ring (a negative end shows its letter), and on an exact side view its name shows under the axes.
+The X / Y / Z gizmo in the top left of the canvas (**Sculpt > Draw & Tablet > Camera > Axes**) shows the world axes as
+the camera sees them, on a soft disc that keeps them readable on dark and light backgrounds. The positive ends are
+filled circles with their letter, the negative ends smaller rings; the ends pointing away from you are smaller and
+fainter, and the nearest is drawn on top. Click an end to look from that side, as in Blender: **X** the right view,
+**Y** the top, **Z** the front, and the ring at the other end of each axis the left, bottom or back view.
+
+Click the same end again for the opposite view (Front, then Back). These are orthographic like the numpad views. The
+end under the pointer gets a ring (a negative end shows its letter), and on an exact side view its name shows under
+the axes.
+
 Drag on the disc between the ends to orbit.
 
 **Sculpt > Draw & Tablet > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
@@ -87,22 +94,24 @@ they go: drag up to zoom out, down to zoom in.
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
 
-**Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of
-the canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a
-left-drag on the background no longer rotates: it waits, and the brush starts where the cursor first reaches the
-model, so strokes that begin at the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and
-<kbd>Shift</kbd> (smooth) strokes start the same way, and a <kbd>Ctrl</kbd>+click on the background still inverts
-the mask. To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
-middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
-style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the Classic or SculptForge style,
-press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Lasso Mask, Rectangle Mask and the
-<kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
+**Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of the
+canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a left-drag on the background
+no longer rotates: it waits, and the brush starts where the cursor first reaches the model, so strokes that begin at
+the silhouette never turn the view by accident. <kbd>Ctrl</kbd> (mask) and <kbd>Shift</kbd> (smooth) strokes start the
+same way, and a <kbd>Ctrl</kbd>+click on the background still inverts the mask.
 
-**Floor grid** (**View > Floor grid**, also **Tool > Viewport Look**; off by default, remembered) draws a faint grid on
-the floor the model stands on: its lowest point, with the up axis (Y) standing on it. It helps judge perspective and
-tilt and line up Parts; the red line is the X axis, the blue one Z. The floor moves when a stroke or a move ends (not
-during it). The squares step up by ten as you zoom out, and the grid fades into the distance; it never draws over
-the model, even seen from below.
+To move the view, right-drag (a pen's lower button is a right click by default), <kbd>Alt</kbd>+drag to pan,
+middle-drag, or hold <kbd>Space</kbd> if **Hold Space and drag to move the camera** is on; with the Blender or Maya
+style, <kbd>Alt</kbd>+left-drag rotates as before. With a pen that has no buttons and the Classic or SculptForge
+style, press <kbd>Shift</kbd>+<kbd>L</kbd> to turn it off while you rotate, or turn on Hold Space. Lasso Mask,
+Rectangle Mask and the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes work as before.
+
+**Floor grid** (**View > Floor grid**, also **Tool > Viewport Look**; off by default, remembered) draws a faint grid
+on the floor the model stands on: its lowest point, with the up axis (Y) standing on it. It helps judge perspective
+and tilt and line up Parts; the red line is the X axis, the blue one Z.
+
+The floor moves when a stroke or a move ends (not during it). The squares step up by ten as you zoom out, and the grid
+fades into the distance; it never draws over the model, even seen from below.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the
@@ -237,11 +246,12 @@ unusual scale.
 
 ## Saved views
 
-**View > Views** has a button for each axis view (Front, Back,
-Left, Right, Top, Bottom) and your own saved cameras. Type a name (or leave it empty for "View 1", "View 2" ...)
-and click **Save View** (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd>); saving under a name that exists
-replaces it. Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets
-it. Saved views are kept in the project.
+**View > Views** has a button for each axis view (Front, Back, Left, Right, Top, Bottom) and your own saved cameras.
+Type a name (or leave it empty for "View 1", "View 2" ...) and click **Save View**
+(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd>); saving under a name that exists replaces it.
+
+Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets it. Saved
+views are kept in the project.
 
 ## Display toggles that help navigation
 
@@ -263,9 +273,10 @@ These live on the right shelf and in the **View** menu:
 
 **Edit > Preferences > Input > Orbit around the pointer** (every key style): a rotation that starts over the model
 turns the view about the surface point under the pointer, so the detail you're working on stays put instead of
-swinging around the middle of the scene. It is on for new installs; if you used SculptForge before it came, your
-orbit stays as it was until you turn it on. The view doesn't jump when the drag starts, and the camera's
-target moves to that point's depth, so zooming toward the middle afterwards zooms at the depth you were working at.
+swinging around the middle of the scene. It is on for new installs; if you used SculptForge before it came, your orbit
+stays as it was until you turn it on. The view doesn't jump when the drag starts, and the camera's target moves to
+that point's depth, so zooming toward the middle afterwards zooms at the depth you were working at.
+
 A rotation that starts over the background turns about the target as before; so does a drag on the axis gizmo's disc.
 Turntable, the orbit locks and <kbd>Shift</kbd> snapping work as usual. Turn it off to always orbit the target (which
 **Frame** sets to the scene centre).

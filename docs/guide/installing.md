@@ -1,5 +1,12 @@
 # Install SculptForge on Windows, macOS and Linux
 
+![The SculptForge window](images/interface-overview.jpg)
+
+> **In short:**
+> - Runs on Windows 10 or 11, macOS 11 or later, and 64-bit Linux.
+> - Download a package, install with one command, or use a package manager.
+> - Also covers the first launch and building from source.
+
 This chapter covers what SculptForge needs, which package to download for your system, what to expect the
 first time you open it, and how to build it from source.
 
@@ -15,7 +22,8 @@ first time you open it, and how to build it from source.
 - **Network**: not needed for sculpting. The free AI features (Brush Lab and image or text to 3D) and the
   community brush gallery need an internet connection unless you run models on your own machine.
 
-> **Note:** SculptForge is a 64-bit desktop application. There is no web, iPad or Android version.
+> **Note:** SculptForge is a 64-bit desktop application. There is no web or iPad version; an early Android build
+> is described in [Android (early)](#android-early).
 
 ## Download
 
@@ -36,6 +44,22 @@ Each link below downloads the newest version. Pick the one for your system:
 
 Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Macs running Linux (it runs on 4,
 16 and 64 KiB memory pages). Older versions are on the [releases page](https://github.com/islandmed/SculptForge/releases).
+
+### Android (early)
+
+An early test build for Android 9 or later: tablets, phones and Chromebooks (arm64 and x86_64), with touch and pen.
+It is not in an app store. Members get it today; it is free for everyone on 26 November.
+
+1. **Members:** accepting the invitation to the member repository (it comes with [membership](https://sculptforge.app/support.html))
+   lets you open its releases on GitHub. Download the `.apk` for your device from the newest member release
+   (`arm64-v8a` for most phones and tablets, `x86_64` for Chromebooks with Intel or AMD) and check it against
+   `SHA256SUMS-android.txt`.
+2. Open it from your browser or file manager and allow installs from that app when Android asks.
+3. If you installed an earlier test APK, uninstall it first: it is signed with a different key, and Android won't
+   update over it. Copy projects out of its Projects folder before you do. This is a test build: a later version,
+   signed with our own key, will need one more uninstall and reinstall.
+
+It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 
 ### Install with one command
 
@@ -207,12 +231,24 @@ SculptForge with:
 SDL_VIDEO_DRIVER=x11 sculptforge
 ```
 
+The start-up splash is its own small window with the app id `sculptforge-splash` (the main window's is `sculptforge`). On
+Hyprland 0.56 and newer, this rule in your Lua config keeps the splash floating, centred, opaque and without a border
+or shadow (Omarchy's default opacity would otherwise make it see-through):
+
+```lua
+hl.window_rule({ match = { class = "^sculptforge-splash$" }, tag = "-default-opacity", float = true, center = true,
+                 border_size = 0, no_shadow = true, opacity = "1 1" })
+```
+
 Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the
 desktop's tablet protocol (tablet-v2), so the tablet must be set up in your desktop's settings rather than
 through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Edit > Preferences > Tablet** for the
 live pressure reading.
 
 ## What you see at start-up
+
+A small splash with the SculptForge logo and version shows for at least half a second while SculptForge loads, then
+fades into the main window. Turn it off in **Edit > Preferences > Interface > Show startup splash** for an instant start.
 
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
@@ -234,29 +270,33 @@ The next chapter, [The interface](interface.md), explains what everything on scr
 
 ## Updating and uninstalling
 
-SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its
-website that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
-**What's new**, **Download**, **Later** and **Skip this version**. Nothing about you or your computer is sent.
-**Help > Check for updates** asks right away, and **Edit > Preferences > Updates** turns the daily check off (and
-picks the update channel: **Stable**, or **Preview** for the betas).
+SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its website
+that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
+**What's new**, **Download**, **Later** and **Skip this version**.
+
+Nothing about you or your computer is sent. **Help > Check for updates** asks right away, and
+**Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
+for the betas).
 
 **One-click update.** The Linux AppImage and the Windows installer and portable zip also get an **Update** button
 on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
 then asks: **Restart now** installs it and starts the new version; **Later** installs it when you quit, so the
 next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.
 
-What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure
-connection; the release's list of checksums must carry the SculptForge release signature (a key built into the
-app); and the download must match its checksum. If any of that fails, nothing is changed and nothing downloaded
-is run: the banner says what went wrong and **Download** still opens the release page. The current version is
-kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as `<folder>.old`) until the
-new version has started once, then removed; if the new version doesn't start, the old one is put back. The
-Windows installer asks for permission to change Program Files, as installing does.
+What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure connection;
+the release's list of checksums must carry the SculptForge release signature (a key built into the app); and the
+download must match its checksum. If any of that fails, nothing is changed and nothing downloaded is run: the banner
+says what went wrong and **Download** still opens the release page.
+
+The current version is kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as
+`<folder>.old`) until the new version has started once, then removed; if the new version doesn't start, the old one is
+put back. The Windows installer asks for permission to change Program Files, as installing does.
 
 **Member builds.** Members get each release early. In **Edit > Preferences > Updates > Member builds**, click
 **Sign in with GitHub**: SculptForge shows a short code; open **github.com/login/device**, sign in with the GitHub
-account that accepted the invitation to the member repository, and enter the code. From then on the update check
-also offers the member builds, and **Update** installs them exactly like releases, with the same signature check.
+account that accepted the invitation to the member repository, and enter the code. From then on the update check also
+offers the member builds, and **Update** installs them exactly like releases, with the same signature check.
+
 The sign-in can only read the member repository's releases (nothing else on your GitHub account), it is kept in your
 system's keychain (Windows Credential Manager, or the Secret Service on Linux such as GNOME Keyring or KWallet; never
 in SculptForge's settings), and **Sign out** removes it. Without a keychain the sign-in lasts until you quit.

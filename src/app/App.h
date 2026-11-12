@@ -139,7 +139,7 @@ struct AppOptions {
     // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
     // 100 when memory allows); outputs default to the current folder.
     bool benchmark = false;
-    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard | standard-1b: a standard scene (ProofMode.h)
+    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard-100m | standard | standard-1b: a standard scene (ProofMode.h)
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
@@ -1499,6 +1499,7 @@ private:
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
+    void updateUndoNotice();           // every frame: "Oldest N undo steps removed to free memory" when a history dropped steps
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
@@ -1564,7 +1565,7 @@ private:
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
-    void drawVoxelResolution(); // the slider (2/3 of its travel for 32-512) and the estimate line
+    void drawVoxelResolution(bool compact = false); // the slider (2/3 of its travel for 32-512) and the estimate line; compact: the shelf's, the slider alone at the width set before
     void drawVoxelHighResConfirm();
     struct VoxelEstimateCache {
         uint32_t part = ~0u;
@@ -2515,7 +2516,7 @@ private:
     void saveWindowState() const;
     bool rememberWindow_ = false;
     // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
-    // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
+    // frame, and the splash (opened at the first start-up step) closes then.
     std::unique_ptr<splash::Window> splash_;
     bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
     std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;

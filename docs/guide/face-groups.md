@@ -1,5 +1,12 @@
 # Face Groups and visibility
 
+![Two sculpted heads](images/shading.jpg)
+
+> **In short:**
+> - Face groups divide a Part's surface into named, coloured regions.
+> - Use them to hide and isolate areas, build masks and split a model into Parts.
+> - **Groups** on the right shelf shows them; **Tool > Face Groups** makes them.
+
 Face Groups (experienced sculptors: Face groups) divide a Part's surface into named regions, shown as flat colours when you turn them on. You use
 them to hide and isolate parts of a model so you can reach what you want to sculpt, to build masks, and to
 split a model into Parts. This chapter covers creating face groups, the <kbd>Ctrl</kbd>+<kbd>Shift</kbd>

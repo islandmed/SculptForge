@@ -31,6 +31,8 @@
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
 //                            keep: leave the button down (a check mid-drag), then `release`
+//   drag_item_to LABEL TARGET [S] [keep]  left-drag from the item onto the centre of another item (Customize Shelves + Ctrl+Alt held:
+//                            drop a palette widget or button on a shelf)
 //   drag_shelf_items N       Customize Shelves + Ctrl+Alt held: drag every action off the shelves; each must come off (at least N)
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
@@ -190,7 +192,7 @@
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
-//                            voxel_resolution, voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
+//                            voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
 //                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -752,14 +754,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
     if (name == "tube_twist") return double(m.tube.twist);
     if (name == "tube_strands") return double(m.tube.strands);
+    if (name == "tube_roll") return double(m.tube.roll);
     if (name == "tube_spin") return double(m.tube.spin);
     if (name == "tube_spread") return double(m.tube.spread);
-    if (name == "tube_slider_order") { // 1 when Tool > Tube's Twist, Spin, Spread and Strands sliders sit in that order, top to bottom
-        ImVec2 at[4];
-        const char* const items[4] = {"Tube/##tubetwist", "Tube/##tubespin", "Tube/##tubespread", "Tube/##tubestrands"};
-        for (int i = 0; i < 4; ++i)
+    if (name == "tube_slider_order") { // 1 when Tool > Tube's Turn, Twist, Spin, Strands and Spread sliders sit in that order, top to bottom (as in 0.12.10)
+        ImVec2 at[5];
+        const char* const items[5] = {"Tube/##tuberoll", "Tube/##tubetwist", "Tube/##tubespin", "Tube/##tubestrands", "Tube/##tubespread"};
+        for (int i = 0; i < 5; ++i)
             if (!findItem(items[i], at[i])) return 0.0;
-        return at[0].y < at[1].y && at[1].y < at[2].y && at[2].y < at[3].y ? 1.0 : 0.0;
+        for (int i = 1; i < 5; ++i)
+            if (!(at[i - 1].y < at[i].y)) return 0.0;
+        return 1.0;
     }
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
@@ -970,6 +975,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
+    if (name == "ui_drag_payload") { // 1 while a shelf-item drag (Customize Shelves) is in flight
+        const ImGuiPayload* p = ImGui::GetDragDropPayload();
+        return p && p->IsDataType(ui::kUiItemPayload) ? 1.0 : 0.0;
+    }
+    if (name == "shelf_drop_accepted") return app_.shelfDrag_.accepted ? 1.0 : 0.0; // the last drag landed on a shelf
+    if (name == "voxel_resolution_on_shelves") { // slots holding the Voxel Resolution slider (Customize Shelves)
+        double n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += double(std::count(list->begin(), list->end(), "widget.voxel_resolution"));
+        return n;
+    }
     if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
     if (name == "shortcut_conflict_open") return app_.shortcutConflictOpen() ? 1.0 : 0.0; // the Replace / Cancel popup
     if (name == "shortcut_popup_overlaps_anchor") { // the popup over the button it belongs to (queue 14: popups clear their anchor)
@@ -3802,6 +3818,62 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     return true;
 }
 
+// drag_item_to LABEL TARGET [S] [keep]: its own function (the parseStep else-if chain is at MSVC's nesting limit, C1061).
+bool Demo::parseDragItemTo(int line, const std::vector<std::string>& w, std::string& error) {
+    if (w.size() < 3) {
+        error = "'drag_item_to' needs 2 arguments";
+        return false;
+    }
+    const std::string label = w[1], target = w[2];
+    const bool keep = w.back() == "keep"; // leave the button down, then `release`
+    const float seconds = w.size() > 3 && w[3] != "keep" ? std::strtof(w[3].c_str(), nullptr) : 0.6f;
+    auto from = std::make_shared<ImVec2>(), to = std::make_shared<ImVec2>();
+    auto press = std::make_shared<std::string>();
+    steps_.push_back([this, line, label, from](float t) {
+        if (findItem(label, *from)) {
+            mouseMotion(from->x, from->y);
+            return true;
+        }
+        if (t > 3.0f) fail(line, notFound(label));
+        return t > 3.0f;
+    });
+    wait(0.15f); // hover first, as a person does
+    steps_.push_back([this, line, label, target, to, from, seconds, keep, press](float t) {
+        if (t == 0.0f) {
+            if (!findItem(target, *to)) {
+                fail(line, notFound(target));
+                return true;
+            }
+            return false;
+        }
+        if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
+        if (press->empty() && buttonDown_) { // the press just landed: who took it
+            ImGuiContext& g = *ImGui::GetCurrentContext();
+            *press = std::string("press: hovered window ") + (g.HoveredWindow ? g.HoveredWindow->Name : "none") + ", hovered id " +
+                     std::to_string(g.HoveredId) + (g.HoveredIdIsDisabled ? " (disabled)" : "") + ", active id " +
+                     std::to_string(g.ActiveId) + " in " + (g.ActiveIdWindow ? g.ActiveIdWindow->Name : "none") +
+                     (g.ActiveIdWindow && g.ActiveId == g.ActiveIdWindow->MoveId ? " (window move)" : "") +
+                     " ctrl " + (g.IO.KeyCtrl ? "yes" : "no") + " alt " + (g.IO.KeyAlt ? "yes" : "no") + "; ";
+        }
+        const float u = std::min(t / seconds, 1.0f);
+        mouseMotion(from->x + (to->x - from->x) * u, from->y + (to->y - from->y) * u);
+        if (t >= seconds) {
+            const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+            if (!payload || !payload->IsDataType(ui::kUiItemPayload)) {
+                ImGuiContext& g = *ImGui::GetCurrentContext();
+                fail(line, "no drag began from \"" + label + "\": " + *press + "drag active " + (g.DragDropActive ? "yes" : "no") +
+                               ", active id " + std::to_string(g.ActiveId) + ", mouse " + std::to_string(int(g.IO.MousePos.x)) + "," +
+                               std::to_string(int(g.IO.MousePos.y)) + " from " + std::to_string(int(from->x)) + "," + std::to_string(int(from->y)));
+            }
+            if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
+            return true;
+        }
+        return false;
+    });
+    wait(0.2f);
+    return true;
+}
+
 std::string Demo::expandLibrary(std::string text) const {
     const std::string& lib = app_.library_.user;
     for (size_t at = text.find("$LIBRARY"); at != std::string::npos; at = text.find("$LIBRARY", at + lib.size()))
@@ -4109,7 +4181,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
+                "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
                 "touch_stroke", "touch_pinch", "palm_guard", "classic_keys", "input_style"};

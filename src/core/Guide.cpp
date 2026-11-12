@@ -268,7 +268,9 @@ Spans parseInline(std::string_view text) {
     InlineParser p;
     p.run(text);
     p.flush();
-    return merged(std::move(p.out));
+    Spans out = merged(std::move(p.out));
+    for (auto& s : out) s.path = s.bold && !s.code && !s.kbd && s.link.empty() && s.text.find(" > ") != std::string::npos;
+    return out;
 }
 
 std::string slugify(std::string_view heading) {
@@ -292,6 +294,16 @@ std::string plainText(const Block& block) {
     switch (block.kind) {
     case BlockKind::Code: return block.text;
     case BlockKind::Image: return block.alt;
+    case BlockKind::Callout: {
+        std::string out = plainText(block.spans);
+        for (const auto& item : block.items) out += ' ' + plainText(item);
+        return out;
+    }
+    case BlockKind::Cards: {
+        std::string out;
+        for (const auto& c : block.cards) out += (out.empty() ? "" : " ") + c.title + ' ' + plainText(c.blurb);
+        return out;
+    }
     case BlockKind::Table: {
         std::string out;
         for (const auto& row : block.rows)
@@ -318,6 +330,7 @@ Document parse(std::string_view md) {
     }
 
     std::vector<std::string> usedAnchors;
+    std::vector<size_t> openDetails; // <details> blocks waiting for their </details>
     std::string para;          // paragraph text being collected
     Block* listItem = nullptr; // the list item that continuation lines join
     auto endParagraph = [&] {
@@ -348,6 +361,49 @@ Document parse(std::string_view md) {
             size_t j = i;
             while (j < lines.size() && lines[j].find("-->") == std::string_view::npos) ++j;
             i = j;
+            continue;
+        }
+        if (startsWith(t, "```cards")) { // [Title](target) | images/x.jpg | blurb
+            endParagraph();
+            endList();
+            Block b;
+            b.kind = BlockKind::Cards;
+            for (++i; i < lines.size() && !startsWith(trim(lines[i]), "```"); ++i) {
+                const auto cells = tableCells(lines[i]);
+                if (cells.empty() || cells[0].empty()) continue;
+                Card c;
+                for (const auto& sp : parseInline(cells[0])) c.title += sp.text, c.target = sp.link.empty() ? c.target : sp.link;
+                if (cells.size() > 1) c.image = std::string(cells[1]);
+                if (cells.size() > 2) c.blurb = parseInline(cells[2]);
+                b.cards.push_back(std::move(c));
+            }
+            doc.blocks.push_back(std::move(b));
+            continue;
+        }
+        if (t == "<details>") {
+            endParagraph();
+            endList();
+            Block b;
+            b.kind = BlockKind::Details;
+            if (i + 1 < lines.size() && startsWith(trim(lines[i + 1]), "<summary>")) {
+                std::string_view sum = trim(lines[++i]).substr(9);
+                if (const size_t close = sum.find("</summary>"); close != std::string_view::npos) sum = sum.substr(0, close);
+                b.spans = parseInline(trim(sum));
+            }
+            openDetails.push_back(doc.blocks.size());
+            doc.blocks.push_back(std::move(b));
+            continue;
+        }
+        if (t == "</details>") {
+            endParagraph();
+            endList();
+            if (!openDetails.empty()) {
+                doc.blocks[openDetails.back()].end = int(doc.blocks.size());
+                openDetails.pop_back();
+                Block b;
+                b.kind = BlockKind::DetailsEnd;
+                doc.blocks.push_back(std::move(b));
+            }
             continue;
         }
         if (startsWith(t, "```")) {
@@ -411,14 +467,19 @@ Document parse(std::string_view md) {
             endParagraph();
             endList();
             std::string text;
+            std::vector<std::string> items; // "> - item" lines (a wrapped item continues on the next "> " line)
             for (; i < lines.size() && !trim(lines[i]).empty() && trim(lines[i])[0] == '>'; ++i) {
-                if (!text.empty()) text += ' ';
-                text += std::string(trim(trim(lines[i]).substr(1)));
+                const std::string_view line = trim(trim(lines[i]).substr(1));
+                std::string_view rest;
+                if (bulletItem(line, rest)) items.emplace_back(rest);
+                else if (!items.empty()) items.back() += ' ' + std::string(line);
+                else text += (text.empty() ? "" : " ") + std::string(line);
             }
             --i;
             Block b;
             b.kind = BlockKind::Callout;
             b.spans = parseInline(text);
+            for (const auto& item : items) b.items.push_back(parseInline(item));
             doc.blocks.push_back(std::move(b));
             continue;
         }
@@ -466,6 +527,14 @@ Document parse(std::string_view md) {
     }
     endParagraph();
     endList();
+    for (size_t k : openDetails) doc.blocks[k].end = int(doc.blocks.size()); // an unclosed <details> runs to the end
+    for (auto& b : doc.blocks) { // the hero: the first image before any "##" heading
+        if (b.kind == BlockKind::Heading && b.level >= 2) break;
+        if (b.kind == BlockKind::Image) {
+            b.hero = true;
+            break;
+        }
+    }
     return doc;
 }
 
@@ -484,6 +553,12 @@ std::vector<Reference> references(const Document& doc) {
     for (const auto& b : doc.blocks) {
         if (b.kind == BlockKind::Image) out.push_back({b.text, true});
         fromSpans(b.spans);
+        for (const auto& item : b.items) fromSpans(item);
+        for (const auto& c : b.cards) {
+            if (!c.target.empty()) out.push_back({c.target, false});
+            if (!c.image.empty()) out.push_back({c.image, true});
+            fromSpans(c.blurb);
+        }
         for (const auto& row : b.rows)
             for (const auto& cell : row) fromSpans(cell);
     }

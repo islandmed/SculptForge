@@ -31,12 +31,11 @@ std::vector<ProofMeshSize>& proofExtraSizes();
 
 // The standard scenes (`sculptforge --benchmark standard-15m`, Help > Benchmark): a procedural head of 15M or 33M
 // triangles (core makeBenchHead) and a fixed stroke set (Clay small / medium / large, Move, Smooth, a 240 px Clay
-// brush, then an orbit). Names: "standard-15m", "standard-33m", "standard" (both). Empty for any other name.
+// brush, then an orbit). Names: "standard-15m", "standard-33m", "standard-100m" (104M, about 15 GB of memory), "standard" (15M + 33M). Empty for any other name.
 std::vector<ProofMeshSize> proofStandardScene(const std::string& name);
 inline constexpr const char* kProofStrokeSet = "standard/1"; // bump when the standard stroke set changes
 
-// (Free memory now: availableMemoryBytes, core/MemoryGuard.h.)
-size_t totalMemoryBytes();
+// (Free and total memory: availableMemoryBytes, totalMemoryBytes, core/MemoryGuard.h.)
 // CPU model, logical cores, RAM, OS: the "hardware" object of the result (the GPU is added by the app).
 Json describeHardware();
 

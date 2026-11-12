@@ -99,7 +99,8 @@ uploads. Any mismatch stops the release.
 
 Signing happens only at promotion: `UPDATE_SIGNING_KEY` is a secret of the environments `release` (job `publish`,
 deployments from tags `v*` only) and `member-release` (betas), never of the repository, so no staging or branch run can
-read it. Step `check` refuses otherwise. packages.yml reads no secret at all (tools/release/check_workflows.py).
+read it. Step `check` refuses otherwise. packages.yml reads no secret but the SignPath token, in the Windows job's signing
+steps only (tools/release/check_workflows.py; "Windows code signing" below).
 
 Unreleased builds: nothing is released, drafted or put in the feed before the tag. Staging's packages exist only as
 that run's Actions artifacts (14 days). In this public repository signed-in GitHub users can download Actions
@@ -112,8 +113,44 @@ the tag (about 40 minutes), attests and verifies them the same way, then smoke-t
 Compiler caches: release builds restore main's caches, and nothing run from a tag or a pull request ever saves one.
 Tokens: only `publish` holds a token that can write.
 
-The packages are not code-signed yet. When signing comes (SignPath for Windows, Apple notarization), it belongs in a
-step between smoke and publish that signs the promoted files, so promotion stays valid.
+## Windows code signing (SignPath Foundation)
+
+Packages are built once and promoted unchanged, so Windows signing happens in packages.yml's Windows job, not at
+promotion (macOS notarization is separate and not done yet). The repository variable **`SIGNING`** switches it on:
+`signpath` signs, anything else (the default) is the unsigned path, unchanged. With it on, on runs for `main`, `staging`
+and `v*` tags only:
+
+1. `sculptforge.exe`, `sculptforge-cli.exe` and any DLL in `build/Release` go to SignPath (artifact configuration
+   `SIGNPATH_CONFIG_BINARIES`, default `binaries`) and come back signed, **before** cpack makes the installer and
+   `.zip` (and build_mcpb.py the `.mcpb`), so all three carry signed exes.
+2. The NSIS installer goes (artifact configuration `SIGNPATH_CONFIG_INSTALLER`, default `installer`) and comes back signed.
+3. `tools/ci/verify_signed.ps1` (Get-AuthenticodeSignature = Valid, with a timestamp) checks every returned file, then
+   the exes inside the installer's `.zip` and the `.mcpb`. A failed or missing signature fails the job: no unsigned
+   package is ever staged under `SIGNING=signpath`. A release policy that waits for approval holds the job up to
+   `SIGNPATH_TIMEOUT` seconds (default 3600) per request.
+4. The job's summary and a notice say `Windows: signed (SignPath, <subject>)` or `Windows: unsigned (SIGNING off)`;
+   `release.sh --stage` prints that line and stops if `SIGNING=signpath` and the packages are unsigned. release.yml's
+   `verify` also refuses staged Windows packages without a signature when `SIGNING=signpath` (`verify_staged.py
+   --require-signed`), so a run staged before the switch can't be promoted unsigned: use `--rebuild`.
+
+SignPath artifact configurations (project SculptForge; both zips are flat, files at the root):
+`binaries` = `<zip-file><pe-file-set><include path="*.exe" max-matches="unbounded"/><include path="*.dll" min-matches="0"
+max-matches="unbounded"/><for-each><authenticode-sign/></for-each></pe-file-set></zip-file>` and `installer` =
+`<zip-file><pe-file path="SculptForge-*.exe"><authenticode-sign/></pe-file></zip-file>` (inside the usual
+`<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">`).
+
+**Test signing** (a policy `test-signing` with a self-signed "SculptForge Test" certificate, looks worse to users than
+unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
+do it (check_workflows.py), the notice says `Windows: test-signed (not for release ...)`, `verify_signed.ps1 -Test` accepts the
+untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
+`release.sh --stage` and `verify_staged.py --require-signed` refuse the test certificate anyway).
+
+Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
+`SIGNPATH_TEST_POLICY_SLUG`, `SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
+secret, read only by the two signing steps, which run only when `SIGN` is true; the workflow never runs on pull requests or
+`t0/**`; release.yml passes it to the `--rebuild` call of packages.yml). Pinned action, token and gating are enforced by
+check_workflows.py. The intermediate artifacts are named `signing-*` (never `windows*`: job sums and verify take those
+for packages) and kept one day.
 
 ## The script
 
@@ -182,6 +219,10 @@ Steps for a beta: `bump check ci tag release status`.
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
+  After the release is complete, `release_apk` adds the Android APKs (arm64-v8a, x86_64, signed with the CI runner's
+  debug key) from the android.yml run of the beta's commit to that private release, with `SHA256SUMS-android.txt`
+  (the signed `SHA256SUMS.txt` is left alone). Never the public release; no run, a red run, expired artifacts (14 days)
+  or a failed upload is a warning and the beta ships without them (`--from release` adds them later).
 - **status** prints the private release link, the invite command and the testers checklist (post it in #members).
 - No site, feed, AUR, Homebrew, Omarchy, winget or issue replies for a beta.
 

@@ -415,6 +415,14 @@ private:
     void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true,
                      const float* given = nullptr); // given: each vertex's influence (0 = not moved)
 
+    // The drag brushes (Sculpt.cpp, limitFolds / relaxDrag): `d`, the offsets of verts_, scaled down where they would turn a
+    // triangle over or squash it to a sliver; and the vertices slid back toward the middle of their neighbours after the dab.
+    void limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d);
+    void relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lambda, int rounds);
+    std::vector<uint32_t> foldSlot_;
+    std::vector<float> foldScale_;
+    std::vector<glm::vec3> foldD_;
+
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
     void repairDab(Mesh& mesh, BVH& bvh);
@@ -475,6 +483,7 @@ private:
     const BVH* lazyBvh_ = nullptr;
     std::vector<uint32_t> curvatureStamp_;
     bool adaptiveDab_ = false; // the dab dabSingle is placing takes the adaptive path
+    bool earlyNormals_ = false; // dab(): this copy's normals go ahead (analytically) for the next mirror copy that meets it
     // Fused batches: the dabs waiting, and the last unmirrored region's size and radius (whether the next dab
     // is big enough to wait), and the place a batch's vertices are kept while it is applied.
     struct PendingDab {

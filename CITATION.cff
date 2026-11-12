@@ -8,8 +8,8 @@ authors:
 license: GPL-3.0-or-later
 repository-code: "https://github.com/islandmed/SculptForge"
 url: "https://islandmed.github.io/SculptForge/"
-version: 0.12.10
-date-released: 2026-11-11
+version: 0.12.12
+date-released: 2026-11-12
 keywords:
   - sculpting
   - 3d

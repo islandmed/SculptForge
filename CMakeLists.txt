@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.11 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.12 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "beta.2")
+set(SCULPTFORGE_PRERELEASE "")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -789,6 +789,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
+    add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
+    set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
@@ -960,6 +964,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
       add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
       set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
+      set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
     endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
@@ -1010,6 +1016,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # The home page says the newest release's news once (the announcement bar), not in the hero, lede and first card too.
+    add_test(NAME guide_home_news COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/home_news_test.py)
     # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
     add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
     # No system dialog or URL opens from a test or an agent's run: every SDL_Show*Dialog / SDL_OpenURL call goes
@@ -1124,12 +1132,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
+    # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
+    sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
+    sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
     # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
     sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
     sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
+    # The undo budget in Preferences > Performance and the status line when steps are dropped (tests/ui/undo_budget.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(undo_budget_1440 undo_budget --size 1440x900)
+    sculptforge_ui_test(undo_budget_2880 undo_budget --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
@@ -1376,6 +1390,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                             $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
                                             ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
       set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+      add_test(NAME bench_scene_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_scene_names.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-scene-names)
+      set_tests_properties(bench_scene_names PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE)
     endif()
     # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
     # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.

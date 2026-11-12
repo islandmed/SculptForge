@@ -250,7 +250,20 @@ public:
     // Memory the undo steps hold (UndoRecord::approxBytes), as counted against byteBudget.
     size_t undoBytes() const;
 
-    size_t byteBudget = size_t(1) << 30; // 1 GiB
+    // What the history may hold. 0 (the default) follows the computer: undoBudgetBytes (core/MemoryGuard.h), asked on
+    // every push; any other value is fixed (the pose history never drops: max).
+    size_t byteBudget = 0;
+    size_t budget() const; // the figure in force now (Preferences > Performance)
+    // What the budget did since the last call, for the status line: steps dropped, and whether the one step left is
+    // over the budget on its own (a whole-mesh step is kept anyway). Empty = nothing to say.
+    struct Notice {
+        size_t dropped = 0;
+        bool lastStepOver = false;
+        bool any() const { return dropped || lastStepOver; }
+    };
+    Notice takeNotice();
+    size_t droppedTotal() const { return droppedTotal_; }
+    bool lastStepOverBudget() const { return lastStepOver_; }
     std::shared_ptr<UndoListener> listener; // the Sculpt Timeline (core/Timeline.h), if one watches this history
 
 private:
@@ -259,6 +272,8 @@ private:
 
     std::deque<UndoRecord> undo_, redo_;
     uint64_t revision_ = 0;
+    size_t droppedPending_ = 0, droppedTotal_ = 0;
+    bool lastStepOver_ = false, overPending_ = false;
 };
 
 } // namespace sf

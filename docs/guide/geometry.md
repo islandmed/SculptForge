@@ -1,5 +1,12 @@
 # Subdivide, remesh, decimate and LODs
 
+![A head after Voxel Remesh](images/quick-tour/02-voxel.jpg)
+
+> **In short:**
+> - Subdivide, remesh, decimate, make symmetric and build LODs for the active Part.
+> - Everything except the LOD preview is undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+> - Find the tools in **Tool > Geometry**, grouped by what you do.
+
 These tools change the topology of the active Part: add resolution for detail, rebuild an even surface,
 reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This
 chapter explains what each one does to your mesh and its attributes, and when to use it.
@@ -25,11 +32,12 @@ In **Tool > Geometry** they are grouped by what you do: **Levels** (see [Subdivi
 
 ## Quads and triangles
 
-SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open
-from the Bridge, Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
-the diagonal, and OBJ, FBX, PLY, USD and Bridge exports write them back as quads, corner for corner. Polygons with
-more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so is the
-result of a voxel remesh.
+SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open from the
+Bridge, Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without the diagonal, and
+OBJ, FBX, PLY, USD and Bridge exports write them back as quads, corner for corner.
+
+Polygons with more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so
+is the result of a voxel remesh.
 
 Sculpting, masking, vertex paint, sculpt layers, undo, Parts and project files all keep the quads. Subdivide
 turns every quad into four quads. Two things turn quads into triangles:
@@ -71,11 +79,13 @@ Use it to:
 - even out stretched triangles after heavy Move or Tendril work;
 - clean up scans, splat conversions and AI-generated models before sculpting.
 
-The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 4096,
-as the `remesh` command; default 200). Higher keeps more detail and makes more triangles, about four times as many
-for each doubling. Two thirds of the slider covers 32 to 512, the everyday range; the last third goes up to 2048 and
-then 4096 (Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from
-the Part's surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
+The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 4096, as
+the `remesh` command; default 200). Higher keeps more detail and makes more triangles, about four times as many for
+each doubling.
+
+Two thirds of the slider covers 32 to 512, the everyday range; the last third goes up to 2048 and then 4096
+(Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from the Part's
+surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
 
 512 is safe on an 8 GB computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about
 760,000 triangles; a round 2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5
@@ -130,18 +140,21 @@ Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Reme
   stroke).
 
 Either one remeshes the active Part at the **Resolution** above, with **Keep Masked** and **Keep Texture** as set
-there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status
-bar says when it's done and how many triangles the Part has now. Each remesh is one undo step. If you sculpt or
-undo while it runs, it doesn't throw that work away: it remeshes the Part again as it is now.
+there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status bar
+says when it's done and how many triangles the Part has now.
+
+Each remesh is one undo step. If you sculpt or undo while it runs, it doesn't throw that work away: it remeshes the
+Part again as it is now.
 
 Both keys change in **Edit > Preferences > Hotkeys** (*Quick Remesh* and *Quick Remesh (hold and drag)*). Neither
 <kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other
 drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes,
 exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
 
-**Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched
-the surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active
-Part is remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
+**Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched the
+surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active Part is
+remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
+
 Sculpting never waits for it. It skips Parts with subdivision levels, sculpt layers or a painted texture (Keep
 Texture), where a remesh would bake or drop them; use the button or <kbd>Shift</kbd>+<kbd>R</kbd> there.
 
@@ -158,6 +171,7 @@ projection](retopology.md).
 **Tool > Geometry > Fill Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
 rim of an extracted shell. The new patch's triangles are sized like the ones around the hole, and the patch follows
 the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed.
+
 The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Fill Holes
 makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes
 back.

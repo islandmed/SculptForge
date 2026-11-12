@@ -1,5 +1,12 @@
 # Scripting and automation
 
+![The console showing commands run from the interface and typed by hand](images/console.jpg)
+
+> **In short:**
+> - Every operation is a named command with parameters.
+> - Run commands from the console, script files, `sculptforge-cli`, Python or AI agents.
+> - <kbd>F3</kbd> opens the command palette to find any command by name.
+
 Every operation in SculptForge is a named command with parameters. The same commands run from the console
 inside the app, from script files, from the `sculptforge-cli` tool on a build farm, from Python, and from AI
 agents through the Model Context Protocol (MCP). This chapter explains the script language, the console, both
@@ -35,8 +42,6 @@ Scripts stop at the first command that fails.
 Press the backtick key (left of <kbd>1</kbd>), or choose **File > Script > Console**, to open the console strip above
 the bottom shelf. Drag its top edge to resize it.
 
-![The console showing commands run from the interface and typed by hand](images/console.jpg)
-
 - **Every command you run appears in the console as a script line**, whether it came from a button, a
   shortcut, the command palette or the console itself, followed by its result. Failures show in red with the
   reason.
@@ -62,11 +67,12 @@ The console buttons (also in **File > Script**):
 
 ## The command palette
 
-Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the window)
-to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
+Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the
+window) to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
 <kbd>Shift</kbd>+<kbd>Enter</kbd> opens it in the console so you can add parameters first. Commands that need
-parameters always open in the console. With an empty search, the palette lists what you used recently. See
-[The interface](interface.md).
+parameters always open in the console.
+
+With an empty search, the palette lists what you used recently. See [The interface](interface.md).
 
 ![The command palette searching for a command](images/command-palette.jpg)
 
@@ -244,10 +250,11 @@ threads.
 
 ## AI agents (MCP)
 
-An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The
-AI blocks out a starting point and shows you options; you do the art. **Help > Connect an AI tool...** is the guide
-in the app, on one screen; it is there while AI features are on (**Edit > Preferences > AI**). It says what this
-section says, in the same words.
+An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The AI
+blocks out a starting point and shows you options; you do the art.
+
+**Help > Connect an AI tool...** is the guide in the app, on one screen; it is there while AI features are on
+(**Edit > Preferences > AI**). It says what this section says, in the same words.
 
 ### Connect an AI tool
 
@@ -313,8 +320,10 @@ requests are rate limited, and what the tool sends is data: tool names and value
 `sculptforge-cli --mcp` runs SculptForge as an MCP server with a scene of its own, no window needed: for batch jobs
 and your own agents. The AI tool gets every command as a tool and works on that scene for the session: it can open
 files, generate models, sculpt strokes, remesh, paint and export. It starts `sculptforge-cli` on your computer and
-talks to it over standard input and output. Nothing listens on the network, and nothing is installed into the AI
-tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Desktop bundle is this server too.
+talks to it over standard input and output.
+
+Nothing listens on the network, and nothing is installed into the AI tool. The setups below use the name `sculptforge`
+and `--mcp`; the Claude Desktop bundle is this server too.
 
 ### I have a subscription
 
