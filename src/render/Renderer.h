@@ -283,6 +283,7 @@ public:
     // Coarse levels (tests): the clusters the last frame drew at a coarse level, and the edited clusters whose levels
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
+    size_t underlayDrawnClusters() const { return underlayClusters_.size(); } // (edited clusters in full over their coarse level, the last Part drawn)
     size_t coarsePendingClusters() const;
     // How often the active Part's drawn detail (full, or the coarse level it drew) changed between two frames when
     // either was a stroke frame: a stroke must not flip the surface between detail levels (#help: fast Clay strokes
@@ -535,6 +536,8 @@ private:
     std::vector<uint8_t> staging_;                         // scratch for sync: gathered vertex data
     std::vector<uint8_t> blockChanged_, blockMoved_;      // scratch for uploadVertices, per block
     std::vector<std::pair<uint32_t, uint32_t>> movedRuns_; // the dirty runs whose positions moved
+    std::vector<std::pair<uint32_t, uint32_t>> regridRuns_; // the dirty runs before a new position grid re-sent everything
+    bool regridded_ = false;                               // this sync made a new grid (the coarse levels follow regridRuns_ only)
     void syncTexture(MeshSlot& s, Mesh& mesh, bool pbr);
     void uploadTangents(MeshSlot& s, const std::vector<glm::vec4>& all);
     // Image-based lighting (core/EnvironmentMath.h): the prefiltered environment (RGB16F, a mip per roughness

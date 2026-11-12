@@ -1486,6 +1486,10 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
     }
+    if (name == "edited_clusters") { // the 3D view drawn once more now: the clusters drawn in full beside the coarse level
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.underlayDrawnClusters());
+    }
     if (name == "timelapse_flicker") {
         // The timelapse's frames on a static camera (320x180, as renderTimelapseFrame draws them): through the
         // history, then a hold on the last step. Held frames show the same model from the same place, so they must

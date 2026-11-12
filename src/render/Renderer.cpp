@@ -1703,6 +1703,8 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     if (outside.load()) {
         // A vertex left the grid: a new grid, and everything sent again.
         s.grid = PositionGrid::around(meshBounds(mesh));
+        regridded_ = true;
+        regridRuns_ = dirtyRuns_; // (only these moved: the coarse levels hold exact positions, a new grid changes none)
         dirtyRuns_.assign(1, {0u, uint32_t(ns)});
         everything = true;
         uploadGathered(staging_, s.vertexBuffer, sizeof(PackedVertex), ns, false, dirtyRuns_, fill, &blockChanged_);
@@ -1736,7 +1738,15 @@ void Renderer::updateBounds(MeshSlot& s, const Mesh& mesh, bool all, bool comput
         }
     }
     s.proxyStale.resize(clusters.size(), 1);
-    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1, markCoarseDirty(s, c);
+    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1;
+    if (all || !regridded_) {
+        for (uint32_t c : cullScratch_) markCoarseDirty(s, c);
+    } else { // (a new position grid re-sent every vertex: the coarse levels follow only the clusters the edit touched)
+        for (const auto& [b, e] : regridRuns_) {
+            if (b >= e) continue;
+            for (uint32_t c = s.order.clusterOfSlot(b), c1 = s.order.clusterOfSlot(e - 1); c <= c1; ++c) markCoarseDirty(s, c);
+        }
+    }
     if (computed) cullScratch_.clear();
     poolFor(cullScratch_.size(), [&](size_t i0, size_t i1) {
         for (size_t i = i0; i < i1; ++i) {
@@ -2372,6 +2382,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Dynamic topology changes topology a little at a time: patches (notePatches) instead of a full upload,
     // until there are too many of them.
     const bool patched = !s.patches.empty() || !mesh.changedTriangles.empty();
+    regridRuns_.clear(), regridded_ = false;
     bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
@@ -2418,6 +2429,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
     } else if (s.regrid) { // a stroke's vertex left the grid (prepareStrokeUpload): a new one, everything sent
+        regridded_ = true;
+        s.order.dirtyRuns(mesh, regridRuns_); // (the coarse levels follow only these; a stroke upload marked its own)
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
         std::fill(s.blockHash.begin(), s.blockHash.end(), ~uint64_t(0) >> 1); // (no block keeps its hash)
