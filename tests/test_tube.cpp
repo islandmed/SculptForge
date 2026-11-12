@@ -668,3 +668,160 @@ TEST(curve_part_resample_and_tube_from_curve) {
     CHECK(reg.execute(doc, "tube_list").message.find("a curve") != std::string::npos);
     CHECK(reg.execute(doc, "tube_set", {{"profile", std::string("zigzag")}}).message.find("braid") != std::string::npos);
 }
+
+namespace {
+
+// Which strand (connected piece) each vertex belongs to.
+std::vector<uint32_t> strandOf(const Mesh& m) {
+    std::vector<uint32_t> up(m.positions.size());
+    for (size_t i = 0; i < up.size(); ++i) up[i] = uint32_t(i);
+    const auto find = [&](uint32_t a) {
+        while (up[a] != a) a = up[a] = up[up[a]];
+        return a;
+    };
+    for (const glm::uvec3& t : m.triangles) up[find(t.y)] = find(t.x), up[find(t.z)] = find(t.x);
+    for (uint32_t& u : up) u = find(u);
+    return up;
+}
+
+// Ray parity from `p` along an odd direction through `triangles` (one strand's triangles).
+bool insideStrand(const Mesh& m, const std::vector<uint32_t>& triangles, const vec3& p) {
+    const vec3 d = glm::normalize(vec3(0.5773f, 0.3317f, 0.7449f));
+    int hits = 0;
+    for (uint32_t i : triangles) {
+        const glm::uvec3 t = m.triangles[i];
+        const vec3 a = m.positions[t.x], e1 = m.positions[t.y] - a, e2 = m.positions[t.z] - a, h = glm::cross(d, e2);
+        const float det = glm::dot(e1, h);
+        if (std::abs(det) < 1e-12f) continue;
+        const vec3 q = p - a;
+        const float u = glm::dot(q, h) / det, v = glm::dot(d, glm::cross(q, e1)) / det, tt = glm::dot(e2, glm::cross(q, e1)) / det;
+        if (u >= 0.0f && v >= 0.0f && u + v <= 1.0f && tt > 1e-6f) ++hits;
+    }
+    return hits % 2 == 1;
+}
+
+} // namespace
+
+TEST(tube_braid_strands_pass_over_and_under) {
+    // The strands of a braid weave: no vertex of one strand lies inside another (they interlock, they don't merge).
+    for (int count : {3, 5}) {
+        TubeShape br = line(3.0f, 0.25f);
+        br.profile = TubeShape::Profile::Braid;
+        br.strands = count;
+        const Mesh m = tubeSweep(br);
+        const std::vector<uint32_t> strand = strandOf(m);
+        CHECK(watertight(m) && oriented(m) && components(m) == count);
+        std::map<uint32_t, std::vector<uint32_t>> own; // each strand's triangles
+        for (size_t i = 0; i < m.triangles.size(); ++i) own[strand[m.triangles[i].x]].push_back(uint32_t(i));
+        int inside = 0;
+        const size_t stride = m.positions.size() / 300 + 1;
+        for (size_t i = 0; i < m.positions.size(); i += stride)
+            for (const auto& [id, triangles] : own)
+                if (id != strand[i] && insideStrand(m, triangles, m.positions[i])) ++inside;
+        CHECK(inside == 0);
+    }
+}
+
+TEST(tube_rope_strand_count_and_spring) {
+    TubeShape rope = line(3.0f, 0.25f);
+    rope.profile = TubeShape::Profile::Rope;
+    for (int count : {1, 2, 3, 5, 8}) {
+        rope.strands = count;
+        const Mesh m = tubeSweep(rope);
+        CHECK(watertight(m) && oriented(m) && components(m) == count && signedVolume(m) > 0.0);
+        float reach = 0.0f;
+        for (const vec3& p : m.positions) reach = std::max(reach, std::hypot(p.y, p.z));
+        CHECK(reach < 0.25f * 1.01f);
+    }
+    // A spring (one strand) is a coil: it winds round the axis, so it passes through every side of it.
+    rope.strands = 1;
+    const Mesh spring = tubeSweep(rope);
+    bool side[4] = {};
+    for (const vec3& p : spring.positions) side[(p.y > 0 ? 1 : 0) + (p.z > 0 ? 2 : 0)] = true;
+    CHECK(side[0] && side[1] && side[2] && side[3]);
+    // Three strands as before; the count is saved and checked.
+    TubeShape saved = line(1.0f, 0.1f);
+    CHECK(tubeToJson(saved)["strands"].isNull());
+    saved.profile = TubeShape::Profile::Rope;
+    saved.strands = 5;
+    CHECK(tubeFromJson(tubeToJson(saved)).strands == 5);
+    saved.strands = 0;
+    CHECK(!tubeValidate(saved).empty());
+    saved.strands = kTubeMaxStrands + 1;
+    CHECK(!tubeValidate(saved).empty());
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,0,0")}, {"radius", 0.1}, {"profile", std::string("rope")}, {"strands", 1.0}}).ok);
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.strands == 1 && tubeMatchesMesh(doc.mesh));
+    CHECK(reg.execute(doc, "tube_set", {{"strands", 4.0}}).ok && doc.mesh.tube.strands == 4);
+    CHECK(!reg.execute(doc, "tube_set", {{"strands", 12.0}}).ok && doc.mesh.tube.strands == 4);
+    CHECK(reg.execute(doc, "undo").ok && doc.mesh.tube.strands == 1);
+}
+
+TEST(tube_repeat_part_along_curve) {
+    Document doc;
+    CommandRegistry reg;
+    Mesh bar = makeCube(2, 1.0f); // a bar 0.6 long, 0.2 across
+    for (vec3& p : bar.positions) p *= vec3(0.6f, 0.2f, 0.2f);
+    bar.recomputeAllNormals();
+    doc.replaceActiveMesh(bar);
+    const size_t barTriangles = doc.mesh.triangleCount();
+    // Not a curve yet: refused.
+    CHECK(!reg.execute(doc, "tube_repeat", {{"part", 0.0}}).ok);
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 3,0,0")}, {"radius", 0.05}, {"curve", true}, {"name", std::string("Path")}}).ok);
+    doc.selectPart(1);
+    const size_t parts = doc.parts.size();
+    // End to end: 3 / 0.6 = 5 copies, each centred at (k + 0.5) * 0.6 along the curve.
+    CommandResult r = reg.execute(doc, "tube_repeat", {{"part", doc.parts[0].name}});
+    CHECK(r.ok);
+    CHECK(doc.parts.size() == parts + 1 && doc.activePart == 1);
+    const int madeAt = doc.findPart(doc.parts[0].name + " Repeat");
+    CHECK(madeAt > 0);
+    const Mesh& made = doc.partMesh(madeAt);
+    CHECK(made.triangleCount() == 5 * barTriangles);
+    vec3 lo(1e9f), hi(-1e9f);
+    for (const vec3& p : made.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+    CHECK(std::abs(lo.x) < 0.01f && std::abs(hi.x - 3.0f) < 0.01f && hi.y < 0.101f && lo.y > -0.101f);
+    // Overlapping, turned 90 degrees each: more copies, and every other copy lies the other way up.
+    r = reg.execute(doc, "tube_repeat", {{"part", 0.0}, {"spacing", 0.5}, {"turn", 90.0}});
+    CHECK(r.ok);
+    const Mesh& links = doc.partMesh(doc.findPart(doc.parts[0].name + " Repeat 2"));
+    CHECK(links.triangleCount() == 10 * barTriangles);
+    CHECK(watertight(made));
+    // One undo step each; the curve and the piece are untouched.
+    const size_t before = doc.parts.size();
+    CHECK(reg.execute(doc, "undo").ok && doc.parts.size() == before - 1);
+    CHECK(doc.partMesh(0).triangleCount() == barTriangles && doc.mesh.tube.curve);
+    // Refusals: the curve itself, a bad spacing, a missing Part, too many copies.
+    CHECK(!reg.execute(doc, "tube_repeat", {{"part", 1.0}}).ok);
+    CHECK(!reg.execute(doc, "tube_repeat", {{"part", 0.0}, {"spacing", 0.0}}).ok);
+    CHECK(!reg.execute(doc, "tube_repeat", {{"part", std::string("Nothing")}}).ok);
+    CHECK(!reg.execute(doc, "tube_repeat", {{"part", 0.0}, {"spacing", 0.1}, {"scale", 0.001}}).ok);
+}
+
+TEST(tube_repeat_turns_flat_pieces_about_the_curve) {
+    Document doc;
+    CommandRegistry reg;
+    Mesh link = makeCube(2, 1.0f); // a flat link: 0.5 long, 0.3 wide, 0.05 thick
+    for (vec3& p : link.positions) p *= vec3(0.5f, 0.3f, 0.05f);
+    link.recomputeAllNormals();
+    doc.replaceActiveMesh(link);
+    const size_t each = doc.mesh.triangleCount();
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 2,0,0")}, {"radius", 0.05}, {"curve", true}, {"up", std::string("0,1,0")}}).ok);
+    doc.selectPart(1);
+    CHECK(reg.execute(doc, "tube_repeat", {{"part", 0.0}, {"turn", 90.0}}).ok);
+    const Mesh& chain = doc.partMesh(doc.findPart(doc.parts[0].name + " Repeat"));
+    CHECK(chain.triangleCount() == 4 * each);
+    // Copy k's extent across: wide (0.3) in one axis for even k, in the other for odd k.
+    for (size_t k = 0; k < 4; ++k) {
+        float y = 0.0f, z = 0.0f;
+        for (size_t i = k * each * 3; i < (k + 1) * each * 3; ++i) {
+            const glm::uvec3 t = chain.triangles[i / 3];
+            const vec3& p = chain.positions[t[i % 3]];
+            y = std::max(y, std::abs(p.y)), z = std::max(z, std::abs(p.z));
+        }
+        CHECK((y > 0.14f) != (z > 0.14f));        // exactly one axis carries the width
+        CHECK((k % 2 == 0) == (y > z));            // and it alternates (the first copy's wide side faces up)
+    }
+}

@@ -468,6 +468,10 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
 // up inside one frame) still glides the view a little; updateKeyNav does the moving.
 void App::keyNavStep(const std::string& id) { keyNavTap_[id] = kKeyNavTapSeconds; }
 
+// Once a frame, in the app's own loop and the UI test runner's (a first key of a two-key shortcut that waited its
+// half second out runs alone; the registry counts the frames' time, a hitch counts as 0.1 s at most).
+void App::tickKeySequence(float dt) { actions_.tick(std::min(dt, 0.1f)); }
+
 // Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
 // distance at any frame rate, and nothing to do with the OS's key repeat.
@@ -791,6 +795,12 @@ void App::drawInputSection() {
                  "stays upright, as in Blender or Maya. X axis, Z axis: it turns about that world axis only "
                  "(View > Orbit lock).",
                  "Preferences > Input");
+    ui::Checkbox("Orbit around the pointer##input.orbit_at_pointer", &uiPrefs_.orbitAtPointer);
+    ui::HelpText("Orbit around the pointer", nullptr,
+                 "A rotation that starts over the model turns the view about the point under the pointer, and later "
+                 "zooms work at that depth. Started over the background, it turns about the middle of the view as "
+                 "before. In every key style.",
+                 "Preferences > Input");
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
 }
@@ -821,16 +831,20 @@ void App::drawCursorSection() {
 void App::drawZIntensitySlider(const char* id) {
     // The stroke's own brush while one runs: the press must not turn the readout back to the main Intensity (#180).
     const bool smooth = (drag_ == Drag::Stroke ? strokeBrush_ : activeBrush()) == BrushType::Smooth;
-    float& value = intensityValue(smooth);
+    float& value = heldIntensity(); // the main one, Smooth's own, or the Shift / Ctrl brush's own (ModifierBrush.cpp)
+    const std::string name = heldIntensityName();
     float shown = value * 100.0f;
-    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
+    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, (name + " %.0f").c_str()))
         value = std::clamp(shown / 100.0f, 0.01f, 1.0f);
-    ui::HelpText(smooth ? "Smooth Intensity" : "Intensity", "U",
-                 smooth       ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
-                                "set it. Ctrl+click to type."
+    ui::HelpText(name.c_str(), "U",
+                 smooth ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
+                          "set it. Ctrl+click to type."
+                 : name != "Intensity"
+                     ? "How strongly the Shift / Ctrl brush works. It keeps its own value: hold its key to see and set it. "
+                       "Ctrl+click to type."
                  : paintMode_ ? "How strongly painting colours the surface (1-100); Ctrl+click to type."
-                              : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
-                                "Ctrl+click to type.",
+                              : "How strongly each dab changes the surface (1-100). Holding Shift shows the Shift brush's own "
+                                "value. Ctrl+click to type.",
                  "Draw");
 }
 
@@ -960,10 +974,11 @@ void App::drawQuickMenu() {
         if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
         ui::HelpText("Falloff", "O", "Below 0: a broad, hard tip. Above 0: a soft point.", "Quick Menu");
         const bool smooth = activeBrush() == BrushType::Smooth;
-        float& zValue = intensityValue(smooth);
+        float& zValue = heldIntensity(); // (Smooth's or the Shift / Ctrl brush's own while its key is held)
+        const std::string zName = heldIntensityName() + " %.0f";
         float z = zValue * 100.0f;
         ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
+        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, zName.c_str()))
             zValue = z / 100.0f;
         ui::HelpText("Intensity", "U",
                      paintMode_ && !smooth ? "How strongly painting colours the surface." : "How strongly the brush changes the surface.",

@@ -524,6 +524,13 @@ void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {
     refitLeaves(mesh, scratchLeaves_);
 }
 
+void BVH::swapTree(BVH& other) {
+    const uint64_t next = std::max(structure_, other.structure_) + 1;
+    std::swap(*this, other);
+    structure_ = next;
+    other.structure_ = next + 1;
+}
+
 void BVH::refitQueried(const Mesh& mesh) { refitLeaves(mesh, queryLeaves_); }
 
 void BVH::refitLeaves(const Mesh& mesh, std::span<const uint32_t> leaves) {
@@ -762,6 +769,42 @@ void BVH::refitChanged(const Mesh& mesh) {
     refitLeaves(mesh, scratchLeaves_);
     for (uint32_t leaf : scratchLeaves_)
         if (nodes_[leaf].count > kMaxLeaf) splitLeaf(mesh, leaf);
+}
+
+void BVH::syncTopologyChange(const Mesh& mesh, std::span<const uint32_t> changedSlots, std::span<const uint32_t> movedVerts) {
+    const uint32_t nt = uint32_t(mesh.triangleCount());
+    if (nodes_.empty() || triLeaf_.empty()) {
+        build(mesh);
+        return;
+    }
+    const uint32_t old = uint32_t(triLeaf_.size());
+    for (uint32_t t : changedSlots)
+        if (t >= nt) removeTriangle(t);
+    for (uint32_t t = nt; t < old; ++t) removeTriangle(t); // (slots the list doesn't name)
+    if (nt < old) resizeTriangles(nt);
+    auto place = [&](uint32_t t) { // a live slot with no leaf yet: beside a triangle it shares a vertex with
+        uint32_t nearby = ~0u;
+        const glm::uvec3& tri = mesh.triangles[t];
+        for (int c = 0; c < 3 && nearby == ~0u; ++c)
+            for (uint32_t u : mesh.vertexTriangles(tri[c]))
+                if (u != t && u < triLeaf_.size() && triLeaf_[u] != kNoLeaf) {
+                    nearby = u;
+                    break;
+                }
+        insertTriangle(mesh, t, nearby);
+    };
+    for (uint32_t t : changedSlots) {
+        if (t >= nt) continue;
+        if (t < triLeaf_.size() && triLeaf_[t] != kNoLeaf) touchTriangle(t);
+        else place(t);
+    }
+    for (uint32_t t = old; t < nt; ++t)
+        if (t >= triLeaf_.size() || triLeaf_[t] == kNoLeaf) place(t);
+    for (uint32_t v : movedVerts)
+        if (v < mesh.vertexCount())
+            for (uint32_t t : mesh.vertexTriangles(v)) touchTriangle(t);
+    refitChanged(mesh);
+    if (degraded()) build(mesh);
 }
 
 bool BVH::degraded() const {

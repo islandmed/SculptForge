@@ -25,7 +25,7 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew omarchy replies status (--stage: bump stage)
+# Steps: bump check ci tag release site aur brew omarchy replies social status (--stage: bump stage)
 # bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
 # promoting: only checks main already has it); check then verifies everything the later steps need, so a release
 # either stops in seconds before the tag or runs through to the end.
@@ -52,7 +52,7 @@ AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal add
 AUR_FLAG=${AUR_FLAG:-$HOME/Work/.sf/aur-publish}
 AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
 OMARCHY_PR=1800
-STEPS=(bump check ci tag release site aur brew omarchy replies status)
+STEPS=(bump check ci tag release site aur brew omarchy replies social status)
 
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
@@ -459,8 +459,8 @@ preflight() {
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
-    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/sculptforge/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
-    gh_file "$owner/omarchy-pkgs" pkgbuilds/sculptforge/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
+    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/omasculpt/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
+    gh_file "$owner/omarchy-pkgs" pkgbuilds/omasculpt/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
         die "the Omarchy PKGBUILD on $owner/omarchy-pkgs $branch has no sha256sums=('<64 hex>' line" "fix it on that branch"
     ok "What's New, home page card, highlights, PKGBUILD, Homebrew tap and Omarchy PR #$OMARCHY_PR are ready"
 }
@@ -916,7 +916,7 @@ step_brew() {
 
 step_omarchy() {
     release_ready
-    local state branch owner path=pkgbuilds/sculptforge/PKGBUILD sum pr
+    local state branch owner path=pkgbuilds/omasculpt/PKGBUILD sum pr
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
@@ -938,7 +938,7 @@ open(p, "w", encoding="utf-8").write(t)
 PY
     (cd "$work/omarchy" && grep -q "^pkgver=$V\$" "$path" && grep -qF "'$sum'" "$path") ||
         die "couldn't update the Omarchy PKGBUILD" "edit $path on $owner/omarchy-pkgs branch $branch by hand (pkgver=$V, first sha256 $sum)"
-    (cd "$work/omarchy" && git add "$path" && commit -m "sculptforge $V" && gitp push -q origin "HEAD:$branch") ||
+    (cd "$work/omarchy" && git add "$path" && commit -m "omasculpt $V" && gitp push -q origin "HEAD:$branch") ||
         die "pushing to $owner/omarchy-pkgs $branch failed" "check gh auth status, then run again"
     ok "Omarchy PR #$OMARCHY_PR builds $V (author $AUTHOR_EMAIL)"
 }
@@ -952,6 +952,14 @@ step_replies() {
     python3 tools/release/reply_drafts.py "$V" "$work/section" "$REPO" "$T" > "$out" 2> "$work/drafts" ||
         die "couldn't write the reply drafts" "python3 tools/release/reply_drafts.py --self-test"
     ok "$(cat "$work/drafts") in $out: sfmonitor posts these (it reads them first)"
+}
+
+# One approved bust-card post for X/Bluesky/Facebook/Instagram the same hour, handed to the "input" session (~/Work/.sf/social/lockstep.py reads
+# website/latest.json, which the site step wrote). Never blocks a release: no script, an error or no card line only prints a note.
+step_social() {
+    local ls=$HOME/Work/.sf/social/lockstep.py
+    [ -f "$ls" ] || { ok "no social lockstep script here; skipped"; return; }
+    python3 "$ls" "$V" website/latest.json || true
 }
 
 step_status() {

@@ -102,6 +102,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("frameDoubleTapMs", double(p.frameDoubleTapMs));
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
+    j.set("modifierBrushes", toJson(p.modifierBrushes));
     j.set("brushSort", p.brushSort);
     j.set("alphaSort", p.alphaSort);
     j.set("materialSort", p.materialSort);
@@ -111,6 +112,7 @@ Json toJson(const UiPrefs& p) {
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
+    j.set("orbitAtPointer", p.orbitAtPointer);
     j.set("invertZoom", p.invertZoom);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("quickRemesh", p.quickRemesh);
@@ -201,6 +203,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.frameDoubleTapMs = std::clamp(int(j["frameDoubleTapMs"].asNumber(p.frameDoubleTapMs)), 0, 1000);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
+    fromJson(j["modifierBrushes"], p.modifierBrushes);
     for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
                           std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
@@ -209,6 +212,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
+    p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
@@ -390,8 +394,7 @@ void App::initUiConfig(bool deterministic) {
         if (options_.resetLayout) { // --reset-layout: the saved layout is dropped (the next save writes without it); keys and preferences stay
             const bool customize = layout_.customize;
             layout_ = standardLayout(uiPrefs_.shellLayout);
-            layout_.customize = customize;
-            storedLayout_ = Json();
+            layout_.customize = customize; // (the autosave writes this; Save Layout's snapshot stays for Revert)
         }
     } else if (const std::string& studio = studioMode().profile.preferences; !studio.empty() && fileExists(studio)) {
         // A studio build's first start: the studio's layout, keys and scale (core/StudioProfile.h); saved as the
@@ -519,6 +522,11 @@ void App::initActions() {
         ICON_LC_COPY, "part_duplicate", nullptr, nullptr,
         "Copy the active Part, with its layers and attributes, and make the copy active (also in the Parts list's "
         "right-click menu).");
+    add("part.make_boolean_mesh", "Make Boolean Mesh", "Tool > Parts", nullptr,
+        [this] { runCommand("make_boolean_mesh", booleanArgs()); }, nullptr, "make_boolean_mesh", nullptr,
+        [this] { return booleanPartIndices(doc_).size() >= 2; },
+        "Combine the shown Parts with a Boolean (Add, Subtract or Intersect, set in the Parts list) into a new Part, in "
+        "list order. They stay as they are, hidden. One undo step.");
     add("part.split_hidden", "Split Hidden", "Tool > Parts", nullptr, [this] { runCommand("part_split_hidden"); }, nullptr,
         "part_split_hidden", nullptr, [this] { return doc_.mesh.hasHidden(); },
         "Move the hidden triangles of the active Part into a new Part just below it, shown. One undo step.");
@@ -896,26 +904,26 @@ void App::initActions() {
         nullptr, "Empty the console log (the session script is kept).");
 
     // --- Config (Preferences > Saving & Layouts) ---
-    // Preferences save themselves (#117); the layout is kept by Save Layout. config.store (Ctrl+Shift+I before
+    // Preferences and the layout save themselves (#117, layoutSavedKey_); Save Layout marks the layout Revert returns to. config.store (Ctrl+Shift+I before
     // 0.11.1) stays as an id, so keymaps and macros that name it still load: it saves the preferences at once.
     add("config.save_layout", "Save Layout", "Preferences > Saving & Layouts", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
-        "Keep the current layout (shelves, trays, open palettes) for future sessions. Preferences and shortcuts save "
-        "themselves.");
+        "Make the current layout (shelves, trays, open palettes) the one Revert to Saved Layout returns to. The layout, "
+        "preferences and shortcuts also save themselves.");
     add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
     add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(3); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
-        "Go back to the built-in layout, shortcuts and radial menus. The shortcuts save themselves; Save Layout keeps "
-        "the layout.");
+        "Go back to the built-in layout, shortcuts and radial menus. They save themselves; Revert to Saved Layout still "
+        "returns to the layout Save Layout kept.");
     add("config.reset_layout", "Reset Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(2); },
         ICON_LC_LAYOUT_TEMPLATE, nullptr, nullptr, nullptr,
         "Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. "
         "Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).");
     add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(1); },
-        ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return fileExists(uiConfigPath()); },
-        "Go back to the layout the last Save Layout kept.");
+        ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return storedLayout_.isObject(); },
+        "Go back to the layout the last Save Layout kept (the layout in use saves itself, so this is the way back to it).");
     add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
         ICON_LC_FOLDER_INPUT, nullptr, nullptr, nullptr,
         "Load a layout and shortcuts file someone shared (or you saved with Export Interface).");
@@ -936,6 +944,7 @@ void App::initActions() {
     registerTextureUiActions(); // Tool > Texture Image, the Vertex / Texture paint target (PanelTexture.cpp)
     registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerStencilActions();   // Alpha > Stencil (StencilOverlay.cpp)
+    registerReferenceActions(); // View > Reference images (ReferenceImages.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Transform gizmo's Move, Scale, Rotate; Shift+W All (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
@@ -954,7 +963,9 @@ void App::initActions() {
     registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
     registerPanelActions();      // panels in windows of their own, Reset panel windows (PanelWindows.cpp)
+    registerMyPanelActions();    // My Panel's key (PanelMyPanel.cpp)
 
+    registerModifierBrushCommands(); // the Shift and Ctrl brushes (ModifierBrush.cpp)
     registerBrushSets(); // brush set commands and actions; the active set's shelf back (PanelBrushSets.cpp)
     // Every command, so the command palette finds anything scriptable.
     actions_.registerCommands(
@@ -1056,6 +1067,34 @@ void App::saveWindowState() const {
 
 std::string App::uiConfigPath() const { return configDir_.empty() ? std::string() : configDir_ + "ui.json"; }
 
+namespace {
+// The layouts a ui.json holds (both of them), "" for a file that is missing or doesn't read.
+std::string layoutsOf(const std::string& path) {
+    std::ifstream f(fsPath(path), std::ios::binary);
+    Json j;
+    std::string err;
+    if (!f || !Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), j, err) || !j.isObject()) return {};
+    return j["layout"].dump() + j["layoutSaved"].dump();
+}
+} // namespace
+
+// The first write of a session keeps what ui.json held (a file that didn't read, --reset-layout's dropped layout) as
+// ui.prev.json, the copy before that as ui.prev2.json: the layout autosaves, so one backup per session would be the
+// session's own last layout by the next start. A file with the same layouts as ui.prev.json changes neither.
+void App::backUpUiConfigOnce() {
+    std::error_code ec;
+    const std::string path = uiConfigPath();
+    if (uiConfigBackedUp_ || path.empty() || !std::filesystem::is_regular_file(fsPath(path), ec)) return;
+    uiConfigBackedUp_ = true;
+    const std::string prev = configDir_ + "ui.prev.json";
+    if (std::filesystem::is_regular_file(fsPath(prev), ec)) {
+        if (!layoutsOf(path).empty() && layoutsOf(path) == layoutsOf(prev)) return;
+        std::filesystem::copy_file(fsPath(prev), fsPath(configDir_ + "ui.prev2.json"),
+                                   std::filesystem::copy_options::overwrite_existing, ec);
+    }
+    std::filesystem::copy_file(fsPath(path), fsPath(prev), std::filesystem::copy_options::overwrite_existing, ec);
+}
+
 bool App::writeUiConfig(const std::string& path, std::string& err) {
     Json j = Json::object();
     j.set("version", 1.0);
@@ -1066,8 +1105,8 @@ bool App::writeUiConfig(const std::string& path, std::string& err) {
     return writeJsonAtomic(path, j, err);
 }
 
-// Preferences save themselves (#117): ui.json gets the shortcuts, the preferences and the radial menus a moment
-// after they change, with the layout as Save Layout last kept it (storedLayout_; none yet: the standard one).
+// Preferences save themselves (#117), and so does the layout: ui.json gets the shortcuts, the preferences, the radial
+// menus and the layout in use a moment after they change, with the layout Save Layout last kept beside it (storedLayout_).
 bool App::writeJsonAtomic(const std::string& path, const Json& j, std::string& err) {
     std::error_code ec;
     const std::string tmp = path + ".tmp";
@@ -1096,14 +1135,16 @@ std::string App::prefsKey() const {
 }
 
 bool App::saveUiPrefs(std::string& err) {
+    backUpUiConfigOnce();
     Json j = Json::object();
     j.set("version", 1.0);
-    if (storedLayout_.isObject()) j.set("layout", storedLayout_);
+    layoutsToUiJson(j, toAutosaveJson(layout_), storedLayout_);
     j.set("shortcuts", actions_.overridesToJson());
     j.set("prefs", toJson(uiPrefs_));
     j.set("radialMenus", toJson(radialMenus_));
     if (!writeJsonAtomic(uiConfigPath(), j, err)) return false;
     prefsSavedKey_ = prefsKey();
+    layoutSavedKey_ = layoutKey();
     prefsSaveAt_ = 0.0;
     return true;
 }
@@ -1115,32 +1156,39 @@ void App::autosavePrefs(bool flush) {
     const double now = double(SDL_GetTicksNS()) * 1e-9;
     if (!flush && now - prefsCheckedAt_ < 0.25) return; // a few looks a second while the app draws
     prefsCheckedAt_ = now;
-    std::string key = prefsKey();
+    std::string key = prefsKey(), lkey = layoutKey();
     if (!prefsKeyKnown_) { // the first look: what the start read (or the defaults) is already on disk
         prefsKeyKnown_ = true;
         prefsSavedKey_ = languageUnsaved_ ? std::string() : std::move(key); // (the first start's language still has to be written)
+        layoutSavedKey_ = options_.resetLayout ? std::string() : std::move(lkey); // (--reset-layout: the reset one is written)
         languageUnsaved_ = false;
         return;
     }
-    if (key == prefsSavedKey_) {
+    const bool prefsChanged = key != prefsSavedKey_;
+    if (!prefsChanged && lkey == layoutSavedKey_) {
         prefsSaveAt_ = 0.0;
         return;
     }
-    if (prefsSaveAt_ == 0.0) { // debounced: a slider being dragged is written once it settles (or every half second)
-        prefsSaveAt_ = now + 0.5;
-        redrawIn(0.5); // (a frame then, even if the app is idle by then)
+    // Debounced: a slider being dragged is written once it settles (or every half second); a layout edit two seconds
+    // after (a panel being dragged, a run of shelf edits: one write).
+    const double wait = prefsChanged ? 0.5 : options_.uiTest.empty() ? 2.0 : 0.3; // (a UI test's frames run faster than the clock)
+    if (prefsSaveAt_ == 0.0 || (prefsChanged && prefsSaveAt_ > now + wait)) {
+        prefsSaveAt_ = now + wait;
+        redrawIn(wait); // (a frame then, even if the app is idle by then)
     }
     if (!flush && now < prefsSaveAt_) return;
     std::string err;
     if (!saveUiPrefs(err)) {
         SDL_Log("%s", err.c_str());
         prefsSavedKey_ = std::move(key); // (no retry every frame; the next change tries again)
+        layoutSavedKey_ = std::move(lkey);
         prefsSaveAt_ = 0.0;
     }
 }
 
 void App::restartPrefsForTest(const std::string& uiJson) {
     autosavePrefs(true);
+    uiConfigBackedUp_ = false; // (a start of its own)
     if (!uiJson.empty() && !uiConfigPath().empty()) {
         std::error_code ec;
         std::filesystem::copy_file(fsPath(uiJson), fsPath(uiConfigPath()), std::filesystem::copy_options::overwrite_existing, ec);
@@ -1164,6 +1212,7 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     restoreBrushSet();
     layoutBaseline_ = layoutKey();
     prefsSavedKey_ = prefsKey();
+    layoutSavedKey_ = layoutKey();
     prefsSaveAt_ = 0.0;
     ImGui::ClearActiveID(); // a new start has no text field in use (the console's would take the next keys)
     ImGui::SetWindowFocus(nullptr);
@@ -1188,18 +1237,22 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
         return false;
     }
     j = legacy::modernizeKeys(j); // keys an older version wrote
-    // Our own ui.json may have no layout yet (the preferences save themselves; the layout waits for Save Layout).
-    const bool hasLayout = j.isObject() && j["layout"].isObject();
+    // Our own ui.json may have no layout yet (a first start that changed only a preference).
+    const UiLayoutPair layouts = layoutsFromUiJson(j);
+    const bool hasLayout = layouts.current.isObject();
     if (!j.isObject() || (!hasLayout && !(own && j["prefs"].isObject()))) {
         err = path + " is not a SculptForge UI configuration";
         return false;
     }
     // The prefs first: they name the shell layout, whose standard shelves fill in what the file didn't store.
     UiPrefs prefs = uiPrefs_;
+    // Orbit around the pointer is on for new installs; our own settings saved before it existed keep orbiting the
+    // target, as those users know it.
+    if (own && !j["prefs"]["orbitAtPointer"].isBool()) prefs.orbitAtPointer = false;
     fromJson(j["prefs"], prefs);
     UiLayout layout = standardLayout(prefs.shellLayout);
-    if (hasLayout && !fromJson(j["layout"], layout, err, prefs.shellLayout)) return false;
-    if (own) storedLayout_ = hasLayout ? j["layout"] : Json();
+    if (hasLayout && !fromJson(layouts.current, layout, err, prefs.shellLayout)) return false;
+    if (own) storedLayout_ = layouts.saved; // (Revert to Saved Layout returns to this; the layout in use is the one above)
     uiPrefs_ = std::move(prefs);
     lookDirty_ = true;
     requestUiScale(); // its UI scale
@@ -1228,13 +1281,15 @@ void App::saveLayout() {
     std::string err;
     if (uiConfigPath().empty()) {
         status_ = "Can't save the layout: no settings folder";
-    } else if (!writeUiConfig(uiConfigPath(), err)) {
-        status_ = err;
     } else {
-        status_ = "Layout saved";
+        const Json before = storedLayout_;
         noteLayoutStored();
-        prefsSavedKey_ = prefsKey();
-        prefsSaveAt_ = 0.0;
+        if (saveUiPrefs(err)) {
+            status_ = "Layout saved";
+        } else {
+            storedLayout_ = before;
+            status_ = err;
+        }
     }
 }
 
@@ -1251,7 +1306,7 @@ void App::restoreStandardUi() {
     resetRadialMenus();
     resetPanels(); // every panel back in the main window (PanelWindows.cpp)
     layoutBaseline_ = layoutKey();
-    status_ = "Standard layout and shortcuts restored - Save Layout keeps the layout";
+    status_ = "Standard layout and shortcuts restored";
 }
 
 void App::applyPendingLayoutOp() {
@@ -1263,7 +1318,7 @@ void App::applyPendingLayoutOp() {
     else if (op == 2) resetLayoutOnly();
     else if (op == 3) restoreStandardUi();
     else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
-                                    ? std::string("Interface loaded - Save Layout keeps its layout") : err;
+                                    ? std::string("Interface loaded") : err;
 }
 
 void App::resetLayoutOnly() {
@@ -1273,7 +1328,7 @@ void App::resetLayoutOnly() {
     resetPanels();
     dropdown_.clear();
     layoutBaseline_ = layoutKey();
-    status_ = "Standard layout restored - Save Layout keeps it";
+    status_ = "Standard layout restored";
 }
 
 std::vector<std::string> App::missingShelfWidgets() const {
@@ -1317,11 +1372,15 @@ void App::addShelfWidget(const std::string& id) {
 
 void App::restoreCustomUi() {
     std::string err;
-    if (!fileExists(uiConfigPath())) {
+    UiLayout layout = standardLayout(uiPrefs_.shellLayout);
+    if (!storedLayout_.isObject()) {
         status_ = "No saved layout yet - Save Layout first";
-    } else if (!readUiConfig(uiConfigPath(), err, true)) {
+    } else if (!fromJson(storedLayout_, layout, err, uiPrefs_.shellLayout)) {
         status_ = err;
     } else {
+        layout.customize = layout_.customize;
+        layout_ = std::move(layout); // (the autosave then writes it as the layout in use)
+        dropdown_.clear();
         layoutBaseline_ = layoutKey();
         status_ = "Saved layout restored";
     }
@@ -1444,8 +1503,8 @@ void App::watchLayoutChanges() {
     autosavePrefs();
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
-    layoutHintShown_ = true; // once per session (never saves the layout by itself)
-    status_ = "Layout changed - Preferences > Saving & Layouts > Save Layout keeps it";
+    layoutHintShown_ = true; // once per session
+    status_ = "Layout changes save themselves - Preferences > Saving & Layouts > Save Layout sets what Revert returns to";
 }
 
 // ---------------------------------------------------------------------------
@@ -1482,17 +1541,20 @@ CanvasRect App::consoleRect() const {
 // Shortcut assignment (Ctrl+Alt+click a button, or Preferences > Hotkeys)
 // ---------------------------------------------------------------------------
 
-void App::beginShortcutCapture(const std::string& actionId) {
+void App::beginShortcutCapture(const std::string& actionId, bool sequence) {
     const Action* a = actions_.find(actionId);
     if (!a) return;
     capturingShortcut_ = actionId;
+    captureSequence_ = sequence;
+    captureFirst_.clear();
     conflict_ = {};
     shortcutAnchor_ = {}; // the button (or tile) clicked just now, so the Replace / Cancel popup can stay clear of it
     if (ImGui::GetCurrentContext() && ImGui::GetCurrentWindowRead()) {
         const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
         if (hi.x > lo.x && hi.y > lo.y) shortcutAnchor_ = ImVec4(lo.x, lo.y, hi.x, hi.y);
     }
-    status_ = "Press a key for '" + a->label + "' (Esc cancels, Backspace clears)";
+    status_ = sequence ? "Press two different keys in a row for '" + a->label + "' (Esc cancels, Backspace removes them)"
+                       : "Press a key for '" + a->label + "' (Esc cancels, Backspace clears)";
 }
 
 void App::resolveShortcutConflict(bool replace) {
@@ -1504,7 +1566,7 @@ void App::resolveShortcutConflict(bool replace) {
         status_ = "Shortcut unchanged";
         return;
     }
-    actions_.assignShortcut(c.actionId, c.chord);
+    actions_.assignShortcut(c.actionId, c.chord, c.keepOthers);
     status_ = label + ": " + c.chord + " (was " + c.holders + ")";
 }
 
@@ -1521,21 +1583,45 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
     if (key == SDLK_ESCAPE) {
         status_ = "Shortcut unchanged";
     } else if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
-        actions_.setShortcut(capturingShortcut_, "");
-        status_ = label + ": no shortcut";
+        if (captureSequence_) { // only the two-key shortcuts go; its single keys stay
+            std::string keep;
+            for (const std::string& alt : shortcutAlternatives(actions_.shortcutText(capturingShortcut_)))
+                if (alt.find(kThen) == std::string::npos) keep += (keep.empty() ? "" : " / ") + alt;
+            actions_.setShortcut(capturingShortcut_, keep);
+            status_ = label + ": two-key shortcuts removed";
+        } else {
+            actions_.setShortcut(capturingShortcut_, "");
+            status_ = label + ": no shortcut";
+        }
     } else {
         const Chord pressed = chordFromEvent(key, mod);
-        const std::string chord = chordText(pressed);
+        std::string chord = chordText(pressed);
+        if (captureSequence_) {
+            if (captureFirst_.empty()) { // the first key: wait for the second
+                captureFirst_ = chord;
+                status_ = "Now the second key for '" + label + "' (a different one)";
+                return true;
+            }
+            Chord first;
+            parseChord(captureFirst_, first);
+            if (first.key == pressed.key) { // no double tap: keep waiting for a different key
+                status_ = "Two different keys, not the same key twice";
+                return true;
+            }
+            chord = captureFirst_ + std::string(kThen) + chord;
+        }
         std::string holders;
-        for (const Action* h : actions_.holdersOf(pressed, capturingShortcut_)) holders += (holders.empty() ? "" : ", ") + h->label;
+        for (const Action* h : actions_.holdersOfShortcut(chord, capturingShortcut_)) holders += (holders.empty() ? "" : ", ") + h->label;
         if (!holders.empty()) { // taken: ask first (Artizmo on Discord)
-            conflict_ = {capturingShortcut_, chord, holders};
+            conflict_ = {capturingShortcut_, chord, holders, captureSequence_};
             capturingShortcut_.clear();
+            captureFirst_.clear();
             return true;
         }
-        actions_.assignShortcut(capturingShortcut_, chord);
+        actions_.assignShortcut(capturingShortcut_, chord, captureSequence_);
         status_ = label + ": " + chord;
     }
+    captureFirst_.clear();
     capturingShortcut_.clear();
     return true;
 }
@@ -1680,9 +1766,15 @@ void App::drawHelpConsoleUi() {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
             ImGui::PushFont(helpTitleFont());
-            ImGui::Text(tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
+            ImGui::Text(captureSequence_ ? tr(ICON_LC_KEYBOARD "  Press two keys in a row for '%s'")
+                                         : tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
                         a ? a->label.c_str() : capturingShortcut_.c_str());
             ImGui::PopFont();
+            if (captureSequence_ && !captureFirst_.empty()) { // the first key is in: now the second
+                ui::Keycaps(captureFirst_);
+                ImGui::SameLine();
+                ImGui::TextColored(col(ui::color::textDim), "%s", tr("then..."));
+            }
             const std::string now = actions_.shortcutText(capturingShortcut_);
             ImGui::TextColored(col(ui::color::textDim), "%s", tr("Now:"));
             ImGui::SameLine();
@@ -1690,7 +1782,8 @@ void App::drawHelpConsoleUi() {
                 ImGui::TextColored(col(ui::color::textDim), "%s", tr("none"));
             else ui::Keycaps(now);
             ImGui::TextColored(col(ui::color::textDim), "%s",
-                               tr("Esc cancels, Backspace clears. A key that's taken asks first."));
+                               captureSequence_ ? tr("Two different keys. Esc cancels, Backspace removes the two-key shortcuts.")
+                                                : tr("Esc cancels, Backspace clears. A key that's taken asks first."));
         }
         ImGui::End();
         ImGui::PopStyleColor(2);
@@ -1839,7 +1932,7 @@ void drawConfigSection(App& app) {
     ui::ActionButton(app, "config.load", ImVec2(half, 0), ui::Look::IconLabel);
     ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(tr("Preferences and shortcuts save themselves. Layout changes last until you quit; Save Layout keeps them."));
+    ImGui::TextUnformatted(tr("Preferences, shortcuts and the layout save themselves. Save Layout sets the layout Revert to Saved Layout returns to."));
     ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 }
@@ -1887,6 +1980,16 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Show startup splash", nullptr,
                  "Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
                  "Preferences > Interface");
+    {
+        // #173: Don't ask again in the pop-ups turns these off; this brings the asking back (or turns it off in one go).
+        bool ask = p.confirmRemeshLevels || p.confirmSubdivide;
+        if (ImGui::Checkbox(tr("Ask before dropping subdivision levels"), &ask)) p.confirmRemeshLevels = p.confirmSubdivide = ask;
+        ui::HelpText("Ask before dropping subdivision levels", nullptr,
+                     "Subdivide, Voxel and Quad Remesh, Decimate, Delete Masked or Hidden, Split, Mirror, Make Symmetric and "
+                     "Merge by Distance remove the subdivision levels of a Part that has them. On: they ask first (Ctrl+Z "
+                     "brings the levels back). Off: they go straight through.",
+                     "Preferences > Interface");
+    }
     ImGui::Checkbox(tr("Ctrl+hover help"), &p.popupInfo);
     ui::HelpText("Ctrl+hover help", nullptr,
                  "Hold Ctrl and point at any control to see what it does and its shortcut. Ctrl+Alt shows a command's "
@@ -2037,7 +2140,7 @@ void drawHotkeysSection(App& app) {
     if (ImGui::BeginTable("##hotkeys", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_PadOuterX,
                           ImVec2(0, std::max(listH, 60.0f * s)))) {
         ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 140.0f * s);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
         for (const Action* a : list) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -2047,15 +2150,32 @@ void drawHotkeysSection(App& app) {
             ImGui::TableNextColumn();
             const std::string chord = reg.shortcutText(a->id);
             const bool capturing = app.capturingShortcut() == a->id;
-            const std::string text = capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
+            const bool sequencing = capturing && app.capturingSequence();
+            const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
+                                                                                 : app.captureFirstKey() + " " + tr("then..."))
+                                     : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
             if (reg.hasOverride(a->id)) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
             const bool modified = reg.hasOverride(a->id); // the arrow beside it puts the default back
-            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(modified ? -(ImGui::GetFrameHeight() + 2.0f * s) : -FLT_MIN, 0)))
+            const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
+            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
                 app.beginShortcutCapture(a->id);
             if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
             ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
                          "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
                          "the arrow beside it puts the default back.",
+                         "Preferences > Hotkeys");
+            ImGui::SameLine(0.0f, 2.0f * s);
+            const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a->id).c_str());
+            {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
+                const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+                const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
+                ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                                    ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
+            }
+            if (sequenceClicked) app.beginShortcutCapture(a->id, true);
+            ui::HelpText("Two keys in a row", nullptr,
+                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within half "
+                         "a second). The first key still works alone if it is bound; it runs when no second key follows.",
                          "Preferences > Hotkeys");
             if (reg.hasOverride(a->id)) {
                 ImGui::SameLine(0.0f, 2.0f * s);

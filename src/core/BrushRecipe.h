@@ -73,6 +73,13 @@ struct BrushRecipe {
     // the recipe's JSON only when on, so other recipes' files stay as they were.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Hard-surface planes (Crisp Flatten; thanks _tfx on Discord). Written to the JSON only when on.
+    // planeLock: the plane is taken at the stroke's first dab and kept for the whole stroke (off: it follows the
+    // surface under each dab). crispEdge: the tip is full strength out to a hard edge with a thin anti-aliased band
+    // (about two and a half vertices wide, so the boundary doesn't stair-step), and the plane pulls all the way at the
+    // default Intensity (Hardness and Tip sharpness don't apply).
+    bool planeLock = false;
+    bool crispEdge = false;
     float cavityMask = 0.0f; // -1..1: >0 only affects cavities, <0 only ridges/peaks
 
     // The built-in alpha (core/BrushAlpha.h) the brush starts with the first time it is picked; empty = whatever

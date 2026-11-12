@@ -15,6 +15,7 @@
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 #include "core/StudioProfile.h"
+#include "core/ThreadPool.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -26,6 +27,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 #ifndef _WIN32
 #include <unistd.h> // execv (--cli)
@@ -335,6 +337,9 @@ static int runMain(int argc, char** argv) {
         if (studio.active) SDL_Log("Studio mode%s: no outside connections", studio.profile.name.empty() ? "" : (" (" + studio.profile.name + ")").c_str());
     }
     if (!crashTest.empty()) crashOnPurpose(crashTest);
+    // The saved thread count before the App exists: its Document builds the built-in stamps on the shared pool, which
+    // takes its size at first use (#184: a count set after that stayed at 16 on a 48-thread machine).
+    if (sf::App::usesProfileThreads(options)) sf::applyCachedThreadCount();
     auto app = std::make_unique<sf::App>();
     if (!app->init(options)) {
         // A double-clicked app that can't start says why (#109: on a laptop it just vanished, not even in the
@@ -354,6 +359,7 @@ static int runMain(int argc, char** argv) {
         sf::crashlog::stop();
         return 1;
     }
+    SDL_Log("Threads: pool of %d (hardware %u)", sf::ThreadPool::shared().threads(), std::thread::hardware_concurrency()); // (bug reports: #184)
     const auto runStart = std::chrono::steady_clock::now();
     int code = app->run();
     const auto runEnd = std::chrono::steady_clock::now();

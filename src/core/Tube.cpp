@@ -24,6 +24,9 @@ constexpr size_t kMaxRings = 200000;
 constexpr int kMaxSides = 256;
 constexpr int kMaxCapRings = 64;
 constexpr float kCurveWire = 0.2f; // a Curve Part's wire, in its points' radii
+constexpr float kBraidThickness = 0.3f; // a braid strand's thickness as a fraction of its width
+constexpr float kBraidWidth = 0.9f;     // a braid strand's half width, as a fraction of a touching strand's radius
+constexpr float kBraidDepth = 1.0f;     // how far a braid strand lifts over and dips under the others, in strand radii (3 strands)
 
 bool finite(const vec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
 
@@ -294,34 +297,62 @@ struct Builder {
         Profile prof = shape.profile;
         if (line.size() < 2 && (prof == Profile::Rope || prof == Profile::Braid || prof == Profile::Sleeve)) prof = Profile::Round;
         if (prof == Profile::Rope || prof == Profile::Braid) {
-            // Three round strands round the centre line: a rope's wind steadily round it, a braid's weave across it.
+            // Round strands wound round the centre line (a rope), or flat strands that pass over and under each other
+            // (a braid). One round strand is a spring.
             const float k = 2.0f * std::clamp(shape.spread, 0.0f, 1.0f);
-            const std::vector<vec3> normals = tubeFrames(line, vec3(0.0f));
             const bool rope = prof == Profile::Rope;
+            const int count = std::clamp(shape.strands, rope ? 1 : 2, kTubeMaxStrands);
+            const float packing = count <= 2 ? 1.0f : std::sin(kPi / float(count)); // strands of one ring touch at spread 0.5
+            const std::vector<vec3> normals = tubeFrames(line, vec3(0.0f));
             const float lay = 360.0f / ((rope ? 7.0f : 12.0f) * mean) * hand; // degrees of strand phase per unit length
-            for (int strand = 0; strand < 3; ++strand) {
+            for (int strand = 0; strand < count; ++strand) {
                 std::vector<TubeSample> sub(line.size());
+                std::vector<vec3> wide(line.size()); // a braid strand's flat side, as the centre line's turn lays it
                 for (size_t i = 0; i < line.size(); ++i) {
                     const TubeSample& s = line[i];
-                    const float rho = s.radius / (1.0f + 1.1547f * k), orbit = s.radius - rho;
+                    const float rho = s.radius / (1.0f + k / packing), orbit = s.radius - rho;
                     const vec3 n = normals[i], b = glm::cross(s.tangent, n);
-                    float phase = 2.0f * kPi * float(strand) / 3.0f + lay * along[i] * kPi / 180.0f;
+                    float phase = 2.0f * kPi * float(strand) / float(count) + lay * along[i] * kPi / 180.0f;
                     vec3 off;
+                    float width = rho;
                     if (rope) {
                         phase += angle[i] * kPi / 180.0f;
                         off = orbit * (std::cos(phase) * n + std::sin(phase) * b);
-                    } else { // flat: wide across, shallow in depth; the turn rotates the whole plait
+                    } else { // across the plait it swings; in depth it lifts over or dips under its neighbours
                         const float c = std::cos(angle[i] * kPi / 180.0f), sn = std::sin(angle[i] * kPi / 180.0f);
                         const vec3 u = c * n + sn * b, v = c * b - sn * n;
-                        off = orbit * (std::sin(phase) * u + 0.45f * std::cos(phase) * v);
+                        // Narrower than a touching strand, so neighbours clear each other across the plait; deeper the more
+                        // strands there are (their paths cross at a shallower angle).
+                        width = kBraidWidth * rho;
+                        const float swing = s.radius - width, lift = kBraidDepth * rho * 0.866f / std::sin(kPi / float(count));
+                        off = swing * std::sin(phase) * u + lift * std::cos(phase) * v;
+                        wide[i] = u;
                     }
-                    sub[i] = {s.position + off, rho, s.tangent};
+                    sub[i] = {s.position + off, width, s.tangent};
                 }
                 for (size_t i = 0; i < sub.size(); ++i) {
                     const vec3 d = sub[std::min(i + 1, sub.size() - 1)].position - sub[i ? i - 1 : 0].position;
                     if (glm::length(d) > 1e-12f) sub[i].tangent = glm::normalize(d);
                 }
-                sweepLine(sub, std::vector<float>(sub.size(), 0.0f), Profile::Round, uniform, edge, groupOffset, flat, vec3(0.0f), 0.0f);
+                std::vector<float> turn(sub.size(), 0.0f);
+                Profile strandProfile = Profile::Round;
+                if (!rope) {
+                    // Lay the ribbon's width across the plait: turn each ring from the carried frame to the wanted side.
+                    strandProfile = Profile::Ribbon;
+                    const std::vector<vec3> frames = tubeFrames(sub, wide[0]);
+                    for (size_t i = 0; i < sub.size(); ++i) {
+                        const vec3 t = sub[i].tangent;
+                        vec3 d = wide[i] - t * glm::dot(wide[i], t);
+                        if (glm::length(d) < 1e-9f) continue;
+                        d = glm::normalize(d);
+                        const vec3 n = frames[i], b = glm::cross(t, n);
+                        turn[i] = std::atan2(-glm::dot(d, n), glm::dot(d, b)) * 180.0f / kPi;
+                    }
+                }
+                const float savedThickness = thickness;
+                if (!rope) thickness = kBraidThickness;
+                sweepLine(sub, turn, strandProfile, uniform, edge, groupOffset, flat, rope ? vec3(0.0f) : wide[0], 0.0f);
+                thickness = savedThickness;
             }
             return;
         }
@@ -404,6 +435,7 @@ std::string tubeValidate(const TubeShape& s) {
     if (!std::isfinite(s.twist) || std::abs(s.twist) > 36000.0f) return "twist must be finite degrees";
     if (!std::isfinite(s.spin) || std::abs(s.spin) > 36000.0f) return "spin must be finite degrees";
     if (!(s.spread >= 0.0f && s.spread <= 1.0f)) return "spread must be from 0 to 1";
+    if (s.strands < 1 || s.strands > kTubeMaxStrands) return "strands must be from 1 to " + std::to_string(kTubeMaxStrands);
     if (!(s.taperStart >= 0.0f && s.taperStart <= 1.0f && s.taperEnd >= 0.0f && s.taperEnd <= 1.0f))
         return "taper must be from 0 to 1";
     return {};
@@ -709,6 +741,91 @@ CommandResult tubeAdd(Document& doc, const TubeShape& shape, bool merge, const s
                       std::to_string(faces) + " faces"};
 }
 
+CommandResult tubeRepeat(Document& doc, int source, float spacing, float turn, float scale, int* made) {
+    const TubeShape& curve = doc.mesh.tube;
+    if (curve.empty()) return {false, "Repeat: the active Part is not a Tube or Curve Part (it needs a curve to follow)"};
+    if (source < 0 || size_t(source) >= doc.parts.size()) return {false, "Repeat: no such Part to repeat"};
+    if (source == doc.activePart) return {false, "Repeat: pick another Part than the curve itself"};
+    if (!(spacing >= kRepeatSpacingMin && spacing <= kRepeatSpacingMax)) return {false, "Repeat: spacing must be from 0.1 to 4"};
+    if (!(scale > 0.0f && scale <= 100.0f) || !std::isfinite(turn)) return {false, "Repeat: scale must be above 0, turn finite degrees"};
+    Mesh scratch;
+    const Mesh& placed = partPlacedMesh(doc, source, scratch);
+    if (placed.triangleCount() == 0) return {false, "Repeat: that Part is empty"};
+
+    // The piece: its centre and three sides (longest, middle, shortest) as a right-handed frame.
+    glm::vec3 lo(1e30f), hi(-1e30f);
+    for (const glm::vec3& p : placed.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+    const glm::vec3 centre = 0.5f * (lo + hi), size = hi - lo;
+    int order[3] = {0, 1, 2};
+    std::sort(order, order + 3, [&](int a, int b) { return size[a] > size[b]; });
+    glm::vec3 axis[3];
+    for (int k = 0; k < 3; ++k) axis[k] = glm::vec3(order[k] == 0, order[k] == 1, order[k] == 2);
+    if (glm::dot(glm::cross(axis[0], axis[1]), axis[2]) < 0.0f) axis[2] = -axis[2];
+    const float pieceLength = size[order[0]] * scale;
+    if (!(pieceLength > 1e-9f)) return {false, "Repeat: that Part has no size"};
+
+    // The curve by length: `at(s)` gives position, tangent and a normal carried along without twisting.
+    TubeShape wire = curve;
+    wire.curve = false;
+    const std::vector<TubeSample> line = tubeCenterline(wire, std::max(tubeEdgeLength(wire), 1e-6f));
+    if (line.size() < 2) return {false, "Repeat: the curve needs at least two distinct points"};
+    const std::vector<glm::vec3> normals = tubeFrames(line, wire.up);
+    std::vector<float> along(line.size(), 0.0f);
+    for (size_t i = 1; i < line.size(); ++i) along[i] = along[i - 1] + glm::distance(line[i - 1].position, line[i].position);
+    const float length = along.back();
+    if (!(length > 1e-9f)) return {false, "Repeat: the curve has no length"};
+    const size_t copies = std::max<size_t>(1, size_t(std::lround(length / (pieceLength * spacing))));
+    if (copies > kRepeatMaxCopies) return {false, "Repeat: that would make " + std::to_string(copies) + " copies (at most " + std::to_string(kRepeatMaxCopies) + "); raise the spacing or the scale"};
+    if (copies * placed.triangleCount() > kRepeatMaxTriangles) return {false, "Repeat: " + std::to_string(copies) + " copies would be over 4 million triangles; use a lighter Part or fewer copies"};
+
+    std::vector<Mesh> pieces(copies);
+    std::vector<const Mesh*> pointers;
+    size_t cursor = 1;
+    for (size_t c = 0; c < copies; ++c) {
+        const float s = length * (float(c) + 0.5f) / float(copies);
+        while (cursor + 1 < line.size() && along[cursor] < s) ++cursor;
+        const float span = std::max(along[cursor] - along[cursor - 1], 1e-12f);
+        const float f = std::clamp((s - along[cursor - 1]) / span, 0.0f, 1.0f);
+        const glm::vec3 position = glm::mix(line[cursor - 1].position, line[cursor].position, f);
+        glm::vec3 t = glm::mix(line[cursor - 1].tangent, line[cursor].tangent, f);
+        t = glm::length(t) > 1e-9f ? glm::normalize(t) : line[cursor].tangent;
+        glm::vec3 n = glm::mix(normals[cursor - 1], normals[cursor], f);
+        n = n - t * glm::dot(n, t);
+        n = glm::length(n) > 1e-9f ? glm::normalize(n) : normals[cursor];
+        const float a = glm::radians(turn * float(c));
+        const glm::vec3 nt = std::cos(a) * n + std::sin(a) * glm::cross(t, n);
+        const glm::vec3 bt = glm::cross(t, nt);
+        // Piece axes (longest, middle, shortest) go to the tangent, the turned normal and the turned binormal.
+        Mesh& piece = pieces[c];
+        piece = placed;
+        piece.layers.clear();
+        piece.paintLayers.clear();
+        piece.multires.reset();
+        piece.micro.reset();
+        piece.tube = {};
+        for (glm::vec3& p : piece.positions) {
+            const glm::vec3 d = p - centre;
+            p = position + scale * (glm::dot(d, axis[0]) * t + glm::dot(d, axis[1]) * nt + glm::dot(d, axis[2]) * bt);
+        }
+        pointers.push_back(&piece);
+    }
+    Mesh merged = mergeMeshes(pointers);
+    merged.recomputeAllNormals();
+    merged.topologyDirty = true;
+    const std::string name = doc.uniquePartName(doc.parts[size_t(source)].name + " Repeat");
+    const size_t tris = merged.triangleCount();
+    const int at = doc.addPart(std::move(merged), name, false, doc.activePart + 1);
+    UndoRecord r; // undo takes the new Part out again
+    r.label = "Repeat along curve";
+    r.part = std::make_shared<PartStep>();
+    r.part->id = doc.parts[size_t(at)].id;
+    r.part->at = at;
+    doc.undo.push(std::move(r));
+    doc.modified = true;
+    if (made) *made = at;
+    return {true, "Repeated \"" + doc.parts[size_t(source)].name + "\" " + std::to_string(copies) + " times along the curve as \"" + name + "\": " + std::to_string(tris) + " triangles"};
+}
+
 bool tubeMatchesMesh(const Mesh& mesh) {
     if (mesh.tube.empty()) return false;
     const Mesh s = tubeSweep(mesh.tube);
@@ -750,6 +867,7 @@ Json tubeToJson(const TubeShape& s) {
     if (s.twist != 0.0f) out.set("twist", double(s.twist));
     if (s.spin != 0.0f) out.set("spin", double(s.spin));
     if (s.spread != 0.5f) out.set("spread", double(s.spread));
+    if (s.strands != 3) out.set("strands", double(s.strands));
     if (s.curve) out.set("curve", true);
     if (glm::length(s.up) > 0.0f) {
         Json up = Json::array();
@@ -777,6 +895,7 @@ TubeShape tubeFromJson(const Json& json) {
     s.twist = float(json["twist"].asNumber(0.0));
     s.spin = float(json["spin"].asNumber(0.0));
     s.spread = float(json["spread"].asNumber(0.5));
+    s.strands = int(json["strands"].asNumber(3.0));
     s.curve = json["curve"].asBool(false);
     if (const Json& up = json["up"]; up.isArray() && up.size() == 3)
         s.up = vec3(float(up[0].asNumber(NAN)), float(up[1].asNumber(NAN)), float(up[2].asNumber(NAN)));
@@ -834,6 +953,7 @@ std::string applyOptions(TubeShape& s, const Args& a) {
     if (a.contains("twist")) s.twist = float(argNumber(a, "twist", 0.0));
     if (a.contains("spin")) s.spin = float(argNumber(a, "spin", 0.0));
     if (a.contains("spread")) s.spread = float(argNumber(a, "spread", 0.5));
+    if (a.contains("strands")) s.strands = int(std::lround(argNumber(a, "strands", 3.0)));
     if (a.contains("taper_start")) s.taperStart = float(argNumber(a, "taper_start", 0.0));
     if (a.contains("taper_end")) s.taperEnd = float(argNumber(a, "taper_end", 0.0));
     if (a.contains("up") && !parseVec3(argString(a, "up"), s.up)) return "up must be \"x,y,z\"";
@@ -863,6 +983,7 @@ void registerTubeCommands(CommandRegistry& reg) {
         {"spread", T::Number,
          "Rope and braid: how far apart the strands are (0 to 1, default 0.5: touching). Sleeve: how thick the wall is (0.5: a quarter of the radius).",
          false},
+        {"strands", T::Number, "Rope and braid: how many strands (1 to 8, default 3). A rope of one strand is a spring.", false},
         {"up", T::String, "\"x,y,z\": the direction the cross-section's first flat side faces (default: automatic).", false},
         {"taper_start", T::Number, "Fraction of the length (0 to 1) over which the start narrows to a point.", false},
         {"taper_end", T::Number, "Fraction of the length (0 to 1) over which the end narrows to a point.", false}};
@@ -907,7 +1028,7 @@ void registerTubeCommands(CommandRegistry& reg) {
                  const TubeShape& s = doc.mesh.tube;
                  if (s.empty()) return {false, kNotTube};
                  std::string out = std::to_string(s.points.size()) + " points, " + (s.curve ? "a curve (tube_from_curve makes the tube), " : "") +
-                                   (s.twist != 0.0f ? "twist " + num(s.twist) + ", " : "") + (s.spin != 0.0f ? "spin " + num(s.spin) + ", " : "") +
+                                   (s.strands != 3 ? std::to_string(s.strands) + " strands, " : std::string()) + (s.twist != 0.0f ? "twist " + num(s.twist) + ", " : "") + (s.spin != 0.0f ? "spin " + num(s.spin) + ", " : "") +
                                    (s.profile == Profile::Round ? std::string()
                                                                 : std::string(tubeProfileName(s.profile)) + " profile" +
                                                                       (s.profile == Profile::Ribbon ? " (thickness " + num(s.thickness) + ")" : "") +
@@ -1024,6 +1145,25 @@ void registerTubeCommands(CommandRegistry& reg) {
                  }
                  s.curve = false;
                  return tubeEdit(doc, std::move(s), "Tube from curve");
+             }});
+    reg.add({"tube_repeat",
+             "Repeat a Part along the active Tube or Curve Part's curve as a new Part (a chain of links, beads, scales): "
+             "the piece's longest side lies along the curve; each copy is turned a set number of degrees more than the "
+             "one before. One undo step; the curve and the piece stay as they are.",
+             {{"part", T::String, "The Part to repeat (name or index from part_list).", true},
+              {"spacing", T::Number, "How far apart the copies' centres are, in lengths of the piece (0.1 to 4, default 1: end to end; 0.8 overlaps like chain links).", false},
+              {"turn", T::Number, "Degrees each copy is turned about the curve more than the one before (default 0; 90 for chain links).", false},
+              {"scale", T::Number, "Size of the copies (default 1).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const std::string which = argString(a, "part");
+                 int source = which.empty() ? int(argNumber(a, "part", -1.0)) : doc.findPart(which);
+                 if (source < 0 && !which.empty()) {
+                     char* end = nullptr;
+                     const long v = std::strtol(which.c_str(), &end, 10);
+                     if (end != which.c_str() && *end == 0) source = int(v);
+                 }
+                 return tubeRepeat(doc, source, float(argNumber(a, "spacing", 1.0)), float(argNumber(a, "turn", 0.0)),
+                                   float(argNumber(a, "scale", 1.0)));
              }});
     reg.add({"tube_bake",
              "Bake the active Tube Part into a plain, sculptable mesh (its points are no longer editable). "

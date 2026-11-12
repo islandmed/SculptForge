@@ -81,6 +81,31 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
   the tests are still picked from the branch's own files.
 - The PC stays for GPU-specific checks (it runs the D3D12 GPU path), T1 and release staging.
 
+## Brush and tool promises (geometric invariants)
+
+Every brush and tool states a promise in its description or the guide ("only cuts", "keeps the volume", "a clean
+sharp edge"). `tests/test_geom_invariants.cpp` checks each one on dense curved meshes (a 1.3M-triangle sphere and a
+saddle, never a flat plane alone: a plane cut on a plane hides the defect), with the checks in `tests/GeomInvariants.h`:
+
+- **Direction**: cut-only = no vertex rises along its normal (`maxRise`), build-only = none sinks (`maxSink`).
+- **Clean edges** (`edgeOutliers`): in the falloff ring (0.6 to 1.1 radii from the nearest dab) the umbrella of the
+  displacement (a vertex's move minus its ring's mean move) stays under 0.25 mean edges; the base surface cancels,
+  so a spike, a speck or a stair-step scores its height in edges. A round tip's one-dab profile never climbs going
+  outward (`radialProfile`: a ring or a terrace). The artist close-ups (tools/qa/closeup.py) use an absolute
+  umbrella rule (> 0.6 mean edges and > 3x the ring median) on app meshes, where there is no before.
+- **Everything**: no NaN, no triangle turned against all its neighbours (`invertedFaces`), nothing moves outside the
+  brush, the X mirror holds (`symmetryError`), all under two crossing pen strokes (pressure 0.2 to 1 and back).
+- **Tools**: remesh, decimate, booleans and Cut stay closed, face outwards, on the form and within 1% of the volume;
+  Smooth removes relief and keeps the volume; a mask holds what it covers.
+
+A library brush gets its `<name>_invariant` test by itself: its promise is read from the recipe (Scrape and Crisp
+Flatten cut, Clay and Fill build, a texture or alpha skips the edge check). For a new brush type, a new tool or a
+new promise: add the case to `promiseOf` or a `*_invariant` TEST, run it on main first and see it fail on the
+defect it is meant to catch. A red found on main is filed as an issue and listed in `kKnown` with it: the test
+prints KNOWN and stays green, and turns red once it passes. A fix must flip its known-red to a normal test: the
+fixing branch deletes its `kKnown` line in the same commit, so the test guards the fix from then on.
+ready.sh refuses a brush or tool branch (~/Work/.sf/brush-paths.txt) without added test lines naming an invariant.
+
 ## Areas: test the part you touched, the whole once per batch
 
 `tests/areas.map` is the one map. Eight areas: **sculpt** (brush engine, strokes, masking, paint, input, performance),

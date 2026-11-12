@@ -53,11 +53,12 @@ const char* const kAxisNames[kSmAxes] = {"Pan X", "Zoom", "Pan Y", "Tilt", "Roll
 
 } // namespace
 
-void App::spaceMouseScan() {
+void App::spaceMouseScan(bool retry) {
     if (spaceMouse_) return;
     int count = 0;
     SDL_JoystickID* ids = SDL_GetJoysticks(&count);
     joysticksSeen_.clear();
+    spaceMouseOpenFailed_ = false;
     if (!ids) return;
     for (int i = 0; i < count && !spaceMouse_; ++i) {
         // UI tests take only their own virtual SpaceMouse, not one plugged into the machine running them.
@@ -68,15 +69,16 @@ void App::spaceMouseScan() {
         std::snprintf(seen, sizeof seen, "%s (%04x:%04x)", name && *name ? name : "?", vendor, product);
         auto skip = [&](const char* why) {
             joysticksSeen_.push_back(std::string(seen) + ": " + why);
-            SDL_Log("SpaceMouse: skipped %s", joysticksSeen_.back().c_str());
+            if (!retry) SDL_Log("SpaceMouse: skipped %s", joysticksSeen_.back().c_str()); // (a retry says it once)
         };
         if (!isSpaceMouseDevice(vendor, product, name ? name : "")) {
             skip("not a SpaceMouse");
             continue;
         }
         SDL_Joystick* j = SDL_OpenJoystick(ids[i]);
-        if (!j) {
+        if (!j) { // 3DxWare's DriverKit extension may hold it just now (it lets go when it quits or is suspended)
             skip((std::string("cannot open: ") + SDL_GetError()).c_str());
+            spaceMouseOpenFailed_ = true;
             continue;
         }
         if (SDL_GetNumJoystickAxes(j) < kSmAxes) { // a 3Dconnexion device without a 6-DoF cap
@@ -156,7 +158,19 @@ void App::updateSpaceMouse(float dt) {
     spaceMouseReadNs_ = SDL_GetTicksNS();
     if (!spaceMouseMoving_) dt = std::min(dt, 1.0f / 60.0f);
     spaceMouseMoving_ = spaceMousePushed_ = false;
-    if (!spaceMouse_) return;
+    if (!spaceMouse_) {
+        // A SpaceMouse SDL listed but could not open (another program had it) is tried again every few seconds, so
+        // quitting the driver is enough: no unplugging, no restart (#110). The idle loop wakes for it.
+        if (spaceMouseOpenFailed_ && options_.uiTest.empty()) {
+            const double now = double(SDL_GetTicksNS()) * 1e-9;
+            if (now >= spaceMouseRetryAt_) {
+                spaceMouseRetryAt_ = now + kSpaceMouseRetrySeconds;
+                spaceMouseScan(true);
+            }
+            if (spaceMouseOpenFailed_) redrawIn(std::max(spaceMouseRetryAt_ - now, 0.0));
+        }
+        return;
+    }
     spaceMouseAxes_ = readAxes(spaceMouse_);
     if (spaceMouseStirred(spaceMouseAxes_, uiPrefs_.spaceMouse)) spaceMouseQuiet_ = 0.0f;
     for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;

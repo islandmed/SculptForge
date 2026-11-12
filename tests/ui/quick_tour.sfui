@@ -31,7 +31,7 @@ expect_value welcome_open == 1
 hover_window 0.99 0.99
 wait 0.2
 shot welcome
-click "Sculpted before? Take the quick tour##welcome.tour"
+click "Quick tour##welcome.tour"
 expect_value welcome_open == 0
 expect_value quick_tour_open == 1
 expect_value quick_tour_slide == 1
