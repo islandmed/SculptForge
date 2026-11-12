@@ -5,6 +5,17 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.10
+
+```features
+date: unreleased
+tagline: Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.
+highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
+highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
+highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)
+highlight: Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge
+```
+
 ## Version 0.12.9
 
 ```features
