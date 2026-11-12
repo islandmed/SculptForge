@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 // stb_truetype (with ImGui) draws the version line: Inter, and the interface's CJK font for a Chinese translation.
@@ -125,29 +127,116 @@ bool paint(int width, int height, const std::string& versionText, std::vector<ui
     return true;
 }
 
+bool drawTexture(SDL_Renderer* renderer, SDL_Texture* tex) {
+    return tex && SDL_SetRenderDrawColor(renderer, kBackground[0], kBackground[1], kBackground[2], 255) && SDL_RenderClear(renderer) &&
+           SDL_RenderTexture(renderer, tex, nullptr, nullptr);
+}
+
 } // namespace
 
-bool Window::open(const std::string& versionText) {
-    if (window_) return true;
+Path pathFromEnv(const char* value) {
+    const std::string v = value ? value : "";
+    return v == "surface" ? Path::Surface : v == "renderer" ? Path::Renderer : v == "software" ? Path::Software : Path::Auto;
+}
+
+namespace {
+
+// A hidden, borderless, floating utility window in the middle of the screen, with its own app id (so a window manager rule can
+// name it: sculptforge-splash; the main window keeps the app's). Hidden until the picture is on it.
+SDL_Window* makeWindow() {
     // A software window surface: with the default SDL may back it with an accelerated renderer, i.e. its own OpenGL context
     // made current on this thread, under the main window's (#192: the main shaders then compiled in the wrong context).
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
+    const char* before = SDL_GetHint(SDL_HINT_APP_ID);
+    const std::string previous = before ? before : "";
+    SDL_SetHint(SDL_HINT_APP_ID, "sculptforge-splash");
     SDL_Window* w = SDL_CreateWindow("SculptForge", kLogicalWidth, kLogicalHeight,
-                                     SDL_WINDOW_BORDERLESS | SDL_WINDOW_UTILITY | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-    if (!w) return false;
-    int pw = 0, ph = 0;
-    SDL_GetWindowSizeInPixels(w, &pw, &ph);
-    SDL_Surface* surface = SDL_GetWindowSurface(w);
-    std::vector<uint8_t> rgba;
-    if (!surface || pw <= 0 || !paint(pw, ph, versionText, rgba) || surface->w != pw || surface->h != ph ||
-        !SDL_ConvertPixels(pw, ph, SDL_PIXELFORMAT_RGBA32, rgba.data(), pw * 4, surface->format, surface->pixels, surface->pitch)) {
-        SDL_DestroyWindow(w);
-        return false;
+                                     SDL_WINDOW_BORDERLESS | SDL_WINDOW_UTILITY | SDL_WINDOW_ALWAYS_ON_TOP |
+                                         SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
+    if (before) SDL_SetHint(SDL_HINT_APP_ID, previous.c_str());
+    else SDL_ResetHint(SDL_HINT_APP_ID);
+    if (w) SDL_SetWindowPosition(w, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED); // (Wayland leaves the place to the compositor)
+    return w;
+}
+
+// An SDL renderer on the window: a GPU driver first (never the software one, nor the GPU API's, which wants its own set-up),
+// the software one only if `software`.
+SDL_Renderer* makeRenderer(SDL_Window* w, bool software) {
+    if (software) return SDL_CreateRenderer(w, "software");
+    for (int i = 0, n = SDL_GetNumRenderDrivers(); i < n; ++i) {
+        const char* name = SDL_GetRenderDriver(i);
+        if (!name || std::string(name) == "software" || std::string(name) == "gpu") continue;
+        if (SDL_Renderer* r = SDL_CreateRenderer(w, name)) return r;
     }
-    SDL_ShowWindow(w);
-    SDL_UpdateWindowSurface(w);
-    window_ = w;
-    SDL_PumpEvents();
+    return nullptr;
+}
+
+} // namespace
+
+bool Window::open(const std::string& versionText, Path path) {
+    if (window_) return true;
+    for (Path attempt : {Path::Surface, Path::Renderer, Path::Software}) {
+        if (path != Path::Auto && path != attempt) continue;
+        SDL_Window* w = makeWindow();
+        if (!w) return false; // no window system at all
+        int pw = 0, ph = 0;
+        SDL_GetWindowSizeInPixels(w, &pw, &ph);
+        std::vector<uint8_t> rgba;
+        bool drawn = false;
+        SDL_Renderer* renderer = nullptr;
+        if (attempt == Path::Surface) {
+            SDL_Surface* surface = SDL_GetWindowSurface(w);
+            drawn = surface && pw > 0 && paint(pw, ph, versionText, rgba) && surface->w == pw && surface->h == ph &&
+                    SDL_ConvertPixels(pw, ph, SDL_PIXELFORMAT_RGBA32, rgba.data(), pw * 4, surface->format, surface->pixels, surface->pitch);
+        } else if ((renderer = makeRenderer(w, attempt == Path::Software)) != nullptr) {
+            // The picture at the renderer's own pixel size, so a fractional or HiDPI scale is drawn, never stretched.
+            if (SDL_GetCurrentRenderOutputSize(renderer, &pw, &ph) && pw > 0 && paint(pw, ph, versionText, rgba)) {
+                SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, pw, ph);
+                if (tex && SDL_UpdateTexture(tex, nullptr, rgba.data(), pw * 4)) {
+                    texture_ = tex;
+                    drawn = drawTexture(renderer, tex);
+                }
+                if (!drawn && tex) { SDL_DestroyTexture(tex); texture_ = nullptr; }
+            }
+        }
+        if (!drawn) { // this way said no: before anything was shown, so no empty window flashes
+            if (renderer) SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(w);
+            texture_ = nullptr;
+            continue;
+        }
+        SDL_ShowWindow(w);
+        if (renderer) SDL_RenderPresent(renderer);
+        else SDL_UpdateWindowSurface(w);
+        window_ = w;
+        renderer_ = renderer;
+        used_ = attempt;
+        SDL_PumpEvents();
+        return true;
+    }
+    return false;
+}
+
+bool Window::readBack(std::vector<uint8_t>& rgba, int& width, int& height) const {
+    if (!window_) return false;
+    SDL_Surface* src = nullptr;
+    bool own = false;
+    if (renderer_) {
+        if (!drawTexture(renderer_, texture_)) return false;
+        src = SDL_RenderReadPixels(renderer_, nullptr);
+        own = true;
+    } else
+        src = SDL_GetWindowSurface(window_);
+    if (!src) return false;
+    SDL_Surface* conv = SDL_ConvertSurface(src, SDL_PIXELFORMAT_RGBA32);
+    if (own) SDL_DestroySurface(src);
+    if (!conv) return false;
+    width = conv->w;
+    height = conv->h;
+    rgba.resize(size_t(width) * size_t(height) * 4);
+    for (int y = 0; y < height; ++y)
+        std::memcpy(&rgba[size_t(y) * size_t(width) * 4], static_cast<const uint8_t*>(conv->pixels) + size_t(y) * size_t(conv->pitch), size_t(width) * 4);
+    SDL_DestroySurface(conv);
     return true;
 }
 
@@ -156,8 +245,26 @@ void Window::pump() {
     SDL_PumpEvents(); // (what comes stays queued for the app's loop)
 }
 
+void Window::fadeOut(double ms) {
+    if (!window_ || ms <= 0.0 || !SDL_SetWindowOpacity(window_, 1.0f)) return; // (no opacity: Wayland, some X11 set-ups; it just closes)
+    const Uint64 start = SDL_GetTicksNS();
+    for (;;) {
+        const double t = double(SDL_GetTicksNS() - start) / 1e6 / ms;
+        if (t >= 1.0) break;
+        SDL_SetWindowOpacity(window_, float(1.0 - t));
+        SDL_PumpEvents();
+        SDL_Delay(8);
+    }
+}
+
 void Window::close() {
     if (!window_) return;
+    if (renderer_) {
+        if (texture_) SDL_DestroyTexture(texture_);
+        SDL_DestroyRenderer(renderer_);
+    }
+    texture_ = nullptr;
+    renderer_ = nullptr;
     SDL_DestroyWindow(window_);
     window_ = nullptr;
     SDL_PumpEvents();
@@ -172,6 +279,42 @@ bool writeShot(const std::string& path, int width, int height, const std::string
         return false;
     }
     return img.savePng(path, error);
+}
+
+int selfTest() {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        std::printf("splash-selftest: no window system: %s\n", SDL_GetError());
+        return 1;
+    }
+    std::printf("splash-selftest: video driver %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "?");
+    int opened = 0, wrong = 0;
+    bool softwareOpened = false;
+    for (Path path : {Path::Surface, Path::Renderer, Path::Software}) {
+        const char* name = path == Path::Surface ? "surface" : path == Path::Renderer ? "renderer" : "software";
+        Window w;
+        if (!w.open("Version 0.0.0", path)) {
+            std::printf("splash-selftest: %-8s no (%s)\n", name, SDL_GetError());
+            continue;
+        }
+        std::vector<uint8_t> rgba;
+        int pw = 0, ph = 0;
+        bool ok = w.usedPath() == path && w.readBack(rgba, pw, ph) && pw > 0 && ph > 0;
+        if (ok) { // the background in the corner, and the brand bust (not the background) at its centre
+            const auto at = [&](int x, int y) { return &rgba[(size_t(y) * size_t(pw) + size_t(x)) * 4]; };
+            const Layout l = layout(pw, ph, 4.3);
+            const uint8_t* corner = at(2, 2);
+            const uint8_t* bust = at(l.bustX + l.bustSize / 2, l.bustY + l.bustSize / 2);
+            ok = corner[0] == kBackground[0] && corner[1] == kBackground[1] && corner[2] == kBackground[2] &&
+                 (bust[0] != kBackground[0] || bust[1] != kBackground[1] || bust[2] != kBackground[2]);
+        }
+        std::printf("splash-selftest: %-8s %s (%dx%d px)\n", name, ok ? "yes, picture right" : "opened but the picture is WRONG", pw, ph);
+        ++opened;
+        if (!ok) ++wrong;
+        if (path == Path::Software && ok) softwareOpened = true;
+    }
+    SDL_Quit();
+    // The software renderer needs nothing from the GPU or the compositor: if it cannot open here, nothing can.
+    return (opened > 0 && wrong == 0 && softwareOpened) ? 0 : 1;
 }
 
 } // namespace splash

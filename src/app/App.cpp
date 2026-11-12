@@ -481,13 +481,14 @@ void App::splashCheckpoint() {
         return;
     }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
-    if (!splash::due(true, splashShown_, ms, splashForced_ ? 0.0 : splash::kShowAfterMs)) return;
+    if (!splash::due(true, splashShown_)) return;
     splashShown_ = true; // (once: a window system that said no isn't asked again)
     auto window = std::make_unique<splash::Window>();
-    if (window->open(splashVersionLine())) {
+    if (window->open(splashVersionLine(), splash::pathFromEnv(std::getenv("SF_SPLASH_PATH")))) { // (SF_SPLASH_PATH: one way only, to check it)
         splash_ = std::move(window);
         splashOpenedAt_ = std::chrono::steady_clock::now();
-        SDL_Log("Start-up splash shown after %.0f ms", ms);
+        SDL_Log("Start-up splash shown after %.0f ms (%s)", ms,
+                splash_->usedPath() == splash::Path::Surface ? "window surface" : splash_->usedPath() == splash::Path::Renderer ? "renderer" : "software renderer");
     } else
         SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
     makeMainContextCurrent(true);
@@ -495,7 +496,7 @@ void App::splashCheckpoint() {
 
 void App::revealMainWindow() {
     mainWindowHidden_ = false;
-    if (splash_) { // up for at least kMinVisibleMs, so it is seen (only a start that showed it waits; a fast start never gets here)
+    if (splash_) { // up for at least kMinVisibleMs, so it is seen (a start slower than that waits for nothing)
         const double visible = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count();
         for (double left = splash::holdMs(visible); left > 0.0; left -= 16.0) {
             splash_->pump();
@@ -507,6 +508,7 @@ void App::revealMainWindow() {
         SDL_RaiseWindow(window_);
     }
     activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.5); // (a few frames for the window system to map it)
+    if (splash_) splash_->fadeOut(splash::kFadeMs); // (the main window is under it, already drawn: no black frame between)
     closeSplash();
 }
 
@@ -514,6 +516,9 @@ std::string App::splashVersionLine() { return std::string(tr("Version")) + " " +
 
 void App::closeSplash() {
     const bool wasOpen = splash_ != nullptr;
+    if (wasOpen)
+        SDL_Log("Start-up splash closed after %.0f ms on screen",
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count());
     splash_.reset();
     if (wasOpen) makeMainContextCurrent(true);
 }

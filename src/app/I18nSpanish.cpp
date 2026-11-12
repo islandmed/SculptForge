@@ -849,8 +849,8 @@ constexpr Entry kSpanish[] = {
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
     {"Show startup splash", "Mostrar pantalla de inicio"},
-    {"Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
-     "Muestra el logotipo de SculptForge mientras el inicio es lento. Un inicio rápido no muestra nada. Se aplica en el próximo inicio."},
+    {"Show the SculptForge logo for half a second or more at every start. Turn it off for an instant start. Applies at the next start.",
+     "Muestra el logotipo de SculptForge medio segundo o más en cada inicio. Desactívalo para un inicio inmediato. Se aplica en el próximo inicio."},
     {"Show Library at startup", "Mostrar Biblioteca al iniciar"},
     {"Placement", "Ubicación"},
     {"Top", "Arriba"},
