@@ -14,6 +14,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace sf {
@@ -156,6 +157,7 @@ inline constexpr int kActivePaintLayer = -2;
 // undo allocates a missing attribute so values can always be restored.
 struct UndoRecord {
     std::string label;
+    uint64_t seq = 0; // order of pushing across every history (UndoStack::push): the oldest step of the pool goes first
     int layer = -1;
     UndoChannel<glm::vec3> positions;
     // Transforms (core/MeshTransform.h) move the base and every sculpt layer together: with `positions` on the
@@ -224,9 +226,12 @@ class Timeline;
 class UndoStack {
     friend class Timeline; // moves steps between undo and redo without applying them (core/Timeline.h)
 public:
-    UndoStack() = default;
-    UndoStack(UndoStack&&) = default; // move-only (records own mesh snapshots)
-    UndoStack& operator=(UndoStack&&) = default;
+    // Every adaptive-budget history on a thread (all Parts of the open scene, the active one included) shares one byte
+    // budget: see budget().
+    UndoStack();
+    ~UndoStack();
+    UndoStack(UndoStack&& other) noexcept; // move-only (records own mesh snapshots)
+    UndoStack& operator=(UndoStack&&) = default; // (swaps the history, not the pool membership: the object keeps its place)
     UndoStack(const UndoStack&) = delete;
     UndoStack& operator=(const UndoStack&) = delete;
     void push(UndoRecord record);
@@ -251,7 +256,9 @@ public:
     size_t undoBytes() const;
 
     // What the history may hold. 0 (the default) follows the computer: undoBudgetBytes (core/MemoryGuard.h), asked on
-    // every push; any other value is fixed (the pose history never drops: max).
+    // every push and shared by every adaptive history on this thread (the Parts of the scene): their steps together
+    // stay within it, and the oldest step of any of them goes first. Any other value is a fixed budget of this history
+    // alone, outside the pool (the pose history never drops: max).
     size_t byteBudget = 0;
     size_t budget() const; // the figure in force now (Preferences > Performance)
     // What the budget did since the last call, for the status line: steps dropped, and whether the one step left is
@@ -269,9 +276,12 @@ public:
 private:
     static void apply(UndoRecord& r, Mesh& mesh, BVH& bvh);
     void enforceBudget();
+    void enforceFixedBudget();
+    void enforcePooledBudget();
 
     std::deque<UndoRecord> undo_, redo_;
     uint64_t revision_ = 0;
+    std::thread::id owner_; // the thread that made it: only histories of one thread pool (no cross-thread reads)
     size_t droppedPending_ = 0, droppedTotal_ = 0;
     bool lastStepOver_ = false, overPending_ = false;
 };

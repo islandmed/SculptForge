@@ -153,3 +153,51 @@ TEST(undo_budget_keeps_a_whole_mesh_step_that_alone_is_over) {
     for (auto& p : before) p.x += 0.2f; // (the state after two pushes)
     CHECK(d.mesh.positions == before);
 }
+
+// Three Parts: their histories share one budget (the floor tier's 8 GB with little free), so together they hold what one
+// history may, the oldest step of any Part goes first, and each Part still undoes exactly.
+TEST(undo_budget_is_one_pool_for_all_parts) {
+    Machine tight(8 * kGiB, 300 * kMB); // the 256 MB floor
+    Document d = makeDoc(makeBenchSphere(150000));
+    d.addPart(makeBenchSphere(150000), "B");
+    d.addPart(makeBenchSphere(150000), "C");
+    CHECK(d.partCount() == 3);
+    pushWholeMeshStep(d, 0.01f); // (part 2 is active: measure one step)
+    const size_t step = d.undo.lastUndo()->budgetBytes();
+    d.undo.clear();
+    CHECK(step > 4 * kMB && step < 100 * kMB);
+
+    std::vector<std::vector<std::vector<glm::vec3>>> states(3); // [part][k] = the Part after k of its pushes
+    for (int p = 0; p < 3; ++p) {
+        d.selectPart(p);
+        states[size_t(p)].push_back(d.mesh.positions);
+    }
+    const size_t rounds = (2 * 256 * kMB) / step / 3 + 3; // twice the pool, in turns across the Parts
+    for (size_t k = 1; k <= rounds; ++k)
+        for (int p = 0; p < 3; ++p) {
+            d.selectPart(p);
+            pushWholeMeshStep(d, 0.01f * float(k) + 0.001f * float(p));
+            states[size_t(p)].push_back(d.mesh.positions);
+        }
+    size_t held = 0, dropped = 0;
+    std::vector<size_t> kept(3);
+    for (int p = 0; p < 3; ++p) {
+        const UndoStack& u = d.partUndo(p);
+        held += u.undoBytes();
+        kept[size_t(p)] = u.undoCount();
+        dropped += d.partUndo(p).takeNotice().dropped;
+    }
+    CHECK(held <= 256 * kMB);                      // one pool, not three
+    CHECK(dropped == 3 * rounds - (kept[0] + kept[1] + kept[2])); // every removed step counted, on whichever Part lost it
+    CHECK(dropped > 0);
+    // The oldest went first, in turn: the Parts' remaining histories differ by at most one step.
+    const auto [lo, hi] = std::minmax_element(kept.begin(), kept.end());
+    CHECK(*hi - *lo <= 1);
+    // Each Part undoes all the way to the exact state it had before its oldest kept step.
+    for (int p = 0; p < 3; ++p) {
+        d.selectPart(p);
+        const size_t n = d.undo.undoCount();
+        for (size_t i = 0; i < n; ++i) CHECK(d.undo.undo(d.mesh, d.bvh));
+        CHECK(d.mesh.positions == states[size_t(p)][rounds - n]);
+    }
+}

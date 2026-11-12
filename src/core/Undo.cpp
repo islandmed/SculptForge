@@ -8,6 +8,8 @@
 #include "core/SelectionSets.h"
 
 #include <algorithm>
+#include <atomic>
+#include <mutex>
 #include <utility>
 
 namespace sf {
@@ -147,8 +149,25 @@ UndoRecord UndoRecord::captureFaceGroups(const Mesh& mesh, std::string label, st
     return r;
 }
 
+namespace {
+
+// Every UndoStack alive, by address (a stack registers where it lives; Document swaps the contents of stacks, it
+// never relocates one). The lock covers the list and the pooled drop.
+struct Registry {
+    std::mutex lock;
+    std::vector<UndoStack*> stacks;
+    std::atomic<uint64_t> seq{0};
+};
+Registry& registry() {
+    static Registry* r = new Registry; // (never destroyed: stacks of globals may outlive a static)
+    return *r;
+}
+
+} // namespace
+
 void UndoStack::push(UndoRecord record) {
     if (record.empty()) return;
+    record.seq = registry().seq.fetch_add(1, std::memory_order_relaxed);
     undo_.push_back(std::move(record));
     if (listener) listener->undoPushed(undo_.back(), redo_);
     redo_.clear();
@@ -320,7 +339,38 @@ size_t UndoStack::undoBytes() const {
     return total;
 }
 
-size_t UndoStack::budget() const { return byteBudget ? byteBudget : undoBudgetBytes(undoBytes()); }
+UndoStack::UndoStack() : owner_(std::this_thread::get_id()) {
+    Registry& r = registry();
+    std::lock_guard<std::mutex> lock(r.lock);
+    r.stacks.push_back(this);
+}
+
+UndoStack::UndoStack(UndoStack&& o) noexcept
+    : listener(std::move(o.listener)), undo_(std::move(o.undo_)), redo_(std::move(o.redo_)), revision_(o.revision_),
+      owner_(std::this_thread::get_id()), droppedPending_(o.droppedPending_), droppedTotal_(o.droppedTotal_),
+      lastStepOver_(o.lastStepOver_), overPending_(o.overPending_) {
+    byteBudget = o.byteBudget;
+    Registry& r = registry();
+    std::lock_guard<std::mutex> lock(r.lock);
+    r.stacks.push_back(this);
+}
+
+UndoStack::~UndoStack() {
+    Registry& r = registry();
+    std::lock_guard<std::mutex> lock(r.lock);
+    r.stacks.erase(std::remove(r.stacks.begin(), r.stacks.end(), this), r.stacks.end());
+}
+
+size_t UndoStack::budget() const {
+    if (byteBudget) return byteBudget;
+    Registry& r = registry();
+    std::lock_guard<std::mutex> lock(r.lock);
+    size_t held = 0;
+    for (const UndoStack* s : r.stacks)
+        if (!s->byteBudget && s->owner_ == owner_)
+            for (const auto& rec : s->undo_) held += rec.budgetBytes();
+    return undoBudgetBytes(held);
+}
 
 UndoStack::Notice UndoStack::takeNotice() {
     Notice n{droppedPending_, overPending_};
@@ -330,19 +380,58 @@ UndoStack::Notice UndoStack::takeNotice() {
 }
 
 void UndoStack::enforceBudget() {
+    if (byteBudget) enforceFixedBudget();
+    else enforcePooledBudget();
+}
+
+void UndoStack::enforceFixedBudget() {
     size_t total = 0;
     for (const auto& r : undo_) total += r.budgetBytes();
-    const size_t limit = byteBudget ? byteBudget : undoBudgetBytes(total);
     const size_t before = droppedPending_;
-    while (undo_.size() > 1 && total > limit) {
+    while (undo_.size() > 1 && total > byteBudget) {
         total -= undo_.front().budgetBytes();
         undo_.pop_front();
         ++droppedPending_;
         ++droppedTotal_;
         if (listener) listener->undoDroppedOldest();
     }
-    const bool over = undo_.size() == 1 && total > limit;
+    const bool over = undo_.size() == 1 && total > byteBudget;
     if (over && (!lastStepOver_ || droppedPending_ != before)) overPending_ = true;
+    lastStepOver_ = over;
+}
+
+// The Parts' histories together: held = every step of every adaptive history on this thread; while over the budget the
+// oldest step of any of them goes, except the newest step of the history just pushed to (a whole-mesh step is kept
+// even when it alone is over). Each history counts what it lost for its own status notice.
+void UndoStack::enforcePooledBudget() {
+    Registry& r = registry();
+    std::lock_guard<std::mutex> lock(r.lock);
+    std::vector<UndoStack*> peers;
+    size_t total = 0;
+    for (UndoStack* s : r.stacks)
+        if (!s->byteBudget && s->owner_ == owner_) {
+            peers.push_back(s);
+            for (const auto& rec : s->undo_) total += rec.budgetBytes();
+        }
+    const size_t limit = undoBudgetBytes(total);
+    bool dropped = false;
+    while (total > limit) {
+        UndoStack* from = nullptr;
+        uint64_t oldest = ~uint64_t(0);
+        for (UndoStack* s : peers) {
+            if (s->undo_.empty() || (s == this && s->undo_.size() < 2)) continue;
+            if (s->undo_.front().seq < oldest) oldest = s->undo_.front().seq, from = s;
+        }
+        if (!from) break;
+        total -= from->undo_.front().budgetBytes();
+        from->undo_.pop_front();
+        ++from->droppedPending_;
+        ++from->droppedTotal_;
+        dropped = true;
+        if (from->listener) from->listener->undoDroppedOldest();
+    }
+    const bool over = total > limit; // only this history's last step is left, and it alone is over
+    if (over && (!lastStepOver_ || dropped)) overPending_ = true;
     lastStepOver_ = over;
 }
 
