@@ -68,9 +68,14 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
             break;
         }
         case GhostKind::ClayBlock: {
-            // The solver measures the square tip's edge in the brush's plane and its corners in space; the preview has no
-            // screen frame for the square, so it takes the round one: the distance in the plane (exact along the tip's axes).
-            const float lateral = glm::length(onPlane(o, an));
+            // The solver measures the square tip's edge in the brush's plane (the tip's frame: alphaUp on the plane) and its
+            // corners in space. Without the frame (up = 0) the tip is round: the distance in the plane.
+            float lateral = glm::length(onPlane(o, an));
+            const glm::vec3 tipUp = onPlane(d.up, an);
+            if (glm::length(tipUp) > 1e-6f) {
+                const glm::vec3 u = glm::normalize(tipUp);
+                lateral = std::max(std::abs(glm::dot(o, u)), std::abs(glm::dot(o, glm::cross(u, an))));
+            }
             const float e = std::clamp((1.0f - lateral / r) / 0.35f, 0.0f, 1.0f);
             const float corner = std::clamp((kClayBlockReach - dist / r) / 0.3f, 0.0f, 1.0f);
             const float w = e * e * (3.0f - 2.0f * e) * corner * d.weight;

@@ -73,6 +73,7 @@ vec3 decodeNormal(uint a) {
 uniform vec4 uGhostA[64];    // centre, radius
 uniform vec4 uGhostB[64];    // area normal, strength x pressure
 uniform vec4 uGhostC[64];    // area centre, weight
+uniform vec4 uGhostD[64];    // Clay Block: the square tip's top edge (0: round)
 uniform int uGhostGroups;    // runs of dabs (one per mirror), each with a sphere holding its dabs
 uniform vec4 uGhostBound[8];
 uniform ivec2 uGhostRange[8]; // [first, end) of each run
@@ -136,6 +137,11 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
                 if (kind == 4) {
                     // (the round tip, its edge measured in the brush's plane, the corners in space: Ghost.cpp)
                     float lat = length(onPlane(x - c, an));
+                    vec3 tipUp = onPlane(uGhostD[i].xyz, an);
+                    if (dot(tipUp, tipUp) > 1e-12) {
+                        tipUp = normalize(tipUp);
+                        lat = max(abs(dot(x - c, tipUp)), abs(dot(x - c, cross(tipUp, an))));
+                    }
                     float e = clamp((1.0 - lat / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
                     float corner = clamp((1.3 - dist / r) / 0.3, 0.0, 1.0);
                     W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * (w * pull * corner);
@@ -1139,6 +1145,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.ghostA = at("uGhostA");
     p.ghostB = at("uGhostB");
     p.ghostC = at("uGhostC");
+    p.ghostD = at("uGhostD");
     p.ghostBound = at("uGhostBound");
     p.ghostKind = at("uGhostKind");
     p.ghostFocal = at("uGhostFocal");
@@ -4025,7 +4032,7 @@ void Renderer::setGhost(uint32_t id, const GhostStroke& ghost) {
 }
 
 void Renderer::setGhostUniforms(const MeshProgram& p) {
-    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs];
+    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs], u[GhostStroke::kMaxDabs];
     glm::vec4 bound[GhostStroke::kMaxMirrors];
     GLint range[GhostStroke::kMaxMirrors * 2];
     int groups = 0;
@@ -4035,6 +4042,7 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
         a[i] = glm::vec4(d.center, d.radius);
         b[i] = glm::vec4(d.normal, d.strength);
         c[i] = glm::vec4(d.areaCenter, d.weight);
+        u[i] = glm::vec4(d.up, 0.0f);
         const bool next = i == 0 || d.mirror != ghost_.dabs[i - 1].mirror;
         if (next) {
             if (groups == int(GhostStroke::kMaxMirrors)) break;
@@ -4058,6 +4066,7 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
     gl::Uniform4fv(p.ghostA, GLsizei(n), glm::value_ptr(a[0]));
     gl::Uniform4fv(p.ghostB, GLsizei(n), glm::value_ptr(b[0]));
     gl::Uniform4fv(p.ghostC, GLsizei(n), glm::value_ptr(c[0]));
+    gl::Uniform4fv(p.ghostD, GLsizei(n), glm::value_ptr(u[0]));
     gl::Uniform2i(p.ghostKind, GLint(ghost_.kind), ghost_.invert ? 1 : 0);
     gl::Uniform1f(p.ghostFocal, ghost_.focal);
     gl::Uniform1f(p.ghostEdge, ghost_.edge);

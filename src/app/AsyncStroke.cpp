@@ -594,6 +594,7 @@ void App::buildGhost() {
                      std::clamp(pressureStrengthOn() ? sd.pressure : 1.0f, 0.0f, 1.0f);
         d.areaCenter = d.center - n * depth;
         d.weight = sd.weight;
+        d.up = screenUpVector(lastDabAngle_); // (the square tip of Clay Block turns with the dabs' angle)
         base.push_back(d);
     }
     for (uint32_t m = 0; m < mirrors.size(); ++m)
@@ -602,6 +603,7 @@ void App::buildGhost() {
             d.center = mirrors[m].point(b.center);
             d.normal = mirrors[m].dir(b.normal);
             d.areaCenter = mirrors[m].point(b.areaCenter);
+            d.up = mirrors[m].dir(b.up);
             d.mirror = m;
             g.dabs.push_back(d);
         }
