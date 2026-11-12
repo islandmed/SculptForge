@@ -930,6 +930,20 @@ float App::topInset() const {
     return appleLaptop && notched && coversDisplay ? band : 0.0f;
 }
 
+void App::logWindowGeometry() const {
+    int w = 0, h = 0, pw = 0, ph = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+    SDL_Rect safe{};
+    SDL_GetWindowSafeArea(window_, &safe);
+    const CanvasRect c = canvasRect();
+    SDL_Log("window %dx%d (%dx%d px, density %.2f, display scale %.2f), safe area %d,%d %dx%d, UI scale %.2f, canvas %.0f,%.0f %.0fx%.0f, "
+            "palm guard %s",
+            w, h, pw, ph, double(SDL_GetWindowPixelDensity(window_)), double(SDL_GetWindowDisplayScale(window_)), safe.x, safe.y,
+            safe.w, safe.h, double(uiScale_), double(c.x), double(c.y), double(c.w), double(c.h),
+            uiPrefs_.tablet.palmRejection ? "on" : "off");
+}
+
 ShellGeometry App::shellGeometry() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
