@@ -132,7 +132,7 @@ void App::touchApply(const TwoFingerStep& step) {
 }
 
 bool App::palmGuard() const {
-    return palmRejection_ && palm_.active(double(SDL_GetTicksNS()) * 1e-9);
+    return uiPrefs_.tablet.palmRejection && palm_.active(double(SDL_GetTicksNS()) * 1e-9);
 }
 
 // A palm's touch: its mouse events never reach the canvas or the UI (App::dispatchEvent asks first), press to release.

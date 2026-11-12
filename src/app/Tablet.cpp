@@ -576,6 +576,11 @@ void App::drawTabletSection() {
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
                  "is where the pen is.",
                  path);
+    ImGui::Checkbox(tr("Ignore fingers while the pen is near##tablet_palm"), &t.palmRejection);
+    ui::HelpText("Palm rejection", nullptr,
+                 "A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, "
+                 "and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
+                 path);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ui::SliderInside("##tablet_view_speed", &t.viewSpeed, 0.1f, 2.0f, "View speed %.2f");
     ui::HelpText("View speed", nullptr,

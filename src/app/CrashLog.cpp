@@ -31,7 +31,8 @@
 #if defined(__linux__)
 #include <sys/prctl.h>
 #endif
-#if __has_include(<execinfo.h>)
+// (Android: bionic declares backtrace() from API 33 only; we build for 28)
+#if __has_include(<execinfo.h>) && (!defined(__ANDROID__) || __ANDROID_API__ >= 33)
 #include <execinfo.h>
 #define SF_HAVE_BACKTRACE 1
 #endif

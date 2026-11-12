@@ -9,6 +9,15 @@ All notable changes to SculptForge are listed here. The format follows
 ### Added
 - **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
   resting palm and do nothing; a trackpad's fingers are never ignored. Off on desktop touch screens.
+- **Android (early test build)**: SculptForge builds for Android tablets, phones and Chromebooks (arm64 and
+  x86_64, Android 9 or later, OpenGL ES 3.2) as a sideloaded APK. Sculpt with a finger or a stylus with pressure,
+  navigate with two fingers (pan, pinch to zoom, twist to roll), undo, save to the app's Projects folder and open any
+  file through the system's document picker. The desktop layout for now; a tablet layout of its own comes next
+  (android/README.md).
+- **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
+  resting palm and do nothing; a trackpad's fingers are never ignored. A pen that never reports leaving stops counting
+  after 3 s. Off on desktop touch screens; **Preferences > Tablet > Ignore fingers while the pen is near** turns it on
+  or off.
 
 ### Changed
 - **Braid** (Tool > Tube) now builds round strands (two to begin with) that twist over and under each other round the
@@ -18,6 +27,9 @@ All notable changes to SculptForge are listed here. The format follows
   **Spin** does what Turn did (turns the cross-section about the curve). A saved Turn loads as Spin; a Spin saved
   before this (degrees per radius of length) is dropped. `tube_set` and `tube_new` take `spin` (`turn` still works).
   Requested by Artizmo on Discord.
+- Release tooling: the members' beta is created in the insiders repository with its own tag target, so a beta no
+  longer stops at "tag has not been pushed".
+- Why page: the agents are described as testing for speed, stability and feel, with artists deciding what gets built.
 
 ## [0.12.10] - 2026-11-11
 
