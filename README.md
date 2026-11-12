@@ -5,7 +5,7 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
-  <strong>New in 0.12.11:</strong> braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less (<a href="https://sculptforge.app/guide/whats-new.html#version-01211">how it works</a>)
+  <strong>New in 0.12.12:</strong> the user guide is redesigned, with new pictures, and big Clay strokes no longer ring (<a href="https://sculptforge.app/guide/whats-new.html#version-01212">how it works</a>)
 </p>
 
 <p align="center">

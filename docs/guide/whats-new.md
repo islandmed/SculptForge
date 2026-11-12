@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.12
 
 ```features
-date: unreleased
+date: 2026-11-12
 tagline: The user guide is redesigned, with new pictures, and big Clay strokes no longer ring.
 highlight: The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips
 highlight: 25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded
@@ -16,6 +16,12 @@ highlight: The Voxel Resolution slider can be dragged onto a shelf in Customize 
 highlight: Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)
 highlight: Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times
 ```
+
+- **A friendlier User Guide**: every chapter opens with a picture and an "In short" box, menu paths show as chips, and
+  the Welcome page is a grid of places to start. **Help > User Guide** (Shift+F1).
+- **Clay on big brushes** leaves one even band, not a row of ring edges along the stroke.
+- **Customize Shelves**: the Voxel Resolution slider can be dragged from the Remesh palette onto a shelf
+  (Ctrl+Alt+drag) and stays there.
 
 ## Version 0.12.11
 
