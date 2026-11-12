@@ -182,6 +182,10 @@ Steps for a beta: `bump check ci tag release status`.
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
+  After the release is complete, `release_apk` adds the Android APKs (arm64-v8a, x86_64, signed with the CI runner's
+  debug key) from the android.yml run of the beta's commit to that private release, with `SHA256SUMS-android.txt`
+  (the signed `SHA256SUMS.txt` is left alone). Never the public release; no run, a red run, expired artifacts (14 days)
+  or a failed upload is a warning and the beta ships without them (`--from release` adds them later).
 - **status** prints the private release link, the invite command and the testers checklist (post it in #members).
 - No site, feed, AUR, Homebrew, Omarchy, winget or issue replies for a beta.
 

@@ -936,6 +936,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
       add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
       set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
+      set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
     endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
