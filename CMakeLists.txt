@@ -5,7 +5,7 @@ if(APPLE)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "beta.1")
+set(SCULPTFORGE_PRERELEASE "beta.2")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -22,6 +22,14 @@ set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names,
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
+# desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
+option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
+if(ANDROID)
+  set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
+  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
+endif()
 if(SCULPTFORGE_BUILD_TESTS)
   enable_testing()
 endif()
@@ -286,8 +294,9 @@ if(APPLE)
 endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
+# Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
 if(SF_ZSTD_FOUND)
@@ -420,7 +429,13 @@ if(SCULPTFORGE_BUILD_APP)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
-  add_executable(sculptforge
+  if(ANDROID)
+    add_library(sculptforge SHARED) # SDL's Java activity loads libmain.so and calls SDL_main
+    set_target_properties(sculptforge PROPERTIES OUTPUT_NAME main)
+  else()
+    add_executable(sculptforge)
+  endif()
+  target_sources(sculptforge PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
@@ -539,6 +554,12 @@ if(SCULPTFORGE_BUILD_APP)
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
                                             sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
+  if(SCULPTFORGE_GLES)
+    target_compile_definitions(sculptforge PRIVATE SF_GLES=1)
+  endif()
+  if(ANDROID)
+    target_link_libraries(sculptforge PRIVATE android log GLESv3 EGL)
+  endif()
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
@@ -923,7 +944,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
     # The members' beta step creates the release in the insiders repository with --target (its checkout has the tag, that repository not).
-    add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    # That step only runs on ubuntu, and the test's stand-in gh is a /bin/sh script Windows can't run: not on Windows.
+    if(NOT WIN32)
+        add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    endif()
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks

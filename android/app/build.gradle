@@ -1,0 +1,43 @@
+// The native libraries (libmain.so, libSDL3.so) and SDL's Java side come from scripts/android-build.sh, which passes
+// where it put them: -PsfJniLibs=<dir with arm64-v8a/...> -PsfSdlJava=<SDL's android-project java folder>.
+plugins {
+    id 'com.android.application'
+}
+
+def sfVersion = (project.findProperty('sfVersion') ?: '0.0.0').toString()
+def sfVersionCode = (project.findProperty('sfVersionCode') ?: '1').toString().toInteger()
+
+android {
+    namespace 'org.sculptforge.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.sculptforge.app'
+        minSdk 28 // Android 9: bionic's posix_spawn; every tablet of the floor tier (3-4 years old) is newer
+        targetSdk 35
+        versionCode sfVersionCode
+        versionName sfVersion
+    }
+    sourceSets {
+        main {
+            if (project.hasProperty('sfSdlJava')) java.srcDirs += project.property('sfSdlJava')
+            if (project.hasProperty('sfJniLibs')) jniLibs.srcDirs = [project.property('sfJniLibs')]
+            if (project.hasProperty('sfRes')) res.srcDirs += project.property('sfRes')
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false // (SDL's Java side is called from native code by name)
+            // Tester builds (M1) carry the build machine's debug key, so they install as they are; a new key on
+            // each CI runner means a tester uninstalls before installing a newer one. Release builds (-PsfUnsigned)
+            // stay unsigned for scripts/android-sign.sh and our release key.
+            signingConfig project.hasProperty('sfUnsigned') ? null : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    packagingOptions {
+        jniLibs { useLegacyPackaging false } // uncompressed and page-aligned: loaded straight from the APK
+    }
+}
