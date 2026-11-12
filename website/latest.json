@@ -1,11 +1,11 @@
 {
-  "version": "0.12.8",
+  "version": "0.12.9",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)",
-    "Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)",
-    "Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)"
+    "Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live",
+    "Faster Undo and Redo of a stroke on dense models of several million triangles (#181)",
+    "A click elsewhere after moving keeps the new Size or Intensity"
   ],
   "support": {
     "founding": {
