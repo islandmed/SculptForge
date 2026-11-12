@@ -1,0 +1,198 @@
+# Artist session 2, detail (tools/qa/artist_pass.py runs it; not a ctest case): divide a sphere to about 5 million
+# triangles and work it like a sculptor: Clay, Crease, Inflate, Pinch, Flatten and Smooth with varied sizes and speeds,
+# pen pressure light and heavy, fast flicks and a long pull, overlapping strokes, a mask that must hold, an alpha,
+# and undo on the big mesh. "print" lines feed the report.
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+camera 0 0
+key f
+wait 0.3
+remember triangles t0
+key ctrl+d
+key ctrl+d
+key ctrl+d
+wait_idle 120
+print longest_frame_ms
+print triangles
+expect_value triangles >= $t0*64
+expect_value open_edges == 0
+print solid_volume
+hover_window 0.97 0.5
+wait 0.3
+shot d01-divided
+
+# Each core brush once, the way it is meant: it must move the clay, and the right way (out or in).
+click "Clay##brush.clay"
+brush_size 60
+snapshot
+drag_path 0.30 0.30 0.40 0.26 0.50 0.25 0.60 0.26 0.70 0.30 S=0.8
+print longest_frame_ms
+expect_value moved > 0
+expect_value moved_out > 0
+click "Crease##brush.crease"
+brush_size 25
+snapshot
+drag_path 0.32 0.40 0.42 0.37 0.50 0.36 S=0.6
+print longest_frame_ms
+expect_value moved > 0
+expect_value moved_out < 0
+click "Inflate##brush.inflate"
+brush_size 50
+snapshot
+stroke 0.38 0.55 0.38 0.55
+stroke 0.38 0.55 0.38 0.55
+print longest_frame_ms
+expect_value moved_out > 0
+click "Pinch##brush.pinch"
+brush_size 40
+snapshot
+drag_path 0.30 0.70 0.40 0.68 0.50 0.70 S=0.6
+print longest_frame_ms
+expect_value moved > 0
+click "Flatten##brush.flatten"
+brush_size 70
+snapshot
+stroke 0.60 0.60 0.70 0.66 0.5
+print longest_frame_ms
+expect_value moved > 0
+hover_window 0.97 0.5
+wait 0.3
+shot d02-brushes
+
+# Smooth (Shift) must soften without shrinking the form.
+remember solid_volume v_before_smooth
+print solid_volume
+click "Clay##brush.clay"
+brush_size 60
+hold shift
+drag_path 0.30 0.30 0.50 0.25 0.70 0.30 S=1.0
+drag_path 0.30 0.30 0.50 0.25 0.70 0.30 S=1.0
+hold none
+print solid_volume
+print longest_frame_ms
+
+# Pen pressure: a light and a heavy Clay stroke on fresh areas; the heavy one must move clearly more.
+click "Clay##brush.clay"
+brush_size 40
+snapshot
+pen_stroke 0.30 0.82 0.45 0.82 0.15 0.2
+print moved_max
+remember moved_max light
+snapshot
+pen_stroke 0.55 0.82 0.70 0.82 0.9 1.0
+print moved_max
+expect_value moved_max > $light*2
+print pen_lost_samples
+expect_value pen_lost_samples == 0
+pen_stroke 0.30 0.88 0.70 0.88 0.1 1.0 tail 1.2
+print stroke_sample_pressure
+
+# Speed: three fast flicks and one long slow pull through many points; the dabs must keep up with the pointer.
+brush_size 30
+stroke 0.62 0.40 0.74 0.46 0.12
+print dab_error_px
+print last_stroke_dabs
+stroke 0.62 0.44 0.74 0.50 0.10
+stroke 0.62 0.48 0.74 0.54 0.08
+print dab_error_px
+print last_stroke_dabs
+drag_path 0.20 0.50 0.25 0.40 0.32 0.32 0.42 0.28 0.52 0.30 0.60 0.36 0.66 0.46 0.66 0.58 0.60 0.68 S=3.0
+print dab_error_px
+print longest_frame_ms
+
+# Twenty overlapping strokes in one spot, varied size: no tearing, no spikes.
+brush_size 35
+stroke 0.45 0.45 0.55 0.48 0.3
+stroke 0.46 0.47 0.54 0.44 0.3
+stroke 0.44 0.46 0.56 0.46 0.2
+stroke 0.47 0.43 0.53 0.50 0.2
+brush_size 20
+stroke 0.45 0.45 0.55 0.48 0.15
+stroke 0.46 0.47 0.54 0.44 0.15
+stroke 0.44 0.46 0.56 0.46 0.15
+stroke 0.47 0.43 0.53 0.50 0.15
+brush_size 50
+stroke 0.45 0.45 0.55 0.48 0.5
+stroke 0.46 0.47 0.54 0.44 0.5
+stroke 0.44 0.46 0.56 0.46 0.4
+stroke 0.47 0.43 0.53 0.50 0.4
+click "Crease##brush.crease"
+brush_size 15
+stroke 0.45 0.45 0.55 0.48 0.3
+stroke 0.46 0.47 0.54 0.44 0.3
+stroke 0.44 0.46 0.56 0.46 0.3
+stroke 0.47 0.43 0.53 0.50 0.3
+click "Inflate##brush.inflate"
+brush_size 25
+stroke 0.48 0.46 0.52 0.47 0.3
+stroke 0.49 0.45 0.51 0.48 0.3
+stroke 0.48 0.47 0.52 0.45 0.3
+stroke 0.50 0.44 0.50 0.49 0.3
+print longest_frame_ms
+expect_value open_edges == 0
+camera -25 -10
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot d03-overlap
+zoom 3
+wait 0.3
+shot d03b-overlap-close
+camera 0 0
+key f
+wait 0.3
+
+# Mask: Ctrl paints a mask; a stroke right across it must leave the masked clay alone.
+hold ctrl
+brush_size 60
+stroke 0.40 0.62 0.60 0.62 0.6
+hold none
+run mask_sharpen iterations=20
+print masked
+expect_value masked > 0
+click "Clay##brush.clay"
+snapshot
+stroke 0.30 0.62 0.70 0.62 0.6
+print moved_masked
+print moved
+expect_value moved > 0
+run mask_clear
+
+# An alpha: the stroke must stamp the pattern.
+run brush_set_alpha name=scales
+click "Standard##brush.standard"
+brush_size 80
+stroke 0.25 0.20 0.45 0.15 0.8
+run brush_set_alpha name=none
+hover_window 0.97 0.5
+wait 0.3
+shot d04-mask-alpha
+
+# Undo on the big mesh: instant and exact.
+snapshot
+click "Clay##brush.clay"
+brush_size 120
+stroke 0.30 0.50 0.70 0.50 0.8
+expect_value moved > 0
+print longest_frame_ms
+key ctrl+z
+wait 0.3
+print longest_frame_ms
+expect_value moved == 0
+key ctrl+shift+z
+wait 0.3
+print longest_frame_ms
+expect_value moved > 0
+
+# Orbit the big mesh like a person turning it to look.
+orbit 300 0
+orbit -150 60
+print longest_frame_ms
+camera -30 -12
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot d05-final

@@ -1,0 +1,44 @@
+# Alpha pool, Scale jitter and Position jitter (Alpha palette; member request: wood detail from scanned planks, where no two
+# stamps may look alike). The pool takes alphas one by one here (a folder is the same command with folder=), each dab draws
+# one at random, Clear puts the brush's own alpha back. CMake runs it at 1440 and 2880 px wide (ui_alpha_pool_1440 / _2880).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+click "Standard##brush.standard"
+click "Alpha##palette.alpha"
+wait 0.2
+expect_value alpha_pool_size == 0
+expect_value alpha_scale_jitter == 0
+shot empty
+
+# Jitter on its own: the sliders' values are the brush's.
+run brush_alpha_options scale_jitter=40 position_jitter=50 angle_jitter=180
+expect_value alpha_scale_jitter == 40
+expect_value alpha_position_jitter == 50
+snapshot
+stroke 0.2 0.5 0.8 0.5
+expect_value moved > 0
+snapshot
+stroke 0.2 0.6 0.8 0.6
+expect_value moved > 0
+
+# The pool: three procedural wood grains; the same one twice stays one.
+run brush_alpha_pool name="Procedural Wood Straight"
+run brush_alpha_pool name="Procedural Wood Cathedral"
+run brush_alpha_pool name="Procedural Wood Weathered"
+run brush_alpha_pool name="Procedural Wood Weathered"
+click "Alpha##palette.alpha"
+wait 0.3
+expect_value alpha_pool_size == 3
+expect "Clear##alphapool"
+shot pooled
+snapshot
+stroke 0.2 0.4 0.8 0.4
+expect_value moved > 0
+
+# Clear: the brush's own alpha again (the palette closes with a stroke: open it again).
+click "Alpha##palette.alpha"
+wait 0.3
+click "Clear##alphapool"
+wait 0.1
+expect_value alpha_pool_size == 0

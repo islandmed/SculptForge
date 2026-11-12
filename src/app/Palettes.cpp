@@ -22,12 +22,15 @@
 
 #include <IconsLucide.h>
 
+#include <imgui_internal.h>
+
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <iterator>
 #include <string>
+#include <utility>
 
 namespace sf {
 
@@ -43,6 +46,7 @@ const PaletteDef* palettes(int& count) {
         {"generate", "Generate", ICON_LC_WAND_SPARKLES, nullptr, &App::drawPalette_Generate},
         {"help", "Help", ICON_LC_CIRCLE_HELP, nullptr, &App::drawPalette_Help},
         {"material", "Material", ICON_LC_SUN, "Vertex Paint & Materials", &App::drawPalette_Material},
+        {"mypanel", "My Panel", ICON_LC_STAR, nullptr, &App::drawPalette_MyPanel},
         {"preferences", "Preferences", ICON_LC_SETTINGS, nullptr, &App::drawPalette_Preferences},
         {"render", "Render", ICON_LC_EYE, nullptr, &App::drawPalette_Render},
         {"script", "Script", ICON_LC_SQUARE_TERMINAL, nullptr, &App::drawPalette_Script},
@@ -68,7 +72,7 @@ const TaskMenuDef* taskMenus(int& count) {
     // is shaded (Lit Sphere materials, PBR) and the Gaussian splats.
     static const TaskMenuDef kMenus[] = {
         {"file", "File", {"file", "script", nullptr}, {nullptr, nullptr}},
-        {"edit", "Edit", {"edit", "preferences", nullptr}, {nullptr, nullptr}},
+        {"edit", "Edit", {"edit", "mypanel", "preferences", nullptr}, {nullptr, nullptr, nullptr}},
         {"sculpt", "Sculpt", {"brush", "draw", "stroke", "alpha", "transform", nullptr}, {nullptr, "Draw & Tablet", nullptr, nullptr, "Symmetry & Gizmo"}},
         {"paint", "Paint", {"color", nullptr}, {"Vertex Paint & Color"}},
         {"mesh", "Mesh", {"tool", "generate", nullptr}, {"Parts & Geometry", "Generate 3D"}},
@@ -179,16 +183,24 @@ void drawOptionRow(App& app, std::initializer_list<const char*> ids) {
     ImGui::PopStyleColor(3);
 }
 
+// App::drawMyPanelSection runs a palette body with its items skipped and lets one section through: that section's
+// Section object (constructed right after subpalette() says yes) ends the pass.
+bool g_captureNext = false;
+
 } // namespace
 
 namespace tray {
 
-Section::Section() { ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f); }
+Section::Section() {
+    ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f);
+    capture_ = std::exchange(g_captureNext, false);
+}
 
 Section::~Section() {
     const float s = ImGui::GetFontSize() / 15.0f;
     ImGui::Unindent(kSectionInset * s);
     ImGui::Dummy(ImVec2(0, 4.0f * s));
+    if (capture_) ImGui::GetCurrentWindow()->SkipItems = true; // the rest of the palette body is not wanted
 }
 
 Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, checkMark()); }
@@ -240,6 +252,17 @@ bool SliderInt(const char* id, int* v, int lo, int hi, const char* format, ImGui
 } // namespace tray
 
 bool App::subpalette(const char* id, const char* englishTitle) {
+    if (!myPanelSection_.empty()) { // My Panel draws this section's body and nothing else of the palette
+        const bool mine = myPanelSection_ == id;
+        if (mine) {
+            auto& title = myPanelTitles_[id];
+            if (title != englishTitle) title = englishTitle;
+        }
+        const bool draw = mine && !myPanelProbe_;
+        ImGui::GetCurrentWindow()->SkipItems = !draw;
+        g_captureNext = draw;
+        return draw;
+    }
     const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
     auto& open = layout_.openSubpalettes;
     bool isOpen = std::find(open.begin(), open.end(), id) != open.end();
@@ -247,8 +270,10 @@ bool App::subpalette(const char* id, const char* englishTitle) {
     const float h = kSectionHeaderH * s;
     const ImVec2 p = ImGui::GetCursorScreenPos();
     const float w = ImGui::GetContentRegionAvail().x;
-    const bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
+    bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
     const bool hovered = ImGui::IsItemHovered();
+    ui::MyPanelDragSource(id, true, title);
+    if (clicked && ui::MyPanelDragged()) clicked = false; // the end of an Alt-drag into My Panel, not a click
     // A quiet section header in the palette header's grammar: title at the left, chevron at the right. No fill until
     // hovered or open, a hairline under it. The title lines up with the section's content (tray::Section). The accent
     // is kept for the current tool (docs/ui-design.md §10), so an open section shows by its fill and text only.
@@ -532,6 +557,14 @@ void App::drawPalette_Edit() {
             a->run();
         }
         ui::HelpAction(*this, "ui.palette.preferences");
+        // My Panel is on the bar only once it holds something or sits in a tray; Edit is where it is found.
+        const std::string myLabel = std::string(tr("My Panel")) + "...##edit.mypanel";
+        const std::string myKey = actions().shortcutText("ui.my_panel");
+        if (ImGui::MenuItem(myLabel.c_str(), myKey.empty() ? nullptr : myKey.c_str())) {
+            dropdown_ = "mypanel";
+            openDropdown_ = true;
+        }
+        ui::HelpAction(*this, "ui.my_panel");
     }
 }
 
@@ -780,6 +813,7 @@ void App::drawPalette_Render() {
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     drawViewsSection();
+    drawReferencesSection(); // View > Reference images (ReferenceImages.cpp)
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }

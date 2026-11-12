@@ -236,6 +236,27 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 > open as drop-downs only. The left-shelf tiles get smaller and the bottom shelf scrolls sideways with the
 > mouse wheel.
 
+## My Panel
+
+**My Panel** is a panel you build yourself, out of the buttons and sections you use most. It is in the **Edit** menu
+(**Edit > My Panel...**; the Classic layout's palette bar shows it once it holds something or sits in a tray), and it
+works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
+
+- **Add a button or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into My Panel.
+  A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons you press
+  all day. A line shows where it will land.
+- **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
+- **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
+  and choose **Remove from My Panel**.
+- **Fold a section** in My Panel by clicking its title. This does not change the same section in its own palette.
+- **Open it where you are working**: press <kbd>F4</kbd> (change the key in **Edit > Preferences > Hotkeys**, the action is
+  **My Panel**). My Panel appears at the cursor; press the key again or <kbd>Esc</kbd> to close it.
+
+Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
+In a My Panel kept in a window of its own you can reorder and remove entries, but to add one, drag it in from the main
+window first. What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset Layout**
+empties it.
+
 ## The shelves
 
 Shelves surround the canvas and hold the controls you use all the time. Point at anything with <kbd>Ctrl</kbd>
@@ -506,8 +527,8 @@ See [Scripting and automation](scripting.md) for the command language, scripts a
 ## Customizing the interface
 
 Everything about the layout can change: which palettes sit in the trays, what's on each shelf, and which keys
-do what. **Shortcuts and preferences save themselves**; layout changes (shelves, trays) last until you quit unless
-you keep them with **Save Layout**.
+do what. **Shortcuts, preferences and the layout save themselves** (the layout a couple of seconds after a change and when
+you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns to.
 
 ### Move, add and remove shelf items
 
@@ -539,21 +560,22 @@ which action lost it.
 ### Saving preferences and layouts
 
 Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
-after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
-All in **Edit > Preferences > Saving & Layouts**:
+after you change it; there is nothing to press. So does the layout: what you change in the shelves, trays and open palettes is
+written a couple of seconds later and when you quit, so a restart or a crash brings it back. **Save Layout** marks a layout you
+like, so **Revert to Saved Layout** can return to it later. All in **Edit > Preferences > Saving & Layouts**:
 
 | Item | What it does |
 |---|---|
-| **Save Layout** | Keeps the current shelves, trays and open palettes for future sessions |
-| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept |
-| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Save Layout afterwards to keep the layout) |
+| **Save Layout** | Marks the current shelves, trays and open palettes as the layout Revert returns to |
+| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept (the autosave then keeps that one) |
+| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Revert to Saved Layout still returns to the one Save Layout kept) |
 | **Export Interface...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
-| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Save Layout afterwards to keep its layout) |
+| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (its layout saves itself like any other) |
 
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
-The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Edit > Preferences > Saving & Layouts > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
+The first time you change the layout in a session, the status line tells you once: "Layout changes save themselves -
+Edit > Preferences > Saving & Layouts > Save Layout sets what Revert returns to". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
@@ -565,8 +587,8 @@ arrangements of the current layout:
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
-A preset changes the layout only (the console, Library and left-handed setting stay as they are). Save
-Layout keeps it.
+A preset changes the layout only (the console, Library and left-handed setting stay as they are). The
+layout saves itself.
 
 ### Interface preferences
 
@@ -643,7 +665,7 @@ way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Spac
 left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
 [Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
 **Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
-[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. See
+[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. **Orbit around the pointer** (on for new installs) turns the view about the point of the model under the pointer when a rotation starts over it (see [Navigation](navigation.md#orbit-around-the-pointer)). See
 [Quick tour for experienced sculptors](quick-tour.md).
 
 ### The background

@@ -3,7 +3,8 @@
 Keep Blender for the scene, rigging, shading and animation, and sculpt in SculptForge: the **SculptForge Bridge**
 add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends
 them back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
-It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer.
+It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer. Gaussian
+splats go the same way with Blender 5.3 or newer ([Splats with Blender](#splats-with-blender)).
 
 ## Install the add-on
 
@@ -143,6 +144,48 @@ SculptForge's VDM brushes and Blender's use the same maps (see
   **Non-Color**), set **Mapping** to **Area Plane**, turn on **Vector Displacement**, then set the stroke method
   to **Anchored** and Strength to 1. Drag on the model to stamp it.
 
+## Splats with Blender
+
+Blender 5.3 draws Gaussian splats natively (a point cloud of the type **3D Gaussian Splat**) and imports them, but it
+can't save them. With the add-on, splats go the same way meshes do, both ways, with everything that makes a splat look
+right: positions, sizes, rotations, opacity and colour including the view-dependent colour (spherical
+harmonics, up to degree 3). It needs Blender 5.3 or newer; on older versions the splat buttons say so and the mesh
+bridge works as before. The file formats and what SculptForge does with a capture are in
+[Gaussian splats](splats.md).
+
+**From Blender to SculptForge**
+
+1. Select the splat object (import a capture with **File > Import > Stanford PLY (.ply)**, or just drop a `.ply` or
+   `.spz` capture on Blender's viewport).
+2. Click **Send to SculptForge**. The capture loads next to your sculpt, as a reference, exactly as if you had opened
+   the PLY there, placed as it is in the Blender scene. (A scene holds one capture: with several selected, the first
+   goes.)
+
+**From SculptForge to Blender**
+
+1. With splats loaded (a capture, or **Sculpt to splats**), choose **File > Blender > Send to Blender**.
+2. They arrive as a splat object named after the capture. Send again and the same object is updated in place, with
+   its materials and modifiers; **Flip**, **Turn 90** and **Fit** in SculptForge move the object, not the splats.
+
+![Splats in SculptForge, ready to send to Blender](images/splats.jpg)
+
+**Drag and drop**
+
+- Drop a `.ply` or `.spz` capture on **Blender's viewport**: Blender 5.3 imports it as splats by itself. The add-on adds
+  the compact `.splat` format (the one many web viewers use) to that.
+- Drop a `.ply`, `.splat`, `.glb` or OpenUSD splat file on **SculptForge's window**: it loads as a reference.
+
+**Saving splats from Blender**
+
+**File > Export > Gaussian Splats (.ply)** saves the selected splat object as a standard 3D Gaussian Splatting PLY
+(Blender has no splat export of its own), which SculptForge, SuperSplat, Postshot and most tools open. By default it
+applies the object's transform; turn off **Apply Object Transform** to write the splats as they are in the object. A
+turned splat keeps its plain colour but loses its view-dependent colour, because that would point the wrong way.
+
+> **Note:** Blender's own **Apply > All Transforms** doesn't update a splat's rotations and spherical harmonics yet
+> (Blender 5.3 release notes), so move splat objects with their transform and let SculptForge or the export apply it.
+> Blender also assumes splats are in sRGB, so very faint, bright splats can look different from a splat viewer.
+
 ## How it works
 
 The two programs share a folder in your user data: `~/.local/share/SculptForge/SculptForge/blender` on Linux,
@@ -170,6 +213,8 @@ SculptForge with `--blender` loads what Blender last sent.
 - **Nothing arrives in SculptForge?** Check **File > Blender > Receive automatically**, or choose **Receive from
   Blender**. **Nothing arrives in Blender?** Click **Receive from SculptForge**; automatic receiving starts after the
   first send from that Blender session.
+- **Splats** need Blender 5.3 or newer. With several splat objects selected only the first is sent (SculptForge holds one
+  capture); the compact `.splat` format loses a little precision in colour and rotation, and has no view-dependent colour.
 - Objects in Edit Mode or Sculpt Mode are updated too: the add-on switches to Object Mode for the update and back.
 
 ## See also

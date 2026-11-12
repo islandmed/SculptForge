@@ -1,7 +1,7 @@
 # Quick tour for experienced sculptors
 
 You know how to sculpt; you just need to know where SculptForge keeps things. This chapter is the same ten stops
-as the in-app tour: **Help > Quick tour**, or **Sculpted before? Take the quick tour** in the welcome. Each slide
+as the in-app tour: **Help > Quick tour**, or **Quick tour** in the welcome. Each slide
 there has a **Show me** button that opens the panel it talks about and flashes it, while the tour waits in a small
 bar at the bottom of the view (**Back to the tour** brings it back).
 

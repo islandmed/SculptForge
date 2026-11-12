@@ -1,0 +1,25 @@
+# The same with Dynamic Topology on (#181): its steps change triangles, not just positions.
+run new_sphere triangles=2000000
+run dyntopo enabled=true detail=50
+camera 0 0
+wait 2
+stroke 0.3 0.4 0.7 0.6 0.8
+wait 0.7
+stroke 0.3 0.6 0.7 0.4 0.8
+wait 0.7
+stroke 0.4 0.3 0.6 0.7 0.8
+wait 0.7
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+shift+z
+wait 0.8
+key ctrl+shift+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8

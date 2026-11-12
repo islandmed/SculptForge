@@ -148,7 +148,8 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
         for (int pass = 0; pass < 2; ++pass)
             stroke(d, nullptr, bt, {{-0.5f, 0.35f, 2.0f}, {0.0f, -0.3f, 2.0f}, {0.5f, 0.35f, 2.0f}}, 0.22f, 1.0f, false);
         break;
-    case BrushType::Smooth: { // a bumpy ridge, its right half smoothed away
+    case BrushType::Smooth:
+    case BrushType::SmoothPeaks: { // a bumpy ridge, its right half smoothed away (the peaks come down)
         for (int i = 0; i < 7; ++i)
             for (int pass = 0; pass < 4; ++pass)
                 stroke(d, nullptr, BrushType::Standard, {glm::vec3(-0.6f + 0.2f * float(i), 0.0f, 2.0f)}, 0.13f, 1.0f, false);

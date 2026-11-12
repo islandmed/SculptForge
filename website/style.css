@@ -234,6 +234,7 @@ p { margin: 0 0 1em; }
   .hero-copy { display: contents; }
   .new-badge { order: 0; font-size: 0.8rem; margin-bottom: 14px; justify-self: start; }
   .eyebrow { order: 1; font-size: 0.72rem; margin-bottom: 0.7em; }
+  .hero-news { order: 1; margin: -0.2em 0 0.9em; font-size: 0.9rem; }
   .hero h1 { order: 2; font-size: 2.6rem; margin-bottom: 0.35em; }
   .lede { display: none; }
   .lede-short { display: block; order: 3; color: #cfcfd6; font-size: 1.05rem; margin-bottom: 1.2em; }
@@ -820,3 +821,25 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .nav .brand-wordmark { display: none; }
   .nav .brand-cube { display: block; height: 34px; }
 }
+
+/* Announcement bar under the nav (index.html .news-bar): the newest release, rewritten by build_site.py; x is remembered per version. */
+.news-bar { background: rgba(242, 140, 60, 0.08); border-bottom: 1px solid var(--border); }
+.news-bar[hidden] { display: none; }
+.news-bar-inner { display: flex; align-items: center; gap: 8px; min-height: 40px; max-height: 44px; }
+.news-bar-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 0.92rem; line-height: 1.3; }
+.news-bar-link:hover { text-decoration: none; color: #fff; }
+.news-bar-link:hover .news-bar-go { transform: translateX(3px); }
+.news-pill { flex: none; background: var(--accent); color: #1a0d04; font-weight: 600; font-size: 0.72rem; padding: 2px 9px; border-radius: 999px; }
+.news-bar-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.news-bar-go { flex: none; color: var(--accent-2); transition: transform 0.15s; }
+.news-bar-x { flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.news-bar-x:hover, .news-bar-x:focus-visible { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+@media (max-width: 620px) {
+  .news-bar-inner { max-height: none; padding-top: 6px; padding-bottom: 6px; }
+  .news-bar-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 0.84rem; }
+  .news-bar-go { display: none; }
+}
+.hero-news { margin: 0.5em 0 0.9em; font-size: 0.95rem; line-height: 1.4; }
+.hero-news a { color: var(--text); }
+.hero-news a:hover { text-decoration: none; color: #fff; }
+.hero-news strong { color: var(--accent-2); font-weight: 600; }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.6 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.8 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -61,6 +61,7 @@ add_library(sculptforge_core STATIC
   src/core/HardwareTier.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/ModifierBrush.cpp
   src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
@@ -112,10 +113,13 @@ add_library(sculptforge_core STATIC
   src/core/EnginePresets.cpp
   src/core/Masking.cpp
   src/core/Cut.cpp
+  src/core/MeshBoolean.cpp
+  src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
+  src/core/Reference.cpp
   src/core/Stroke.cpp
   src/core/Precision.cpp
   src/core/PathStroke.cpp
@@ -411,6 +415,7 @@ if(SCULPTFORGE_BUILD_APP)
     splashWordmark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-wordmark.png # the start-up splash: wordmark and brand bust
     splashBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-bust.png # (StartupSplashWindow.cpp; the bust is website/press/sculptforge-bust-1024.png at 576 px, 256 colours)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
+    socialIcons ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/social/social-icons.png # the community icon strip (Welcome; tools/brand/make_social_icons.py)
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
@@ -438,6 +443,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/UserGlyphs.cpp
     src/app/Shell.cpp
     src/app/PanelWindows.cpp
+    src/app/PanelMyPanel.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
     src/app/CommandPalette.cpp
@@ -456,6 +462,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/BrushSettingsUi.cpp
+    src/app/ModifierBrush.cpp
     src/app/PanelVdm.cpp
     src/app/PanelKelvinlet.cpp
     src/app/PanelCloth.cpp
@@ -466,6 +473,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelVertexPaint.cpp
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
+    src/app/ReferenceImages.cpp
     src/app/PanelPacks.cpp
     src/app/PanelPlugins.cpp
     src/app/PanelBrushSets.cpp
@@ -496,6 +504,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelProject.cpp
     src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
+    src/app/BooleanPreview.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
@@ -554,8 +563,7 @@ if(SCULPTFORGE_BUILD_APP)
     target_compile_options(sculptforge PRIVATE -Wall -Wextra -Wno-unused-parameter)
   endif()
   sculptforge_pch(sculptforge <imgui.h>)
-  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
-                              PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   if(WIN32)
     set_target_properties(sculptforge PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release,MinSizeRel>)
     set(ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.ico")
@@ -770,6 +778,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
   add_test(NAME figure_pose_bench COMMAND sculptforge_tests --nightly nightly_figure_pose_bench)
   set_tests_properties(figure_pose_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
+  # SF_BOOLEAN_BENCH=1: Part Booleans on 2 x 100k and 2 x 1M triangles (tests/test_mesh_boolean.cpp).
+  add_test(NAME boolean_bench COMMAND sculptforge_tests --nightly nightly_boolean_bench)
+  set_tests_properties(boolean_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
   # SF_DECIMATE_AB=1: decimate() with and without its valence cap (tests/test_decimate_valence.cpp).
   add_test(NAME decimate_valence_ab COMMAND sculptforge_tests --nightly nightly_decimate_valence_cap)
   set_tests_properties(decimate_valence_ab PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
@@ -1069,6 +1080,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
+    # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
+    sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
+    sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
+    # View > Reference images (tests/ui/reference_images.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(reference_images_1440 reference_images --size 1440x900)
+    sculptforge_ui_test(reference_images_2880 reference_images --size 2880x1800)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
@@ -1076,9 +1096,20 @@ if(SCULPTFORGE_BUILD_TESTS)
     # at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
     sculptforge_ui_test(layout_revert_2880 layout_revert --size 2880x1800)
+    # The layout saves itself; Save Layout marks what Revert returns to (tests/ui/layout_autosave.sfui).
+    sculptforge_ui_test(layout_autosave_1440 layout_autosave --size 1440x900)
+    sculptforge_ui_test(layout_autosave_2880 layout_autosave --size 2880x1800)
     # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
     sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
     sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
+    # Crisp Flatten's chamfer, grazing views and Brush Lab options (tests/ui/crisp_flatten.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(crisp_flatten_1440 crisp_flatten --size 1440x900)
+    sculptforge_ui_test(crisp_flatten_2880 crisp_flatten --size 2880x1800)
+    # Smooth Peaks (tests/ui/smooth_peaks.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(smooth_peaks_1440 smooth_peaks --size 1440x900)
+    sculptforge_ui_test(smooth_peaks_2880 smooth_peaks --size 2880x1800)
+    sculptforge_ui_test(key_sequence_1440 key_sequence --size 1440x900)
+    sculptforge_ui_test(key_sequence_2880 key_sequence --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
@@ -1111,6 +1142,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A free Space that returns no model / switched Text to 3D off (tests/ui/generate_space_refused.sfui).
     sculptforge_ui_test(generate_space_refused_1440 generate_space_refused --size 1440x900)
     sculptforge_ui_test(generate_space_refused_2880 generate_space_refused --size 2880x1800)
+    sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
+    sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px
@@ -1125,12 +1158,20 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Drape on the Full Body (centimetres) at its default Units per metre: comes to rest (tests/ui/cloth_drape_units.sfui).
     sculptforge_ui_test(cloth_drape_units_1440 cloth_drape_units --size 1440x900)
     sculptforge_ui_test(cloth_drape_units_2880 cloth_drape_units --size 2880x1800)
+    # Tube strands (a spring) and Repeat along curve at 1440 and 2880 px (tests/ui/tube_modifiers.sfui).
+    sculptforge_ui_test(tube_modifiers_1440 tube_modifiers --size 1440x900)
+    sculptforge_ui_test(tube_modifiers_2880 tube_modifiers --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
     # #173's levels prompt before a remesh or decimate (tests/ui/levels_confirm.sfui).
     sculptforge_ui_test(levels_confirm_1440 levels_confirm --size 1440x900)
     sculptforge_ui_test(levels_confirm_2880 levels_confirm --size 2880x1800)
+    # The same prompt before Mirror, Make Symmetric, Delete Masked, Split and Merge by Distance, and its Preferences switch.
+    sculptforge_ui_test(levels_confirm_ops_1440 levels_confirm_ops --size 1440x900)
+    sculptforge_ui_test(levels_confirm_ops_2880 levels_confirm_ops --size 2880x1800)
+    sculptforge_ui_test(levels_confirm_prefs_1440 levels_confirm_prefs --size 1440x900)
+    sculptforge_ui_test(levels_confirm_prefs_2880 levels_confirm_prefs --size 2880x1800)
     # The Tool sub-palettes named and ordered by task (tests/ui/tool_palettes.sfui; narrow/ at 1024).
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)
@@ -1154,6 +1195,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
     # Help > Support (the welcome screen) and the full membership card at 1440 px: the perk lines fit (100 % and 200 %).
     sculptforge_ui_test(support_1440 support --size 1440x900)
+    sculptforge_ui_test(support_2880 support --size 2880x1620) # the welcome and About at 200 %: the icon rows keep their line
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
@@ -1240,9 +1282,19 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Panels in windows of their own (Founding Member #1's request), for the look review at 1440 px, 100 % and 200 %.
     sculptforge_ui_test(detach_panels_1440 sizes/detach_panels --size 1440x900)
     sculptforge_ui_test(detach_panels_1440_200 sizes/detach_panels --size 2880x1800)
+    # My Panel (Member Request), for the look review at 1440 px, 100 % and 200 %.
+    sculptforge_ui_test(my_panel_1440 sizes/my_panel --size 1440x900)
+    sculptforge_ui_test(my_panel_1440_200 sizes/my_panel --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
+    # A Threads value saved in Preferences reaches the shared pool at the next start (#184; the 0.12.5 fix never ran in the
+    # real app, the App's Document started the pool at 16 first). Starts the app twice, offscreen.
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME threads_restart COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/threads_restart.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/threads-restart-test)
+      set_tests_properties(threads_restart PROPERTIES LABELS ui TIMEOUT 300)
+    endif()
     # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
     # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
     # nightly holds it to 2 %).

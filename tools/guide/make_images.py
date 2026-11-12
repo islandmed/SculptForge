@@ -55,6 +55,7 @@ CROPS = {
     "splats": ("splats", (300, 90, 1280, 865), 980),
     "user-guide": ("user-guide", (138, 108, 1180, 842), 1042),
     "extract": ("extract", (380, 140, 1000, 740), 620),
+    "booleans": ("booleans", (380, 46, 1600, 900), 960),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
     "qremesh": ("qremesh", (0, 0, 1600, 960), MAX_WIDTH),
 }
