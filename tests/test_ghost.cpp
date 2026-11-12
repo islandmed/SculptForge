@@ -111,6 +111,62 @@ TEST(ghost_estimates_a_curved_surface_closely) {
     CHECK(e.worst < e.moved * 0.1f);
 }
 
+TEST(ghost_matches_solver_per_vertex_at_every_intensity) {
+    // GEOMETRIC INVARIANT (11-12): for every brush the preview models, the vertex the ghost draws is the vertex the
+    // solver places, at Intensity 0.1 / 0.35 / 1.0, with and without pen pressure, on a bumpy seeded sphere (a bump
+    // puts surface on both sides of every plane brush's plane). Clay and Clay Block drew 1.43x too much at 0.35
+    // (the preview skipped clayPull). Clay Block's square tip needs the brush's screen frame, which the preview lacks:
+    // it is compared on the tip's two axes, where the round tip agrees with the square one.
+    Mesh bumpy = makeIcosphere(6);
+    for (size_t v = 0; v < bumpy.positions.size(); ++v) {
+        const glm::vec3 q = bumpy.positions[v];
+        bumpy.positions[v] *= 1.0f + 0.03f * std::sin(9.0f * q.x + 2.0f * q.y) * std::cos(7.0f * q.z - q.x);
+    }
+    bumpy.recomputeAllNormals();
+    struct Case { BrushType type; const char* name; };
+    const Case cases[] = {{BrushType::Standard, "Standard"}, {BrushType::Inflate, "Inflate"}, {BrushType::Clay, "Clay"},
+                          {BrushType::ClayBlock, "Clay Block"}, {BrushType::Flatten, "Flatten"},
+                          {BrushType::Crease, "Crease"}, {BrushType::Pinch, "Pinch"},
+                          {BrushType::SharpCrease, "Sharp Crease"}, {BrushType::Trim, "Trim"}};
+    for (const Case& c : cases) {
+        for (float intensity : {0.1f, 0.35f, 1.0f}) {
+            for (float pressure : {1.0f, 0.6f}) {
+                DabParams p;
+                p.center = glm::normalize(glm::vec3(0.25f, 0.35f, 1.0f)) * 1.01f;
+                p.radius = 0.35f;
+                p.strength = intensity;
+                p.pressure = pressure;
+                p.viewDir = glm::vec3(0.0f, 0.0f, -1.0f);
+                Document doc = makeDoc(bumpy);
+                const std::vector<glm::vec3> before = doc.mesh.positions, normals = doc.mesh.normals;
+                doc.sculptor.beginStroke(doc.mesh, "test");
+                doc.sculptor.dab(doc.mesh, doc.bvh, c.type, p, Symmetry{false, false, false});
+                const GhostStroke g = ghostOf(c.type, doc.sculptor.lastFrame, p, Symmetry{false, false, false});
+                doc.sculptor.endStroke();
+                const glm::vec3 an = glm::normalize(doc.sculptor.lastFrame.normal);
+                glm::vec3 up = glm::vec3(0, 1, 0) - an * an.y; // Sculptor's tip frame for alphaUp = +Y
+                up = glm::normalize(up);
+                const glm::vec3 right = glm::cross(up, an);
+                float worst = 0.0f, moved = 0.0f;
+                for (size_t v = 0; v < before.size(); ++v) {
+                    if (c.type == BrushType::ClayBlock) {
+                        const glm::vec3 o = before[v] - p.center;
+                        const float a = std::abs(glm::dot(o, right)), b = std::abs(glm::dot(o, up));
+                        if (std::min(a, b) > 0.02f * p.radius) continue;
+                    }
+                    worst = std::max(worst, glm::distance(ghostMove(g, before[v], normals[v]), doc.mesh.positions[v]));
+                    moved = std::max(moved, glm::distance(before[v], doc.mesh.positions[v]));
+                }
+                const bool ok = worst <= std::max(moved * 0.01f, 1e-6f);
+                if (!ok)
+                    std::printf("ghost vs solver: %s intensity %.2f pressure %.1f: worst %.6f of a move up to %.6f\n", c.name,
+                                intensity, pressure, worst, moved);
+                CHECK(ok);
+            }
+        }
+    }
+}
+
 TEST(ghost_kinds_cover_the_displacement_brushes) {
     CHECK(ghostKindForBrush(int(BrushType::Standard)) == GhostKind::Standard);
     CHECK(ghostKindForBrush(int(BrushType::Clay)) == GhostKind::Clay);
