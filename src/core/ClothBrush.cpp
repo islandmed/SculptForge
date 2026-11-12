@@ -27,6 +27,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <span>
 #include <unordered_map>
 
 namespace sf {
@@ -92,8 +93,150 @@ struct ClothStroke {
     std::vector<float> driveWeight;
     std::vector<uint32_t> ringOffset, ring; // per region vertex, its neighbours in the region (CSR, from the edges)
     std::vector<glm::vec3> anchor;          // Grab: the first dab's centre per symmetry copy
+    std::vector<size_t> inverseOf;          // per symmetry copy, the index of its inverse
+    std::vector<std::vector<uint32_t>> partner; // per symmetry copy, per region vertex: the vertex at the copy's image of it (~0u: none)
+    std::vector<glm::vec3> mean;            // scratch for symmetrize
+    std::vector<glm::uvec3> tris;           // the region's triangles (region indices)
+    std::vector<int32_t> triNbr;            // per triangle, the triangle across each edge (-1: none in the region)
     std::unordered_map<uint32_t, float> grow; // Inflate: per mesh vertex, its rest-length scale (1 = as at the start)
 };
+
+namespace {
+
+// For each symmetry copy, the region vertex that sits where the copy puts each region vertex (at the stroke-start shape),
+// within a hundredth of an edge. A mesh that is symmetric has all of them; anywhere it is not, the vertex has none.
+void matchPartners(ClothStroke& cs, std::span<const SymCopy> copies) {
+    cs.partner.clear();
+    if (copies.size() < 2 || cs.restLocal.empty()) return;
+    cs.inverseOf = symmetryInverses(copies);
+    const size_t n = cs.restLocal.size();
+    const float cell = 0.5f * cs.meanEdge, tol = 0.01f * cs.meanEdge;
+    const auto cellOf = [&](const glm::vec3& p) { return glm::ivec3(glm::floor(p / cell)); };
+    const auto keyOf = [](const glm::ivec3& c) {
+        constexpr uint64_t kBias = 1u << 20, kMask = (1u << 21) - 1;
+        return ((uint64_t(c.x + int(kBias)) & kMask) << 42) | ((uint64_t(c.y + int(kBias)) & kMask) << 21) |
+               (uint64_t(c.z + int(kBias)) & kMask);
+    };
+    std::vector<std::pair<uint64_t, uint32_t>> grid(n);
+    for (size_t i = 0; i < n; ++i) grid[i] = {keyOf(cellOf(cs.restLocal[i])), uint32_t(i)};
+    std::sort(grid.begin(), grid.end());
+    cs.partner.assign(copies.size(), {});
+    for (size_t m = 1; m < copies.size(); ++m) {
+        std::vector<uint32_t>& out = cs.partner[m];
+        out.assign(n, ~0u);
+        poolFor(n, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const glm::vec3 q = copies[m].point(cs.restLocal[i]);
+                const glm::ivec3 lo = cellOf(q - glm::vec3(tol)), hi = cellOf(q + glm::vec3(tol));
+                float best = tol * tol;
+                for (int z = lo.z; z <= hi.z; ++z)
+                    for (int y = lo.y; y <= hi.y; ++y)
+                        for (int x = lo.x; x <= hi.x; ++x) {
+                            const uint64_t key = keyOf({x, y, z});
+                            auto it = std::lower_bound(grid.begin(), grid.end(), std::make_pair(key, 0u));
+                            for (; it != grid.end() && it->first == key; ++it) {
+                                const glm::vec3 d = cs.restLocal[it->second] - q;
+                                if (const float d2 = glm::dot(d, d); d2 <= best) best = d2, out[i] = it->second;
+                            }
+                        }
+            }
+        }, 4096);
+    }
+}
+
+// The solver visits the two sides of a symmetric region in different orders (its colouring follows vertex indices),
+// and with a few passes a dab is far from converged, so each side lands somewhere else (0.3 edges after one dab,
+// 4.5 after a stroke). Averaging every vertex with its partners' images makes the result the same on both sides.
+void symmetrize(ClothStroke& cs, std::vector<glm::vec3>& x, std::span<const SymCopy> copies) {
+    if (cs.partner.size() != copies.size() || copies.size() < 2) return;
+    const size_t n = x.size();
+    cs.mean.resize(n);
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            glm::vec3 sum = x[i];
+            float count = 1.0f;
+            // (a pinned vertex stays where its pin holds it, and a vertex only meets partners held the same way:
+            // a mask on one side never pulls the other)
+            if (cs.basePin[i] >= 1.0f) {
+                cs.mean[i] = sum;
+                continue;
+            }
+            for (size_t m = 1; m < copies.size(); ++m) {
+                const uint32_t u = cs.partner[m][i];
+                if (u == ~0u || std::abs(cs.basePin[u] - cs.basePin[i]) > 1e-3f) continue;
+                sum += copies[cs.inverseOf[m]].point(x[u]);
+                count += 1.0f;
+            }
+            cs.mean[i] = sum / count;
+        }
+    }, 8192);
+    x.swap(cs.mean);
+    cs.mean.clear();
+}
+
+// The triangle across each edge of every region triangle.
+void linkTriangles(ClothStroke& cs) {
+    struct Side {
+        uint64_t edge;
+        uint32_t tri, slot;
+    };
+    std::vector<Side> sides;
+    sides.reserve(cs.tris.size() * 3);
+    for (uint32_t t = 0; t < cs.tris.size(); ++t) {
+        const uint32_t c[3] = {cs.tris[t].x, cs.tris[t].y, cs.tris[t].z};
+        for (uint32_t k = 0; k < 3; ++k) {
+            const uint32_t a = c[k], b = c[(k + 1) % 3];
+            sides.push_back({(uint64_t(std::min(a, b)) << 32) | std::max(a, b), t, k});
+        }
+    }
+    std::sort(sides.begin(), sides.end(), [](const Side& l, const Side& r) { return l.edge != r.edge ? l.edge < r.edge : l.tri < r.tri; });
+    cs.triNbr.assign(cs.tris.size() * 3, -1);
+    for (size_t i = 0; i + 1 < sides.size(); ++i)
+        if (sides[i].edge == sides[i + 1].edge && (i + 2 >= sides.size() || sides[i + 2].edge != sides[i].edge)) {
+            cs.triNbr[sides[i].tri * 3 + sides[i].slot] = int32_t(sides[i + 1].tri);
+            cs.triNbr[sides[i + 1].tri * 3 + sides[i + 1].slot] = int32_t(sides[i].tri);
+        }
+}
+
+// A fold can pop a vertex through the cloth, leaving a triangle turned inside out against every neighbour (a black
+// speck). The corners of such a triangle go back to their neighbours' average, twice at most.
+void settleSpecks(ClothStroke& cs, std::vector<glm::vec3>& x) {
+    const size_t nt = cs.tris.size();
+    if (nt == 0 || cs.triNbr.size() != nt * 3) return;
+    std::vector<glm::vec3> normal(nt);
+    std::vector<uint8_t> bad(x.size());
+    for (int round = 0; round < 2; ++round) {
+        for (size_t t = 0; t < nt; ++t) {
+            const glm::uvec3 f = cs.tris[t];
+            const glm::vec3 n = glm::cross(x[f.y] - x[f.x], x[f.z] - x[f.x]);
+            const float l = glm::length(n);
+            normal[t] = l > 0.0f ? n / l : n;
+        }
+        std::fill(bad.begin(), bad.end(), uint8_t(0));
+        bool any = false;
+        for (size_t t = 0; t < nt; ++t) {
+            const int32_t* nb = &cs.triNbr[t * 3];
+            if (nb[0] < 0 || nb[1] < 0 || nb[2] < 0) continue;
+            if (glm::dot(normal[t], normal[nb[0]]) > -0.4f || glm::dot(normal[t], normal[nb[1]]) > -0.4f ||
+                glm::dot(normal[t], normal[nb[2]]) > -0.4f)
+                continue;
+            const glm::uvec3 f = cs.tris[t];
+            for (uint32_t v : {f.x, f.y, f.z})
+                if (cs.basePin[v] < 1.0f) bad[v] = 1, any = true;
+        }
+        if (!any) return;
+        cs.mean = x;
+        for (size_t i = 0; i < x.size(); ++i) {
+            const uint32_t r0 = cs.ringOffset[i], r1 = cs.ringOffset[i + 1];
+            if (!bad[i] || r1 == r0) continue;
+            glm::vec3 sum(0.0f);
+            for (uint32_t k = r0; k < r1; ++k) sum += cs.mean[cs.ring[k]];
+            x[i] = sum / float(r1 - r0);
+        }
+    }
+}
+
+} // namespace
 
 size_t Sculptor::clothRegion() const { return cloth_ ? cloth_->verts.size() : 0; }
 
@@ -232,6 +375,9 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
             for (size_t i = 0; i < nv; ++i)
                 if (const auto g = cs.grow.find(cs.verts[i]); g != cs.grow.end()) cs.sim.setRestScale(uint32_t(i), g->second);
         }
+        matchPartners(cs, mirrors);
+        cs.tris = setup.triangles;
+        linkTriangles(cs);
         cs.builtAt.clear();
         for (const SymCopy& m : mirrors) cs.builtAt.push_back(m.point(p.center));
         cs.builtRadius = r;
@@ -358,6 +504,8 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                 xm[i] = cs.start[i] + 0.5f * cs.delta[i] + 0.5f * mean / float(r1 - r0);
             }
         }, 8192);
+        symmetrize(cs, xm, mirrors);
+        settleSpecks(cs, xm);
     }
     const double kernel = build + lapMs(clock);
 
