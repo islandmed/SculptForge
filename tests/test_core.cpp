@@ -1349,7 +1349,15 @@ TEST(free_huggingface_models) {
     for (const auto& p : presets) {
         wellFormed = wellFormed && std::string(p.space).rfind("https://", 0) == 0 && !p.steps.empty();
         bool image = false;
-        for (const auto& step : p.steps)
+        for (const auto& step : p.steps) {
+            for (const auto& sl : step.slots) {
+                image = image || std::string(sl.arg) == "$IMG";
+                if (std::string(sl.arg) != "$IMG" && std::string(sl.arg).rfind("$OUT", 0) != 0) {
+                    Json v;
+                    std::string err;
+                    wellFormed = wellFormed && Json::parse(sl.arg, v, err);
+                }
+            }
             for (const auto& a : step.args) {
                 image = image || a == "$IMG";
                 if (a != "$IMG" && a.rfind("$OUT", 0) != 0) {
@@ -1358,6 +1366,7 @@ TEST(free_huggingface_models) {
                     wellFormed = wellFormed && Json::parse(a, v, err); // literal args must be valid JSON
                 }
             }
+        }
         usesImage = usesImage && image;
     }
     CHECK(wellFormed && usesImage);
@@ -1466,8 +1475,10 @@ TEST(free_huggingface_models) {
     bool usesPrompt = true;
     for (const auto& p : ai::hfTextPresets()) {
         bool prompt = false;
-        for (const auto& step : p.steps)
+        for (const auto& step : p.steps) {
             for (const auto& a : step.args) prompt = prompt || a == "$PROMPT";
+            for (const auto& sl : step.slots) prompt = prompt || std::string(sl.arg) == "$PROMPT";
+        }
         usesPrompt = usesPrompt && prompt;
     }
     CHECK(usesPrompt);

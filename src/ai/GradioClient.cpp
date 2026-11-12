@@ -7,6 +7,7 @@
 #include "ai/Http.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <random>
 
@@ -117,6 +118,71 @@ std::string friendlyGradioError(const std::string& raw) {
     return raw;
 }
 
+bool gradioBuildInputs(const Json& config, const std::string& apiName, const std::vector<Json>& userArgs,
+                       const std::vector<GradioSlot>& slots, Json& data, int& fnIndex, std::string& error) {
+    const Json& deps = config["dependencies"];
+    const Json* dep = nullptr;
+    for (size_t i = 0; i < deps.size(); ++i)
+        if (deps[i]["api_name"].asString() == apiName) {
+            dep = &deps[i];
+            fnIndex = deps[i]["id"].isNumber() ? int(deps[i]["id"].asNumber()) : int(i);
+            break;
+        }
+    if (!dep) {
+        error = "This Space has no '" + apiName + "' endpoint (it may have changed)";
+        return false;
+    }
+    auto component = [&](double id) -> const Json* {
+        for (const auto& c : config["components"].items())
+            if (c["id"].asNumber() == id) return &c;
+        return nullptr;
+    };
+    auto lower = [](std::string t) {
+        for (char& c : t) c = char(std::tolower(static_cast<unsigned char>(c)));
+        return t;
+    };
+    const auto& inputs = (*dep)["inputs"].items();
+    std::vector<const Json*> comps;
+    for (const auto& id : inputs) comps.push_back(component(id.asNumber()));
+    auto typeOf = [&](size_t i) { return comps[i] ? (*comps[i])["type"].asString() : std::string(); };
+
+    // Slots first: by label, else by type, each input claimed once.
+    std::vector<const Json*> claimed(inputs.size(), nullptr);
+    std::vector<const GradioSlot*> owner(inputs.size(), nullptr);
+    for (const auto& slot : slots) {
+        size_t found = inputs.size();
+        for (int pass = 0; pass < 2 && found == inputs.size(); ++pass)
+            for (size_t i = 0; i < inputs.size(); ++i) {
+                if (owner[i] || typeOf(i) == "state") continue;
+                const bool hit = pass == 0 ? comps[i] && !slot.label.empty() &&
+                                                 lower((*comps[i])["props"]["label"].asString()) == lower(slot.label)
+                                           : !slot.type.empty() && typeOf(i) == slot.type;
+                if (hit) {
+                    found = i;
+                    break;
+                }
+            }
+        if (found == inputs.size() && slot.optional) continue;
+        if (found == inputs.size()) {
+            error = "This Space has no '" + (slot.label.empty() ? slot.type : slot.label) + "' input on '" + apiName + "' (it may have changed)";
+            return false;
+        }
+        owner[found] = &slot;
+    }
+
+    data = Json::array();
+    size_t next = 0;
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        const std::string type = typeOf(i);
+        const Json fallback = comps[i] ? (*comps[i])["props"]["value"] : Json();
+        if (type == "state") data.push(fallback); // hidden from the public API; the server keeps it per session
+        else if (owner[i]) data.push(owner[i]->value);
+        else if (next < userArgs.size()) data.push(userArgs[next++]);
+        else data.push(fallback);
+    }
+    return true;
+}
+
 std::vector<std::string> GradioClient::headers(bool json) const {
     std::vector<std::string> h;
     if (json) h.push_back("Content-Type: application/json");
@@ -177,36 +243,11 @@ std::string GradioClient::fileUrl(const Json& value) const {
 }
 
 bool GradioClient::call(const std::string& apiName, const std::vector<Json>& userArgs, std::vector<Json>& outputs,
-                        std::string& error, const std::function<void(const std::string&)>& onStatus) {
-    // Find the endpoint and build the full input list.
-    const Json& deps = config_["dependencies"];
-    const Json* dep = nullptr;
+                        std::string& error, const std::function<void(const std::string&)>& onStatus,
+                        const std::vector<GradioSlot>& slots) {
+    Json data;
     int fnIndex = -1;
-    for (size_t i = 0; i < deps.size(); ++i)
-        if (deps[i]["api_name"].asString() == apiName) {
-            dep = &deps[i];
-            fnIndex = deps[i]["id"].isNumber() ? int(deps[i]["id"].asNumber()) : int(i);
-            break;
-        }
-    if (!dep) {
-        error = "This Space has no '" + apiName + "' endpoint (it may have changed)";
-        return false;
-    }
-    auto component = [&](double id) -> const Json* {
-        for (const auto& c : config_["components"].items())
-            if (c["id"].asNumber() == id) return &c;
-        return nullptr;
-    };
-    Json data = Json::array();
-    size_t next = 0;
-    for (const auto& id : (*dep)["inputs"].items()) {
-        const Json* c = component(id.asNumber());
-        const std::string type = c ? (*c)["type"].asString() : std::string();
-        const Json fallback = c ? (*c)["props"]["value"] : Json();
-        if (type == "state") data.push(fallback); // hidden from the public API; the server keeps it per session
-        else if (next < userArgs.size()) data.push(userArgs[next++]);
-        else data.push(fallback);
-    }
+    if (!gradioBuildInputs(config_, apiName, userArgs, slots, data, fnIndex, error)) return false;
 
     Json join = Json::object();
     join.set("data", data);

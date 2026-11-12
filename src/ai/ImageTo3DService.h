@@ -56,9 +56,17 @@ struct ServiceModel {
 const std::vector<ServiceModel>& falModels();
 
 // Free models on Hugging Face Spaces (shared GPUs; a free HF token raises the daily quota).
+// An input a step must fill, found by its label (else its component type) wherever the Space puts it (GradioSlot).
+struct HfSlot {
+    const char* label;
+    const char* type;
+    const char* arg; // as in HfStep::args
+    bool optional = false;
+};
 struct HfStep {
     const char* api;
     std::vector<std::string> args; // "$IMG" = the uploaded image, "$OUT<n>" = first output of step n, else JSON
+    std::vector<HfSlot> slots = {}; // filled first; `args` then take the remaining inputs in order, the rest = the Space's defaults
 };
 struct HfPreset {
     const char* id;
