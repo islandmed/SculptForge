@@ -35,6 +35,7 @@ from pathlib import Path
 TOKEN = "secrets.INSIDERS_REPO_TOKEN"
 MEMBER_ENV = "member-release"
 SIGNING = "secrets.UPDATE_SIGNING_KEY"
+SIGNPATH = "secrets.SIGNPATH_API_TOKEN"
 SIGNING_ENVS = {"release", MEMBER_ENV}
 ATTEST = re.compile(r"uses:\s*actions/attest-build-provenance@[0-9a-f]{40}\b")
 PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}(\s+#\s*\S.*)?$")
@@ -71,7 +72,9 @@ def environment(lines):
 def paths(body, key):
     """The globs of `key:` (path / subject-path) in the job's upload-artifact / attest step: inline or a `|` block."""
     want = "upload-artifact" if key == "path" else "attest-build-provenance"
-    out, lines = set(), "\n".join(s for s in re.split(r"\n(?=\s*- )", body) if want in s).splitlines()
+    # (signing-* uploads are SignPath's input: unsigned copies for a request, not packages; packages.yml job windows)
+    out, lines = set(), "\n".join(s for s in re.split(r"\n(?=\s*- )", body)
+                                  if want in s and not re.search(r"^\s+name:\s*signing-", s, re.M)).splitlines()
     for i, line in enumerate(lines):
         m = re.match(rf"^(\s+){key}:\s*(.*?)\s*$", line)
         if not m:
@@ -86,6 +89,58 @@ def paths(body, key):
     return out
 
 
+def check_signing(pk):
+    """packages.yml reads exactly one secret: the SignPath token, in job windows, in steps that run only when
+    SIGN == 'true' (repository variable SIGNING=signpath, on main, staging or a tag), never on pull_request or t0/**."""
+    errs = []
+    names = set(re.findall(r"secrets\.(\w+)", pk))
+    if names - {"SIGNPATH_API_TOKEN"}:
+        errs.append(f"packages.yml: reads {sorted(names - {'SIGNPATH_API_TOKEN'})} (staging builds see no secret but the SignPath token)")
+    on = re.search(r"^on:\s*\n(?:[ \t]+.*\n|\s*\n|#.*\n)*", pk, re.M)
+    on = on.group(0) if on else pk.split("\njobs:")[0]
+    if re.search(r"\b(pull_request|pull_request_target|schedule|issue_comment|workflow_run)\b|t0/", on):
+        errs.append("packages.yml: runs on pull requests, t0/** or other triggers than push to main/staging, dispatch and call "
+                    "(SIGNPATH_API_TOKEN must never be reachable there)")
+    pj = jobs(pk)
+    for job, lines in pj.items():
+        body = "\n".join(lines)
+        if SIGNPATH not in body and "signpath/" not in body:
+            continue
+        if job != "windows":
+            errs.append(f"packages.yml: job {job} uses SIGNPATH_API_TOKEN / the signing action (only job windows may)")
+            continue
+        sign = [l for l in lines if re.match(r"^      SIGN:", l)]
+        if len(sign) != 1 or "vars.SIGNING == 'signpath'" not in sign[0] or "refs/heads/main" not in sign[0] \
+                or "refs/heads/staging" not in sign[0] or "pull_request" in sign[0] or "t0/" in sign[0]:
+            errs.append("packages.yml: job windows needs env SIGN limited to vars.SIGNING == 'signpath' on main, staging and tags")
+        steps = re.split(r"\n(?=      - )", body)
+        actions = 0
+        for st in steps:
+            if SIGNPATH not in st:
+                continue
+            actions += 1
+            toks = [l.strip() for l in st.splitlines() if SIGNPATH in l]
+            if len(toks) != 1 or not re.fullmatch(r"api-token:\s*\$\{\{\s*secrets\.SIGNPATH_API_TOKEN\s*\}\}", toks[0]):
+                errs.append("packages.yml: SIGNPATH_API_TOKEN must only be the api-token: input of a signing step")
+            if not re.search(r"^\s+(- )?if:\s*env\.SIGN == 'true'\s*$", st, re.M):
+                errs.append("packages.yml: a step with SIGNPATH_API_TOKEN isn't limited by `if: env.SIGN == 'true'`")
+            if not re.search(r"uses:\s*signpath/github-action-submit-signing-request@[0-9a-f]{40}\b", st):
+                errs.append("packages.yml: SIGNPATH_API_TOKEN goes only to signpath/github-action-submit-signing-request, pinned by SHA")
+            if re.search(r"(^|[\s;])set\s+-[a-wyz]*x|ACTIONS_STEP_DEBUG|\becho\b.*TOKEN", st):
+                errs.append("packages.yml: shell tracing or echo near the SignPath token")
+        if actions == 0:
+            errs.append("packages.yml: job windows names SignPath but no step passes api-token")
+        if body.count("verify_signed.ps1") < actions:
+            errs.append("packages.yml: every SignPath signing step must be followed by tools/ci/verify_signed.ps1 (a failed signature fails the job)")
+        if "title=Windows signing" not in body or "GITHUB_STEP_SUMMARY" not in body:
+            errs.append("packages.yml: job windows has no 'Windows: signed/unsigned' summary and notice (scripts/release.sh --stage prints it)")
+        if re.search(r"continue-on-error:\s*true", body):
+            errs.append("packages.yml: job windows must not continue-on-error (a failed signing must fail the job)")
+        if re.search(r"name:\s*windows\w", body):
+            errs.append("packages.yml: an artifact named windows* is taken for a package (job sums, release.yml)")
+    return errs
+
+
 def check(files):
     """files: {name: text}. Returns the list of problems."""
     errs = []
@@ -97,10 +152,16 @@ def check(files):
                 errs.append(f"{name}: job {job} reads INSIDERS_REPO_TOKEN outside a GitHub Environment")
             if any(SIGNING in l for l in lines) and environment(lines) not in SIGNING_ENVS:
                 errs.append(f"{name}: job {job} reads UPDATE_SIGNING_KEY outside the environments release / member-release")
+    for name, text in files.items():
+        for n, line in enumerate(text.splitlines(), 1):
+            m = re.match(r"^\s*(?:-\s+)?uses:\s*(signpath/\S.*?)\s*$", line)
+            if m and not PINNED.match(m.group(1)):
+                errs.append(f"{name}:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA (the signing action sees the token)")
+        if name not in ("packages.yml", "release.yml") and SIGNPATH in text:
+            errs.append(f"{name}: reads SIGNPATH_API_TOKEN (only packages.yml's Windows job and release.yml's call of it may)")
     pk = files.get("packages.yml")
     if pk is not None:
-        if "secrets." in pk:
-            errs.append("packages.yml: reads a secret (staging builds must never see one; signing happens at promotion)")
+        errs += check_signing(pk)
         if re.search(r"^\s+paths(-ignore)?:", pk.split("\njobs:")[0], re.M):
             errs.append("packages.yml: a paths: filter (job reuse skips unchanged build inputs: tools/release/build_inputs.txt)")
         if not re.search(r"staged_run\.py\b.*--before-run", "\n".join(jobs(pk).get("reuse", []))):
@@ -182,6 +243,12 @@ def check(files):
         body = "\n".join(rj.get(job, []))
         if not re.search(r"needs:.*\bverify\b", body) or "verify_staged.py" not in body:
             errs.append(f"release.yml: job {job} must need verify and re-check the checksums (verify_staged.py --sums-only)")
+    for job, lines in rj.items():
+        got = [x.strip() for x in lines if SIGNPATH in x]
+        if got and (got != ["SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}"] and not all(
+                x.startswith("SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}") for x in got)
+                or not any(re.match(r"^    uses:\s*\./\.github/workflows/packages\.yml\s*$", x) for x in lines)):
+            errs.append(f"release.yml: job {job} reads SIGNPATH_API_TOKEN other than to pass it to the packages.yml call")
     holders = {j: l for j, l in rj.items() if any(TOKEN in x for x in l)}
     if not holders:
         errs.append("release.yml: no job publishes to the insiders repository with INSIDERS_REPO_TOKEN")
@@ -260,6 +327,47 @@ jobs:
   sums:
     steps:
       - uses: actions/upload-artifact@v7
+"""
+
+
+SIGN_IF = "if: env.SIGN == 'true'"
+SP_USES = "signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0"
+# packages.yml with the Windows job as it signs (SIGNING=signpath): the one place the token may be read
+SIGNED = PACKAGES.replace("  sums:", f"""  windows:
+    permissions:
+      id-token: write
+    env:
+      SIGN: ${{{{ vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v')) }}}}
+    steps:
+      - {SIGN_IF}
+        id: in
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signing-binaries-unsigned
+          path: signing/binaries/*
+      - name: Signing - SignPath signs the binaries
+        {SIGN_IF}
+        uses: {SP_USES}
+        with:
+          api-token: ${{{{ secrets.SIGNPATH_API_TOKEN }}}}
+          github-artifact-id: ${{{{ steps.in.outputs.artifact-id }}}}
+      - {SIGN_IF}
+        run: ./tools/ci/verify_signed.ps1 -Path build/x.exe
+      - run: Write-Host "::notice title=Windows signing::$line" >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            build/*.exe
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/*.exe
+  sums:""")
+RELEASE_CALL = """  rebuild:
+    uses: ./.github/workflows/packages.yml
+    secrets:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
 """
 
 
@@ -367,6 +475,34 @@ def self_test():
         "t0 other on all branches": ({"release.yml": GOOD, "t0.yml": T0, "a.yml": "on:\n  push:\n    paths: [x]\njobs:\n  a:\n"}, 1),
         "t0 other ignores t0": ({"release.yml": GOOD, "t0.yml": T0,
                                  "a.yml": "on:\n  push:\n    branches-ignore: ['t0/**']\n    paths: [x]\njobs:\n  a:\n"}, 0),
+        "signing good": ({"release.yml": GOOD, "packages.yml": SIGNED}, 0),
+        "signing call passes token": ({"release.yml": GOOD + RELEASE_CALL, "packages.yml": SIGNED}, 0),
+        "signing release reads token in a step": ({"release.yml": GOOD + RELEASE_CALL.replace(
+            "    uses: ./.github/workflows/packages.yml\n    secrets:\n      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}\n",
+            "    steps:\n      - env:\n          T: ${{ secrets.SIGNPATH_API_TOKEN }}\n        run: echo\n"), "packages.yml": SIGNED}, 1),
+        "signing other workflow reads token": ({"release.yml": GOOD, "packages.yml": SIGNED,
+                                                "x.yml": "jobs:\n  a:\n    env:\n      T: ${{ secrets.SIGNPATH_API_TOKEN }}\n"}, 1),
+        "signing unpinned": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0", "@v3")}, 1),
+        "signing step not gated": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "name: Signing - SignPath signs the binaries\n        " + SIGN_IF, "name: Signing - SignPath signs the binaries")}, 1),
+        "signing token to env": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "          github-artifact-id:", "          x: ${{ secrets.SIGNPATH_API_TOKEN }}\n          github-artifact-id:")}, 1),
+        "signing token to another action": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            SP_USES, "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1")}, 1),
+        "signing not verified": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("verify_signed.ps1", "x.ps1")}, 1),
+        "signing no summary": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("title=Windows signing", "title=x")}, 1),
+        "signing also on other refs": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "startsWith(github.ref, 'refs/tags/v')", "startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'")}, 1),
+        "signing without the variable": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("vars.SIGNING == 'signpath' && ", "")}, 1),
+        "signing on pull requests": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "    branches: [main, staging]\n", "    branches: [main, staging]\n  pull_request:\n")}, 1),
+        "signing in another job": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("  windows:\n", "  winx:\n")}, 1),
+        "signing job can go red-less": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "  windows:\n", "  windows:\n    continue-on-error: true\n")}, 1),
+        "signing intermediate named windows": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "signing-binaries-unsigned", "windows-unsigned")}, 1),
+        "signing intermediate attested nowhere": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "signing-binaries-unsigned", "binaries-unsigned")}, 1),
         "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]
