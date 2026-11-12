@@ -42,6 +42,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char fontCjkSc[];
 extern const unsigned long long fontCjkSc_size;
+extern const unsigned char fontCjkJp[];
+extern const unsigned long long fontCjkJp_size;
 extern const unsigned char splashWordmark[];
 extern const unsigned long long splashWordmark_size;
 extern const unsigned char splashBust[];
@@ -75,7 +77,9 @@ std::vector<uint32_t> codepoints(const std::string& utf8) {
 // `text` starting at column `left`, its x-height centred on row `centreY`, `pixelHeight` tall.
 void drawText(std::vector<uint8_t>& rgba, int width, int height, const std::string& text, int left, int centreY, float pixelHeight) {
     static const Face inter(assets::fontRegular);
-    static const Face cjk(language() == Language::SimplifiedChinese ? assets::fontCjkSc : assets::fontCjk);
+    static const Face cjk(language() == Language::SimplifiedChinese ? assets::fontCjkSc
+                          : language() == Language::Japanese    ? assets::fontCjkJp
+                                                                : assets::fontCjk);
     if (!inter.ok) return;
     struct Glyph { const Face* face; int index; float advance; };
     std::vector<Glyph> glyphs;

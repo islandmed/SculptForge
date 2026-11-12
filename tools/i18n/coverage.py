@@ -5,7 +5,7 @@
 which of them the table has no translation for.
 
     tools/i18n/coverage.py              counts and percent per language
-    tools/i18n/coverage.py --missing    also every missing string (es, zh-TW, zh-CN, or --lang es)
+    tools/i18n/coverage.py --missing    also every missing string (es, zh-TW, zh-CN, ja, or --lang es)
     tools/i18n/coverage.py --check      exit 1 unless every language is at 100% (ctest i18n_coverage)
     tools/i18n/coverage.py --json       the strings and what each language lacks, for scripts
     tools/i18n/coverage.py --raw        literals ImGui shows without tr(): not translatable until wrapped in tr()
@@ -37,8 +37,8 @@ SRC = ROOT / "src" / "app"
 KEEP = Path(__file__).resolve().parent / "keep_english.txt"
 RAW_ALLOW = Path(__file__).resolve().parent / "raw_allow.txt"
 LANGS = {"es": SRC / "I18nSpanish.cpp", "zh-TW": SRC / "I18nTraditionalChinese.cpp",
-         "zh-CN": SRC / "I18nSimplifiedChinese.cpp"}
-SKIP_FILES = {"I18n.cpp", "I18nSpanish.cpp", "I18nTraditionalChinese.cpp", "I18nSimplifiedChinese.cpp"}
+         "zh-CN": SRC / "I18nSimplifiedChinese.cpp", "ja": SRC / "I18nJapanese.cpp"}
+SKIP_FILES = {"I18n.cpp", "I18nSpanish.cpp", "I18nTraditionalChinese.cpp", "I18nSimplifiedChinese.cpp", "I18nJapanese.cpp"}
 
 # tr() and trPath() translate their argument; every function or lambda that passes one of its parameters on to them
 # (or to another such function) is found in the sources (wrappers()): ui::Checkbox, ui::HelpText, hint()... A name

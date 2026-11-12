@@ -623,7 +623,7 @@ layout saves itself.
 | Setting | Default | What it does |
 |---|---|---|
 | **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
-| **Language** | English | The interface language: **English**, **Español**, Traditional Chinese or Simplified Chinese (see below) |
+| **Language** | English | The interface language: **English**, **Español**, Traditional Chinese, Simplified Chinese or **Japanese** (see below) |
 | **Show startup splash** | On | The SculptForge logo and version at every start, for half a second or more while SculptForge loads, then it fades into the main window. Turn it off for an instant start. Applies at the next start |
 | **Ctrl+hover help** | On | Ctrl-hover help boxes |
 | **Help box opacity** | 0.97 | How solid the help box is |
@@ -644,17 +644,19 @@ name.
 
 **Traditional Chinese** (the button with its Chinese name; contributed by yoyomaimai) works the same way, with Taiwan
 usage and the brush and tool names in English; **Simplified Chinese** (the fourth button) is the same translation in
-simplified characters with mainland terms, drawn with mainland glyph shapes. Anything not translated yet (most
-Ctrl-help descriptions, this guide) shows in English. Scripts and `sculptforge-cli` commands are the same in every
-language.
+simplified characters with mainland terms, drawn with mainland glyph shapes. The fifth button, **Japanese**, is Japanese
+with the same rules: names of tools and brushes stay in English, polite form in tooltips and help, Japanese glyph shapes.
+It is a first translation and a native speaker's review is welcome (tell us in #testers on Discord or open an issue).
+Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and `sculptforge-cli`
+commands are the same in every language.
 
 **On the first start** SculptForge looks at the language your computer's interface is in (Windows display language,
-macOS preferred language, or `LC_ALL`, `LC_MESSAGES` and `LANG` on Linux). If it is one of the four above it starts in
+macOS preferred language, or `LC_ALL`, `LC_MESSAGES` and `LANG` on Linux). If it is one of the five above it starts in
 it, with a small note along the bottom, *SculptForge is in Español. Change*, in that language and in English;
 **Change** opens Edit > Preferences > Interface.
 
 Any other computer language (Portuguese, French...) starts in English, and the **Language** row at the top of the
-welcome shows the four names, each in its own script: one click switches the whole interface. **Help > Welcome** shows
+welcome shows the five names, each in its own script: one click switches the whole interface. **Help > Welcome** shows
 the row again. Nothing is ever sent anywhere, and the choice is asked once.
 
 **UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
