@@ -468,13 +468,6 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
 // up inside one frame) still glides the view a little; updateKeyNav does the moving.
 void App::keyNavStep(const std::string& id) { keyNavTap_[id] = kKeyNavTapSeconds; }
 
-// Once a frame, in the app's own loop and the UI test runner's (a first key of a two-key shortcut that waited its
-// half second out runs alone; the registry counts the frames' time, a hitch counts as 0.1 s at most).
-void App::tickKeySequence(float dt) {
-    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
-    actions_.tick(std::min(dt, 0.1f));
-}
-
 // Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
 // distance at any frame rate, and nothing to do with the OS's key repeat.
@@ -737,16 +730,6 @@ void App::drawInputSection() {
     }
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
-    {
-        ImGui::TextDisabled("%s", tr("Two-key window"));
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        ImGui::SliderFloat("##input.two_key_window", &uiPrefs_.twoKeyWindow, kKeySequenceMin, kKeySequenceMax, "%.2f s");
-        ui::HelpText("Two-key window", nullptr,
-                     "How long the second key of a two-key shortcut (\"C then V\") has after the first, whether you press "
-                     "the two together (either one first) or tap them in a row. A key that is part of a two-key shortcut "
-                     "runs its own action once this time is up; every other key runs at once.",
-                     "Preferences > Input");
-    }
     {
         ImGui::TextDisabled("%s", tr("Pan and zoom key speed"));
         ImGui::SetNextItemWidth(-FLT_MIN);

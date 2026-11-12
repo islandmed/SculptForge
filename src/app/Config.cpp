@@ -117,7 +117,6 @@ Json toJson(const UiPrefs& p) {
     j.set("mouseOrbitSpeed", p.mouseOrbitSpeed);
     j.set("invertZoom", p.invertZoom);
     j.set("keyNavSpeed", p.keyNavSpeed);
-    j.set("twoKeyWindow", p.twoKeyWindow);
     j.set("quickRemesh", p.quickRemesh);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
@@ -218,7 +217,6 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
     p.mouseOrbitSpeed = clampMouseOrbitSpeed(float(j["mouseOrbitSpeed"].asNumber(p.mouseOrbitSpeed)));
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
-    p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
@@ -1265,6 +1263,11 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     layout_ = std::move(layout);
     layout_.customize = customize;
     actions_.overridesFromJson(j["shortcuts"]);
+    if (const int lost = actions_.droppedTwoKeyShortcuts(); lost > 0) { // saved by 0.12.8 to 0.12.10 (removed in 0.12.11)
+        status_ = "Two-key shortcuts are gone: " + std::to_string(lost) + (lost == 1 ? " shortcut lost them" : " shortcuts lost them");
+        SDL_Log("%s", status_.c_str());
+        languageUnsaved_ = true; // (what the file says is not what runs now: the first autosave look writes it again)
+    }
     if (j.has("radialMenus")) applyRadialMenusJson(j["radialMenus"]); // (an older file keeps the menus there are)
     setLanguage(languageFromCode(uiPrefs_.language)); // (the requestUiScale above adds the Chinese glyphs if needed)
     applyPerformancePrefs();
@@ -1546,20 +1549,17 @@ CanvasRect App::consoleRect() const {
 // Shortcut assignment (Ctrl+Alt+click a button, or Preferences > Hotkeys)
 // ---------------------------------------------------------------------------
 
-void App::beginShortcutCapture(const std::string& actionId, bool sequence) {
+void App::beginShortcutCapture(const std::string& actionId) {
     const Action* a = actions_.find(actionId);
     if (!a) return;
     capturingShortcut_ = actionId;
-    captureSequence_ = sequence;
-    captureFirst_.clear();
     conflict_ = {};
     shortcutAnchor_ = {}; // the button (or tile) clicked just now, so the Replace / Cancel popup can stay clear of it
     if (ImGui::GetCurrentContext() && ImGui::GetCurrentWindowRead()) {
         const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
         if (hi.x > lo.x && hi.y > lo.y) shortcutAnchor_ = ImVec4(lo.x, lo.y, hi.x, hi.y);
     }
-    status_ = sequence ? "Press two different keys in a row for '" + a->label + "' (Esc cancels, Backspace removes them)"
-                       : "Press a key for '" + a->label + "' (Esc cancels, Backspace clears)";
+    status_ = "Press a key for '" + a->label + "' (Esc cancels, Backspace clears)";
 }
 
 void App::resolveShortcutConflict(bool replace) {
@@ -1571,7 +1571,7 @@ void App::resolveShortcutConflict(bool replace) {
         status_ = "Shortcut unchanged";
         return;
     }
-    actions_.assignShortcut(c.actionId, c.chord, c.keepOthers);
+    actions_.assignShortcut(c.actionId, c.chord);
     status_ = label + ": " + c.chord + " (was " + c.holders + ")";
 }
 
@@ -1588,45 +1588,21 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
     if (key == SDLK_ESCAPE) {
         status_ = "Shortcut unchanged";
     } else if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
-        if (captureSequence_) { // only the two-key shortcuts go; its single keys stay
-            std::string keep;
-            for (const std::string& alt : shortcutAlternatives(actions_.shortcutText(capturingShortcut_)))
-                if (alt.find(kThen) == std::string::npos) keep += (keep.empty() ? "" : " / ") + alt;
-            actions_.setShortcut(capturingShortcut_, keep);
-            status_ = label + ": two-key shortcuts removed";
-        } else {
-            actions_.setShortcut(capturingShortcut_, "");
-            status_ = label + ": no shortcut";
-        }
+        actions_.setShortcut(capturingShortcut_, "");
+        status_ = label + ": no shortcut";
     } else {
         const Chord pressed = chordFromEvent(key, mod);
-        std::string chord = chordText(pressed);
-        if (captureSequence_) {
-            if (captureFirst_.empty()) { // the first key: wait for the second
-                captureFirst_ = chord;
-                status_ = "Now the second key for '" + label + "' (a different one)";
-                return true;
-            }
-            Chord first;
-            parseChord(captureFirst_, first);
-            if (first.key == pressed.key) { // no double tap: keep waiting for a different key
-                status_ = "Two different keys, not the same key twice";
-                return true;
-            }
-            chord = captureFirst_ + std::string(kThen) + chord;
-        }
+        const std::string chord = chordText(pressed);
         std::string holders;
-        for (const Action* h : actions_.holdersOfShortcut(chord, capturingShortcut_)) holders += (holders.empty() ? "" : ", ") + h->label;
+        for (const Action* h : actions_.holdersOf(pressed, capturingShortcut_)) holders += (holders.empty() ? "" : ", ") + h->label;
         if (!holders.empty()) { // taken: ask first (Artizmo on Discord)
-            conflict_ = {capturingShortcut_, chord, holders, captureSequence_};
+            conflict_ = {capturingShortcut_, chord, holders};
             capturingShortcut_.clear();
-            captureFirst_.clear();
             return true;
         }
-        actions_.assignShortcut(capturingShortcut_, chord, captureSequence_);
-        status_ = label + ": " + chord + (chord.find(kThen) != std::string::npos ? " (also works pressed together)" : "");
+        actions_.assignShortcut(capturingShortcut_, chord);
+        status_ = label + ": " + chord;
     }
-    captureFirst_.clear();
     capturingShortcut_.clear();
     return true;
 }
@@ -1686,8 +1662,6 @@ void App::drawShortcutConflict() {
             const Action* a = actions_.find(conflict_.actionId);
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w - 28.0f * s);
             ImGui::Text(tr("%s is already used by %s."), conflict_.chord.c_str(), conflict_.holders.c_str());
-            if (conflict_.chord.find(kThen) != std::string::npos)
-                ImGui::TextColored(col(ui::color::textDim), "%s", tr("It also works with both keys pressed together."));
             ImGui::TextColored(col(ui::color::textDim), tr("Replace gives it to '%s' and takes it from there."),
                                a ? trAction(a->id, a->label) : conflict_.actionId.c_str());
             ImGui::PopTextWrapPos();
@@ -1773,15 +1747,9 @@ void App::drawHelpConsoleUi() {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
             ImGui::PushFont(helpTitleFont());
-            ImGui::Text(captureSequence_ ? tr(ICON_LC_KEYBOARD "  Press two keys in a row for '%s'")
-                                         : tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
+            ImGui::Text(tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
                         a ? a->label.c_str() : capturingShortcut_.c_str());
             ImGui::PopFont();
-            if (captureSequence_ && !captureFirst_.empty()) { // the first key is in: now the second
-                ui::Keycaps(captureFirst_);
-                ImGui::SameLine();
-                ImGui::TextColored(col(ui::color::textDim), "%s", tr("then..."));
-            }
             const std::string now = actions_.shortcutText(capturingShortcut_);
             ImGui::TextColored(col(ui::color::textDim), "%s", tr("Now:"));
             ImGui::SameLine();
@@ -1789,8 +1757,7 @@ void App::drawHelpConsoleUi() {
                 ImGui::TextColored(col(ui::color::textDim), "%s", tr("none"));
             else ui::Keycaps(now);
             ImGui::TextColored(col(ui::color::textDim), "%s",
-                               captureSequence_ ? tr("Two different keys. Esc cancels, Backspace removes the two-key shortcuts.")
-                                                : tr("Esc cancels, Backspace clears. A key that's taken asks first."));
+                               tr("Esc cancels, Backspace clears. A key that's taken asks first."));
         }
         ImGui::End();
         ImGui::PopStyleColor(2);
@@ -2147,7 +2114,7 @@ void drawHotkeysSection(App& app) {
     if (ImGui::BeginTable("##hotkeys", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_PadOuterX,
                           ImVec2(0, std::max(listH, 60.0f * s)))) {
         ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 140.0f * s);
         for (const Action* a : list) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -2157,37 +2124,15 @@ void drawHotkeysSection(App& app) {
             ImGui::TableNextColumn();
             const std::string chord = reg.shortcutText(a->id);
             const bool capturing = app.capturingShortcut() == a->id;
-            const bool sequencing = capturing && app.capturingSequence();
-            const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
-                                                                                 : app.captureFirstKey() + " " + tr("then..."))
-                                     : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
+            const std::string text = capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
             if (reg.hasOverride(a->id)) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
             const bool modified = reg.hasOverride(a->id); // the arrow beside it puts the default back
-            const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
-            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
+            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(modified ? -(ImGui::GetFrameHeight() + 2.0f * s) : -FLT_MIN, 0)))
                 app.beginShortcutCapture(a->id);
             if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
             ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
-                         chord.find(kThen) != std::string::npos
-                             ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
-                               "both keys pressed together."
-                             : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back.",
-                         "Preferences > Hotkeys");
-            ImGui::SameLine(0.0f, 2.0f * s);
-            const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a->id).c_str());
-            {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
-                const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-                const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
-                ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
-                                                    ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
-            }
-            if (sequenceClicked) app.beginShortcutCapture(a->id, true);
-            ui::HelpText("Two keys in a row", nullptr,
-                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
-                         "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
-                         "bound; it runs when the window is up and the other key did not come.",
+                         "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                         "the arrow beside it puts the default back.",
                          "Preferences > Hotkeys");
             if (reg.hasOverride(a->id)) {
                 ImGui::SameLine(0.0f, 2.0f * s);

@@ -348,13 +348,6 @@ bool App::init(const AppOptions& options) {
     splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
-    actions_.setAloneHook([this](SDL_Keycode key, bool begin) { // a first key that waited: a pie menu on it holds open only while it is down
-        if (!begin) keyDown_ = aloneSavedKey_;
-        else {
-            aloneSavedKey_ = keyDown_;
-            keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
-        }
-    });
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
@@ -665,7 +658,6 @@ int App::runUiTest(int w, int h, int fps) {
         pollQRemesh();
         pollSplatTrain();
         pollSculptable();
-        tickKeySequence(dt);
         updateCameraAspect();
         updateSpaceMouse(dt);
         updateKeyNav(dt);
@@ -1018,7 +1010,6 @@ bool App::wantsFrames(double now) const {
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
-           actions_.sequenceWaiting() || // a first key waiting for its second, then for its own action (Actions.cpp)
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
@@ -1390,7 +1381,6 @@ int App::run() {
             continue;
         }
         if (measuring) cpuFrameStart = processCpuSeconds();
-        tickKeySequence(dt);
         updateCameraAspect();
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
@@ -1791,7 +1781,6 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
         keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
-        actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = false; // Space let go in another window never reaches us
@@ -1812,7 +1801,6 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_AXIS:
     case SDL_EVENT_PEN_BUTTON_DOWN:
     case SDL_EVENT_PEN_BUTTON_UP:
-        if (e.type == SDL_EVENT_PEN_DOWN) actions_.flushSequence(); // the pen starts a stroke: a first key waiting runs alone now
         handlePenEvent(e);
         break;
     case SDL_EVENT_FINGER_DOWN:
@@ -1832,7 +1820,6 @@ void App::dispatchEvent(const SDL_Event& event) {
         tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        actions_.flushSequence(); // a click is not the second key: the first key runs alone before it
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
@@ -1870,10 +1857,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
-            onKey(e.key.key, e.key.mod, true); // held brush size keys repeat, whatever they are bound to
+            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
-        actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
         std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
@@ -2422,7 +2408,7 @@ void App::onMouseUp() {
     penNavButton_ = 0;
 }
 
-void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
+void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
@@ -2474,8 +2460,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
-    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
-    actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
+    actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
     keyDown_ = SDLK_UNKNOWN;
 }
 

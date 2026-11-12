@@ -1,0 +1,29 @@
+# Frame double-tap (Preferences > Input) is its own setting, apart from the removed two-key shortcuts: it is still on the
+# page with its saved value, F frames the active Part, and F twice inside the setting frames the scene. Shot at 1440 and 2880.
+run ui_look look=classic layout=classic
+restart data/prefs/ui_frame_tap.json
+wait 0.2
+expect_value frame_double_tap_ms == 250
+run new_sphere subdivisions=3
+run part_append type=sphere size=0.2 name=Eye
+expect_value input_style == 0
+mouse_move 0.5 0.5
+key f
+remember camera_distance part
+wait 1.0
+# Two presses 50 ms apart: inside 250 ms, the scene.
+key f
+wait 0.05
+key f
+expect_value camera_distance > $part
+wait 1.0
+# 400 ms apart: outside 250 ms, the active Part again.
+key f
+wait 0.4
+key f
+wait 1.0
+expect_value camera_distance == $part
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+wait 0.5
+shot frame_double_tap_pref

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "layout": {},
+  "shortcuts": {
+    "view.wireframe": "C then V / F7",
+    "view.opposite": "A then S",
+    "color.switch": "V"
+  },
+  "prefs": {
+    "twoKeyWindow": 0.8
+  }
+}

@@ -1101,9 +1101,6 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
-    # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
-    sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
-    sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
@@ -1126,14 +1123,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
     sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
     sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
+    # Two-key shortcuts removed: an old ui.json loses them with a notice, no slider or button (tests/ui/two_key_removed.sfui), at 1440 px and 200 %.
+    sculptforge_ui_test(two_key_removed_1440 two_key_removed --size 1440x900)
+    sculptforge_ui_test(two_key_removed_2880 two_key_removed --size 2880x1800)
+    # Frame double-tap stays (tests/ui/frame_double_tap.sfui), at 1440 px and 200 %.
+    sculptforge_ui_test(frame_double_tap_1440 frame_double_tap --size 1440x900)
+    sculptforge_ui_test(frame_double_tap_2880 frame_double_tap --size 2880x1800)
     # Crisp Flatten's chamfer, grazing views and Brush Lab options (tests/ui/crisp_flatten.sfui), at 1440 px and 2880 px.
     sculptforge_ui_test(crisp_flatten_1440 crisp_flatten --size 1440x900)
     sculptforge_ui_test(crisp_flatten_2880 crisp_flatten --size 2880x1800)
     # Smooth Peaks (tests/ui/smooth_peaks.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(smooth_peaks_1440 smooth_peaks --size 1440x900)
     sculptforge_ui_test(smooth_peaks_2880 smooth_peaks --size 2880x1800)
-    sculptforge_ui_test(key_sequence_1440 key_sequence --size 1440x900)
-    sculptforge_ui_test(key_sequence_2880 key_sequence --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)

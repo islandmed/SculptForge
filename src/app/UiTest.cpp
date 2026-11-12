@@ -792,6 +792,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
     if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
     if (name == "mouse_orbit_speed") return std::round(double(app_.uiPrefs_.mouseOrbitSpeed) * 100.0);
+    if (name == "frame_double_tap_ms") return double(app_.uiPrefs_.frameDoubleTapMs);
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -1046,7 +1047,6 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
-    if (name == "key_sequence_waiting") return app_.actions_.sequenceWaiting() ? 1.0 : 0.0; // a first key waiting for its second
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
     if (name == "custom_litspheres") {
         int n = 0;
@@ -2897,9 +2897,6 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "mouse_orbit_speed") { // mouse_orbit_speed X: Preferences > Input's mouse orbit speed (0.1 to 2)
         if (!need(1)) return false;
         run([this, v = num(1, 1.0f)] { app_.uiPrefs_.mouseOrbitSpeed = clampMouseOrbitSpeed(v); });
-    } else if (verb == "two_key_window") { // two_key_window X: Preferences > Input's two-key window (seconds)
-        if (!need(1)) return false;
-        run([this, v = num(1, 0.4f)] { app_.uiPrefs_.twoKeyWindow = v; });
     } else if (verb == "input_style") {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;

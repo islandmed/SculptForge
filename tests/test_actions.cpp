@@ -140,6 +140,25 @@ TEST(action_registry_commands) {
     open->run();
     CHECK(prefilled == "open" && ran == "subdivide");
 }
+
+TEST(action_saved_two_key_shortcuts_are_dropped) { // saved by 0.12.8 to 0.12.10; removed since
+    ActionRegistry reg;
+    reg.add({"view.wireframe", "Wireframe", nullptr, "", "Render", "W", "", [] {}, nullptr, nullptr});
+    reg.add({"view.opposite", "Opposite", nullptr, "", "Render", "O", "", [] {}, nullptr, nullptr});
+    reg.add({"edit.undo", "Undo", nullptr, "", "Edit", "Ctrl+Z", "undo", [] {}, nullptr, nullptr});
+    Json saved = Json::object();
+    saved.set("view.wireframe", std::string("C then V / F7"));
+    saved.set("view.opposite", std::string("A then S"));
+    saved.set("edit.undo", std::string("Ctrl+U"));
+    reg.overridesFromJson(saved);
+    CHECK(reg.droppedTwoKeyShortcuts() == 2);
+    CHECK(reg.shortcutText("view.wireframe") == "F7");  // (the other key stays)
+    CHECK(reg.shortcutText("view.opposite").empty());   // (nothing was left: unbound)
+    CHECK(reg.shortcutText("edit.undo") == "Ctrl+U");   // (a plain shortcut is as saved)
+    CHECK(reg.handleKey(SDLK_F7, SDL_KMOD_NONE));
+    reg.overridesFromJson(reg.overridesToJson());       // (what is written back has none to drop)
+    CHECK(reg.droppedTwoKeyShortcuts() == 0 && reg.shortcutText("view.wireframe") == "F7");
+}
 #endif
 
 #include <algorithm>
@@ -200,208 +219,6 @@ TEST(action_registry_conflicts_reset_and_key_nav) {
     CHECK(keyNavMotion(reg.find("view.zoom_in"), px, py, zoom) && zoom > 0 && px == 0);
     CHECK(!keyNavMotion(reg.find("brush.clay"), px, py, zoom));
     CHECK(px == 0 && py == 0 && zoom == 0);
-}
-
-// Two keys in a row (Artizmo on Discord): A then S; no same-key double tap; the first key still works alone.
-TEST(action_key_sequences) {
-    KeySequence seq;
-    CHECK(parseSequence("a then s", seq) && seq.first.key == SDLK_A && seq.second.key == SDLK_S && sequenceText(seq) == "A then S");
-    CHECK(parseSequence("Ctrl+K then C", seq) && seq.first.ctrl && !seq.second.ctrl);
-    CHECK(!parseSequence("A then A", seq) && !parseSequence("A then Shift+A", seq)); // the same key twice
-    CHECK(!parseSequence("A", seq) && !parseSequence("A then", seq) && !parseSequence("A then Hyper+X", seq));
-    CHECK((shortcutSteps("A then S") == std::vector<std::string>{"A", "S"}) && shortcutSteps("Ctrl+Z").size() == 1);
-    CHECK((shortcutAlternatives("a then s / F5 / A then A") == std::vector<std::string>{"A then S", "F5"}));
-    CHECK(parseChords("A then S / F5").size() == 1); // single-chord readers never see a sequence
-
-    int ran = 0, alone = 0, other = 0;
-    ActionRegistry reg;
-    reg.add({"tool.one", "One", nullptr, "", "Tool", "A then S", "", [&] { ++ran; }, nullptr, nullptr});
-    reg.add({"tool.alone", "Alone", nullptr, "", "Tool", "A", "", [&] { ++alone; }, nullptr, nullptr});
-    reg.add({"tool.s", "Esses", nullptr, "", "Tool", "S", "", [&] { ++other; }, nullptr, nullptr});
-    reg.add({"tool.f", "Eff", nullptr, "", "Tool", "F", "", [&] { ++other; }, nullptr, nullptr});
-
-    // A, S in time: the sequence runs, neither key alone does.
-    CHECK(reg.handleKey(SDLK_A, SDL_KMOD_NONE) && reg.sequenceWaiting() && alone == 0);
-    reg.tick(0.2f);
-    CHECK(reg.handleKey(SDLK_S, SDL_KMOD_NONE));
-    CHECK(ran == 1 && alone == 0 && other == 0 && !reg.sequenceWaiting());
-    reg.tick(1.0f);
-    CHECK(alone == 0); // nothing left waiting
-
-    // A alone: it waits, then runs by itself when the time is up.
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    reg.tick(kKeySequenceSeconds * 0.5f);
-    CHECK(alone == 0 && reg.sequenceWaiting());
-    reg.tick(kKeySequenceSeconds * 0.6f);
-    CHECK(alone == 1 && !reg.sequenceWaiting() && ran == 1);
-    // S after the time is over is S alone, not the sequence (S ends a sequence, so it waits its own window for an A).
-    reg.handleKey(SDLK_S, SDL_KMOD_NONE);
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    CHECK(other == 1 && ran == 1);
-
-    // A, then another key that isn't the second: A runs, then that key runs as usual.
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    reg.tick(0.1f);
-    CHECK(reg.handleKey(SDLK_F, SDL_KMOD_NONE));
-    CHECK(alone == 2 && other == 2 && ran == 1 && !reg.sequenceWaiting());
-    // Shift or Ctrl pressed on the way to the second key changes nothing; a late second key is a plain key.
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    CHECK(!reg.handleKey(SDLK_LSHIFT, SDL_KMOD_LSHIFT) && reg.sequenceWaiting());
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    CHECK(alone == 3);
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    reg.handleKey(SDLK_S, SDL_KMOD_NONE);
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    CHECK(ran == 1 && other == 3);
-
-    // A first key with no action of its own is only a prefix: nothing runs when it times out.
-    reg.add({"tool.q", "Cue", nullptr, "", "Tool", "Q then W", "", [&] { ++ran; }, nullptr, nullptr});
-    reg.handleKey(SDLK_Q, SDL_KMOD_NONE);
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    CHECK(ran == 1 && !reg.sequenceWaiting());
-    reg.handleKey(SDLK_Q, SDL_KMOD_NONE);
-    reg.handleKey(SDLK_W, SDL_KMOD_NONE);
-    CHECK(ran == 2);
-    // Another key's sequence does not match: Q, E (unbound) runs nothing and does not stick.
-    reg.handleKey(SDLK_Q, SDL_KMOD_NONE);
-    CHECK(!reg.handleKey(SDLK_E, SDL_KMOD_NONE) && ran == 2 && !reg.sequenceWaiting());
-
-    // A click (or pen down) is not the second key: the first runs alone at once. Focus lost: nothing runs.
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    reg.flushSequence();
-    CHECK(alone == 5 && !reg.sequenceWaiting());
-    reg.handleKey(SDLK_A, SDL_KMOD_NONE);
-    reg.dropSequence();
-    reg.tick(kKeySequenceSeconds + 0.01f);
-    CHECK(alone == 5 && !reg.sequenceWaiting());
-
-    // Conflicts: the same sequence on another action is a holder; A alone, or S alone, is not.
-    KeySequence as;
-    CHECK(parseSequence("A then S", as));
-    auto h = reg.holdersOfShortcut("A then S", "tool.q");
-    CHECK(h.size() == 1 && h[0]->id == "tool.one");
-    CHECK(reg.holdersOfShortcut("A then S", "tool.one").empty());
-    CHECK(reg.holdersOfShortcut("S then A", "tool.q").empty());
-    CHECK(reg.actionForSequence(as) && reg.actionForSequence(as)->id == "tool.one");
-    // Replace: the other action loses the sequence but keeps its other keys; the saved text reads back.
-    reg.assignShortcut("tool.q", "F5", false);
-    reg.assignShortcut("tool.q", "A then S", true);
-    CHECK(reg.shortcutText("tool.one").empty() && reg.shortcutText("tool.q") == "A then S / F5");
-    Json saved = reg.overridesToJson();
-    ActionRegistry again;
-    again.add({"tool.q", "Cue", nullptr, "", "Tool", "Q then W", "", [&] { ++ran; }, nullptr, nullptr});
-    again.overridesFromJson(saved);
-    CHECK(again.shortcutText("tool.q") == "A then S / F5" && again.actionForSequence(as));
-    // Reset gives the default back and takes it from the sequence's new holder.
-    CHECK(reg.resetShortcut("tool.one") == "Cue");
-    CHECK(reg.shortcutText("tool.one") == "A then S" && reg.shortcutText("tool.q") == "F5");
-}
-
-// Two keys pressed together (Artizmo on Discord): C = Pick colour, V = Switch Color, "C then V" = Fill. The second key
-// going down while the first is still held is the sequence, as tap, tap is, and V before C with V still held too; each
-// key alone waits the window out, other keys run at once.
-TEST(action_key_sequence_overlap) {
-    int fill = 0, pick = 0, swap = 0, other = 0;
-    ActionRegistry reg;
-    reg.add({"color.fill", "Fill", nullptr, "", "Color", "C then V", "", [&] { ++fill; }, nullptr, nullptr});
-    reg.add({"color.pick", "Pick", nullptr, "", "Color", "C", "", [&] { ++pick; }, nullptr, nullptr});
-    reg.add({"color.swap", "Swap", nullptr, "", "Color", "V", "", [&] { ++swap; }, nullptr, nullptr});
-    reg.add({"tool.x", "Ex", nullptr, "", "Tool", "X / Ctrl+C", "", [&] { ++other; }, nullptr, nullptr});
-    const float w = reg.sequenceWindow();
-    CHECK(w == kKeySequenceSeconds && w >= 0.35f && w <= 1.0f);
-
-    // Keys in no sequence run at once, with no added latency (also Ctrl+C: not C).
-    CHECK(reg.handleKey(SDLK_X, SDL_KMOD_NONE) && other == 1 && !reg.sequenceWaiting());
-    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_LCTRL) && other == 2 && !reg.sequenceWaiting());
-
-    // Overlap, C first: C down, V down with C still held (no key-up is ever sent): Fill, nothing else.
-    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE) && reg.sequenceWaiting() && pick == 0);
-    reg.tick(0.02f);
-    CHECK(reg.handleKey(SDLK_V, SDL_KMOD_NONE));
-    CHECK(fill == 1 && pick == 0 && swap == 0 && !reg.sequenceWaiting());
-    reg.tick(2.0f);
-    CHECK(fill == 1 && pick == 0 && swap == 0);
-
-    // Overlap, V first: V waits too (it ends a sequence); C goes down with V still held: the same Fill.
-    CHECK(reg.handleKey(SDLK_V, SDL_KMOD_NONE) && reg.sequenceWaiting() && swap == 0);
-    reg.tick(0.02f);
-    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE));
-    CHECK(fill == 2 && pick == 0 && swap == 0 && !reg.sequenceWaiting());
-
-    // V tapped, then C (V already up): that is V, C in a row, not "C then V": V alone, then C waits.
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
-    reg.keyUp(SDLK_V);
-    reg.tick(0.05f);
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    CHECK(fill == 2 && swap == 1 && reg.sequenceWaiting());
-    reg.tick(w + 0.01f);
-    CHECK(pick == 1 && !reg.sequenceWaiting());
-
-    // Tap, tap (C up, V down inside the window): Fill. Key-up of the first changes nothing for C then V.
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.keyUp(SDLK_C);
-    reg.tick(w - 0.05f);
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
-    CHECK(fill == 3 && pick == 1 && swap == 1);
-
-    // Too late: C alone, then V alone (each after its own window).
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.tick(w + 0.02f);
-    CHECK(pick == 2 && !reg.sequenceWaiting());
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
-    CHECK(fill == 3 && swap == 1 && reg.sequenceWaiting());
-    reg.tick(w + 0.02f);
-    CHECK(swap == 2 && !reg.sequenceWaiting());
-
-    // C alone: nothing before the window is up, then once.
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.tick(w * 0.5f);
-    CHECK(pick == 2 && reg.sequenceWaiting());
-    reg.tick(w);
-    reg.tick(1.0f);
-    CHECK(pick == 3 && !reg.sequenceWaiting());
-
-    // Key repeat of the waiting key is not a second press: no early run, no restart of the window, no second run.
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.tick(w * 0.75f);
-    CHECK(reg.handleKey(SDLK_C, SDL_KMOD_NONE, true) && reg.sequenceWaiting() && pick == 3);
-    reg.tick(w * 0.3f); // past the window counted from the real press: the repeat did not restart it
-    CHECK(pick == 4 && !reg.sequenceWaiting());
-    // ...and a repeat of a key that waits for nothing is an ordinary press (held brush size keys rely on that).
-    CHECK(reg.handleKey(SDLK_X, SDL_KMOD_NONE, true) && other == 3);
-
-    // Modifiers pressed on the way change nothing, before or after the first key.
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    CHECK(!reg.handleKey(SDLK_LSHIFT, SDL_KMOD_LSHIFT) && reg.sequenceWaiting() && pick == 4);
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
-    CHECK(fill == 4 && pick == 4);
-
-    // Another key while C waits: C alone first, then that key (not the sequence).
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.handleKey(SDLK_X, SDL_KMOD_NONE);
-    CHECK(pick == 5 && other == 4 && fill == 4 && !reg.sequenceWaiting());
-
-    // The window is a preference, 0.35 to 1 s: a full second works, and a press 0.9 s later is still the sequence.
-    reg.setSequenceWindow(0.1f);
-    CHECK(reg.sequenceWindow() == kKeySequenceMin);
-    reg.setSequenceWindow(5.0f);
-    CHECK(reg.sequenceWindow() == kKeySequenceMax);
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    for (int i = 0; i < 9; ++i) reg.tick(0.1f); // 0.9 s later
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE);
-    CHECK(fill == 5 && pick == 5);
-    reg.setSequenceWindow(0.4f);
-
-    // The hook: tells which key waited, around the action it runs alone (the app knows if that key is still down).
-    std::vector<std::pair<SDL_Keycode, bool>> calls;
-    reg.setAloneHook([&](SDL_Keycode k, bool begin) { calls.emplace_back(k, begin); });
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.tick(1.0f);
-    CHECK(calls.size() == 2 && calls[0] == std::make_pair(SDLK_C, true) && calls[1] == std::make_pair(SDLK_C, false));
-    reg.handleKey(SDLK_C, SDL_KMOD_NONE);
-    reg.handleKey(SDLK_V, SDL_KMOD_NONE); // the sequence: no alone action, no hook
-    CHECK(calls.size() == 2 && fill == 6);
 }
 
 // The pan and zoom keys ease in and out and cover the same distance at any frame rate (no OS key repeat involved).

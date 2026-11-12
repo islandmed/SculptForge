@@ -1,0 +1,24 @@
+# Two-key shortcuts ("A then S", 0.12.8 to 0.12.10) are removed: a ui.json that still has them loses them with a one-line
+# notice (a shortcut left with none is unbound, one with other keys keeps them), the old Two-key window preference is ignored
+# without a word, and Preferences has no Two-key window slider and no two-key button in Hotkeys. Shot at 1440 and 2880.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+restart data/prefs/ui_two_key_old.json
+wait 0.2
+expect_status Two-key shortcuts are gone: 2 shortcuts lost them
+expect_shortcut view.wireframe F7
+expect_shortcut view.opposite
+expect_shortcut color.switch V
+expect_value wireframe == 0
+key f7
+expect_value wireframe == 1
+# A key that began a two-key shortcut acts at once now.
+key v
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+wait 0.5
+shot preferences_input_no_two_key
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Wireframe"
+wait 0.5
+shot hotkeys_no_two_key
