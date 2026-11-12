@@ -713,7 +713,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Ignore fingers while the pen is near", "筆靠近時忽略手指"},
     {"Palm rejection", "防誤觸"},
     {"A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
-     "繪畫時手掌擱在螢幕上並不是觸控：筆在感應範圍內以及離開後的片刻內，落下的手指不會產生任何操作。觸控板不會被忽略。在 Android 上預設開啟。"},
+     "繪畫時手掌放在螢幕上並不是觸控：筆在感應範圍內以及離開後的片刻內，落下的手指不會產生任何操作。觸控板不會被忽略。在 Android 上預設開啟。"},
     {"Mouse mode (relative)", "滑鼠模式（相對）"},
     {"Mouse mode", "滑鼠模式"},
     {"View speed", "視圖速度"},

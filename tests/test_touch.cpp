@@ -93,7 +93,7 @@ TEST(palm_guard_follows_the_pen) {
     PalmGuard g;
     CHECK(!g.active(0.0)); // no pen yet: fingers count
     g.pen(true, 10.0);
-    CHECK(g.active(10.0) && g.active(500.0)); // in range: as long as it stays
+    CHECK(g.active(10.0) && g.active(10.0 + PalmGuard::kSilent - 0.1)); // in range: while it keeps sending
     g.pen(true, 500.0); // (hover, motion, a stroke: every pen event renews it)
     g.pen(false, 501.0);
     CHECK(g.active(501.0) && g.active(501.0 + PalmGuard::kAfterPen - 0.01)); // the hand is still there for a moment

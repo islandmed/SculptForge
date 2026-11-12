@@ -5,5 +5,6 @@ added: **Palm rejection** (Android): fingers that land while the pen is in range
 testers:
   - Android tablet with a pen: rest the hand on the screen while sculpting; the palm draws and navigates nothing.
   - Lift the pen: a finger sculpts or pinches again right away.
+  - Hold the pen perfectly still over the screen for 4 s with a finger down: if the guard lets the finger through, the pen driver sends no hover samples while still (say which stylus).
 ---
 Palm rejection by pen proximity (PalmGuard in core/TouchGesture.h); desktop-testable through the palm_guard UI-test verb.
