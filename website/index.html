@@ -38,6 +38,8 @@
     .stand-lead strong, .stand-text strong { display: block; color: var(--text); font-weight: 600; }
     .standout { padding: 64px 0 72px; background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .stand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .stand-grid > li:empty { display: none; } /* a tile whose picture the deploy took down (media_takedown.py) */
+    .demo.clip:not(:has(video, img)) { display: none; } /* a clip the deploy took down (media_takedown.py) */
     .stand-tile { display: flex; flex-direction: column; height: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--muted); }
     .stand-tile:hover, .stand-tile:focus-visible { border-color: var(--accent); text-decoration: none; }
     .stand-img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #14141a; border-bottom: 1px solid var(--border); }
@@ -439,7 +441,7 @@ rez-env sculptforge -- sculptforge troll.usda \
         <h2>See it in action</h2>
         <p class="section-lede">Real recordings of the app at real speed, with nothing edited in.</p>
 
-        <div class="demo">
+        <div class="demo clip">
           <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
             <source src="media/udim-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
             <source src="media/udim.mp4?v=1" type="video/mp4">
@@ -451,7 +453,7 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
+        <div class="demo clip reverse">
           <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
             <source src="media/layer-weight-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
             <source src="media/layer-weight.mp4?v=1" type="video/mp4">
@@ -463,7 +465,7 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo">
+        <div class="demo clip">
           <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
             <source src="media/vdm-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
             <source src="media/vdm.mp4?v=1" type="video/mp4">
@@ -475,7 +477,7 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
+        <div class="demo clip reverse">
           <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
             <source src="media/view-keys-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
             <source src="media/view-keys.mp4?v=1" type="video/mp4">
