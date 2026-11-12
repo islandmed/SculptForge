@@ -64,7 +64,11 @@ struct PickerUi {
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.
     static bool sliderKnob(ImVec2& knob);
     // While Size (S) or Falloff (O) is open (#138): where it opened (window coordinates), which, and the value it is
-    // setting: the number being typed (not applied before Enter), else the current one. False otherwise.
+    // setting: the number being typed (not applied before Enter), else the current one. Size and Falloff show a ring;
+    // Intensity (U, I) is a disc inside it, 0..1. False otherwise.
+    // True when the open slider is following the pointer: it has moved sideways from where the key opened it (and the
+    // knob was not grabbed or a number typed). A click then keeps the value and starts nothing (App::handleEvent).
+    static bool sliderFollowing(const App& app);
     static bool sliderPreview(const App& app, ImVec2& at, Slider& which, float& value);
 };
 

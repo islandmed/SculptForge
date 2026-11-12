@@ -1209,6 +1209,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
+    # The follow-the-mouse pop-up at the review sizes (1440 and 1440@200%): ring and readout in both.
+    sculptforge_ui_test(size_follow_1440 size_follow --size 1440x810)
+    sculptforge_ui_test(size_follow_2880 size_follow --size 2880x1620)
     # The Parts / Geometry tools (foirgairwolf on Discord) at a laptop's and a small window's width: rows fit.
     sculptforge_ui_test(parts_split_selection_1440 parts_split_selection --size 1440x900)
     sculptforge_ui_test(mesh_check_1440 mesh_check --size 1440x900)
