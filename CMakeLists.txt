@@ -1083,6 +1083,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # The undo budget in Preferences > Performance and the status line when steps are dropped (tests/ui/undo_budget.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(undo_budget_1440 undo_budget --size 1440x900)
+    sculptforge_ui_test(undo_budget_2880 undo_budget --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)

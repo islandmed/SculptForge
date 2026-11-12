@@ -483,6 +483,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"A folder of .obj, .ply or .glb files: insert them one at a time", "存放 .obj、.ply 或 .glb 文件的文件夹：逐个插入"},
     {"Insert set", "插入集"},
     {"[ / ] previous / next   Esc stops", "[ / ] 上一个 / 下一个   Esc 停止"},
+    {"Oldest undo step removed to free memory", "已移除最旧的撤销步骤以释放内存"},
+    {"Oldest %d undo steps removed to free memory", "已移除最旧的 %d 个撤销步骤以释放内存"},
+    {"The last step alone is over the undo budget, so it is kept", "最后一步本身就超过撤销上限，仍会保留"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "GPU 内存不足，无法显示所有部件：请隐藏部分部件或降低一级细分。"},
     {"%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename", "%s\n%zu 个顶点，%zu 个三角形%s%s%s\n点击以选择，双击以重命名"},
@@ -2436,10 +2439,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "上一笔触每个笔触（笔刷的一步，含所有对称侧）的耗时：查找并移动顶点、更新其法线与 BVH（选择结构），以及将更改"
      "发送到 GPU（每帧）。低于 16 ms 即可跟上 60 Hz 显示器。"},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
-     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their "
      "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
      "visible Parts.",
-     "场景包含的内容：网格与其拓扑、BVH、为了切换而保留的细分层级、撤销历史（编辑最多保留 1 GB，会丢弃最旧的步骤）"
+     "场景包含的内容：网格与其拓扑、BVH、为了切换而保留的细分层级、撤销历史（编辑按可用内存保留，会丢弃最旧的步骤）"
      "、含图层与材质通道的绘制贴图（通道中只有绘制过的 64x64 图块会占用内存），以及可见部件的 GPU 缓冲区。"},
     // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
     {"Measure this computer again (about 2 seconds): the GPU's triangle throughput and upload speed, brush speed and "

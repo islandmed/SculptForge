@@ -122,6 +122,7 @@ ui_fill_layers              sculpt
 ui_first_sculpt             sculpt
 ui_focal_alpha              sculpt
 ui_hardware_*               sculpt
+ui_undo_budget_*            sculpt
 ui_kelvinlet_capture        sculpt
 ui_keep_masked              sculpt
 ui_library*                 ui

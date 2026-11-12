@@ -3336,6 +3336,7 @@ void App::syncScene() {
     }
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;
 }
@@ -3374,6 +3375,26 @@ void App::clearLods() {
     lods_.clear();
     previewLod_ = -1;
     if (previewed) lastDisplayed_ = nullptr;
+}
+
+void App::updateUndoNotice() {
+    size_t dropped = 0;
+    bool over = false;
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const UndoStack::Notice n = doc_.partUndo(i).takeNotice();
+        dropped += n.dropped;
+        over = over || n.lastStepOver;
+    }
+    if (!dropped && !over) return;
+    std::string msg;
+    if (dropped) {
+        char buf[160];
+        std::snprintf(buf, sizeof buf, dropped == 1 ? tr("Oldest undo step removed to free memory") : tr("Oldest %d undo steps removed to free memory"),
+                      int(dropped));
+        msg = buf;
+    }
+    if (over) msg += (msg.empty() ? "" : ". ") + std::string(tr("The last step alone is over the undo budget, so it is kept"));
+    status_ = msg;
 }
 
 void App::updateTitle() {
