@@ -15,7 +15,7 @@ first time you open it, and how to build it from source.
 - **Network**: not needed for sculpting. The free AI features (Brush Lab and image or text to 3D) and the
   community brush gallery need an internet connection unless you run models on your own machine.
 
-> **Note:** SculptForge is a 64-bit desktop application. There is no web, iPad or Android version.
+> **Note:** SculptForge is a 64-bit desktop application. There is no web or iPad version. Android is in early access for members now, and the public release is planned for 26 November.
 
 ## Download
 
