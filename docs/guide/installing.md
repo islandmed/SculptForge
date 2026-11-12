@@ -214,6 +214,9 @@ live pressure reading.
 
 ## What you see at start-up
 
+A small splash with the SculptForge logo and version shows for at least half a second while SculptForge loads, then
+fades into the main window. Turn it off in **Edit > Preferences > Interface > Show startup splash** for an instant start.
+
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
 (comma) to close it, or turn off **Edit > Preferences > Library > Show at startup**. The first start also creates
