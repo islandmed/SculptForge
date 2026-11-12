@@ -43,7 +43,7 @@ stroke 0.3 0.5 0.7 0.5 0.6 hold
 wait 0.3
 expect_value coarse_pending > 0
 release
-wait 0.6
+wait 1.5 # (the levels follow 0.35 s after the last edit, and a slow runner finishes the stroke late)
 expect_value coarse_pending == 0
 expect_value coarse_clusters == $before
 shot painted-coarse
