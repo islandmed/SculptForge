@@ -9,10 +9,11 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: The user guide is redesigned, with new pictures, and Voxel Resolution fits on a shelf.
+tagline: The user guide is redesigned, with new pictures, and big Clay strokes no longer ring.
 highlight: The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips
 highlight: 25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded
 highlight: The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)
+highlight: Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)
 highlight: Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times
 ```
 
