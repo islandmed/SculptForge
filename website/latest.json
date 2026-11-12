@@ -1,11 +1,12 @@
 {
-  "version": "0.12.9",
+  "version": "0.12.10",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live",
-    "Faster Undo and Redo of a stroke on dense models of several million triangles (#181)",
-    "A click elsewhere after moving keeps the new Size or Intensity"
+    "Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)",
+    "Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)",
+    "Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)",
+    "Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge"
   ],
   "support": {
     "founding": {
