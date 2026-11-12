@@ -11,6 +11,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 date: unreleased
 tagline: Brush Size and Intensity follow the mouse, and Undo is faster on dense models.
 highlight: Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live
+highlight: A click elsewhere after moving keeps the new Size or Intensity
 highlight: Faster Undo and Redo of a stroke on dense models of several million triangles (#181)
 ```
 
