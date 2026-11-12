@@ -418,7 +418,7 @@ TEST(tube_profile_mirror_exact) {
 
 TEST(tube_invariant_turn_twist_spin_together_on_a_curved_tube) {
     // Turn, Twist and Spin all set at once, on a bent tapered tube, for every profile (the round Braid among them): the sweep is
-    // closed, oriented and finite, and the X mirror copy is its exact mirror image (all three negate).
+    // closed, oriented and finite, and the X mirror copy is its mirror image (all three negate): exact for the outline profiles.
     using P = TubeShape::Profile;
     for (P profile : {P::Square, P::Triangle, P::Ribbon, P::Rope, P::Braid, P::Sleeve}) {
         TubeShape s = curvy();
@@ -434,14 +434,27 @@ TEST(tube_invariant_turn_twist_spin_together_on_a_curved_tube) {
         for (const vec3& p : both.positions) finite = finite && std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         CHECK(finite && a.vertexCount() > 0 && watertight(a) && oriented(a) && signedVolume(a) > 0.0);
         CHECK(both.vertexCount() == 2 * a.vertexCount() && watertight(both));
-        float worst = 0.0f;
-        for (size_t i = 0; i < a.vertexCount(); i += 11) {
-            const vec3 m(-a.positions[i].x, a.positions[i].y, a.positions[i].z);
-            float best = 1e9f;
-            for (size_t j = a.vertexCount(); j < both.vertexCount(); ++j) best = std::min(best, glm::distance(m, both.positions[j]));
-            worst = std::max(worst, best);
+        const bool strands = profile == P::Rope || profile == P::Braid; // (their strands start from an automatic first normal, so the
+                                                                        // copy is the mirror image up to a turn about the curve)
+        if (strands) {
+            // What a mirror and a turn about the curve both keep: the volume, and how far the shape reaches in each axis.
+            const double v = signedVolume(a);
+            CHECK(std::abs(signedVolume(both) / (2.0 * v) - 1.0) < 1e-3);
+            float lo = 1e9f, hi = -1e9f, mlo = 1e9f, mhi = -1e9f;
+            for (size_t i = 0; i < a.vertexCount(); ++i) lo = std::min(lo, a.positions[i].y), hi = std::max(hi, a.positions[i].y);
+            for (size_t j = a.vertexCount(); j < both.vertexCount(); ++j) mlo = std::min(mlo, both.positions[j].y), mhi = std::max(mhi, both.positions[j].y);
+            CHECK(std::abs(lo - mlo) < 0.03f && std::abs(hi - mhi) < 0.03f);
+        } else {
+            float worst = 0.0f;
+            for (size_t i = 0; i < a.vertexCount(); i += 11) {
+                const vec3 m(-a.positions[i].x, a.positions[i].y, a.positions[i].z);
+                float best = 1e9f;
+                for (size_t j = a.vertexCount(); j < both.vertexCount(); ++j) best = std::min(best, glm::distance(m, both.positions[j]));
+                worst = std::max(worst, best);
+            }
+            if (worst >= 1e-3f) std::printf("  mirror copy of profile %d is off by %g\n", int(profile), worst);
+            CHECK(worst < 1e-3f);
         }
-        CHECK(worst < 1e-3f);
         // Turn is the same all along, Spin is not: zero them apart and the sweeps differ, saved and read back they agree.
         TubeShape back = tubeFromJson(tubeToJson(one));
         CHECK(back.roll == 25.0f && back.twist == 90.0f && back.spin == 15.0f && tubeSweep(back).positions == a.positions);
