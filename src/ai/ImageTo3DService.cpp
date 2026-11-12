@@ -292,24 +292,24 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
             result.error = "Cancelled";
             return result;
         }
-        std::vector<Json> args;
-        for (const auto& a : step.args) {
-            if (a == "$IMG") {
-                args.push_back(image);
-            } else if (a == "$PROMPT") {
-                args.push_back(Json(prompt));
-            } else if (a.rfind("$OUT", 0) == 0) {
+        auto resolve = [&](const std::string& a) {
+            if (a == "$IMG") return image;
+            if (a == "$PROMPT") return Json(prompt);
+            if (a.rfind("$OUT", 0) == 0) {
                 const size_t n = size_t(std::stoi(a.substr(4)));
-                args.push_back(n < firstOutputs.size() ? firstOutputs[n] : Json());
-            } else {
-                Json v;
-                std::string err;
-                Json::parse(a, v, err);
-                args.push_back(v);
+                return n < firstOutputs.size() ? firstOutputs[n] : Json();
             }
-        }
+            Json v;
+            std::string err;
+            Json::parse(a, v, err);
+            return v;
+        };
+        std::vector<Json> args;
+        for (const auto& a : step.args) args.push_back(resolve(a));
+        std::vector<GradioSlot> slots;
+        for (const auto& sl : step.slots) slots.push_back({sl.label, sl.type, resolve(sl.arg), sl.optional});
         std::vector<Json> outputs;
-        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); })) {
+        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }, slots)) {
             std::fprintf(stderr, "Generate 3D: %s (%s) '%s' failed: %s\n", preset->label, preset->space, step.api, result.error.c_str());
             result.error = std::string(preset->label) + ": " + result.error;
             return result;
@@ -443,11 +443,15 @@ bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std
     return true;
 }
 
+// The image presets send an empty text prompt (the Space's own default is null) where the Space has one; 2.1's state input has none.
+static const HfSlot kNoPrompt = {"Text Prompt", "textbox", "\"\"", true};
+
 const std::vector<HfPreset>& hfTextPresets() {
     static const std::vector<HfPreset> presets = {
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fast", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
-         {{"shape_generation", {"$PROMPT"}}}},
-        {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space", {{"shape_generation", {"$PROMPT"}}}},
+         {{"shape_generation", {}, {{"Text Prompt", "textbox", "$PROMPT"}}}}},
+        {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",
+         {{"shape_generation", {}, {{"Text Prompt", "textbox", "$PROMPT"}}}}},
     };
     return presets;
 }
@@ -456,13 +460,16 @@ const std::vector<HfPreset>& hfPresets() {
     static const std::vector<HfPreset> presets = {
         // Hunyuan3D 2.1 first: the default, works with no token. resolveHfPreset() falls back to it.
         {"hunyuan3d-2.1", "Hunyuan3D 2.1 (Tencent) - free, no token", "https://tencent-hunyuan3d-2-1.hf.space",
-         {{"shape_generation", {"$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"trellis-2", "TRELLIS.2 (Microsoft, MIT) - Best detail (needs token)", "https://microsoft-trellis-2.hf.space",
-         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
+         {{"start_session", {}},
+          {"preprocess_image", {}, {{"", "image", "$IMG"}}},
+          {"image_to_3d", {}, {{"", "image", "$OUT1"}}},
+          {"extract_glb", {}}}},
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
-         {{"shape_generation", {"\"\"", "$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",
-         {{"shape_generation", {"\"\"", "$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"stable-fast-3d", "Stable Fast 3D (Stability AI) - free, quick and simple", "https://stabilityai-stable-fast-3d.hf.space",
          // As its UI does: check the background, remove it (fills the session state), then Run.
          {{"requires_bg_remove", {"$IMG", "0.85"}},

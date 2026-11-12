@@ -1,11 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The start-up splash (idea by @lowenski, #176): our brand bust and wordmark on the dark brand background, shown only while start-up
-// takes longer than kShowAfterMs and gone when the main window has drawn its first frame (but not before it has been up for
-// kMinVisibleMs: a splash that flashes for a frame is worse than none). Start-up is checked between its steps and once more
-// before the first frame; a start that is over within kShowAfterMs never shows it (on a fast laptop that is every start). This file is the part with no
-// window system in it (the decisions, the settings file, the picture); StartupSplashWindow.cpp opens the window.
+// The start-up splash (idea by @lowenski, #176): our brand bust and wordmark on the dark brand background, shown on every
+// interactive start (a brand moment, owner 11-12) from the first start-up step, overlapped with the start-up work, and gone when
+// the main window has drawn its first frame, but not before it has been up for kMinVisibleMs (so a start that takes less than that
+// is the only one the splash makes longer). It fades into the main window (kFadeMs, where the window system can). This file is
+// the part with no window system in it (the decisions, the settings file, the picture); StartupSplashWindow.cpp opens the window.
 #pragma once
 
 #include <cstdint>
@@ -19,8 +19,8 @@ struct Image;
 
 namespace sf::splash {
 
-constexpr double kShowAfterMs = 300.0; // quicker starts never show it
-constexpr double kMinVisibleMs = 700.0; // once shown, it stays at least this long (never added to a start that didn't show it)
+constexpr double kMinVisibleMs = 500.0; // once shown, it stays at least this long (start-up work runs meanwhile)
+constexpr double kFadeMs = 150.0;       // the fade into the main window
 constexpr int kLogicalWidth = 640, kLogicalHeight = 360; // 16:9, like the invite splash
 constexpr uint8_t kBackground[3] = {0x0f, 0x0f, 0x12}; // the site's --bg
 
@@ -34,13 +34,13 @@ struct Setting {
 // True: the main window starts hidden (no flash of an empty window) and the splash may show. False: as before.
 bool enabled(const Setting& s);
 
-// A checkpoint of start-up: open the splash now? (once; only when enabled, and start-up is past showAfterMs)
-bool due(bool enabled, bool alreadyShown, double elapsedMs, double showAfterMs = kShowAfterMs);
+// A checkpoint of start-up: open the splash now? (once, at the first one; only when enabled)
+bool due(bool enabled, bool alreadyShown);
 
 // How much longer the open splash stays before the main window may replace it (0: it has been up long enough).
 double holdMs(double visibleMs);
 
-// SF_SPLASH=1: show the splash on this run whatever the start-up time or the preference (it stays kMinVisibleMs), to see it.
+// SF_SPLASH=1: show the splash on this run whatever the preference (and SF_STARTUP_SPLASH=0), to see it.
 bool forcedFromEnv(const char* value);
 
 // ui.json's "prefs": "startupSplash" (true when absent or unreadable) and "language" ("en" when absent).

@@ -2,11 +2,13 @@
 # DISCORD_ANNOUNCE_WEBHOOK secret; without the secret the job skips. No checkout of untrusted code, no other secrets.
 # Message text comes only from this repository or the release itself (tag, URL), never from issues or pull requests.
 #
-# - A release: "SculptForge vX.Y.Z is out", the release's feed highlights, the download link and the release URL.
+# - A release: "## SculptForge X.Y.Z", the headline (the feed's first highlight) in bold, the other highlights, and masked
+#   [Download] · [What's new] links, with the release card (website/media/release-X.Y.Z.jpg, committed to the site by the
+#   launch kit) as the embed image. The job waits up to CARD_WAIT_MINUTES for the card to be live and posts without it after.
 #   The Release workflow publishes with GITHUB_TOKEN, and GitHub sends no `release` event for that, so its
 #   successful run (workflow_run) triggers the post; `release: published` covers a release published by hand.
-# - A beta (a vX.Y.Z-beta.N or -rc.N pre-release): "SculptForge X.Y.Z Beta N is out for testing", the highlights of
-#   the feed's channels.preview (release.sh step "preview"), the release link and how to send feedback (#bug-reports).
+# - A beta (a vX.Y.Z-beta.N or -rc.N pre-release): "## SculptForge X.Y.Z Beta N is out for testing", the highlights of
+#   the feed's channels.preview (release.sh step "preview"), the masked release link and how to send feedback (#bug-reports).
 #   release.sh step "site" writes the highlights to website/latest.json on main after the release is out, so the
 #   job waits (up to FEED_WAIT_MINUTES) for the feed to name this version, then posts without highlights if it never does.
 # - Run workflow: posts .github/announcements/<file> (at most 2000 characters), with an optional embed image: a
@@ -41,7 +43,7 @@ jobs:
   post:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
         with:
@@ -65,6 +67,7 @@ jobs:
           API_URL: ${{ github.api_url }}
           GH_TOKEN: ${{ github.token }}
           FEED_WAIT_MINUTES: "45"
+          CARD_WAIT_MINUTES: "20"
         run: |
           python3 - <<'EOF'
           import json, os, pathlib, re, subprocess, sys, time, urllib.request
@@ -82,6 +85,37 @@ jobs:
                   "User-Agent": UA})
               with urllib.request.urlopen(req, timeout=30) as r:
                   return json.load(r)
+
+          def compose(version, label, pre, url, highlights):
+              """The Discord text: header, the headline (first highlight) in bold, the rest as short lines, masked links
+              (angle brackets: no auto-embed). A stable release links the site and its What's new entry, a beta its release."""
+              head = f"## SculptForge {label} is out for testing" if pre else f"## SculptForge {version}"
+              lines = [head]
+              if highlights:
+                  lines.append(f"**{highlights[0].rstrip('.')}.**")
+                  lines += [f"• {h}" for h in highlights[1:]]
+              elif not pre:
+                  lines.append(f"SculptForge {version} is out.")
+              if pre:
+                  lines += ["A beta of the next release: please try it on your own work before it goes stable.",
+                            "Feedback: post in #bug-reports with your OS, the version (Help > About) and your hardware "
+                            "(graphics card, tablet), plus what you did and what you saw. What works well is welcome too.",
+                            "Want the next betas offered in the app? Preferences > Updates > Update channel: Preview.",
+                            f"[Download the beta](<{url}>) (Windows, macOS, Linux)"]
+              else:
+                  anchor = "version-" + version.replace(".", "")
+                  lines.append(f"[Download](<{SITE}>) · [What's new](<{SITE}/guide/whats-new.html#{anchor}>)")
+              return "\n".join(lines)
+
+          def card_url(version):
+              """The release card's live URL once the site serves it (an image), else None."""
+              url = f"{SITE}/media/release-{version}.jpg"
+              try:
+                  req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return url if r.status == 200 and r.headers.get("Content-Type", "").startswith("image/") else None
+              except Exception:
+                  return None
 
           if event == "workflow_dispatch":
               base = pathlib.Path(".github/announcements").resolve()
@@ -127,33 +161,27 @@ jobs:
                   if pre:  # a beta's highlights are in the Preview channel's entry
                       feed = (feed.get("channels") or {}).get("preview") or {} if isinstance(feed, dict) else {}
                   if feed.get("version") == version:
-                      highlights = [h.strip() for h in feed.get("highlights", []) if isinstance(h, str) and h.strip()][:6]
+                      highlights = [h.strip() for h in feed.get("highlights", []) if isinstance(h, str) and h.strip()][:4]
                       break
                   if time.time() >= deadline:
                       print(f"::warning::website/latest.json never said {version}; posting without highlights"); break
                   time.sleep(60)
               while True:
-                  if pre:
-                      lines = [f"**SculptForge {label} is out for testing**",
-                               "A beta of the next release: please try it on your own work before it goes stable."]
-                  else:
-                      lines = [f"**SculptForge {label} is out**"]
-                  lines += [f"• {h}" for h in highlights]
-                  if not highlights:
-                      lines.append(f"What's new: {SITE}/guide/whats-new.html")
-                  if pre:
-                      tail = [f"Download the beta (Windows, macOS, Linux): {url}",
-                              "Feedback: post in #bug-reports with your OS, the version (Help > About) and your "
-                              "hardware (graphics card, tablet), plus what you did and what you saw. What works well "
-                              "is welcome too.",
-                              "Want the next betas offered in the app? Preferences > Updates > Update channel: Preview."]
-                  else:
-                      tail = [f"Download: {SITE}", f"Release notes: {url}"]
-                  text = "\n".join(lines + tail)
+                  text = compose(version, label, pre, url, highlights)
                   if len(text) <= 2000 or not highlights:
                       break
                   highlights.pop()
-              payload["flags"] = 4  # no link previews: the post itself is the summary
+              card = None
+              if not pre:  # the release card leads the post; the launch kit commits it to the site shortly after the release
+                  wait = time.time() + 60 * float(env("CARD_WAIT_MINUTES", "20"))
+                  while not (card := card_url(version)) and time.time() < wait:
+                      time.sleep(30)
+                  if card:
+                      payload["embeds"] = [{"image": {"url": card}}]
+                  else:
+                      print(f"::warning::{SITE}/media/release-{version}.jpg never went live; posting without the card")
+              if not payload.get("embeds"):
+                  payload["flags"] = 4  # no link previews: the post itself is the summary (flag 4 would hide the card too)
               what = tag
           if not text:
               sys.exit("the message is empty")

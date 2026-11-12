@@ -136,21 +136,6 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     return {};
 }
 
-size_t totalMemoryBytes() {
-#if defined(_WIN32)
-    MEMORYSTATUSEX m{};
-    m.dwLength = sizeof m;
-    return GlobalMemoryStatusEx(&m) ? size_t(m.ullTotalPhys) : 0;
-#elif defined(__APPLE__)
-    uint64_t bytes = 0;
-    size_t len = sizeof bytes;
-    return sysctlbyname("hw.memsize", &bytes, &len, nullptr, 0) == 0 ? size_t(bytes) : 0;
-#else
-    const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGE_SIZE);
-    return pages > 0 && page > 0 ? size_t(pages) * size_t(page) : 0;
-#endif
-}
-
 namespace {
 
 std::string trim(std::string s) {

@@ -446,6 +446,8 @@ constexpr Entry kSpanish[] = {
     {"Orbit around the pointer", "Orbitar alrededor del puntero"},
     {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
      "Una rotación que empieza sobre el modelo gira la vista alrededor del punto bajo el puntero, y los zooms posteriores trabajan a esa profundidad. Si empieza sobre el fondo, gira alrededor del centro de la vista como antes. En todos los estilos de teclas."},
+    {"Mouse orbit speed", "Velocidad de órbita del ratón"},
+    {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "Cuánto gira la vista por cada píxel que avanza un arrastre de rotación con el ratón o el trackpad, en todos los estilos de teclas. 1x es el giro habitual; bájalo si la vista gira demasiado rápido. El lápiz tiene su propia Velocidad de vista en Preferencias > Tableta."},
     {"Fullscreen", "Pantalla completa"},
     {"Gradient", "Degradado"},
     {"Flat Colour", "Color plano"},
@@ -528,6 +530,9 @@ constexpr Entry kSpanish[] = {
     {"A folder of .obj, .ply or .glb files: insert them one at a time", "Una carpeta de archivos .obj, .ply o .glb: insértalos de uno en uno"},
     {"Insert set", "Conjunto para insertar"},
     {"[ / ] previous / next   Esc stops", "[ / ] anterior / siguiente   Esc termina"},
+    {"Oldest undo step removed to free memory", "Se quitó el paso de deshacer más antiguo para liberar memoria"},
+    {"Oldest %d undo steps removed to free memory", "Se quitaron los %d pasos de deshacer más antiguos para liberar memoria"},
+    {"The last step alone is over the undo budget, so it is kept", "El último paso supera por sí solo el límite de deshacer y se conserva"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "No hay memoria de GPU suficiente para mostrar todas las piezas: oculta alguna o baja un nivel de "
      "subdivisión."},
@@ -847,8 +852,8 @@ constexpr Entry kSpanish[] = {
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
     {"Show startup splash", "Mostrar pantalla de inicio"},
-    {"Show the SculptForge logo while a slow start runs. A quick start shows nothing. Applies at the next start.",
-     "Muestra el logotipo de SculptForge mientras el inicio es lento. Un inicio rápido no muestra nada. Se aplica en el próximo inicio."},
+    {"Show the SculptForge logo for half a second or more at every start. Turn it off for an instant start. Applies at the next start.",
+     "Muestra el logotipo de SculptForge medio segundo o más en cada inicio. Desactívalo para un inicio inmediato. Se aplica en el próximo inicio."},
     {"Show Library at startup", "Mostrar Biblioteca al iniciar"},
     {"Placement", "Ubicación"},
     {"Top", "Arriba"},
@@ -857,6 +862,10 @@ constexpr Entry kSpanish[] = {
     {"Library folder", "Carpeta de la biblioteca"},
     {"Use the default folder", "Usar la carpeta predeterminada"},
     {"Mouse & pen", "Ratón y lápiz"},
+    {"Ignore fingers while the pen is near", "Ignorar los dedos mientras el lápiz está cerca"},
+    {"Palm rejection", "Rechazo de palma"},
+    {"A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
+     "Una mano apoyada en la pantalla mientras dibujas no es un toque: los dedos que tocan mientras el lápiz está al alcance, y un instante después de que se aleje, no hacen nada. Un trackpad nunca se ignora. Activado por defecto en Android."},
     {"Mouse mode (relative)", "Modo ratón (relativo)"},
     {"Mouse mode", "Modo ratón"},
     {"View speed", "Velocidad de vista"},
@@ -2724,11 +2733,11 @@ constexpr Entry kSpanish[] = {
      "vértices, actualizar sus normales y el BVH (la estructura de selección), y enviar el cambio a la GPU (por "
      "fotograma). Menos de 16 ms sigue el ritmo de una pantalla de 60 Hz."},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
-     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their "
      "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
      "visible Parts.",
      "Lo que contiene la escena: las mallas con su topología, los BVH, los niveles de subdivisión guardados para "
-     "pasar entre ellos, el historial de deshacer (Editar guarda hasta 1 GB, descartando los pasos más antiguos), "
+     "pasar entre ellos, el historial de deshacer (Editar guarda tanto como permita la memoria libre, descartando los pasos más antiguos), "
      "las texturas pintadas con sus capas y canales de material (solo los mosaicos pintados de 64x64 de un canal "
      "usan memoria), y los buffers de GPU de las Piezas visibles."},
     // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
@@ -3866,6 +3875,9 @@ constexpr Entry kSpanish[] = {
     {"Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; the arrow beside it puts the default back.", "Haz clic y pulsa la nueva tecla. Esc cancela, Retroceso borra. Naranja: distinta de la predeterminada; la flecha de al lado la restaura."},
     {"How fast the view moves while a Pan or Zoom key is held (Ctrl+Numpad 4, 6, 8 and 2 pan; Numpad Plus and Minus zoom; rebind them in Hotkeys). 1x is a screen in about two seconds.", "Qué tan rápido se mueve la vista mientras se mantiene una tecla de Desplazar o Zoom (Ctrl+Numpad 4, 6, 8 y 2 desplazan; Numpad Más y Menos hacen zoom; reasígnalas en Atajos). 1x es una pantalla en unos dos segundos."},
     {"Pan and zoom key speed", "Velocidad de las teclas de desplazar y zoom"},
+    {"Two-key window", "Ventana de dos teclas"},
+    {"How long the second key of a two-key shortcut (\"C then V\") has after the first, whether you press the two together (either one first) or tap them in a row. A key that is part of a two-key shortcut runs its own action once this time is up; every other key runs at once.", "Cuánto tiempo tiene la segunda tecla de un atajo de dos teclas (\"C y luego V\") tras la primera, ya sea que pulses las dos a la vez (cualquiera primero) o una tras otra. Una tecla que forma parte de un atajo de dos teclas ejecuta su propia acción al terminar este tiempo; las demás teclas se ejecutan al instante."},
+    {"It also works with both keys pressed together.", "También funciona con las dos teclas pulsadas a la vez."},
     {"Puts this action's default shortcut back.", "Restaura el atajo predeterminado de esta acción."},
     {"Replace", "Reemplazar"},
     {"Replace gives it to '%s' and takes it from there.", "Reemplazar se la da a '%s' y se la quita al otro."},
@@ -3874,7 +3886,7 @@ constexpr Entry kSpanish[] = {
     {"press 2 keys...", "pulsa 2 teclas..."},
     {"Two different keys. Esc cancels, Backspace removes the two-key shortcuts.", "Dos teclas distintas. Esc cancela, Retroceso quita los atajos de dos teclas."},
     {"Two keys in a row", "Dos teclas seguidas"},
-    {"Adds a second shortcut that takes two different keys one after the other, like A then S (within half a second). The first key still works alone if it is bound; it runs when no second key follows.", "Añade otro atajo de dos teclas distintas, una tras otra, como A y luego S (en medio segundo). La primera tecla sigue funcionando sola si tiene atajo: se ejecuta cuando no llega una segunda."},
+    {"Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key window in Preferences > Input), or both pressed together. Each key still works alone if it is bound; it runs when the window is up and the other key did not come.", "Añade otro atajo de dos teclas distintas, una tras otra, como A y luego S (dentro de la Ventana de dos teclas de Preferencias > Input), o las dos a la vez. Cada tecla sigue funcionando sola si tiene atajo: se ejecuta cuando termina la ventana y no llegó la otra."},
     {"Reset to default", "Restablecer"},
     {"Pan left", "Desplazar a la izquierda"},
     {"Pan right", "Desplazar a la derecha"},
@@ -5369,8 +5381,8 @@ constexpr Entry kSpanish[] = {
      "Qué tan separadas están las copias, en longitudes de la Parte: 1 es extremo con extremo, menos las solapa como eslabones de cadena."},
     {"How many degrees each copy is turned about the curve more than the one before: 90 for chain links.",
      "Cuántos grados se gira cada copia alrededor de la curva más que la anterior: 90 para eslabones de cadena."},
-    {"How many strands the rope or braid has. One round strand is a spring; Spread opens it up.",
-     "Cuántas hebras tiene la cuerda o la trenza. Una hebra redonda es un resorte; Extensión lo abre."},
+    {"How many strands the rope or braid has (a braid starts with two). One round strand is a spring; Spread opens it up.",
+     "Cuántos hilos tiene la cuerda o la trenza (una trenza empieza con dos). Un solo hilo redondo es un muelle; Extensión lo abre."},
     {"Part to repeat",
      "Parte a repetir"},
     {"Pick a Part...",
@@ -5393,12 +5405,12 @@ constexpr Entry kSpanish[] = {
      "La Parte cuyas copias se colocan a lo largo de la curva: un eslabón, una cuenta, una escama. Su lado más largo sigue la curva."},
     {"Rope",
      "Cuerda"},
-    {"Rope and braid: how far apart the strands are (0.5: touching). Sleeve: how thick the wall is.",
-     "Cuerda y trenza: cuánto se separan los hilos (0.5: se tocan). Manga: el grosor de la pared."},
+    {"Rope: how far apart the strands are (0.5: touching). Braid: how loose the weave is (0: strands packed together, 1: apart, long turns). Sleeve: how thick the wall is.",
+     "Cuerda: cuánto se separan los hilos (0.5: se tocan). Trenza: lo suelto que es el trenzado (0: hilos juntos, 1: separados, vueltas largas). Manga: lo gruesa que es la pared."},
     {"Sleeve",
      "Manga"},
-    {"Three flat strands woven across each other: plaits, straps, braided hair (for new tubes, and the active Tube Part). Spread sets how far apart the strands are.",
-     "Tres hilos planos entrelazados: trenzas, correas, pelo trenzado (para tubos nuevos y la Pieza Tube activa). Extensión fija cuánto se separan los hilos."},
+    {"Round strands twisted over and under each other, two by default: braided cord, plaits, hair (for new tubes, and the active Tube Part). Spread sets how tight the weave is: 0 packs the strands together, 1 opens it up.",
+     "Hilos redondos trenzados por encima y por debajo unos de otros, dos por defecto: cordón trenzado, trenzas, pelo (para tubos nuevos y la Pieza Tube activa). Extensión fija lo apretado que es el trenzado: 0 junta los hilos, 1 lo abre."},
     {"Three strands wound round the curve: rope, cable, twine. Spread sets how far apart the strands are, Twist and Spin turn them (for new tubes, and the active Tube Part).",
      "Tres hilos enrollados alrededor de la curva: cuerda, cable, cordel. Extensión fija cuánto se separan los hilos; Torcer y Giro los giran (para tubos nuevos y la Pieza Tube activa)."},
     {"Tube from curve",
@@ -5423,6 +5435,8 @@ constexpr Entry kSpanish[] = {
      "Grosor %.2f"},
     {"Triangle",
      "Triángulo"},
+    {"Spin %.0f\xc2\xb0",
+     "Giro %.0f\xc2\xb0"},
     {"Turn %.0f\xc2\xb0",
      "Girar %.0f\xc2\xb0"},
     {"Turns the cross-section about the curve, in degrees.",

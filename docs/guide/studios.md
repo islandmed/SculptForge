@@ -1,15 +1,17 @@
 # SculptForge for studios
 
 SculptForge is built to drop into animation, VFX and game studios that run their own pipelines: native on
-Linux, scriptable, standards-based, with no licence server and nothing that phones home. This chapter is for
+Linux, scriptable, standards-based, with no licence server and no telemetry. This chapter is for
 pipeline TDs and IT: the VFX Reference Platform builds, Rez deployment, shared brush libraries, environment
 variables, headless use, licensing and [IT deployment](#it-deployment) (a managed policy, the AI audit log, single
 sign-on, AI gateways and air-gapped use).
+For the checkable facts with their methods and sources (performance, platforms, OpenUSD, automation, security and what is
+not done yet), see the [technical brief](https://sculptforge.app/studios/brief).
 
 ## VFX Reference Platform builds
 
-SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). Every commit is built and tested in
-the platform's reference environments:
+SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). Every push to main and every merge batch
+is built and tested in the platform's reference environments:
 
 | | CY2026 | CY2027 | SculptForge |
 |---|---|---|---|

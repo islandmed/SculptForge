@@ -6,6 +6,120 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.11] - 2026-11-12
+
+### Added
+- **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
+  resting palm and do nothing; a trackpad's fingers are never ignored. Off on desktop touch screens.
+- **Android (early, members first; free for everyone on 26 November)**: SculptForge builds for Android tablets, phones and Chromebooks (arm64 and
+  x86_64, Android 9 or later, OpenGL ES 3.2) as a sideloaded APK. Sculpt with a finger or a stylus with pressure,
+  navigate with two fingers (pan, pinch to zoom, twist to roll), undo, save to the app's Projects folder and open any
+  file through the system's document picker. The desktop layout for now; a tablet layout of its own comes next
+  (android/README.md).
+- **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
+  resting palm and do nothing; a trackpad's fingers are never ignored. A pen that never reports leaving stops counting
+  after 3 s. Off on desktop touch screens; **Preferences > Tablet > Ignore fingers while the pen is near** turns it on
+  or off.
+
+### Changed
+- **Braid** (Tool > Tube) now builds round strands (two to begin with) that twist over and under each other round the
+  curve, instead of flat ribbons. **Spread** sets the weave: 0 packs the strands together so they touch, 1 opens them
+  up with longer turns. Saved braids look different. Requested by Artizmo on Discord.
+- Release tooling: the members' beta is created in the insiders repository with its own tag target, so a beta no
+  longer stops at "tag has not been pushed".
+- Why page: the agents are described as testing for speed, stability and feel, with artists deciding what gets built.
+- **Guide**: the install page now says Android is in early access for members, public on 26 November, instead of "no
+  Android version".
+- The start-up splash shows on every interactive start for at least 0.5 s (overlapped with start-up work), centred and
+  floating, and fades into the main window. Turn it off in Preferences > Interface > Show startup splash.
+- Four home-page demo clips and 25 guide screenshots showed old interface labels; the site leaves them out until they
+  are re-recorded on current main.
+- **Website home page**: a release's news appears once, in the announcement bar under the menu; the hero and the
+  What's new heading no longer repeat it. The release card check (scripts/release.sh) looks for the bar, and a
+  colon-chain tagline fails the guide check.
+- **Website**: the home page and the About page now show what is built in: Blender round-trip, Gaussian splats with
+  Blender 5.3, capture to sculptable mesh, quad retopology and baking, garments and cloth, and the optional AI
+  brushes. Blender and splats lead in the hero on desktop and phone, with a six-tile "Built in" band below it.
+
+### Fixed
+- **Nudge and Palette Knife folded the surface over itself** (#198, #199): a second stroke across an area they had
+  dragged, and a single Nudge stroke, left thousands of triangles folded over their neighbours (dark creases and
+  specks). The material they push is now spread out again behind the brush; Palette Knife drags a little less per dab
+  when its steps are long (at the default spacing it drags as far as before); Nudge slides along the plane of the
+  brush instead of each vertex's own, noisy normal (which also keeps the two halves of a mirrored stroke identical),
+  and holds back a move that would turn a triangle over while its brush covers up to about 12,000 vertices. In the
+  close-up session the folded triangles fall from 1,444 to 607 (Palette Knife) and Nudge adds none (it added 4,972);
+  on a replay of the same strokes Nudge goes from 5,347 to 0 and Palette Knife from 1,381 to about 620. Palette Knife
+  still leaves creases where two strokes overlap. Cost: Palette Knife takes about 0.2 ms more per dab with a small
+  brush and 40 to 50% more time with a very large one; Nudge about 1.2 ms more per dab with a small brush (the fold
+  check), little more with a large one. Nudge reaches about 6% less far on a long stroke. Tendril is unchanged.
+- The start-up splash never appeared on Wayland ("Window framebuffer support not available"); it is now drawn through
+  an SDL renderer when the window has no surface, and fully drawn before the window is shown.
+- **Spikes and streaks from stacked Crease and Inflate strokes** (#194): on a divided mesh (about 5 million triangles)
+  Crease packs the triangles across its line, and Inflate, moving every point along its own normal, then flipped them
+  (twenty overlapping strokes left about 2,000 folded triangles and needles). A dab that reaches such a packed grid
+  now swells along the brush's normal instead; Inflate on an ordinary surface is unchanged.
+- **Undo history and memory** (#202, slice 1; thanks @TheLycanFenrir): the undo history now fits the computer's free
+  memory (a quarter of its total memory, never below 256 MB) instead of a fixed 1 GB that could run an 8 GB computer
+  out of memory next to a very dense mesh, and a 64 GB computer keeps far more history. When steps must go, the status
+  line says "Oldest N undo steps removed to free memory" (English, Spanish and both Chinese) instead of dropping them
+  silently, and Preferences > Performance shows the live budget. Saving older steps to disk and unloading hidden Parts
+  are planned for the rest of #202.
+
+## [0.12.10] - 2026-11-11
+
+### Added
+- **Mouse orbit speed** in Preferences > Input (thanks hullalmiah on Discord): 0.1x-2x for mouse and trackpad rotation
+  drags in every input style, including orbiting around the pointer; 1x is the turn as it was. The pen keeps its own
+  View speed. Saved in the preferences.
+- **Two-key window** (Preferences > Input): how long the second key of a two-key shortcut has, 0.35 to 1 s (0.4 s by
+  default). The keys of a two-key shortcut can be pressed together, either one first, or one after the other. A key
+  that is part of one runs its own action once the window is up; every other key runs at once.
+
+### Changed
+- Release tooling: the Discord release post has a header, the headline first and the release card as its image, with
+  masked Download and What's new links instead of raw URLs.
+- Release tooling: the release stage warns when the version's launch headline is missing, or when its keywords are not
+  in the first highlight line and the What's New tagline; the promote puts the headline first in the GitHub release
+  body, and stages the README's "New in" line.
+- Release tooling: a staging CI run that fails in a test step gets one rerun of its failed jobs, and a test that
+  passes on the rerun is logged as flaky instead of failing the release. A test that fails twice stays red.
+
+### Fixed
+- **Brush Size and Intensity** keep their value when the pointer goes past the canvas edge while you adjust (S / F, U
+  / Shift+F), instead of snapping back to the old one; only a click on another control cancels.
+- Crisp Flatten only cuts down now and never adds clay (thanks Hameron on Discord). Pen pressure no longer scales the
+  Crisp Flatten cut depth (it left terraces across a facet), so a light-pressure stroke lands on the same plane.
+  Surface below the plane is left alone at any depth, which also removes the scattered spikes, debris and stair-steps
+  along the edges of its facets. The regular Flatten brush is still the one that fills dips. The brush's shelf preview
+  is a little wider so the cut shows.
+- **Generate 3D** (free Hugging Face models): Hunyuan3D 2, 2 mini Turbo and 2.1 and TRELLIS.2 now find their image and
+  prompt inputs by name, so the Spaces adding or reordering inputs (Hunyuan3D now takes 13, TRELLIS.2 15) no longer
+  breaks them. Everything else uses each Space's own defaults.
+- **Symmetry with textured brushes** (#197): with X or radial symmetry the mirrored strokes of the brushes that stamp
+  a pattern or an alpha (Dragon Scales, Skin Pores, Stone Carve, Wood Grain, Woven Cloth and about 25 more) now carry
+  the pattern's mirror image, where they used to lay a different pattern on each side.
+- two-key shortcuts also fire when both keys are pressed together (thanks Artizmo on Discord)
+
+## [0.12.9] - 2026-11-11
+
+### Changed
+- **Tests** (contributors): a CMakeLists.txt edit that only adds new source files or a guarded `add_test` runs those
+  files' tests in T0, not the whole suite; the mode matrix runs as four shards side by side; `stale_tree` runs on
+  every change; a per-push tier (`SF_T0_TIER=push`: direct picks + start, sculpt, save and open) runs in about half
+  the test time and is never the READY verdict; known flakes go in `tests/quarantine.txt` with an owner and a date,
+  after which they block again.
+
+### Fixed
+- **Brush Size and Intensity** follow the mouse: press S (or F in the Blender style) or U, move the mouse sideways and
+  the value changes live, with the ring drawn at the live size where you started (Intensity shows a disc inside it).
+  Click or Enter keeps it, Esc or a right click puts it back (thanks hullalmiah on Discord).
+- **Undo / Redo of a stroke on a dense model (#181).** Every Undo and Redo made the viewport send the whole model to
+  the graphics card again and rebuild its distance-view cache, so the time grew with the model instead of the stroke
+  (5.4M triangles with 3 subdivision levels: 470-600 ms per Ctrl+Z, now 20-30 ms in the frame; the upload itself 500
+  ms, now 4-8 ms). Only the vertices the stroke changed are sent now. Thanks @TheLycanFenrir and @Devon0209 for the
+  reports.
+
 ## [0.12.8] - 2026-11-11
 
 ### Added

@@ -174,6 +174,8 @@ public:
     void syncScene(const std::vector<SceneMesh>& scene);
     // True when Part `id` didn't fit in GPU memory at its last full upload (it isn't drawn until it does).
     bool outOfMemory(uint32_t id) const;
+    // Full mesh uploads so far (a whole layout and every vertex): UI tests check that an undo sends only what it changed.
+    uint64_t fullUploads() const { return fullUploads_; }
     // Re-uploads the splats when `version` differs from the last upload.
     void syncSplats(const SplatCloud& splats, uint64_t version);
     using Viewport = RenderViewport;
@@ -553,6 +555,7 @@ private:
     std::vector<uint32_t> coarseClusters_;
     size_t lastCoarseClusters_ = 0;
     bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;
+    uint64_t fullUploads_ = 0;
     double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
     double triangleRateM_ = 0.0;    // calibrated, million triangles a second (0 = unknown)
     std::vector<uint8_t> coarseLevel_;

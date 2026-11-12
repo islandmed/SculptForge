@@ -9,6 +9,7 @@
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
 #include "app/GizmoAll.h"
+#include "app/OrbitSpeed.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -214,11 +215,11 @@ private:
     void onMouseUp();
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
-    void orbitBy(float x, float y, float dx, float dy);
+    void orbitBy(float x, float y, float dx, float dy, bool mouse = false);
     std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
-    void onKey(SDL_Keycode key, SDL_Keymod mod);
+    void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
 
     bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
@@ -319,6 +320,8 @@ private:
     bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
     bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
     float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
+    float sizeRingPreviewValue_ = 0.0f;       // the value it shows (Intensity 0..1: the disc inside the ring)
+    bool sizeRingPreviewIntensity_ = false;   // an Intensity pop-up's preview: a disc in the ring
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
     bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
@@ -1496,6 +1499,7 @@ private:
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
+    void updateUndoNotice();           // every frame: "Oldest N undo steps removed to free memory" when a history dropped steps
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
@@ -2512,7 +2516,7 @@ private:
     void saveWindowState() const;
     bool rememberWindow_ = false;
     // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
-    // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
+    // frame, and the splash (opened at the first start-up step) closes then.
     std::unique_ptr<splash::Window> splash_;
     bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
     std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;
@@ -3071,6 +3075,7 @@ private:
         bool paint = false;
     } strokeLatch_;
     uint32_t strokePopupSwallowUp_ = 0; // mouse buttons whose press the popup took: their release is its too
+    SDL_Keycode aloneSavedKey_ = SDLK_UNKNOWN; // keyDown_ while a waiting first key runs alone (Actions setAloneHook)
     SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
     uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
     std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed
@@ -3262,6 +3267,13 @@ private:
     bool touchNavigates_ = false;   // this touch began over the 3D view
     bool touchDirect_ = true;       // a touch screen (false: a trackpad)
     bool touchSwallowMouse_ = false; // a gesture ran: the finger's mouse events stay off the canvas until it lifts
+    // Palm rejection (Preferences > Tablet, TabletSettings::palmRejection): a finger that lands while a pen is in range,
+    // or within PalmGuard::kAfterPen of it leaving, is a palm or a resting hand: ignored until it lifts. Every maker's
+    // pen reports proximity.
+    PalmGuard palm_;
+    bool touchPalm_ = false;    // the touch whose mouse events are being dropped
+    bool palmGuard() const;
+    bool palmMouseEvent(const SDL_Event& e); // true: a palm's, dropped
     bool touchNativePinch_ = false; // SDL sends pinch events: a trackpad's finger spread doesn't zoom again
     bool touchTwisting_ = false;    // the twist passed kTouchTwistStart: it rolls the view from now on
     bool touchPinching_ = false;    // a trackpad pinch or twist is under way: its stray scroll doesn't zoom

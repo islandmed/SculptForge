@@ -24,9 +24,6 @@ constexpr size_t kMaxRings = 200000;
 constexpr int kMaxSides = 256;
 constexpr int kMaxCapRings = 64;
 constexpr float kCurveWire = 0.2f; // a Curve Part's wire, in its points' radii
-constexpr float kBraidThickness = 0.3f; // a braid strand's thickness as a fraction of its width
-constexpr float kBraidWidth = 0.9f;     // a braid strand's half width, as a fraction of a touching strand's radius
-constexpr float kBraidDepth = 1.0f;     // how far a braid strand lifts over and dips under the others, in strand radii (3 strands)
 
 bool finite(const vec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
 
@@ -296,63 +293,75 @@ struct Builder {
 
         Profile prof = shape.profile;
         if (line.size() < 2 && (prof == Profile::Rope || prof == Profile::Braid || prof == Profile::Sleeve)) prof = Profile::Round;
-        if (prof == Profile::Rope || prof == Profile::Braid) {
-            // Round strands wound round the centre line (a rope), or flat strands that pass over and under each other
-            // (a braid). One round strand is a spring.
-            const float k = 2.0f * std::clamp(shape.spread, 0.0f, 1.0f);
-            const bool rope = prof == Profile::Rope;
-            const int count = std::clamp(shape.strands, rope ? 1 : 2, kTubeMaxStrands);
-            const float packing = count <= 2 ? 1.0f : std::sin(kPi / float(count)); // strands of one ring touch at spread 0.5
-            const std::vector<vec3> normals = tubeFrames(line, vec3(0.0f));
-            const float lay = 360.0f / ((rope ? 7.0f : 12.0f) * mean) * hand; // degrees of strand phase per unit length
-            for (int strand = 0; strand < count; ++strand) {
-                std::vector<TubeSample> sub(line.size());
-                std::vector<vec3> wide(line.size()); // a braid strand's flat side, as the centre line's turn lays it
-                for (size_t i = 0; i < line.size(); ++i) {
-                    const TubeSample& s = line[i];
-                    const float rho = s.radius / (1.0f + k / packing), orbit = s.radius - rho;
-                    const vec3 n = normals[i], b = glm::cross(s.tangent, n);
-                    float phase = 2.0f * kPi * float(strand) / float(count) + lay * along[i] * kPi / 180.0f;
-                    vec3 off;
-                    float width = rho;
-                    if (rope) {
-                        phase += angle[i] * kPi / 180.0f;
-                        off = orbit * (std::cos(phase) * n + std::sin(phase) * b);
-                    } else { // across the plait it swings; in depth it lifts over or dips under its neighbours
-                        const float c = std::cos(angle[i] * kPi / 180.0f), sn = std::sin(angle[i] * kPi / 180.0f);
-                        const vec3 u = c * n + sn * b, v = c * b - sn * n;
-                        // Narrower than a touching strand, so neighbours clear each other across the plait; deeper the more
-                        // strands there are (their paths cross at a shallower angle).
-                        width = kBraidWidth * rho;
-                        const float swing = s.radius - width, lift = kBraidDepth * rho * 0.866f / std::sin(kPi / float(count));
-                        off = swing * std::sin(phase) * u + lift * std::cos(phase) * v;
-                        wide[i] = u;
+        if (prof == Profile::Braid) {
+            // Round strands twisted round the centre line, over and under each other like a double helix; Spread sets how
+            // loose (orbit and pitch grow, strands part) or tight (touching, a solid rope). Refine the line first: a turn
+            // needs a dozen rings or more.
+            const int count = std::clamp(shape.strands, 2, kTubeMaxStrands);
+            float widest = 0.0f;
+            for (const TubePoint& p : shape.points) widest = std::max(widest, p.radius);
+            const BraidLayout lay = braidLayout(count, shape.spread, std::max(widest, 1e-12f));
+            const float rate = 2.0f * kPi / lay.pitch * hand; // phase per unit length
+            std::vector<TubeSample> fine;
+            std::vector<float> fineAlong, fineAngle;
+            for (size_t i = 0; i < line.size(); ++i) {
+                const int steps = i == 0 ? 1 : std::clamp(int(std::ceil(std::abs(rate) * (along[i] - along[i - 1]) / (kPi / 12.0f))), 1, 64);
+                for (int k = 1; k <= steps; ++k) {
+                    const float f = float(k) / float(steps);
+                    const size_t j = i == 0 ? 0 : i - 1;
+                    TubeSample s = line[i];
+                    float al = along[i], an = angle[i];
+                    if (i > 0) {
+                        s.position = glm::mix(line[j].position, line[i].position, f);
+                        s.radius = glm::mix(line[j].radius, line[i].radius, f);
+                        const vec3 t = glm::mix(line[j].tangent, line[i].tangent, f);
+                        s.tangent = glm::length(t) > 1e-9f ? glm::normalize(t) : line[i].tangent;
+                        al = glm::mix(along[j], along[i], f), an = glm::mix(angle[j], angle[i], f);
                     }
-                    sub[i] = {s.position + off, width, s.tangent};
+                    fine.push_back(s), fineAlong.push_back(al), fineAngle.push_back(an);
+                }
+            }
+            const std::vector<vec3> normals = tubeFrames(fine, vec3(0.0f));
+            // The thin strands keep a round outline: about 12 sides each however much of the tube's radius they take.
+            const float strandEdge = edge * lay.radius / std::max(widest, 1e-12f) * (16.0f / 12.0f);
+            for (int strand = 0; strand < count; ++strand) {
+                std::vector<TubeSample> sub(fine.size());
+                for (size_t i = 0; i < fine.size(); ++i) {
+                    const TubeSample& s = fine[i];
+                    const float k = std::min(s.radius / std::max(widest, 1e-12f), 1.0f); // the layout scales with a tapered radius
+                    const vec3 n = normals[i], b = glm::cross(s.tangent, n);
+                    const float phase = 2.0f * kPi * float(strand) / float(count) + rate * fineAlong[i] + fineAngle[i] * kPi / 180.0f;
+                    sub[i] = {s.position + k * lay.orbit * (std::cos(phase) * n + std::sin(phase) * b), k * lay.radius, s.tangent};
                 }
                 for (size_t i = 0; i < sub.size(); ++i) {
                     const vec3 d = sub[std::min(i + 1, sub.size() - 1)].position - sub[i ? i - 1 : 0].position;
                     if (glm::length(d) > 1e-12f) sub[i].tangent = glm::normalize(d);
                 }
-                std::vector<float> turn(sub.size(), 0.0f);
-                Profile strandProfile = Profile::Round;
-                if (!rope) {
-                    // Lay the ribbon's width across the plait: turn each ring from the carried frame to the wanted side.
-                    strandProfile = Profile::Ribbon;
-                    const std::vector<vec3> frames = tubeFrames(sub, wide[0]);
-                    for (size_t i = 0; i < sub.size(); ++i) {
-                        const vec3 t = sub[i].tangent;
-                        vec3 d = wide[i] - t * glm::dot(wide[i], t);
-                        if (glm::length(d) < 1e-9f) continue;
-                        d = glm::normalize(d);
-                        const vec3 n = frames[i], b = glm::cross(t, n);
-                        turn[i] = std::atan2(-glm::dot(d, n), glm::dot(d, b)) * 180.0f / kPi;
-                    }
+                sweepLine(sub, std::vector<float>(sub.size(), 0.0f), Profile::Round, uniform, uniform ? edge : strandEdge, groupOffset, flat, vec3(0.0f), 0.0f);
+            }
+            return;
+        }
+        if (prof == Profile::Rope) {
+            // Round strands wound round the centre line. One round strand is a spring.
+            const float k = 2.0f * std::clamp(shape.spread, 0.0f, 1.0f);
+            const int count = std::clamp(shape.strands, 1, kTubeMaxStrands);
+            const float packing = count <= 2 ? 1.0f : std::sin(kPi / float(count)); // strands of one ring touch at spread 0.5
+            const std::vector<vec3> normals = tubeFrames(line, vec3(0.0f));
+            const float lay = 360.0f / (7.0f * mean) * hand; // degrees of strand phase per unit length
+            for (int strand = 0; strand < count; ++strand) {
+                std::vector<TubeSample> sub(line.size());
+                for (size_t i = 0; i < line.size(); ++i) {
+                    const TubeSample& s = line[i];
+                    const float rho = s.radius / (1.0f + k / packing), orbit = s.radius - rho;
+                    const vec3 n = normals[i], b = glm::cross(s.tangent, n);
+                    const float phase = 2.0f * kPi * float(strand) / float(count) + lay * along[i] * kPi / 180.0f + angle[i] * kPi / 180.0f;
+                    sub[i] = {s.position + orbit * (std::cos(phase) * n + std::sin(phase) * b), rho, s.tangent};
                 }
-                const float savedThickness = thickness;
-                if (!rope) thickness = kBraidThickness;
-                sweepLine(sub, turn, strandProfile, uniform, edge, groupOffset, flat, rope ? vec3(0.0f) : wide[0], 0.0f);
-                thickness = savedThickness;
+                for (size_t i = 0; i < sub.size(); ++i) {
+                    const vec3 d = sub[std::min(i + 1, sub.size() - 1)].position - sub[i ? i - 1 : 0].position;
+                    if (glm::length(d) > 1e-12f) sub[i].tangent = glm::normalize(d);
+                }
+                sweepLine(sub, std::vector<float>(sub.size(), 0.0f), Profile::Round, uniform, edge, groupOffset, flat, vec3(0.0f), 0.0f);
             }
             return;
         }
@@ -398,6 +407,21 @@ std::string num(double v) {
 }
 
 } // namespace
+
+BraidLayout braidLayout(int count, float spread, float radius) {
+    const int n = std::clamp(count, 2, kTubeMaxStrands);
+    const float s = std::clamp(spread, 0.0f, 1.0f);
+    const float orbitPerRadius = ((n == 2 ? 1.08f : 1.18f) + 1.5f * s) / std::sin(kPi / float(n)); // 1 / sin(pi/n) strand radii is touching; a little more at s = 0 so the tilt of the turns still clears
+    BraidLayout out;
+    out.radius = radius / (1.0f + orbitPerRadius);
+    out.orbit = orbitPerRadius * out.radius;
+    // Shortest pitch at which a strand clears the next turn of its neighbours (their spacing across the helix is
+    // 2 * radius), a little over so a tight braid nearly touches without cutting in; the looser, the longer.
+    const float round = 2.0f * kPi * out.orbit, along = 2.0f * out.radius * float(n);
+    const float least = along * round / std::sqrt(std::max(round * round - along * along, 0.01f * round * round));
+    out.pitch = least * 1.15f * (1.0f + 2.0f * s);
+    return out;
+}
 
 const char* tubeProfileName(TubeShape::Profile p) {
     switch (p) {

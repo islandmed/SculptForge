@@ -308,6 +308,14 @@ bool ActionRegistry::isSequenceStart(const Chord& chord) const {
     return false;
 }
 
+bool ActionRegistry::isSequenceEnd(const Chord& chord) const {
+    rebuildChords();
+    for (const auto& seqs : sequences_)
+        for (const KeySequence& s : seqs)
+            if (s.second == chord) return true;
+    return false;
+}
+
 const Action* ActionRegistry::actionForChord(const Chord& chord) const {
     for (size_t i = 0; i < actions_.size(); ++i)
         for (const Chord& c : chordsOf(i))
@@ -360,8 +368,12 @@ bool ActionRegistry::runAction(const Action* a) {
 void ActionRegistry::flushPending() {
     if (!pending_.on) return;
     const std::string id = pending_.aloneId;
+    const SDL_Keycode key = pending_.first.key;
     pending_ = {};
-    if (!id.empty()) runAction(find(id));
+    if (id.empty()) return;
+    if (aloneHook_) aloneHook_(key, true);
+    runAction(find(id));
+    if (aloneHook_) aloneHook_(key, false);
 }
 
 void ActionRegistry::tick(float dt) {
@@ -369,23 +381,29 @@ void ActionRegistry::tick(float dt) {
     if (pending_.on && clock_ >= pending_.until) flushPending();
 }
 
-bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods) {
+bool ActionRegistry::handleKey(SDL_Keycode key, SDL_Keymod mods, bool repeat) {
     if (isModifierKey(key)) return false; // Shift or Ctrl pressed on the way to the second key changes nothing
     const Chord chord = chordFromEvent(key, mods);
+    if (repeat && pending_.on && pending_.first.key == key) return true; // C held: its repeats are not a second press
     if (pending_.on) {
         const Chord first = pending_.first;
         const bool inTime = clock_ < pending_.until;
-        if (inTime)
-            if (const Action* seq = actionForSequence({first, chord})) {
-                pending_ = {}; // the sequence replaces the first key's own action
+        if (inTime) {
+            // The waiting key then this one; or this key then the waiting one, when the waiting key is still held
+            // (V went down before C, both down together: "C then V").
+            const Action* seq = actionForSequence({first, chord});
+            if (!seq && pending_.down) seq = actionForSequence({chord, first});
+            if (seq) {
+                pending_ = {}; // the sequence replaces both keys' own actions
                 runAction(seq);
                 return true;
             }
+        }
         flushPending(); // not the second key (or too late): the first key alone, then this key as usual
     }
-    if (isSequenceStart(chord)) {
+    if (isSequenceStart(chord) || isSequenceEnd(chord)) { // (the ending key waits for a key that begins it, pressed with it)
         const Action* alone = actionForKey(key, mods);
-        pending_ = {true, chord, clock_ + double(kKeySequenceSeconds), alone && alone->run ? alone->id : std::string()};
+        pending_ = {true, chord, true, clock_ + double(window_), alone && alone->run ? alone->id : std::string()};
         return true;
     }
     return runAction(actionForKey(key, mods));

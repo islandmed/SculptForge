@@ -705,16 +705,26 @@ NEWS_START, NEWS_END = "<!-- news-hero:start", "<!-- news-hero:end -->"
 CHANGELOG_URL = "https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md"
 
 
+# Two-key shortcuts stay off the home cards: the home page shows the broad features (the guide and the changelog still name them).
+HOME_HIDE = re.compile(r"two[- ]keys?\b|\bkeys? in a row", re.I)
+
+
+def home_tagline(tagline: str) -> str:
+    """A tagline for a home card: its ';'-separated parts without those the home page hides."""
+    return "; ".join(p for p in re.split(r";\s*", tagline) if not HOME_HIDE.search(p))
+
+
 def home_whats_new(page: "WhatsNewPage") -> str:
     vs = page.versions[:page.detailed]
     out = []
-    if vs:
-        lede = vs[0]["tagline"] or vs[0]["version"]
-        out.append(f'        <p class="section-lede">New in {html.escape(vs[0]["version"])}: {inline(lede, [])} '
-                   f'<a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="{CHANGELOG_URL}">changelog</a></p>')
+    if vs:  # no tagline here: the announcement bar says the release news once, the cards carry the details
+        out.append(f'        <p class="section-lede"><a href="guide/whats-new.html">Everything that changed</a> &middot; '
+                   f'<a href="{CHANGELOG_URL}">changelog</a></p>')
     out.append('        <div class="wn-home">')
-    for v in vs:
-        titles = [split_highlight(h)[0] for h in v["highlights"] if split_highlight(h)[0]] or [c["title"] for c in v["cards"]]
+    for n, v in enumerate(vs):
+        keep = lambda s: not HOME_HIDE.search(s)
+        titles = [x for x in [split_highlight(h)[0] for h in v["highlights"] if split_highlight(h)[0]] if keep(x)] or \
+            [c["title"] for c in v["cards"] if keep(c["title"])]
         first = next((c for c in v["cards"] if c["image"]), None)
         pic, clip = (first["image"], first.get("clip", "")) if first else ("", "")
         img = (f'<div class="wn-pic"><img src="guide/{html.escape(pic)}" alt="" width="600" height="340" loading="lazy" '
@@ -722,12 +732,13 @@ def home_whats_new(page: "WhatsNewPage") -> str:
         if clip:  # the first card's clip plays on the home page too, its picture as the poster
             img = (f'<div class="wn-pic"><video src="guide/{html.escape(clip)}" poster="guide/{html.escape(pic)}" width="600" '
                    f'height="340" muted loop playsinline autoplay></video></div>')
-        items = "".join(f"<li>{inline(c['title'], [])}</li>" for c in v["cards"]) or \
-            "".join(f"<li>{inline(r[:1].upper() + r[1:], [])}</li>" for _, r in map(split_highlight, v["highlights"]))
+        items = "".join(f"<li>{inline(c['title'], [])}</li>" for c in v["cards"] if keep(c["title"])) or \
+            "".join(f"<li>{inline(r[:1].upper() + r[1:], [])}</li>" for _, r in map(split_highlight, v["highlights"]) if keep(r))
+        tag = "" if n == 0 else home_tagline(v["tagline"])  # the newest release's tagline is the bar's, said once
         out.append(f'          <article class="wn-home-card"><a href="guide/whats-new.html#{v["anchor"]}">{img}'
                    f'<div class="wn-card-body"><h3>{html.escape(", ".join(titles[:3]) or "Version " + v["version"])} '
                    f'<small>new in {html.escape(v["version"])}</small></h3>'
-                   + (f'<p>{inline(v["tagline"], [])}</p>' if v["tagline"] else "")
+                   + (f'<p>{inline(tag, [])}</p>' if tag else "")
                    + f'<ul>{items}</ul></div></a></article>')
     out.append("        </div>")
     if page.groups:
@@ -755,25 +766,22 @@ def news_hero(page: "WhatsNewPage") -> str:
 
 
 def write_news_hero(t: str, page: "WhatsNewPage") -> str:
-    """T with the announcement bar and the hero's "New in X" line brought up to the newest version, each only when
-    its data-version differs (an edited one for the same version stays). No markers or no versions: unchanged
-    (never blocks a release)."""
+    """T with the announcement bar brought up to the newest version (only when its data-version differs: an edited
+    line for the same version stays) and the hero's news line emptied: the bar is the one place the page says the
+    release news. No markers or no versions: unchanged (never blocks a release)."""
     if not page.versions:
         return t
-    v = page.versions[0]
-    ver = html.escape(v["version"])
-    text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
-    for start, end, make in (
-            (NEWS_START, NEWS_END, lambda: news_hero(page)),
-            (HERO_START, HERO_END, lambda: f'          <p class="hero-news" data-version="{ver}"><a href="guide/whats-new.html#{v["anchor"]}">'
-                                            f'<strong>New in {ver}:</strong> {text[:1].lower() + text[1:]}.</a></p>\n          ')):
-        a = t.find(start)
-        b = t.find(end, a)
-        if a < 0 or b < 0:
-            continue
-        a = t.index("\n", a) + 1 if start == NEWS_START else a + len(start) + 1
+    ver = html.escape(page.versions[0]["version"])
+    a = t.find(NEWS_START)
+    b = t.find(NEWS_END, a)
+    if a >= 0 and b >= 0:
+        a = t.index("\n", a) + 1
         if f'data-version="{ver}"' not in t[a:b]:
-            t = t[:a] + make() + ("    " if start == NEWS_START else "") + t[b:]
+            t = t[:a] + news_hero(page) + "    " + t[b:]
+    a = t.find(HERO_START)
+    b = t.find(HERO_END, a)
+    if a >= 0 and b >= 0:
+        t = t[:a + len(HERO_START)] + "\n          " + t[b:]
     return t
 
 
@@ -1009,6 +1017,9 @@ def check(index: Page, chapters) -> list:
     wn = pages.get(WHATS_NEW)
     if isinstance(wn, WhatsNewPage):
         problems += wn.problems
+        if wn.versions and re.search(r"\w: ", wn.versions[0]["tagline"]):
+            problems.append(f"{WHATS_NEW}: Version {wn.versions[0]['version']}: the tagline is the headline and up to 2 short "
+                            "items, sentence case, no 'X: verb' colon chains (the site bar, README and feed show it)")
         for v in wn.versions:
             if not v["date"]:
                 problems.append(f"{WHATS_NEW}: Version {v['version']} has no ```features block with its date")
@@ -1299,7 +1310,7 @@ def main() -> int:
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
                 SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "jobs.html", SITE + "queue.html", SITE + "vote.html",
                 SITE + "supporters.html", SITE + "why.html", SITE + "code-signing.html",
-                SITE + "performance/"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
+                SITE + "performance/", SITE + "llms.txt"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"  <url><loc>{html.escape(u)}</loc></url>\n" for u in urls) + "</urlset>\n", encoding="utf-8")

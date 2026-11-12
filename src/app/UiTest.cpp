@@ -58,6 +58,7 @@
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
+//   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
@@ -128,7 +129,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
@@ -318,6 +319,9 @@
 //   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//   click_here [right]       click where the mouse is (the press and the release, no move)
+//   mouse_by DX DY           the mouse moves by DX DY pixels from where it is (no button): the S / U pop-up follows it
+//   expect_value size_ring_value (the preview's value: Size px, Falloff -1..1, Intensity 0..1)
 //
 // Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
 //   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
@@ -662,6 +666,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return sum / double((bx - ax) * (by - ay));
     }
     if (name == "triangles") return double(m.triangleCount());
+    if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
     if (name == "brushes") return double(app_.doc_.brushes.size());
@@ -747,6 +752,18 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
     if (name == "tube_twist") return double(m.tube.twist);
     if (name == "tube_strands") return double(m.tube.strands);
+    if (name == "tube_roll") return double(m.tube.roll);
+    if (name == "tube_spin") return double(m.tube.spin);
+    if (name == "tube_spread") return double(m.tube.spread);
+    if (name == "tube_slider_order") { // 1 when Tool > Tube's Turn, Twist, Spin, Strands and Spread sliders sit in that order, top to bottom (as in 0.12.10)
+        ImVec2 at[5];
+        const char* const items[5] = {"Tube/##tuberoll", "Tube/##tubetwist", "Tube/##tubespin", "Tube/##tubestrands", "Tube/##tubespread"};
+        for (int i = 0; i < 5; ++i)
+            if (!findItem(items[i], at[i])) return 0.0;
+        for (int i = 1; i < 5; ++i)
+            if (!(at[i - 1].y < at[i].y)) return 0.0;
+        return 1.0;
+    }
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
@@ -777,6 +794,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
     if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
+    if (name == "mouse_orbit_speed") return std::round(double(app_.uiPrefs_.mouseOrbitSpeed) * 100.0);
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -1031,6 +1049,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
+    if (name == "key_sequence_waiting") return app_.actions_.sequenceWaiting() ? 1.0 : 0.0; // a first key waiting for its second
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
     if (name == "custom_litspheres") {
         int n = 0;
@@ -1377,6 +1396,13 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t h : m.hidden) n += h != 0;
         return double(n);
     }
+    if (name == "moved_raised") { // the most any vertex rose along its snapshot normal since `snapshot` (0 = nothing added)
+        if (basePositions_.size() != m.vertexCount() || baseNormals_.size() != basePositions_.size()) return -1.0;
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v)
+            up = std::max(up, double(glm::dot(m.positions[v] - basePositions_[v], baseNormals_[v])));
+        return up;
+    }
     if (name == "moved_masked") { // masked vertices (mask >= 0.5) that moved since `snapshot`
         if (basePositions_.size() != m.vertexCount()) return -1.0;
         double count = 0.0;
@@ -1529,6 +1555,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
+    if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
     if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
@@ -1542,6 +1569,8 @@ double Demo::query(const std::string& name, bool& known) const {
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
     if (name == "touch_fingers") return double(app_.touch_.fingers());
+    if (name == "tablet_palm_rejection") return app_.uiPrefs_.tablet.palmRejection ? 1.0 : 0.0;
+    if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
@@ -2539,6 +2568,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
         wait(0.05f);
+    } else if (verb == "reset_sliders") { // Size, Intensities and Falloff back to the defaults (a case that clicked a S / U pop-up kept its value)
+        run([this] {
+            app_.radiusPx_ = 60.0f;
+            app_.strength_ = app_.smoothStrength_ = 0.5f;
+            app_.rgbIntensity_ = 1.0f;
+            app_.focalShift_ = 0.0f;
+        });
+        wait(0.05f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });
@@ -2847,6 +2884,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
+    } else if (verb == "palm_guard") { // palm_guard on|off [hold s [silent s]]: fingers are ignored while the pen is near (Android's default)
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off", hold = num(2, PalmGuard::kAfterPen), silent = num(3, PalmGuard::kSilent)] {
+            app_.uiPrefs_.tablet.palmRejection = on;
+            app_.palm_.afterPen = hold;
+            app_.palm_.silent = silent;
+        });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });
     } else if (verb == "quick_tour_offers") {
@@ -2855,6 +2899,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "key_nav_speed") { // key_nav_speed X: Preferences > Input's pan and zoom key speed (0.1 to 5)
         if (!need(1)) return false;
         run([this, v = num(1, 1.0f)] { app_.uiPrefs_.keyNavSpeed = std::clamp(v, 0.1f, 5.0f); });
+    } else if (verb == "mouse_orbit_speed") { // mouse_orbit_speed X: Preferences > Input's mouse orbit speed (0.1 to 2)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1.0f)] { app_.uiPrefs_.mouseOrbitSpeed = clampMouseOrbitSpeed(v); });
+    } else if (verb == "two_key_window") { // two_key_window X: Preferences > Input's two-key window (seconds)
+        if (!need(1)) return false;
+        run([this, v = num(1, 0.4f)] { app_.uiPrefs_.twoKeyWindow = v; });
     } else if (verb == "input_style") {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
@@ -3080,6 +3130,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "wait") {
         if (!need(1)) return false;
         wait(num(1, 0));
+    } else if (verb == "wait_real") { // wait_real S: S seconds of the clock (the app's timers run on it; "wait" is frame time)
+        if (!need(1)) return false;
+        const Uint64 ns = Uint64(num(1, 0) * 1e9f);
+        auto from = std::make_shared<Uint64>(0);
+        steps_.push_back([from, ns](float t) {
+            if (t == 0.0f) *from = SDL_GetTicksNS();
+            SDL_Delay(5);
+            return SDL_GetTicksNS() - *from >= ns;
+        });
     } else if (verb == "wait_idle") {
         const float timeout = num(1, 120.0f);
         // Idle for several frames in a row: work is often only requested by the frame after an input (a
@@ -3500,6 +3559,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const ImVec2 p = onModel(u, v);
             mouseMotion(p.x, p.y);
         });
+        wait(0.05f);
+    } else if (verb == "click_here") {
+        const int button = w.size() > 1 && w[1] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        run([this, button] {
+            mouseButton(true, button);
+            mouseButton(false, button);
+        });
+        wait(0.1f);
+    } else if (verb == "mouse_by") {
+        if (!need(2)) return false;
+        run([this, dx = num(1, 0.0f), dy = num(2, 0.0f)] { mouseMotion(app_.mouseX_ + dx, app_.mouseY_ + dy); });
         wait(0.05f);
     } else if (verb == "touch_pinch" || verb == "touch_stroke") {
         // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
@@ -4037,10 +4107,10 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
-                "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
-                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
-                "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
+                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
+                "touch_stroke", "touch_pinch", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";

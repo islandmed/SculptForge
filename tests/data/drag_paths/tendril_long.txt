@@ -1,0 +1,12 @@
+# Stroke paths of a close-up session of the dragging brushes (a 1.3M-triangle unit sphere, front view, perspective ignored):
+# the cursor's samples mapped onto the sphere, played in order, each on the surface the earlier ones left. Read by tests/GeomInvariants.h.
+brush: Tendril
+radius_world: 0.1901  (world_radius_mm / 1000, printed by the app for this brush and size)
+strength: 0.50  (Intensity 50)
+spacing: the brush's default (recipe spacing; not changed by the script)
+symmetry: X (mirror plane x = 0)
+view_dir: 0,0,-1  (camera on +z looking at the origin)
+strokes: 1
+stroke1_kind: mouse drag_path, 1.2 s
+stroke1_pressure_start_end: 1.0 1.0  (linear along the stroke)
+stroke1_points: 0.10000,0.40000,0.91104 0.11927,0.40000,0.90872 0.13854,0.40000,0.90598 0.15781,0.40000,0.90283 0.17708,0.40000,0.89925 0.19635,0.40000,0.89524 0.21562,0.40000,0.89079 0.23489,0.40000,0.88590 0.25405,0.39824,0.88140 0.27318,0.39585,0.87674 0.29230,0.39346,0.87164 0.31142,0.39107,0.86607 0.33054,0.38868,0.86004 0.34966,0.38629,0.85353 0.36878,0.38390,0.84653 0.38791,0.38151,0.83903 0.40703,0.37912,0.83102 0.42615,0.37673,0.82248 0.44527,0.37434,0.81339 0.46439,0.37195,0.80374 0.48351,0.36956,0.79350 0.50264,0.36717,0.78265 0.52176,0.36478,0.77117 0.54088,0.36239,0.75903 0.56000,0.36000,0.74619

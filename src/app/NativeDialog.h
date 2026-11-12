@@ -28,6 +28,9 @@ void openFolder(SDL_DialogFileCallback callback, void* userdata, SDL_Window* win
 bool message(SDL_MessageBoxFlags flags, const char* title, const char* text, SDL_Window* window);
 bool openUrl(const char* url); // false when suppressed (callers say it couldn't open), as SDL_OpenURL
 
+#ifdef __ANDROID__
+std::string androidProjectsDir(); // where projects are saved on Android (NativeDialog.cpp)
+#endif
 bool suppressed();           // no native dialog now (see above)
 void setScripted(bool on);   // a UI test script is running (Demo::loadScript)
 void answerNext(std::string path); // the next suppressed dialog answers PATH ("" = cancel)

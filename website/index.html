@@ -19,7 +19,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.8", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.11", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
@@ -28,6 +28,33 @@
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    /* Built in (site/standout): two lead rows in the hero, then a six-tile band. Blender and splats lead on every width. */
+    .stand-lead { list-style: none; margin: 18px 0 4px; padding: 0; display: grid; gap: 10px; max-width: 36em; }
+    .stand-lead a { display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; color: var(--muted); font-size: 0.92rem; line-height: 1.35;
+                    background: rgba(242, 140, 60, 0.07); border: 1px solid #4a3321; border-radius: 14px; }
+    .stand-lead a:hover, .stand-lead a:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-lead img { flex: none; width: 76px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+    .stand-lead strong, .stand-text strong { display: block; color: var(--text); font-weight: 600; }
+    .standout { padding: 64px 0 72px; background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .stand-grid > li:empty { display: none; } /* a tile whose picture the deploy took down (media_takedown.py) */
+    .demo.clip:not(:has(video, img)) { display: none; } /* a clip the deploy took down (media_takedown.py) */
+    .stand-tile { display: flex; flex-direction: column; height: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--muted); }
+    .stand-tile:hover, .stand-tile:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #14141a; border-bottom: 1px solid var(--border); }
+    .stand-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .stand-img.contain img { object-fit: contain; }
+    .stand-text { display: block; padding: 16px 18px 20px; font-size: 0.95rem; line-height: 1.5; }
+    .stand-text strong { font-size: 1.05rem; margin-bottom: 4px; }
+    .stand-foot { margin: 28px 0 0; color: var(--muted); }
+    @media (max-width: 960px) { .stand-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) {
+      .stand-lead { order: 3; margin: 0 0 16px; }
+      .stand-grid { grid-template-columns: 1fr; gap: 14px; }
+      .standout { padding: 44px 0 52px; }
+    }
+  </style>
 </head>
 <body>
   <div class="scroll-progress" aria-hidden="true"></div>
@@ -52,9 +79,9 @@
 
   <main id="top">
     <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
-    <aside class="news-bar" data-version="0.12.8" aria-label="Latest release">
+    <aside class="news-bar" data-version="0.12.11" aria-label="Latest release">
       <div class="wrap news-bar-inner">
-        <a class="news-bar-link" href="guide/whats-new.html#version-0128"><span class="news-pill">New</span><span class="news-bar-text">Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <a class="news-bar-link" href="guide/whats-new.html#version-01211"><span class="news-pill">New</span><span class="news-bar-text">Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
         <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
     </aside>
@@ -67,7 +94,6 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
           <!-- hero-news:start -->
-          <p class="hero-news" data-version="0.12.8"><a href="guide/whats-new.html#version-0128"><strong>New in 0.12.8:</strong> reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</a></p>
           <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
@@ -75,13 +101,16 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
           <p class="lede-short">We build the orchestration layer, and our agents build the software, openly, with the
             artists who use it. New versions every few days.</p>
           <p class="tagline">Sculpt it. Forge it. Ship it.</p>
+          <ul class="stand-lead" aria-label="Built in">
+            <li><a href="guide/blender.html"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610"><span><strong>Blender round-trip</strong>Send objects over and back in one click.</span></a></li>
+            <li><a href="guide/blender.html#splats-with-blender"><img src="guide/images/splats.jpg" alt="" width="980" height="775"><span><strong>Gaussian splats, with Blender 5.3</strong>Sculpt over a splat, send it back.</span></a></li>
+          </ul>
           <div class="ctas">
             <a class="btn primary" href="#download">Download</a>
             <a class="btn" href="why.html">Why we're doing this</a>
           </div>
           <p class="hero-note">Linux, macOS and Windows. No account, no subscription.</p>
-          <p class="speed-line">On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right
-            after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
+          <p class="speed-line">Orbiting 104 million micro triangles, drawn at the detail the view allows, runs at 208 frames a second on our simulated entry-level tier and 657 on an RTX 3060. The raw results are published. <a href="benchmarks/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
             <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
@@ -100,6 +129,26 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
           <figcaption class="hero-credit">Video review by <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK</a>
             on YouTube. It loads from YouTube when you press play.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <!-- Built in (site/standout): what sets us apart, each claim checked against the guide and a shipped release. Splats +
+         Blender 5.3 round-trip: 0.12.7; Blender bridge, Make sculptable, Quad Remesh, Bake, Brush Lab: 0.10.6 or earlier;
+         Garments: 0.11.12. Words: "built in" / "in SculptForge", never "only" or "first". Images are the guide's real shots. -->
+    <section id="standout" class="section standout" aria-labelledby="standout-title">
+      <div class="wrap">
+        <p class="eyebrow">Built in</p>
+        <h2 id="standout-title">What you get in SculptForge</h2>
+        <p class="section-lede">Each of these ships today and has a chapter in the guide.</p>
+        <ul class="stand-grid">
+          <li><a class="stand-tile" href="guide/blender.html"><span class="stand-img"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610" loading="lazy"></span><span class="stand-text"><strong>Blender round-trip</strong>One click sends objects to SculptForge and back. They update in place, with transform, materials and modifiers kept (Blender 4.2+).</span></a></li>
+          <li><a class="stand-tile" href="guide/blender.html#splats-with-blender"><span class="stand-img"><img src="guide/images/splats.jpg" alt="" width="980" height="775" loading="lazy"></span><span class="stand-text"><strong>Gaussian splats, with Blender 5.3</strong>Send a splat from Blender 5.3, sculpt over it, and send the splats back to the same object.</span></a></li>
+          <li><a class="stand-tile" href="guide/scan-to-sculptable.html"><span class="stand-img contain"><img src="guide/images/make-sculptable.jpg" alt="" width="1200" height="507" loading="lazy"></span><span class="stand-text"><strong>Capture to sculptable mesh</strong>One click turns a splat capture into clean quads with its colours.</span></a></li>
+          <li><a class="stand-tile" href="guide/retopology.html"><span class="stand-img"><img src="guide/images/qremesh.jpg" alt="" width="1100" height="660" loading="lazy"></span><span class="stand-text"><strong>Quad retopology and baking</strong>Quad Remesh with your own guide curves, then bake normal, displacement and occlusion maps.</span></a></li>
+          <li><a class="stand-tile" href="guide/garments.html"><span class="stand-img"><img src="guide/images/garments.jpg" alt="" width="600" height="340" loading="lazy"></span><span class="stand-text"><strong>Garments and cloth</strong>Real-size sewing patterns from 8 templates, draped with a cloth brush.</span></a></li>
+          <li><a class="stand-tile" href="guide/brush-lab.html"><span class="stand-img contain"><img src="guide/images/brush-lab.jpg" alt="" width="457" height="230" loading="lazy"></span><span class="stand-text"><strong>Optional AI brushes</strong>Describe a brush in words and Brush Lab makes it. Your own provider, no account, and one switch turns AI off.</span></a></li>
+        </ul>
+        <p class="stand-foot">Free and open source (GPL v3) on Linux, macOS and Windows. <a href="guide/whats-new.html">A new version every few days &rarr;</a></p>
       </div>
     </section>
 
@@ -149,6 +198,10 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
           <figure class="voice">
             <blockquote><p>I'm primarily focused on digital sculpting and using SculptForge for my workflow as a multimedia freelancer. I was really happy to find software that lets me get into my creative flow. And boy does it handle the polygon counts.</p></blockquote>
             <figcaption><span class="voice-name">Hameron</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>Thanks! The software rocks!!</p></blockquote>
+            <figcaption><span class="voice-name">Rand_Gogh</span><span class="voice-role">Concept Designer and Character Artist</span></figcaption>
           </figure>
         </div>
       </div>
@@ -217,9 +270,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="grid">
           <article class="card">
             <h3>Dense scans that keep up</h3>
-            <p>On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right after a big stroke.
-              On our simulated entry-level tier, the slowest frames orbiting a 28-million-triangle scan went from 24 to
-              12 ms in 0.11.7.</p>
+            <p>Orbiting 104 million micro triangles, drawn at the detail the view allows, averages 208 frames a second on our simulated entry-level tier (a capped M1 Pro laptop) and 657 on an RTX 3060. A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on the 3060. Big brushes still trail the pen. Every number is the median of three runs, with the raw results published.</p>
           </article>
           <article class="card">
             <h3>Open file formats</h3>
@@ -393,10 +444,10 @@ rez-env sculptforge -- sculptforge troll.usda \
         <h2>See it in action</h2>
         <p class="section-lede">Real recordings of the app at real speed, with nothing edited in.</p>
 
-        <div class="demo">
-          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/udim-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/udim.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/udim-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/udim.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>UDIM tiles in any grid</h3>
@@ -405,10 +456,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/layer-weight-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/layer-weight.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/layer-weight-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/layer-weight.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Move a feature on its own layer</h3>
@@ -417,10 +468,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo">
-          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/vdm-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/vdm.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/vdm-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/vdm.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Vector stamps that turn</h3>
@@ -429,10 +480,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/view-keys-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/view-keys.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/view-keys-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/view-keys.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>The view keys you already know</h3>
@@ -464,14 +515,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.12</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.8: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede"><a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0128"><div class="wn-card-body"><h3>Reference images, Start-up fix, Two-key shortcuts <small>new in 0.12.8</small></h3><p>Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</p><ul><li>Your front and side drawings in the view while you sculpt (idea by Oslen on Discord)</li><li>SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)</li><li>Bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)</li><li>Shortcuts with two keys in a row</li><li>Reference images to sculpt against</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0127"><div class="wn-card-body"><h3>Booleans between Parts, My Panel, Crisp Flatten <small>new in 0.12.7</small></h3><p>Booleans between Parts, Gaussian splats with Blender, and a panel of your own.</p><ul><li>Add, Subtract or Intersect from Tool &gt; Parts, with a live preview</li><li>Gaussian splats both ways with Blender 5.3 through the Blender bridge</li><li>Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)</li><li>A panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)</li><li>Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)</li><li>Alpha pool and jitter for non-repeating detail</li><li>Hard planes with a sharp edge</li><li>Warnings before destructive operations</li><li>Put any brush on Shift or Ctrl</li><li>Orbit around the point under the pointer</li><li>Exact Booleans between Parts, with a live preview</li><li>My Panel, a panel you build from your own buttons and sections</li><li>Smooth Peaks brush</li><li>Repeat a Part along a curve, real braids and springs</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0126"><div class="wn-card-body"><h3>Pan and zoom keys work again <small>new in 0.12.6</small></h3><p>Pan and zoom keys work again, layouts revert safely, and garments drape on a body.</p><ul><li>A tap nudges the view, holding glides (thanks Artizmo on Discord)</li><li>Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)</li><li>Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)</li><li>Drape a garment on a body in Tool &gt; Garments, with a steadier cloth rest</li><li>Save Visible Parts As and a Mask colour preference</li><li>Save only the visible Parts</li><li>Featured creator card in the Welcome window</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01211"><div class="wn-card-body"><h3>Version 0.12.11 <small>new in 0.12.11</small></h3><ul><li>Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before</li><li>The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy</li><li>Inflate over a Crease no longer tears the surface (#194)</li><li>Palette Knife and Nudge no longer fold the surface (#198, #199)</li><li>The Undo memory budget follows free memory, shown live in Preferences &gt; Performance (#202)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01210"><div class="wn-card-body"><h3>Mouse orbit speed, Symmetry with textured brushes, Crisp Flatten only cuts <small>new in 0.12.10</small></h3><p>Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.</p><ul><li>Preferences &gt; Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)</li><li>Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)</li><li>It never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0129"><div class="wn-card-body"><h3>Brush Size and Intensity follow the mouse <small>new in 0.12.9</small></h3><p>Brush Size and Intensity follow the mouse, and Undo is faster on dense models.</p><ul><li>Press S or F (or U, Shift+F), move sideways and the value changes live</li><li>A click elsewhere after moving keeps the new Size or Intensity</li><li>Faster Undo and Redo of a stroke on dense models of several million triangles (#181)</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0125"><h3>0.12.0 to 0.12.5</h3><ul><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0128"><h3>0.12.0 to 0.12.8</h3><ul><li>Reference images</li><li>Booleans between Parts</li><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011x"><h3>0.11.x</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
@@ -496,7 +547,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.12.8. All builds come from the
+        <p class="section-lede">Version 0.12.11. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
@@ -514,6 +565,8 @@ rez-env sculptforge -- sculptforge troll.usda \
             <strong>Blender add-on</strong><span>Blender 4.2+ · send to SculptForge and back</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/tree/main/packaging/arch">
             <strong>Arch Linux</strong><span>PKGBUILD · <code>makepkg -si</code></span></a>
+          <a class="dl" href="support.html?utm_campaign=android-site">
+            <strong>Android (early test build)</strong><span>Members today, free for everyone on 26 November · Android 9+ · tablets, phones &amp; Chromebooks</span></a>
           <a class="dl vfx-dl" href="https://github.com/islandmed/SculptForge/releases/latest">
             <strong>VFX Reference Platform</strong><span>CY2026 (Rocky 8) &amp; CY2027 (Rocky 9) · .tar.gz with Python module</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/blob/main/docs/studios.md#deploying-with-rez">
@@ -524,6 +577,11 @@ rez-env sculptforge -- sculptforge troll.usda \
           (ARM64, portable .zip, one-command install) · on macOS also
           <code>brew install --cask islandmed/tap/sculptforge</code> ·
           <a href="https://github.com/islandmed/SculptForge/releases">older versions</a>.</p>
+        <p class="fine">Android is an early test build. Members get the .apk today from the members' releases (the invitation
+          to the member repository comes with <a href="support.html?utm_campaign=android-site">membership</a>); it is free for
+          everyone on 26 November. Sideload it (allow installs from your browser or file manager) and uninstall any earlier
+          test APK first, since it is signed with a different key. Test build: a later version will need one uninstall and
+          reinstall. Found a bug? Tell us on <a href="https://github.com/islandmed/SculptForge/issues">GitHub</a> or Discord.</p>
         <p class="fine">Package managers: Homebrew is live; winget and Omarchy are in review; the AUR package is ready
           but not published yet; apt and dnf repositories are being built. Status:
           <a href="guide/installing.html">Install guide</a>.</p>
@@ -577,7 +635,7 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="links">
         <a href="performance/">Performance</a>
         <a href="guide/index.html">User guide</a>
-        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="benchmarks/">Benchmarks: 33M, 104M, 201M</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="why.html">Why SculptForge</a>

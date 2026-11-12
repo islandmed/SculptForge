@@ -1,0 +1,154 @@
+{
+ "_recorded": "2026-11-11 from https://tencent-hunyuan3d-2mini-turbo.hf.space/config, trimmed to the endpoints Generate 3D calls",
+ "version": "4.44.1",
+ "components": [
+  {
+   "id": 6,
+   "type": "image",
+   "props": {
+    "label": "Image"
+   }
+  },
+  {
+   "id": 8,
+   "type": "textbox",
+   "props": {
+    "label": "Text Prompt"
+   }
+  },
+  {
+   "id": 12,
+   "type": "image",
+   "props": {
+    "label": "Front"
+   }
+  },
+  {
+   "id": 13,
+   "type": "image",
+   "props": {
+    "label": "Back"
+   }
+  },
+  {
+   "id": 15,
+   "type": "image",
+   "props": {
+    "label": "Left"
+   }
+  },
+  {
+   "id": 16,
+   "type": "image",
+   "props": {
+    "label": "Right"
+   }
+  },
+  {
+   "id": 21,
+   "type": "file",
+   "props": {
+    "label": "File"
+   }
+  },
+  {
+   "id": 30,
+   "type": "checkbox",
+   "props": {
+    "label": "Remove Background",
+    "value": true
+   }
+  },
+  {
+   "id": 31,
+   "type": "checkbox",
+   "props": {
+    "label": "Randomize seed",
+    "value": true
+   }
+  },
+  {
+   "id": 33,
+   "type": "slider",
+   "props": {
+    "label": "Seed",
+    "value": 1234
+   }
+  },
+  {
+   "id": 35,
+   "type": "slider",
+   "props": {
+    "label": "Inference Steps",
+    "value": 5
+   }
+  },
+  {
+   "id": 36,
+   "type": "slider",
+   "props": {
+    "label": "Octree Resolution",
+    "value": 256
+   }
+  },
+  {
+   "id": 39,
+   "type": "number",
+   "props": {
+    "label": "Guidance Scale",
+    "value": 5.0
+   }
+  },
+  {
+   "id": 40,
+   "type": "slider",
+   "props": {
+    "label": "Number of Chunks",
+    "value": 8000
+   }
+  },
+  {
+   "id": 57,
+   "type": "html",
+   "props": {
+    "label": "Output",
+    "value": "\n    <div style='height: 650px; width: 100%; border-radius: 8px; border-color: #e5e7eb; border-style: solid; border-width: 1px; display: flex; justify-content: center; align-items: center;'>\n      <div style='text-align: center; font-size: 16px; color: #6b7280;'>\n        <p style=\"color: #8d8d8d;\">Welcome to Hunyuan3D!</p>\n        <p style=\"color: #8d8d8d;\">No mesh here.</p>\n      </div>\n    </div>\n    "
+   }
+  },
+  {
+   "id": 61,
+   "type": "json",
+   "props": {
+    "label": "Mesh Stats",
+    "value": {}
+   }
+  }
+ ],
+ "dependencies": [
+  {
+   "id": 4,
+   "api_name": "shape_generation",
+   "inputs": [
+    8,
+    6,
+    12,
+    13,
+    15,
+    16,
+    35,
+    39,
+    33,
+    36,
+    30,
+    40,
+    31
+   ],
+   "outputs": [
+    21,
+    57,
+    61,
+    33
+   ]
+  }
+ ]
+}

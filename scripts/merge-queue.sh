@@ -77,7 +77,11 @@ wait_ci() { # wait_ci <branch>: dispatches the full CI on the branch, waits, ret
     done
     [ -n "$id" ] || die "no CI run started for $branch"
     echo "   CI: https://github.com/$REPO/actions/runs/$id" >&2
-    gh run watch "$id" -R "$REPO" --exit-status --interval 30 >/dev/null 2>&1 && echo success || echo failure
+    gh run watch "$id" -R "$REPO" --exit-status --interval 30 >/dev/null 2>&1 && { echo success; return; }
+    # scripts/release.sh --stage exports infra_retry: a setup-step or test-step failure gets one rerun of its failed jobs (logged;
+    # a test that passes on it goes to flaky.md). Otherwise, or red again: failure.
+    if declare -F infra_retry >/dev/null && infra_retry "$id" &&
+        [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = success ]; then echo success; else echo failure; fi
 }
 
 run_serial() {

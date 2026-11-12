@@ -15,6 +15,21 @@
 
 namespace sf::ai {
 
+// An input found by what it is, not where it sits: the first input whose label is `label` (any case), else the first
+// not yet claimed input of component type `type` ("image", "textbox"). Spaces reorder and add inputs (Hunyuan3D's
+// shape_generation grew from 2 to 13), so presets name the slots they must fill and leave the rest to the Space's defaults.
+struct GradioSlot {
+    std::string label, type;
+    Json value;
+    bool optional = false; // no such input: skip it instead of failing (a Space that dropped it)
+};
+
+// The `data` array for endpoint `apiName` of the Space whose /config is `config`: state inputs keep their config value
+// (the server holds them per session), `slots` fill the inputs they name, `args` fill the remaining non-state inputs in
+// order, and every other input takes the Space's own default. False with `error` when the endpoint or a slot is missing.
+bool gradioBuildInputs(const Json& config, const std::string& apiName, const std::vector<Json>& args,
+                       const std::vector<GradioSlot>& slots, Json& data, int& fnIndex, std::string& error);
+
 class GradioClient {
 public:
     // `spaceUrl`, e.g. https://tencent-hunyuan3d-2-1.hf.space. `token` (optional) is a
@@ -24,12 +39,12 @@ public:
     // Uploads a file and returns its Gradio FileData object.
     bool upload(const std::string& bytes, const std::string& fileName, Json& fileData, std::string& error);
 
-    // Runs the endpoint `apiName`. `args` fill the non-state inputs in order (buttons
-    // included: their value is their label); state inputs come from the session and any
-    // missing trailing inputs take the app's own defaults. `outputs` receives every output
+    // Runs the endpoint `apiName`. `slots` fill the inputs they name (gradioBuildInputs), `args` the remaining non-state
+    // inputs in order (buttons included: their value is their label); state inputs come from the session and any
+    // missing inputs take the app's own defaults. `outputs` receives every output
     // value; `onStatus` gets queue/progress text.
     bool call(const std::string& apiName, const std::vector<Json>& args, std::vector<Json>& outputs, std::string& error,
-              const std::function<void(const std::string&)>& onStatus = {});
+              const std::function<void(const std::string&)>& onStatus = {}, const std::vector<GradioSlot>& slots = {});
 
     // The first 3D model / file output of the last call, as a downloadable URL.
     std::string lastModelUrl() const { return lastModelUrl_; }

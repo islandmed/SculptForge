@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Voxel.h"
+#include "core/AtomicRef.h"
 
 #include <algorithm>
 #include <array>
@@ -441,7 +442,7 @@ void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid) {
                     const float u = float(i) / float(steps), v = float(j) / float(steps);
                     const glm::ivec3 s(glm::round(a + (b - a) * u + (c - a) * v));
                     if (glm::any(glm::lessThan(s, glm::ivec3(0))) || glm::any(glm::greaterThanEqual(s, grid.dims))) continue;
-                    std::atomic_ref<float>(grid.values[grid.index(s.x, s.y, s.z)]).store(1.0f, std::memory_order_relaxed);
+                    AtomicRef<float>(grid.values[grid.index(s.x, s.y, s.z)]).store(1.0f, std::memory_order_relaxed);
                 }
         }
     }, 8192);

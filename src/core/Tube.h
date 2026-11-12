@@ -5,7 +5,7 @@
 // Catmull-Rom through control points, each with its own radius) and a tube is swept along it: rings placed
 // adaptively (closer where the curve bends), oriented by rotation-minimizing frames (double reflection), so the
 // tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
-// the ends are round or flat. Rope and Braid are strands (three by default) round the curve (a rope of one strand is a spring), Sleeve is hollow with open ends; Twist
+// the ends are round or flat. Rope and Braid are strands (three by default) round the curve (a rope of one strand is a spring; a braid's round strands twist over and under each other), Sleeve is hollow with open ends; Twist
 // and Spin turn the cross-section along the length. A Curve Part is the same data swept as a thin wire (only the guide
 // line): Resample sets its point count exactly, and Tube from curve makes it a tube. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
@@ -53,6 +53,14 @@ std::vector<TubePoint> tubeSimplify(const std::vector<TubePoint>& points, float 
 // Exactly `count` (2..kTubeMaxPoints) points evenly spaced along the smooth curve through `points`, radii blended
 // between them; the first and last stay as they were. Empty for fewer than two distinct points.
 std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count);
+
+// How a braid's round strands lie for a tube of `radius` (its outer reach) with `count` (2..kTubeMaxStrands) strands and Spread
+// `spread` (0..1): each strand has radius `radius`, its centre line winds round the tube's centre line at distance `orbit`,
+// one full turn per `pitch` of length. Spread 0: neighbours touch (a tight rope); 1: they are well apart, the turns long.
+struct BraidLayout {
+    float radius = 0.0f, orbit = 0.0f, pitch = 0.0f;
+};
+BraidLayout braidLayout(int count, float spread, float radius);
 
 // "round", "square", "triangle", "ribbon", "rope", "braid", "sleeve".
 const char* tubeProfileName(TubeShape::Profile p);

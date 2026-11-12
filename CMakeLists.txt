@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.8 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.11 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -22,6 +22,14 @@ set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names,
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
+# desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
+option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
+if(ANDROID)
+  set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
+  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
+endif()
 if(SCULPTFORGE_BUILD_TESTS)
   enable_testing()
 endif()
@@ -286,8 +294,9 @@ if(APPLE)
 endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
+# Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
 if(SF_ZSTD_FOUND)
@@ -420,7 +429,13 @@ if(SCULPTFORGE_BUILD_APP)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
-  add_executable(sculptforge
+  if(ANDROID)
+    add_library(sculptforge SHARED) # SDL's Java activity loads libmain.so and calls SDL_main
+    set_target_properties(sculptforge PROPERTIES OUTPUT_NAME main)
+  else()
+    add_executable(sculptforge)
+  endif()
+  target_sources(sculptforge PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
@@ -539,6 +554,12 @@ if(SCULPTFORGE_BUILD_APP)
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
                                             sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
+  if(SCULPTFORGE_GLES)
+    target_compile_definitions(sculptforge PRIVATE SF_GLES=1)
+  endif()
+  if(ANDROID)
+    target_link_libraries(sculptforge PRIVATE android log GLESv3 EGL)
+  endif()
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
@@ -768,6 +789,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
+    add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
+    set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
@@ -917,16 +942,36 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
+    if(UNIX)
+      add_test(NAME release_card COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_card_test.sh)
+      set_tests_properties(release_card PROPERTIES TIMEOUT 60)
+    endif()
+    add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
+    # The members' beta step creates the release in the insiders repository with --target (its checkout has the tag, that repository not).
+    # That step only runs on ubuntu, and the test's stand-in gh is a /bin/sh script Windows can't run: not on Windows.
+    if(NOT WIN32)
+        add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    endif()
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks
     # the real release's asset list too).
     add_test(NAME release_install_assets COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py)
     add_test(NAME release_install_assets_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py --self-test)
+    # release.sh --stage warns (never fails) when the CMO's launch headline is missing or its keywords miss HIGHLIGHTS line 1 / the tagline.
+    if(UNIX)
+      add_test(NAME release_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_headline_test.sh)
+      set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
+      set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
+      set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
+    endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
     # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
     add_test(NAME release_staged_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/staged_run.py --self-test)
+    add_test(NAME release_flaky_log COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/flaky_log.py --self-test)
     add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
@@ -939,6 +984,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
+    endif()
+    # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
+      set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
     endif()
     # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
     if(UNIX AND NOT APPLE)
@@ -966,6 +1016,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # The home page says the newest release's news once (the announcement bar), not in the hero, lede and first card too.
+    add_test(NAME guide_home_news COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/home_news_test.py)
     # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
     add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
     # No system dialog or URL opens from a test or an agent's run: every SDL_Show*Dialog / SDL_OpenURL call goes
@@ -1083,6 +1135,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
+    sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
+    sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
+    # The undo budget in Preferences > Performance and the status line when steps are dropped (tests/ui/undo_budget.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(undo_budget_1440 undo_budget --size 1440x900)
+    sculptforge_ui_test(undo_budget_2880 undo_budget --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
@@ -1092,6 +1150,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Voxel Remesh keeps the stroked areas smooth (#193; tests/ui/remesh_fidelity.sfui), before and after shots at both sizes.
     sculptforge_ui_test(remesh_fidelity_1440 remesh_fidelity --size 1440x900)
     sculptforge_ui_test(remesh_fidelity_2880 remesh_fidelity --size 2880x1800)
+    # Mouse orbit speed (tests/ui/mouse_orbit_speed.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(mouse_orbit_speed_1440 mouse_orbit_speed --size 1440x900)
+    sculptforge_ui_test(mouse_orbit_speed_2880 mouse_orbit_speed --size 2880x1800)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
@@ -1164,6 +1225,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Tube strands (a spring) and Repeat along curve at 1440 and 2880 px (tests/ui/tube_modifiers.sfui).
     sculptforge_ui_test(tube_modifiers_1440 tube_modifiers --size 1440x900)
     sculptforge_ui_test(tube_modifiers_2880 tube_modifiers --size 2880x1800)
+    # Tube Braid: round woven strands, loose to tight, and the Twist / Spin / Spread / Strands order (tests/ui/tube_braid.sfui).
+    sculptforge_ui_test(tube_braid_1440 tube_braid --size 1440x900)
+    sculptforge_ui_test(tube_braid_2880 tube_braid --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
@@ -1212,6 +1276,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
+    # The follow-the-mouse pop-up at the review sizes (1440 and 1440@200%): ring and readout in both.
+    sculptforge_ui_test(size_follow_1440 size_follow --size 1440x810)
+    sculptforge_ui_test(size_follow_2880 size_follow --size 2880x1620)
     # The Parts / Geometry tools (foirgairwolf on Discord) at a laptop's and a small window's width: rows fit.
     sculptforge_ui_test(parts_split_selection_1440 parts_split_selection --size 1440x900)
     sculptforge_ui_test(mesh_check_1440 mesh_check --size 1440x900)
