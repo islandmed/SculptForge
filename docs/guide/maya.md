@@ -1,5 +1,12 @@
 # Working with Maya
 
+![A game-ready lion bust](images/hero-game-ready.jpg)
+
+> **In short:**
+> - The **SculptForge shelf** sends Maya meshes to SculptForge; **Send to Maya** brings them back.
+> - The apps exchange files through one folder you choose in both; no ports.
+> - The bridge is off until you choose the folder.
+
 Keep Maya for the scene, rigging and animation, and sculpt in SculptForge: the **SculptForge shelf** for Maya
 sends the selected meshes to SculptForge, and **File > Maya > Send to Maya** sends them back, replacing each
 Maya object's mesh by name. It works through files in a shared folder, on Linux, Windows and macOS.
@@ -84,10 +91,11 @@ SculptForge starts**.
 3. In Maya click **Link** on the SculptForge shelf, paste, and click **Link**. The button says **Linked**, and
    SculptForge sends Maya every visible Part, so both start from the same mesh.
 
-Now sculpt: about ten times a second, the vertices your stroke moves appear in Maya. When a stroke changes the
-faces (dynamic topology, remesh, divide), the whole Part goes when the stroke ends. Edit a mesh in Maya and
-SculptForge gets it as soon as you pause (one undo step there). Updates that arrive in Maya over the link aren't
-Maya undo steps: undo in SculptForge, and Maya follows.
+Now sculpt: about ten times a second, the vertices your stroke moves appear in Maya. When a stroke changes the faces
+(dynamic topology, remesh, divide), the whole Part goes when the stroke ends.
+
+Edit a mesh in Maya and SculptForge gets it as soon as you pause (one undo step there). Updates that arrive in Maya
+over the link aren't Maya undo steps: undo in SculptForge, and Maya follows.
 
 **To turn it off**, click **Live link on** in SculptForge's top bar (or **File > Maya > Turn the Live link off**),
 or click **Linked** in Maya. Quitting SculptForge turns it off too.

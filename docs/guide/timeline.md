@@ -1,5 +1,12 @@
 # Sculpt Timeline and timelapse
 
+![The lion head model (CC0, Poly Haven) in SculptForge](images/welcome-bust.jpg)
+
+> **In short:**
+> - Every stroke is a step on the **Sculpt Timeline**; drag to see any point.
+> - Go back and sculpt: later steps stay as a branch, not thrown away.
+> - Re-tune a past stroke's strength, or render the history as a timelapse.
+
 Every stroke and operation you make is a step on the **Sculpt Timeline**, the strip along the top of the
 canvas (or its bottom: **Edit > Preferences > Interface > Timeline position**). Drag its scrubber to see the model at any point of the session, click a step to go back there, and keep
 sculpting from it: the steps you had made after it are not thrown away as with a plain undo, they stay as a
@@ -31,22 +38,24 @@ step, as before. Each Part keeps its own timeline, like its own undo history.
 
 ## Branches: undo without losing anything
 
-Go back to an earlier step and sculpt: a new branch starts there. The steps you had made after that point stay
-in the history as a thin lane above the track, starting where the branch splits off. Click the lane to make
-that branch the active one again; the branch you leave becomes the lane. Nothing is lost by trying an idea and
-going back.
+Go back to an earlier step and sculpt: a new branch starts there. The steps you had made after that point stay in the
+history as a thin lane above the track, starting where the branch splits off.
+
+Click the lane to make that branch the active one again; the branch you leave becomes the lane. Nothing is lost by
+trying an idea and going back.
 
 ## Re-tuning a past stroke
 
 Right-click a stroke on the track and drag **Strength**: 1 is the stroke as you made it, 0 removes it, 2 makes it
 twice as strong. The model updates at once and the strokes you made after it are kept.
 
-How it works: the change to that one stroke's displacement is added to the model as it is now. Where later
-strokes don't touch the area, the result is exactly what you would have had with the new strength. Where later
-strokes overlap it, they keep the displacement they made at the time, on top of the re-tuned stroke: they are
-not sculpted again. So a Smooth you did afterwards over the same spot won't smooth the stronger version, and a
-later Inflate keeps the direction it pushed in then. For most detail passes that is what you want; for a big
-change under a lot of later work, check the area afterwards.
+How it works: the change to that one stroke's displacement is added to the model as it is now. Where later strokes
+don't touch the area, the result is exactly what you would have had with the new strength. Where later strokes overlap
+it, they keep the displacement they made at the time, on top of the re-tuned stroke: they are not sculpted again.
+
+So a Smooth you did afterwards over the same spot won't smooth the stronger version, and a later Inflate keeps the
+direction it pushed in then. For most detail passes that is what you want; for a big change under a lot of later work,
+check the area afterwards.
 
 A stroke can't be re-tuned when a step after it replaced the mesh as a whole (dynamic topology, a remesh,
 Add Level, a sculpt layer change): the menu says which step is in the way. Strokes made on a sculpt layer can't be
@@ -83,10 +92,11 @@ history there, keeping what came after it.
 ## Timelapse video
 
 **Export timelapse** (the film icon in the strip, or **Export timelapse...** in the command palette) renders the
-history of the active Part, from the start to the step you are at, as a turntable video: the model builds up
-stroke by stroke while the camera goes once around it, with a short pause at the start and the end. Pick 1080p
-or 4K, the length, and where to save the MP4. There are no captions or interface in the video. It needs
-[ffmpeg](https://ffmpeg.org/) installed.
+history of the active Part, from the start to the step you are at, as a turntable video: the model builds up stroke by
+stroke while the camera goes once around it, with a short pause at the start and the end. Pick 1080p or 4K, the
+length, and where to save the MP4.
+
+There are no captions or interface in the video. It needs [ffmpeg](https://ffmpeg.org/) installed.
 
 From the command line, for a project saved with its history:
 

@@ -6,6 +6,40 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.12] - 2026-11-12
+
+### Added
+- **Proof mode**: `sculptforge --benchmark standard-100m` runs the standard strokes on the same procedural head at 104
+  million triangles (about 16 GB of free memory), and a result made with `SF_HW_SIMULATE` set records it in
+  `settings.hw_simulate`, so a simulated hardware tier says so in its JSON.
+
+### Changed
+- 25 User Guide pictures re-taken on the current version, so they show today's panel names.
+- The User Guide (in the app and on the website) reads like the site: each chapter opens with a hero picture and an
+  "In short" box, long paragraphs are split into short ones, menu paths such as Edit > Preferences > Input show as
+  chips, and Welcome starts with a card grid (Your first sculpt, Quick tour, What's new, Install, Get help). The
+  membership details moved to a new Support and membership chapter. The guide's colours follow the current look, so
+  light desktop themes read too.
+- **Performance guide**: the "What to expect" table now shows dab times and view speeds measured with `sculptforge
+  --bench` (4, 16 and 33 million triangles, median of three runs on an Apple M1 Pro laptop) and links their raw
+  output; the figure for 100 million triangles is removed because it was not measured.
+- The four home-page demo clips (UDIM tiles, layer transform, vector stamps, view keys) are re-recorded on the current
+  version and back on the page.
+
+### Fixed
+- **Large Clay strokes showed each dab as a ring** (#196): on a form that curves away under the brush (a 120 px brush
+  on a sphere) the middle of the dab stood above Clay's plane and stayed untouched, the dab lifted a ring, and the
+  ring's edge was a crease, one per dab along the stroke. The plane now reaches the surface under the cursor and the
+  pull is scaled by how much higher that is, so the middle lifts as it does on a flat surface and a stroke builds up
+  about as much as before (a flat surface is unchanged). Light Clay strokes no longer leave a raised edge: on a
+  strongly curved form they build up a little more softly than they did, because the ring they used to lift is gone (a
+  heavy stroke moves the same amount of clay). Brush-pack Clay brushes follow the same plane.
+- **Symmetry strokes whose two sides overlap** (a big brush near the mirror plane): the second side's plane now reads
+  the surface the first side just left, so a Fast Big Brushes stroke matches the exact one.
+- **Voxel Resolution in Customize Shelves** (masterfull95 on Discord, #191): Ctrl+Alt+drag on the Remesh palette's
+  Resolution slider only moved the palette; it can now be dropped onto a shelf like any button, works there, and is
+  kept across restarts.
+
 ## [0.12.11] - 2026-11-12
 
 ### Added

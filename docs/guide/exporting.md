@@ -1,5 +1,12 @@
 # Exporting, Unreal and Bridge
 
+![A game-ready lion bust](images/hero-game-ready.jpg)
+
+> **In short:**
+> - Export to glTF, FBX, OpenUSD, OBJ, STL and PLY; every visible Part is written.
+> - Make LOD chains for games, or send a mesh straight into a running Unreal Editor.
+> - To keep everything (Parts, layers, mask, paint), save a project instead.
+
 This chapter covers getting your sculpt out of SculptForge: the export formats and what each one keeps, LOD
 chains for games, sending a mesh straight into a running Unreal Editor, and exchanging models with another sculpting
 application through the Bridge. To keep everything (Parts, layers, mask, vertex paint, brushes) use a project file instead; see
@@ -32,12 +39,13 @@ only hold triangles.
 ![The Tool > Export sub-palette with a generated LOD chain and the Unreal Engine settings](images/export.jpg)
 
 UVs are kept through OBJ, FBX, USD, glTF and Bridge files, in and out. A Part with a painted
-[texture](texture-painting.md) is exported with it: the PNG is written next to the file as
-`<name>_color.png` (`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded
-in GLB and USDZ files. Spaces in the file name become `_` in the names of the files written beside it
-(`my scene.obj` gets `my_scene.mtl` and `my_scene_color.png`), because OBJ and MTL separate file names with
-spaces. **Tool > Texture Image > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
-come from [Tool > Bake](baking.md) as separate image files.
+[texture](texture-painting.md) is exported with it: the PNG is written next to the file as `<name>_color.png`
+(`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded in GLB and USDZ files. Spaces
+in the file name become `_` in the names of the files written beside it (`my scene.obj` gets `my_scene.mtl` and
+`my_scene_color.png`), because OBJ and MTL separate file names with spaces.
+
+**Tool > Texture Image > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps come from
+[Tool > Bake](baking.md) as separate image files.
 
 [Edge creases](edges.md#creases) go out and come back in through USD only (`creaseIndices`, `creaseLengths`,
 `creaseSharpnesses`, with `subdivisionScheme` set so other apps subdivide the cage with them). glTF, OBJ, FBX, PLY

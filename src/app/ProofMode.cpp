@@ -88,8 +88,10 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     // ~150 bytes a triangle like the spheres; the head is built the same way (a cube's quads, divided).
     const ProofMeshSize s15{15, "15M", [](size_t t) { return makeBenchHead(t); }, 150};
     const ProofMeshSize s33{33, "33M", [](size_t t) { return makeBenchHead(t); }, 150};
+    const ProofMeshSize s100{100, "100M", [](size_t t) { return makeBenchHead(t); }, 150}; // (104M: the same head, one level up)
     if (name == "standard-15m") return {s15};
     if (name == "standard-33m") return {s33};
+    if (name == "standard-100m") return {s100};
     if (name == "standard") return {s15, s33};
     if (name == "standard-1b") { // Focus Detail (prototype): ~1.02 billion micro triangles from a detail file
         const ProofMeshSize s1b{1019, "1B Focus Detail", [](size_t) {
@@ -1060,6 +1062,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             settings.set("scene", p.scene);
             settings.set("stroke_set", kProofStrokeSet);
         }
+        if (const char* sim = std::getenv("SF_HW_SIMULATE"); sim && *sim) settings.set("hw_simulate", std::string(sim)); // a simulated tier says so (not in the hardware fields)
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
         root.set("settings", settings);

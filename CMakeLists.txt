@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.11 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.12 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -1132,6 +1132,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
+    # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
+    sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
+    sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
@@ -1387,6 +1390,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                             $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
                                             ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
       set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+      add_test(NAME bench_scene_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_scene_names.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-scene-names)
+      set_tests_properties(bench_scene_names PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE)
     endif()
     # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
     # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.

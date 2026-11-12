@@ -27,7 +27,7 @@ SITE = "https://sculptforge.app/"
 # Chapters that were renamed: the old page stays as a small redirect so links from elsewhere keep working.
 REDIRECTS: dict[str, str] = {}
 CALLOUTS = {"tip": "Tip", "note": "Note", "experienced": "Experienced sculptor?", "not-yet": "Not yet", "warning": "Warning",
-            "important": "Important"}
+            "important": "Important", "short": "In short"}
 
 # ---------------------------------------------------------------------------
 # Site header nav and footer social row: the hand-written pages carry the same markup; motion.js moves everything but
@@ -157,6 +157,14 @@ def inline(text: str, links: list) -> str:
                 out.append("&amp;")
                 i += 1
             continue
+        if text.startswith("**", i) and not bold:  # **Edit > Preferences > Input**: a menu path, one chip per step
+            close = text.find("**", i + 2)
+            inner = text[i + 2:close] if close != -1 else ""
+            if " > " in inner and not any(ch in inner for ch in "[`<*"):
+                steps = [html.escape(html.unescape(x.strip())) for x in inner.split(" > ")]
+                out.append('<span class="path">' + "<i>&#8250;</i>".join(f"<span>{x}</span>" for x in steps) + "</span>")
+                i = close + 2
+                continue
         if text.startswith("**", i):
             out.append("</strong>" if bold else "<strong>")
             bold = not bold
@@ -244,6 +252,7 @@ class Page:
         self.headings = []  # (level, text, anchor)
         self.links = []
         self.images = []
+        self.loops = []  # site-only hero loops (../media/x.mp4)
         self.chars = text
         self.text_blocks = []  # (anchor, heading, plain text) for the search index
         self.body = self.render(text)
@@ -284,6 +293,7 @@ class Page:
 
         i = 0
         pending_item = None  # [level, tag, text] being collected (wrapped list items)
+        hero_done, loop = False, ""
 
         def flush_item():
             nonlocal pending_item
@@ -303,11 +313,43 @@ class Page:
                 close_lists()
                 i += 1
                 continue
+            m = re.match(r"^<!-- loop: (\S+) -->$", t)
+            if m:  # the next (hero) image plays this muted loop on the site; the app shows the image
+                loop = m.group(1)
+                i += 1
+                continue
             if t.startswith("<!--"):
                 flush_para(); flush_item(); close_lists()
                 while i < len(lines) and "-->" not in lines[i]:
                     i += 1
                 i += 1
+                continue
+            if t.startswith("```cards"):  # [Title](target) | images/x.jpg | blurb
+                flush_para(); flush_item(); close_lists()
+                cards = []
+                i += 1
+                while i < len(lines) and not lines[i].strip().startswith("```"):
+                    cells = table_cells(lines[i]) if lines[i].strip() else []
+                    i += 1
+                    if not cells:
+                        continue
+                    mc = re.match(r"^\[(.*)\]\((.*)\)$", cells[0])
+                    title, target = (mc.group(1), mc.group(2).strip()) if mc else (cells[0], "")
+                    img = cells[1] if len(cells) > 1 else ""
+                    blurb = cells[2] if len(cells) > 2 else ""
+                    if target:
+                        self.links.append(target)
+                    pic = ""
+                    if img:
+                        self.images.append(img)
+                        size = image_size(SRC / img)
+                        dims = f' width="{size[0]}" height="{size[1]}"' if size else ""
+                        pic = f'<img src="{html.escape(img)}" alt=""{dims} loading="lazy" decoding="async">'
+                    cards.append(f'<a class="guide-card" href="{html.escape(md_link(target))}">{pic}'
+                                 f'<strong>{html.escape(title)}</strong><span>{inline(blurb, self.links)}</span></a>')
+                    search_text.append(f"{title} {plain(inline(blurb, []))}")
+                i += 1
+                out.append('<div class="guide-cards">' + "".join(cards) + "</div>")
                 continue
             if t.startswith("```"):
                 flush_para(); flush_item(); close_lists()
@@ -368,9 +410,15 @@ class Page:
                 continue
             if t.startswith(">"):
                 flush_para(); flush_item(); close_lists()
-                parts = []
+                parts, items = [], []  # "> - item" lines are the callout's bullets
                 while i < len(lines) and lines[i].strip().startswith(">"):
-                    parts.append(lines[i].strip()[1:].strip())
+                    line = lines[i].strip()[1:].strip()
+                    if re.match(r"^[-*+] ", line):
+                        items.append(line[2:].strip())
+                    elif items:
+                        items[-1] += " " + line
+                    else:
+                        parts.append(line)
                     i += 1
                 text = " ".join(parts)
                 kind = "note"
@@ -381,8 +429,25 @@ class Page:
                         if label.lower() == name.lower():
                             kind = key
                 rendered = inline(text, self.links)
-                out.append(f'<aside class="callout callout-{kind}"><p>{rendered}</p></aside>')
-                search_text.append(plain(rendered))
+                lis = "".join(f"<li>{inline(x, self.links)}</li>" for x in items)
+                body = (f"<p>{rendered}</p>" if text else "") + (f"<ul>{lis}</ul>" if items else "")
+                out.append(f'<aside class="callout callout-{kind}">{body}</aside>')
+                search_text.append(plain(body))
+                continue
+            if t == "<details>":  # a folded section: <details> / <summary>Label</summary> ... </details>
+                flush_para(); flush_item(); close_lists()
+                summary = ""
+                if i + 1 < len(lines) and lines[i + 1].strip().startswith("<summary>"):
+                    i += 1
+                    summary = lines[i].strip()[len("<summary>"):].replace("</summary>", "").strip()
+                out.append(f'<details class="fold"><summary>{inline(summary, self.links)}</summary>')
+                search_text.append(summary)
+                i += 1
+                continue
+            if t == "</details>":
+                flush_para(); flush_item(); close_lists()
+                out.append("</details>")
+                i += 1
                 continue
             m = re.match(r"^!\[(.*)\]\((.*)\)$", t)
             if m:
@@ -391,6 +456,19 @@ class Page:
                 self.images.append(src)
                 size = image_size(SRC / src)
                 dims = f' width="{size[0]}" height="{size[1]}"' if size else ""
+                if not hero_done and not self.headings:  # the chapter's hero: full width, no caption
+                    hero_done = True
+                    if loop:
+                        self.loops.append(loop)
+                        out.append(f'<figure class="guide-hero"><video src="{html.escape(loop)}" poster="{html.escape(src)}"{dims} '
+                                   f'autoplay muted loop playsinline preload="metadata" aria-label="{html.escape(alt)}">'
+                                   f'</video></figure>')
+                    else:
+                        out.append(f'<figure class="guide-hero"><img src="{html.escape(src)}" alt="{html.escape(alt)}"{dims} '
+                                   f'decoding="async"></figure>')
+                    search_text.append(alt)
+                    i += 1
+                    continue
                 out.append(f'<figure class="shot"><a href="{html.escape(src)}" class="zoom"><img src="{html.escape(src)}" '
                            f'alt="{html.escape(alt)}"{dims} loading="lazy" decoding="async"></a>'
                            f'<figcaption>{inline(alt, [])}</figcaption></figure>')
@@ -924,7 +1002,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <meta property="og:image" content="{SITE}img/social-preview.png?v=5">
   <meta property="og:url" content="{url}">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=39">
+  <link rel="stylesheet" href="../style.css?v=40">
   <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
@@ -1056,6 +1134,9 @@ def check(index: Page, chapters) -> list:
         for src in p.images:
             if not (SRC / src).is_file():
                 problems.append(f"{name}: image {src} doesn't exist")
+        for src in getattr(p, "loops", []):
+            if not (ROOT / "website" / "guide" / src).resolve().is_file():
+                problems.append(f"{name}: loop {src} doesn't exist (website/media)")
     for old_name, new_name in REDIRECTS.items():
         if new_name[:-5] + ".md" not in pages:
             problems.append(f"REDIRECTS: {old_name} points to {new_name}, which isn't a chapter")
@@ -1186,7 +1267,7 @@ def supporters_html() -> str:
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
   <link rel="canonical" href="{SITE}supporters.html">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=39">
+  <link rel="stylesheet" href="style.css?v=40">
   <style>
     .supporters {{ columns: 3 14em; column-gap: 32px; padding: 0; list-style: none; }}
     .supporters li {{ break-inside: avoid; padding: 4px 0; }}

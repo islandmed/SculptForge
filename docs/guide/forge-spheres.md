@@ -1,5 +1,12 @@
 # Forge Spheres
 
+![A posed figure sculpted in SculptForge](images/wn-0120-pose.jpg)
+
+> **In short:**
+> - Block out a base mesh from connected spheres: torso, head, limbs, tail.
+> - **Preview** (<kbd>A</kbd>) shows the skin over the spheres.
+> - **Make Mesh** turns the skin into a new Part you sculpt as usual.
+
 Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
 limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a
 mesh you sculpt as usual. It is the quickest way to get the structure of a character or creature before any detail.
