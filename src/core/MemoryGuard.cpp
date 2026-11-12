@@ -12,6 +12,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
+#include <mutex>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -21,8 +23,10 @@
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
+#include <sys/sysctl.h>
 #else
 #include <fstream>
+#include <unistd.h>
 #endif
 
 namespace sf {
@@ -30,6 +34,11 @@ namespace sf {
 namespace {
 
 std::atomic<size_t> g_override{0};
+std::atomic<size_t> g_totalOverride{0};
+std::mutex g_cacheLock;
+std::chrono::steady_clock::time_point g_cacheAt;
+size_t g_cacheValue = 0;
+bool g_cacheValid = false;
 
 // A mesh in the app, per triangle: its arrays, adjacency, BVH, GPU buffers and the undo step's copy (measured: the
 // 33M benchmark head peaks at 4.7 GB, 141 bytes a triangle).
@@ -68,7 +77,50 @@ size_t availableMemoryBytes() {
     return systemAvailable();
 }
 
+size_t availableMemoryBytesCached() {
+    if (g_override.load(std::memory_order_relaxed) || std::getenv("SF_AVAILABLE_MEMORY_MB")) return availableMemoryBytes();
+    const auto now = std::chrono::steady_clock::now();
+    std::lock_guard<std::mutex> lock(g_cacheLock);
+    if (!g_cacheValid || now - g_cacheAt > std::chrono::seconds(1)) {
+        g_cacheValue = systemAvailable();
+        g_cacheAt = now;
+        g_cacheValid = true;
+    }
+    return g_cacheValue;
+}
+
 void setAvailableMemoryOverride(size_t b) { g_override.store(b, std::memory_order_relaxed); }
+
+size_t totalMemoryBytes() {
+    if (const size_t o = g_totalOverride.load(std::memory_order_relaxed)) return o;
+    if (const char* v = std::getenv("SF_TOTAL_MEMORY_MB"); v && *v)
+        if (const double mb = std::atof(v); mb > 0.0) return size_t(mb * 1048576.0);
+#if defined(_WIN32)
+    MEMORYSTATUSEX m{};
+    m.dwLength = sizeof m;
+    return GlobalMemoryStatusEx(&m) ? size_t(m.ullTotalPhys) : 0;
+#elif defined(__APPLE__)
+    uint64_t bytes = 0;
+    size_t len = sizeof bytes;
+    return sysctlbyname("hw.memsize", &bytes, &len, nullptr, 0) == 0 ? size_t(bytes) : 0;
+#else
+    const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGE_SIZE);
+    return pages > 0 && page > 0 ? size_t(pages) * size_t(page) : 0;
+#endif
+}
+
+void setTotalMemoryOverride(size_t b) { g_totalOverride.store(b, std::memory_order_relaxed); }
+
+size_t undoBudgetFor(size_t total, size_t available, size_t held) {
+    if (available == 0) return kUndoBudgetUnknown;
+    const size_t cap = total ? total / 4 : kUndoBudgetUnknown;
+    const size_t margin = memoryMargin(0);
+    // Below the margin the history gives back what is missing, down to the floor.
+    const size_t room = available > margin ? held + (available - margin) : (held > margin - available ? held - (margin - available) : 0);
+    return std::max(kUndoBudgetMin, std::min(cap, room));
+}
+
+size_t undoBudgetBytes(size_t held) { return undoBudgetFor(totalMemoryBytes(), availableMemoryBytesCached(), held); }
 
 size_t memoryMargin(size_t need) { return std::max<size_t>(size_t(512) << 20, need / 10); }
 

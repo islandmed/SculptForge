@@ -1499,6 +1499,7 @@ private:
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
+    void updateUndoNotice();           // every frame: "Oldest N undo steps removed to free memory" when a history dropped steps
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply

@@ -483,6 +483,9 @@ constexpr Entry kTraditionalChinese[] = {
     {"A folder of .obj, .ply or .glb files: insert them one at a time", "存放 .obj、.ply 或 .glb 檔案的資料夾：逐一插入"},
     {"Insert set", "插入集"},
     {"[ / ] previous / next   Esc stops", "[ / ] 上一個 / 下一個   Esc 停止"},
+    {"Oldest undo step removed to free memory", "已移除最舊的復原步驟以節省記憶體"},
+    {"Oldest %d undo steps removed to free memory", "已移除最舊的 %d 個復原步驟以節省記憶體"},
+    {"The last step alone is over the undo budget, so it is kept", "最後一步本身就超過復原上限，仍會保留"},
     {"Not enough GPU memory to show every Part: hide some or step down a subdivision level.",
      "GPU 記憶體不足，無法顯示所有部件：請隱藏部分部件或降低一級細分。"},
     {"%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename", "%s\n%zu 個頂點，%zu 個三角形%s%s%s\n點選以選取，連按兩下以重新命名"},
@@ -2442,10 +2445,10 @@ constexpr Entry kTraditionalChinese[] = {
      "上一筆畫每個筆觸（筆刷的一步，含所有對稱側）的耗時：尋找並移動頂點、更新其法線與 BVH（選取結構），以及將變更傳"
      "送到 GPU（每影格）。低於 16 ms 即可跟上 60 Hz 顯示器。"},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping "
-     "between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures with their "
+     "between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their "
      "layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the "
      "visible Parts.",
-     "場景包含的內容：網格與其拓樸、BVH、為了切換而保留的細分層級、復原記錄（編輯最多保留 1 GB，會捨棄最舊的步驟）、"
+     "場景包含的內容：網格與其拓樸、BVH、為了切換而保留的細分層級、復原記錄（編輯依可用記憶體保留，會捨棄最舊的步驟）、"
      "含圖層與材質通道的繪製貼圖（通道中只有繪製過的 64x64 圖塊會佔用記憶體），以及可見部件的 GPU 緩衝區。"},
     // --- PanelPerformanceProfile.cpp (tools/i18n/coverage.py) ---
     {"Measure this computer again (about 2 seconds): the GPU's triangle throughput and upload speed, brush speed and "
