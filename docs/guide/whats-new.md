@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.13
+
+```features
+date: unreleased
+tagline: SculptForge now speaks Japanese, AI agents reach fine detail, and masks hold on Micro levels.
+highlight: SculptForge now speaks Japanese, with the whole interface in 日本語 (machine-translated, native review welcome)
+highlight: AI agents connected over MCP reach fine detail such as pores and wrinkles
+highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
+highlight: Windows laptops with two graphics chips start SculptForge on the faster one
+highlight: The Clay live preview matches the final stroke, and Help > Copy log to clipboard helps with problem reports
+```
+
 ## Version 0.12.12
 
 ```features
