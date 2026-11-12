@@ -3263,6 +3263,11 @@ private:
     bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
     void touchTick();                          // once a frame: a held press that waited long enough goes through
     void touchFlushPress();
+    void fitStartView(bool resized); // the starting model fits a narrow view (Shell.cpp)
+    bool startFrameChecked_ = false;
+    bool autoFramed_ = false;              // the camera is still where fitStartView left it
+    glm::vec3 autoFramedTarget_{0.0f};
+    float autoFramedDistance_ = 0.0f;
     void logWindowGeometry() const;            // one log line: window, pixels, density, safe area, UI scale (Android bug reports)
     void touchReset();                         // every finger forgotten (focus lost, a resize): no gesture stays stuck
     void touchApply(const TwoFingerStep& step);

@@ -1415,6 +1415,10 @@ int App::run() {
         if (measuring) cpuFrameStart = processCpuSeconds();
         tickKeySequence(dt);
         updateCameraAspect();
+        if (!startFrameChecked_) { // (the first frame that knows the 3D view's shape)
+            startFrameChecked_ = true;
+            fitStartView(false);
+        }
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
@@ -1838,6 +1842,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (e.window.windowID == SDL_GetWindowID(window_)) {
             touchReset();
             logWindowGeometry();
+            updateCameraAspect(); // (the turned view's shape, before the model is framed into it)
+            fitStartView(true);
         }
         break;
 #endif

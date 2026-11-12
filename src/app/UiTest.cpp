@@ -110,6 +110,7 @@
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
 //                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
+//                            model_side_clear (px between the model's projected box and the 3D view's nearer side, < 0: cut off),
 //                            welcome_open (the first-run welcome shown), welcome_outside_px (how far its window sticks out of
 //                            the screen, 0: inside; a phone screen cut its X and Close off), welcome_overflow_px (how far its
 //                            content runs past its right edge), new_look_card_open (the one-time
@@ -349,6 +350,7 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
+//   start_view               the camera as a fresh start has it, then the first frame's fit into the view (a phone's narrow one)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
@@ -1400,6 +1402,24 @@ double Demo::query(const std::string& name, bool& known) const {
             bottom = std::max(bottom, y);
         }
         return name == "model_top_clear" ? double(top - (c.y + area.y * c.h)) : double(c.y + area.w * c.h - bottom);
+    }
+    // The model's projected bounding box against the 3D view's sides, px: >= 0 when it fits across (a phone held upright
+    // showed the middle of a model wider than the view: "nothing visible").
+    if (name == "model_side_clear") {
+        const auto c = app_.canvasRect();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::mat4 vp = app_.camera_.projection() * app_.camera_.view();
+        float left = 1e9f, right = -1e9f;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+            if (h.w <= 0.0f) return -1e9;
+            const float x = c.x + (h.x / h.w * 0.5f + 0.5f) * c.w;
+            left = std::min(left, x);
+            right = std::max(right, x);
+        }
+        return double(std::min(left - c.x, c.x + c.w - right));
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
@@ -2915,6 +2935,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.uiPrefs_.tablet.palmRejection = on;
             app_.palm_.afterPen = hold;
             app_.palm_.silent = silent;
+        });
+    } else if (verb == "start_view") { // start_view: the camera as a fresh start has it, then the first frame's fit (App::fitStartView)
+        run([this] {
+            app_.camera_ = Camera();
+            app_.autoFramed_ = false;
+            app_.updateCameraAspect();
+            app_.fitStartView(false);
         });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });

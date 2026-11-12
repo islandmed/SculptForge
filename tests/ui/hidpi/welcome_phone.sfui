@@ -23,3 +23,10 @@ expect_value welcome_outside_px == 0
 expect_value welcome_overflow_px == 0
 click "Close##welcome"
 expect_value welcome_open == 0
+
+# The starting model on the same phone screen (portrait): the first frame fits it into the 3D view between the shelves,
+# where the default camera showed only the middle of it ("nothing visible", Hameron).
+start_view
+wait_idle 10
+expect_value model_side_clear >= 0
+shot start-view-phone
