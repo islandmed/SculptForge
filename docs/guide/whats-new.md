@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.11
 
 ```features
-date: unreleased
+date: 2026-11-12
 tagline: Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.
 highlight: Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before
 highlight: The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy
@@ -16,6 +16,14 @@ highlight: Inflate over a Crease no longer tears the surface (#194)
 highlight: Palette Knife and Nudge no longer fold the surface (#198, #199)
 highlight: The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)
 ```
+
+- **Nudge and Palette Knife fold the surface less**: a second stroke across a dragged area leaves fewer creases, and
+  Nudge's two halves agree under symmetry.
+- **Startup splash on every start**: the logo and version now show at every start for at least half a second, centred,
+  then fade into the main window, and it now shows on Wayland, where it never appeared. **Preferences > Interface >
+  Show startup splash** turns it off for an instant start.
+- **Inflate over a Crease groove**: stacked Crease and Inflate strokes no longer tear needles and streaks into a
+  divided mesh.
 
 ## Version 0.12.10
 

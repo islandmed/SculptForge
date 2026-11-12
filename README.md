@@ -5,7 +5,7 @@
 <h1 align="center">SculptForge</h1>
 
 <p align="center">
-  <strong>New in 0.12.10:</strong> mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten (<a href="https://sculptforge.app/guide/whats-new.html#version-01210">how it works</a>)
+  <strong>New in 0.12.11:</strong> braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less (<a href="https://sculptforge.app/guide/whats-new.html#version-01211">how it works</a>)
 </p>
 
 <p align="center">

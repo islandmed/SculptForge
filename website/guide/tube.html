@@ -91,7 +91,7 @@ Drag anywhere in the view: on the model, off it, or from one into the other. A t
 </ul>
 <p><strong>Snap to surfaces</strong> (on by default) makes a stroke follow the model: a strap round an arm, a seam, a vein; pulled off the model, it carries on into the air from the edge. Turn it off to draw on the plane alone, for example to pass in front of the model.</p>
 <h2 id="shape-cross-section-and-taper">Shape: cross-section and taper<a class="anchor" href="#shape-cross-section-and-taper" aria-label="Link to this section">#</a></h2>
-<p><strong>Shape</strong> sets the cross-section: <strong>Circle</strong>, <strong>Square</strong> (sharp corners: beams, frames, planks), <strong>Triangle</strong> (ridges, blades, spines) or <strong>Ribbon</strong> (a flat strip: straps, cloth strips, leaves, hair cards). A ribbon lies flat towards you as you draw it; <strong>Thickness</strong> sets how flat it is. <strong>Spin</strong> turns a square, triangle or ribbon about the curve.</p>
+<p><strong>Shape</strong> sets the cross-section: <strong>Circle</strong>, <strong>Square</strong> (sharp corners: beams, frames, planks), <strong>Triangle</strong> (ridges, blades, spines) or <strong>Ribbon</strong> (a flat strip: straps, cloth strips, leaves, hair cards). A ribbon lies flat towards you as you draw it; <strong>Thickness</strong> sets how flat it is. <strong>Turn</strong> turns a square, triangle or ribbon about the curve.</p>
 <p><strong>Taper start</strong> and <strong>Taper end</strong> narrow the tube to a point over that much of its length (0: none, 1: all of it): horns, claws, spikes, tails.</p>
 <p>These set new tubes and the selected Tube Part, so you can change the shape after drawing. A slider shows the change on the tube as you drag it, and letting go is one undo step.</p>
 <h2 id="profiles-and-modifiers">Profiles and modifiers<a class="anchor" href="#profiles-and-modifiers" aria-label="Link to this section">#</a></h2>
@@ -107,7 +107,7 @@ Drag anywhere in the view: on the model, off it, or from one into the other. A t
 <strong>Sleeve</strong>: a hollow tube with open ends (sleeves, pipes, bracelets, hoses).
 </li>
 </ul>
-<p>For any profile but Circle, <strong>Twist</strong> turns the cross-section a set number of degrees from the start to the end, and <strong>Spin</strong> turns it about the curve by a fixed number of degrees (the same turn all along). <strong>Spread</strong> sets a rope&#x27;s strands (0.5: touching) and a braid&#x27;s weave (0: the strands packed together, touching, a tight rope; 1: wide apart with long turns), and for a sleeve how thick the wall is. <strong>Strands</strong> sets how many strands a rope or braid has, 1 to 8 (3 for a rope, 2 for a braid to begin with). A braid&#x27;s round strands twist over and under each other, so more strands make a thicker cord. A rope of one strand is a <strong>spring</strong>: <strong>Spread</strong> opens the coils. <strong>Taper</strong> narrows strands and walls with the tube. Each one is a live slider on the selected Tube Part and one undo step.</p>
+<p>For any profile but Circle, <strong>Twist</strong> turns the cross-section a set number of degrees from the start to the end, and <strong>Spin</strong> turns it steadily, so many degrees per tube radius of length (a screw thread). <strong>Spread</strong> sets a rope&#x27;s strands (0.5: touching) and a braid&#x27;s weave (0: the strands packed together, touching, a tight rope; 1: wide apart with long turns), and for a sleeve how thick the wall is. <strong>Strands</strong> sets how many strands a rope or braid has, 1 to 8 (3 for a rope, 2 for a braid to begin with). A braid&#x27;s round strands twist over and under each other, so more strands make a thicker cord. A rope of one strand is a <strong>spring</strong>: <strong>Spread</strong> opens the coils, and <strong>Spin</strong> changes how tightly it winds. <strong>Taper</strong> narrows strands and walls with the tube. Each one is a live slider on the selected Tube Part and one undo step.</p>
 <h2 id="repeat-a-part-along-a-curve">Repeat a Part along a curve<a class="anchor" href="#repeat-a-part-along-a-curve" aria-label="Link to this section">#</a></h2>
 <p><strong>Repeat along curve</strong> lays copies of another Part along the active Tube or Curve Part: chain links, beads, scales, studs, fence posts. Add the Part you want repeated first (a single link, say), select the curve, and in <strong>Tool &gt; Tube</strong> pick the Part, set the two sliders and press <strong>Repeat along curve</strong>.</p>
 <ul>
@@ -165,7 +165,7 @@ tube_set_point index=1 position=&quot;0.5,0.6,0&quot; radius=0.1
 tube_insert_point index=0
 tube_delete_point index=2
 tube_set caps=flat radius_scale=1.5
-tube_set profile=ribbon thickness=0.2 spin=30 taper_end=0.5
+tube_set profile=ribbon thickness=0.2 turn=30 taper_end=0.5
 tube_simplify keep=0.5
 tube_new points=&quot;0,0,0 1,0.5,0 2,0,0.4&quot; curve=true
 tube_resample count=24
