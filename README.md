@@ -1,17 +1,12 @@
 <p align="center">
-  <img src="website/img/bust-256.png" width="160" alt="SculptForge: a clay bust on an anvil">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/banner-dark.png">
+    <img src="docs/images/readme/banner-light.png" width="800" alt="SculptForge: the free, open-source sculpting app for Linux, macOS and Windows">
+  </picture>
 </p>
-
-<h1 align="center">SculptForge</h1>
 
 <p align="center">
   <strong>New in 0.12.12:</strong> the user guide is redesigned, with new pictures, and big Clay strokes no longer ring (<a href="https://sculptforge.app/guide/whats-new.html#version-01212">how it works</a>)
-</p>
-
-<p align="center">
-  <strong>The free, open-source sculpting app.</strong><br>
-  Digital sculpting for VFX, animation and games on Linux, macOS and Windows, with free built-in AI:<br>
-  an AI brush creator and image/text to 3D.
 </p>
 
 <p align="center">
@@ -33,6 +28,22 @@
 </p>
 
 <p align="center">
+  <a href="https://sculptforge.app/#demos"><img src="docs/images/showcase.jpg" width="800" alt="A detailed lion head sculpted in SculptForge"></a>
+</p>
+
+**Sculpt with the brushes, symmetry and navigation you already know.** Free, open source, no subscription, no account.
+
+- **Fast and native:** starts instantly, works offline, on Linux, macOS and Windows.
+- **Free AI, built in:** describe a brush and Brush Lab builds it, or turn a sketch or a description into a sculptable model. Bring your own Claude, fal.ai or Meshy key, or run models on your machine.
+- **Made for pipelines:** LOD chains, blend shapes, Send to Unreal, Blender bridge, OpenUSD, FBX and glTF.
+
+<p align="center">
+  <b><a href="https://github.com/islandmed/SculptForge/releases/latest">Download</a></b> ·
+  <a href="https://sculptforge.app/guide/">Read the guide</a> ·
+  <a href="https://discord.gg/gWrYkEmQhH">Join the Discord</a>
+</p>
+
+<p align="center">
   <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs"><img src="website/media/poster-asknk.jpg" width="640" alt="Watch askNK's review of SculptForge on YouTube"></a><br>
   <sub>Video review by <a href="https://www.youtube.com/@asknk">askNK</a>. Click to watch on YouTube.</sub>
 </p>
@@ -42,134 +53,98 @@
   and read the <a href="docs/guide/index.md">user guide on GitHub</a>.
 </sub></p>
 
-<p align="center">
-  <a href="https://sculptforge.app/#demos"><img src="docs/images/showcase.jpg" width="800" alt="A detailed lion head sculpted in SculptForge"></a>
-</p>
+## In motion
 
-SculptForge is a free, open-source, focused sculpting app with the brushes, symmetry and
-navigation experienced sculptors already know. It costs nothing, has no subscription, runs natively on Linux as well as
-Windows and macOS, and comes with source code you can change. It starts instantly, works offline,
-and fits into game and animation pipelines: sculpt a character, generate its LODs, sculpt blend shapes, and
-send it straight into Unreal Engine. **AI comes built in and free**: describe a brush and the AI brush creator
-(Brush Lab) builds it, or turn a sketch, concept art or a description into a sculptable model. No account or key is needed. Prefer your own?
-Plug in Claude, fal.ai or Meshy, or run models entirely on your own machine.
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/images/readme/loop-remesh.gif" alt="Horns pulled out of a sphere with the Move brush"><br><sub>Pull out forms, the mesh follows</sub></td>
+    <td align="center" width="50%"><img src="docs/images/readme/loop-vdm.gif" alt="A vector displacement stamp"><br><sub>Vector displacement stamps</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/loop-layer.gif" alt="Posing a head with the Gizmo and a mask"><br><sub>Pose with the Gizmo and a mask</sub></td>
+    <td align="center"><img src="docs/images/readme/loop-udim.gif" alt="The UV editor packing UDIM tiles"><br><sub>UV editor with UDIM tiles</sub></td>
+  </tr>
+</table>
 
 ## Experienced sculptor?
 
-Pick **Classic sculpting keys** at the first start and your hands know the way: familiar brushes, symmetry, Alt and
-Shift modifiers, masking and face groups with Ctrl and Ctrl+Shift, Parts, subdivision levels, dynamic topology, quad
-remeshing and a Gizmo. Bring models over as OBJ, FBX, glTF or USD, or through the Bridge (face groups, mask and vertex
-paint come along).
+Pick **Classic sculpting keys** at the first start and your hands know the way. Bring models over as OBJ, FBX, glTF or USD, or through the Bridge (face groups, mask and vertex paint come along).
 
-> **Status: early release; see [Releases](https://github.com/islandmed/SculptForge/releases/latest) for the latest version.** The core sculpting, pipeline and AI features work and are tested on every
-> commit. Version 0.8 adds dynamic topology (brushes add triangles where they need them),
-> vector displacement brushes, Quad Remesh Guides and sculpt layers on every subdivision level; 0.7 added classic
-> keys and gestures and a Blender bridge add-on; 0.6 halved the memory and made the view twice as
-> fast on huge meshes (see the [changelog](CHANGELOG.md)).
+You get:
+- Familiar brushes, symmetry, and Alt and Shift modifiers
+- Masking and face groups on Ctrl and Ctrl+Shift
+- Parts, subdivision levels, dynamic topology, quad remeshing and a Gizmo
 
 ## Features
 
-**An interface experienced sculptors can find their way around**
-- Task menus (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) in the Forge Terminal look by default, or the
-  Classic layout with alphabetical palettes in one click (Preferences > Interface > Look)
-- Shelves around the canvas, palettes holding every tool, a Library (`,`) of thumbnails, the
-  brush picker (`B`, type letters to pick), hold-Ctrl help on every button, a command palette (F3) and a script
-  console (`` ` ``), and a fully customizable layout; preferences save themselves. See [docs/ui-design.md](docs/ui-design.md).
-- A built-in **user guide** (Help > User Guide, Shift+F1) with search, also on the
-  [website](https://sculptforge.app/guide/); hold Ctrl over any control and press F1 to open its
-  chapter. Source: [docs/guide](docs/guide/index.md).
+Each group opens to the details.
 
-**Sculpting**
-- Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Sharp Crease, Clay Block, Tendril, Trim,
-  Layer and Nudge brushes; X/Y/Z symmetry; tablet pressure; classic modifiers and navigation.
-- Stroke types (dots, drag-rect, spray, lazy mouse) and brush alphas (built-in or any grayscale image).
-- **Masking** (Ctrl to paint, invert, blur, sharpen, grow/shrink, mask by cavity or face group) that every brush
-  respects.
-- **Face Groups and visibility** with classic gestures: auto groups, Ctrl+Shift isolate / hide, rectangle hide, remove
-  hidden.
-- **Parts**: keep the body, eyes, teeth and armour as separate meshes, each with its own undo history. You can
-  append a sphere, cube, plane or model file, show/hide, solo, reorder, duplicate, merge and split (by face group or
-  by piece), and Alt+click a Part to select it. Projects, OBJ, glTF, FBX, USD and Bridge files keep them as separate
-  objects.
-- **Gizmo** (W Move, E Scale, R Rotate): move, scale and rotate a Part, or only its unmasked part with a
-  soft falloff for posing a limb at its joint; Shift snapping, numeric entry, All Parts, one undo step per drag.
-- **Vertex Paint** (Paint brush, RGB while sculpting, fills, cavity paint) and six Lit Sphere materials.
-- **Texture painting** on UV maps: Auto UV (xatlas) unwraps any sculpt, then the Paint brush paints a 1K-8K
-  texture with the same paint layers and blend modes; vertex paint and texture convert both ways, and OBJ, glTF,
-  USD, FBX and Bridge exports write the PNG next to the model.
-- **Project files** (`.sfproj`) that keep everything, with an unsaved-changes prompt, recent files and autosave.
-- Unlimited undo, Loop subdivision, **voxel remesh** (voxel remesh) and quadric decimation.
-- **Quad Remesh** quad retopology (quad remesh: target count, Size Variation, Follow Face Groups, vertex paint density,
-  symmetry) and **Project Detail** to bring the sculpted detail back onto the new topology.
-- **Sculpt layers** that work as blend shapes, with live weights and playback.
+<details open>
+<summary><b>Sculpting</b>: brushes, masks, layers, remesh, paint</summary>
 
-**Free built-in AI: Brush Lab (describe a brush, AI builds it)**
-- "Dry cracked mud", "overlapping dragon scales", then "make it sharper". Brushes are recipes (data, never
-  code), with every value exposed as a slider. They're kept in your brush library; share them as
-  `.sfbrush` files or one-line brush codes (right-click > Copy brush code, Ctrl+V to paste one). Studios share
-  a folder through `SCULPTFORGE_BRUSH_PATH`, and the
-  [community gallery](https://sculptforge.app/brushes.html) installs brushes in one click
-  (Brush > Community brushes). See [docs/brushes.md](docs/brushes.md).
-- **Free out of the box**: no account or key. It uses an open model (GPT-OSS 20B) hosted by Pollinations.ai,
-  and falls back to a local Ollama when you're offline.
-- Or bring your own: Claude (Anthropic API) or any OpenAI-compatible endpoint, including **private local
-  models through Ollama or LM Studio** ([5-minute setup for Windows, macOS and Linux](docs/local-ai.md)).
+- Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge brushes; X/Y/Z symmetry; tablet pressure
+- Stroke types (dots, drag-rect, spray, lazy mouse) and brush alphas (built-in or any grayscale image)
+- **Masking** that every brush respects: paint, invert, blur, sharpen, grow/shrink, by cavity or face group
+- **Face Groups and visibility** with Ctrl+Shift isolate, hide and rectangle hide
+- **Parts**: body, eyes, teeth and armour as separate meshes, each with its own undo history; append, solo, reorder, duplicate, merge and split
+- **Gizmo** (W Move, E Scale, R Rotate): a Part, or only its unmasked area with a soft falloff for posing a limb; Shift snaps
+- **Vertex Paint** and six Lit Sphere materials
+- **Texture painting** on UV maps: Auto UV (xatlas), 1K-8K textures, paint layers and blend modes; vertex paint and texture convert both ways
+- **Voxel remesh**, **Quad Remesh** (target count, Size Variation, Follow Face Groups, symmetry), **Project Detail**, Loop subdivision and quadric decimation
+- **Sculpt layers** that work as blend shapes, with live weights and playback
+- **Project files** (`.sfproj`) with autosave, recent files and unlimited undo
+</details>
 
-**Free built-in AI: Generate 3D from an image or text**
-- A sketch, a piece of concept art or a description becomes a full 3D model (limbs, back and all), then gets
-  remeshed so you can sculpt it straight away.
-- **Free** through the official Hugging Face demos of Hunyuan3D 2 / 2.1, TRELLIS.2 and Stable Fast 3D; or
-  **your own ComfyUI** (local or a studio GPU server) running any workflow, with ready-made Hunyuan3D 2.1
-  workflows included; or paid with your own fal.ai or Meshy key; or plug in any local model.
-  See [AI services & model licences](docs/ai-services.md).
-- Offline tools as well: silhouette blockout, relief, and stamp-from-view.
+<details>
+<summary><b>Interface</b>: yours to arrange</summary>
 
-**ComfyUI, both ways**
-- Generate models in SculptForge with any ComfyUI workflow on your own machine or GPU server
-  ([docs/comfyui.md](docs/comfyui.md)).
-- The **ComfyUI-SculptForge** node pack brings SculptForge into ComfyUI graphs: voxel remesh, decimate, LOD chains,
-  and GLB / FBX / USD / OBJ / STL export, working with ComfyUI's own Hunyuan3D mesh nodes
-  ([islandmed/ComfyUI-SculptForge](https://github.com/islandmed/ComfyUI-SculptForge); in ComfyUI-Manager use
-  *Install via Git URL*).
+- Task menus (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) in the Forge Terminal look, or the Classic layout in one click (Preferences > Interface > Look)
+- Shelves, palettes, a Library (`,`) of thumbnails, the brush picker (`B`), a command palette (F3) and a script console (`` ` ``)
+- A built-in **user guide** (Shift+F1) with search, also [online](https://sculptforge.app/guide/); hold Ctrl over any control and press F1 for its chapter
+- More in [docs/ui-design.md](docs/ui-design.md)
+</details>
 
-**Game & animation pipelines**
-- One-click **LOD chains**; blend shapes survive on every level.
-- **Send to Unreal** (Ctrl+U) imports or updates the asset in a running Unreal Editor, on this computer or
-  another one on your network, with no plugin to install. Static meshes come with LODs, skeletal meshes with
-  morph targets. See [docs/unreal.md](docs/unreal.md).
-- **FBX** (binary 7.4, LOD groups, blend shapes), **glTF/GLB** (morph targets), **OpenUSD** USDA/USDZ (UsdSkel
-  blend shapes), OBJ, PLY and STL. Exports are checked with the Khronos glTF validator and OpenUSD's `usdchecker`.
+<details>
+<summary><b>Free AI</b>: Brush Lab and image or text to 3D</summary>
 
-**Blender bridge**
-- The **SculptForge Bridge** add-on for Blender 4.2+ (`addons/blender`): select objects, Send to SculptForge,
-  sculpt, Send to Blender. The objects update in place, keeping transforms, materials and modifiers; quads, UVs,
-  colours, mask and face sets come across both ways. See [the guide](docs/guide/blender.md) and
-  [docs/blender.md](docs/blender.md).
+**Brush Lab** turns "dry cracked mud" or "overlapping dragon scales" into a brush, then "make it sharper".
+- Brushes are recipes (data, never code) with every value a slider, kept in your library
+- Share them as `.sfbrush` files or one-line brush codes (right-click > Copy brush code); studios share a folder through `SCULPTFORGE_BRUSH_PATH`
+- The [community gallery](https://sculptforge.app/brushes.html) installs brushes in one click (Brush > Community brushes); see [docs/brushes.md](docs/brushes.md)
+- Free out of the box (no account or key): an open model (GPT-OSS 20B) hosted by Pollinations.ai, with a local Ollama as the offline fallback
+- Or bring your own: Claude, any OpenAI-compatible endpoint, or a private local model ([5-minute setup](docs/local-ai.md))
 
-**Bridge**
-- Bridge files in and out with face groups, mask, vertex paint and UVs, and **File > Bridge** (Send / Receive) on
-  Windows and macOS: every visible Part goes over as its own object. See
-  [Exporting](docs/guide/exporting.md#exchange-models-through-the-bridge).
+**Generate 3D** turns a sketch, concept art or a description into a model, remeshed so you can sculpt it at once.
+- Free through the official Hugging Face demos of Hunyuan3D 2 / 2.1, TRELLIS.2 and Stable Fast 3D
+- Or your own ComfyUI workflow, a paid fal.ai or Meshy key, or any local model; see [AI services & model licences](docs/ai-services.md)
+- Offline tools too: silhouette blockout, relief, and stamp-from-view
+</details>
 
-**Gaussian splats**
-- Open phone captures (Polycam, Luma, Postshot, Scaniverse and others) as a sculpting reference, convert them
-  into watertight meshes, or turn a sculpt into splats.
-- Supports PLY (up to SH degree 3), `.splat`, glTF **`KHR_gaussian_splatting`** and OpenUSD
-  **`ParticleField3DGaussianSplat`**.
+<details>
+<summary><b>Pipelines</b>: Unreal, Blender, USD, splats, ComfyUI</summary>
 
-**Automation**
-- `sculptforge-cli` runs every operation headless, for build farms and pipelines.
-- A built-in **MCP server** (`sculptforge-cli --mcp`) lets Claude Code, Claude Desktop or any MCP client
-  sculpt, convert and export.
-- Headless thumbnail and turntable rendering, plus a scripted demo recorder (`--demo … --record`).
+- One-click **LOD chains**; blend shapes survive on every level
+- **Send to Unreal** (Ctrl+U) imports or updates the asset in a running Unreal Editor, even on another computer, with no plugin; see [docs/unreal.md](docs/unreal.md)
+- **FBX** (LOD groups, blend shapes), **glTF/GLB** (morph targets), **OpenUSD** (UsdSkel blend shapes), OBJ, PLY and STL, checked with the Khronos glTF validator and `usdchecker`
+- **Blender bridge** add-on (4.2+, `addons/blender`): Send to SculptForge, sculpt, Send to Blender; objects update in place with transforms, materials and modifiers ([guide](docs/guide/blender.md))
+- **Bridge** files keep face groups, mask, vertex paint and UVs; File > Bridge on Windows and macOS sends each visible Part as its own object ([Exporting](docs/guide/exporting.md#exchange-models-through-the-bridge))
+- **Gaussian splats**: open phone captures (Polycam, Luma, Postshot, Scaniverse) as reference or convert them to watertight meshes; PLY, `.splat`, `KHR_gaussian_splatting`, OpenUSD
+- **ComfyUI**, both ways: generate with any workflow ([docs/comfyui.md](docs/comfyui.md)), or use the [ComfyUI-SculptForge](https://github.com/islandmed/ComfyUI-SculptForge) nodes for remesh, decimate, LODs and export (ComfyUI-Manager: *Install via Git URL*)
+</details>
 
+<details>
+<summary><b>Automation</b>: headless CLI, MCP, Python</summary>
+
+- `sculptforge-cli` runs every operation headless, for build farms and pipelines
+- A built-in **MCP server** (`sculptforge-cli --mcp`) lets Claude Code, Claude Desktop or any MCP client sculpt, convert and export
+- Headless thumbnail and turntable rendering, plus a scripted demo recorder (`--demo ... --record`)
+</details>
 
 ## For studios and pipelines
 
-Built for studios with their own pipelines: **[VFX Reference Platform](https://vfxplatform.com) CY2026/CY2027
-builds** (GCC 14, glibc 2.28/2.34, C++20, Python 3.13), a **Python API** (`import sculptforge`), a **Rez**
-package, headless CLI and farm rendering, OpenUSD/FBX/glTF, native Linux, and no licence server. The GPL lets
-you modify it in-house without publishing your changes. See **[docs/studios.md](docs/studios.md)**.
+Built for studios with their own pipelines: **[VFX Reference Platform](https://vfxplatform.com) CY2026/CY2027 builds**, a Python API (`import sculptforge`), a Rez package, headless CLI and farm rendering, and no licence server.
+
+The GPL lets you modify it in-house without publishing your changes. See **[docs/studios.md](docs/studios.md)**.
 
 ## Install
 
@@ -177,8 +152,7 @@ you modify it in-house without publishing your changes. See **[docs/studios.md](
 **[Download for macOS](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.dmg)** ·
 **[Download for Linux](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage)** (AppImage, x86_64)
 
-Every link gets the newest version, straight from GitHub (works where sculptforge.app is blocked; the [guide is here too](docs/guide/index.md)). **[install/](install/README.md)** has the full list (.deb, .rpm, ARM64,
-portable .zip, Arch) and what to do after downloading. Or install with one command:
+Every link gets the newest version straight from GitHub. **[install/](install/README.md)** lists every package (.deb, .rpm, ARM64, portable .zip, Arch). Or install with one command:
 
 ```sh
 # macOS / Linux
@@ -190,10 +164,11 @@ curl -fsSL https://raw.githubusercontent.com/islandmed/SculptForge/main/install/
 irm https://raw.githubusercontent.com/islandmed/SculptForge/main/install/install.ps1 | iex
 ```
 
-The builds aren't code-signed yet. On **macOS**, right-click the app and choose **Open** the first time. On
-**Windows**, if SmartScreen appears, choose **More info → Run anyway**. Studio builds (VFX Reference Platform,
-[Rez](packaging/rez/package.py)), older versions and checksums are on the
-[releases page](https://github.com/islandmed/SculptForge/releases).
+The builds aren't code-signed yet:
+- **macOS:** right-click the app and choose **Open** the first time
+- **Windows:** if SmartScreen appears, choose **More info → Run anyway**
+
+Studio builds ([Rez](packaging/rez/package.py)), older versions and checksums are on the [releases page](https://github.com/islandmed/SculptForge/releases).
 
 ## Building
 
@@ -244,11 +219,9 @@ Run `sculptforge-cli --list` for every command.
 
 ### Use with AI tools
 
-SculptForge's tools work from Claude, ChatGPT (Codex CLI), Gemini (Antigravity CLI), Grok (Grok Build), Cursor,
-VS Code, JetBrains, Zed and other MCP clients: the AI tool starts `sculptforge-cli --mcp` on your computer (stdio;
-nothing listens on the network). In the app, **Help > Connect an AI tool...** shows the exact command or settings for
-your install, with Copy buttons. Claude Desktop also installs it from a bundle (`SculptForge-*.mcpb` on each
-[release](https://github.com/islandmed/SculptForge/releases/latest)).
+SculptForge works from Claude, ChatGPT (Codex CLI), Gemini, Grok, Cursor, VS Code, JetBrains, Zed and other MCP clients. The AI tool starts `sculptforge-cli --mcp` on your computer; nothing listens on the network.
+
+In the app, **Help > Connect an AI tool...** shows the exact command for your install, with Copy buttons. Claude Desktop installs it from a bundle (`SculptForge-*.mcpb` on each [release](https://github.com/islandmed/SculptForge/releases/latest)).
 
 ```sh
 claude mcp add --scope user sculptforge -- /path/to/sculptforge-cli --mcp      # Claude Code
@@ -261,8 +234,10 @@ client, your own agent and plain function calling (`sculptforge-cli --schema`):
 
 ## Controls
 
-The [user guide](https://sculptforge.app/guide/shortcuts.html) has the full list (it's also in the
-app: F1 for Controls, Shift+F1 for the guide).
+Sculpt with left-drag, Alt inverts, Shift smooths. The [full list](https://sculptforge.app/guide/shortcuts.html) is in the app too (F1).
+
+<details>
+<summary>Show the controls table</summary>
 
 | Action | Input |
 |---|---|
@@ -293,12 +268,15 @@ app: F1 for Controls, Shift+F1 for the guide).
 | Export GLB | Ctrl+E |
 | Send to Unreal | Ctrl+U |
 
-Graphics tablets (Wacom, XP-Pen, Huion ...) work through the system's tablet driver on Windows (Windows Ink),
-macOS and Linux (Wayland / X11). Setup and mappings: [docs/tablet.md](docs/tablet.md).
+</details>
 
-On Linux, SculptForge runs as a native Wayland window (no XWayland, sharp at fractional scales) or on X11.
+- **Tablets** (Wacom, XP-Pen, Huion ...) work through the system driver on Windows, macOS and Linux; see [docs/tablet.md](docs/tablet.md)
+- **Linux** runs as a native Wayland window (sharp at fractional scales) or on X11
 
 ## Project layout
+
+<details>
+<summary>Show the source tree</summary>
 
 ```
 src/core     Mesh, BVH, brushes & recipes, layers, undo, subdivision, decimation,
@@ -314,6 +292,7 @@ packaging    Linux desktop/AppStream files, Windows resources, Arch PKGBUILD, Re
 website      Project website (GitHub Pages)
 tests        Unit tests
 ```
+</details>
 
 ## Privacy
 
@@ -323,15 +302,10 @@ where, and for the licences of the AI models.
 
 ## Membership
 
-SculptForge is free, and nothing in the app is ever paywalled.
-**[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year): betas and early builds, the monthly
-feature vote, Member Requests (one request a month, built first and credited to you), #members on Discord and your name in
-the [credits](https://sculptforge.app/supporters.html); the first 100 members are Founding Members, price locked for
-good. **[Studio](https://sculptforge.app/studios.html?utm_campaign=github#membership)**
-($300 / month flat for the whole studio, any number of artists; Founding Studio $150 for the first 5 studios): your
-studio's own isolated build with your assets built in, a pinned version with security fixes, an offline signed
-installer, support and a private channel. Every release
-stays free for everyone; bug-fix and security releases go out to everyone the same day.
+SculptForge is free, and nothing in the app is ever paywalled. Every release stays free for everyone; bug-fix and security releases go out to all the same day.
+
+- **[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year): betas and early builds, the monthly feature vote, one Member Request a month (built first, credited to you), #members on Discord and your name in the [credits](https://sculptforge.app/supporters.html). The first 100 are Founding Members, price locked for good.
+- **[Studio](https://sculptforge.app/studios.html?utm_campaign=github#membership)** ($300 / month flat, any number of artists; Founding Studio $150 for the first 5): your own isolated build with your assets built in, a pinned version with security fixes, an offline signed installer, support and a private channel.
 
 <!-- Studio members' logos go here. -->
 
