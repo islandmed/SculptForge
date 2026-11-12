@@ -1,0 +1,20 @@
+# A big brush edits hundreds of clusters of a mesh resting on its coarse levels. Only the edited clusters that border a
+# coarse one need the coarse underlay (it closes the cracks between full and coarse); the interior is full beside full.
+# Drawing it under all of them cost about a millisecond a frame on a 28M mesh at 240 px, and the stroke's last dabs landed
+# later (floor bench: 240 px release in its slow mode 8 of 10 rounds against 4 of 10 before the stroke-LOD change).
+# edited_clusters: the clusters drawn in full over a coarse underlay; coarse_pending: the edited clusters in all.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere subdivisions=8
+wait 1.0
+click "Clay##brush.clay"
+brush_size 300
+stroke 0.30 0.50 0.70 0.50 0.2 hold
+expect_value coarse_pending > 64
+expect_value edited_clusters < 40
+expect_value coarse_clusters > 0
+release
+print drawn_triangles
+wait_idle 30
+expect_value coarse_pending == 0

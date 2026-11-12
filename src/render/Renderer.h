@@ -438,6 +438,7 @@ private:
         std::unique_ptr<CoarseLevels> coarse;
         std::vector<uint8_t> coarseDirty;
         std::vector<uint32_t> coarsePending; // the dirty clusters, to update
+        std::vector<uint32_t> clusterAdjStart, clusterAdj; // the clusters that share a vertex, per cluster (CSR; made with the coarse levels)
         bool coarseTried = false, coarseEdited = false; // (coarseEdited: this sync marked some)
         std::vector<uint32_t> coarseFresh; // the clusters edits marked since the last sync (their cells follow at once)
         double coarseEditAt = 0.0; // frame clock of the last edit that marked a cluster dirty (the levels follow after a rest)
@@ -565,6 +566,9 @@ private:
     // (coarseClusters_, coarseLevel_), the finest that fits.
     void cullCoarse(const MeshSlot& s, const CullView& view, size_t budget);
     std::vector<uint32_t> coarseClusters_;
+    std::vector<uint32_t> underlayCandidates_;           // (cullCoarse) the edited clusters that could need an underlay
+    std::vector<uint8_t> underlayMark_;                  // (cullCoarse) per cluster: drawn coarse this frame
+    static constexpr size_t kUnderlayAll = 64;           // up to this many edited clusters all get one
     // The edited clusters drawn in full beside the coarse rest also draw their coarse level, pushed back (cullCoarse): it
     // closes the cracks between the full ones and their coarse neighbours, which meet at the cells' points.
     std::vector<uint32_t> underlayClusters_;
