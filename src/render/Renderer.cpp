@@ -3934,7 +3934,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
                      int(active && settings.wireframe), s.drawnTriangles, budget);
-    if (s.coarse && !s.coarsePending.empty() && !settings.stroking) stillWanted_ = true; // (frames until the levels follow the edits, drawn coarse or in full)
+    if (s.coarse && !s.coarsePending.empty()) stillWanted_ = true; // (frames until the levels follow the edits, drawn coarse or in full, stroking or not: the frame after a stroke must come)
     s.drewCoarse = coarse;
     if (coarse) {
         cullCoarse(s, frameCull_, budget);

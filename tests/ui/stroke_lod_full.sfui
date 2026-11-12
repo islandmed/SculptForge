@@ -13,7 +13,8 @@ release
 stroke 0.40 0.55 0.62 0.60 0.15
 stroke 0.30 0.30 0.50 0.35 0.15
 stroke 0.45 0.60 0.30 0.40 0.15
-wait 1.5 # (the levels follow 0.35 s after the last edit, and a slow runner finishes the strokes late)
+print drawn_triangles # (a draw first: the stroke's last edits reach the renderer with a frame, and "wait" draws none on a slow runner)
+wait_idle 30 # (then idle: the levels follow 0.35 s after the last edit)
 expect_value coarse_clusters == 0
 expect_value coarse_pending == 0
 expect_value stroke_detail_switches == 0

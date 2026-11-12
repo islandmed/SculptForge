@@ -43,7 +43,8 @@ stroke 0.3 0.5 0.7 0.5 0.6 hold
 wait 0.3
 expect_value coarse_pending > 0
 release
-wait 1.5 # (the levels follow 0.35 s after the last edit, and a slow runner finishes the stroke late)
+print drawn_triangles # (a draw first: the stroke's last edits reach the renderer with a frame, and "wait" draws none on a slow runner)
+wait_idle 30 # (then idle: the levels follow 0.35 s after the last edit)
 expect_value coarse_pending == 0
 expect_value coarse_clusters == $before
 shot painted-coarse
