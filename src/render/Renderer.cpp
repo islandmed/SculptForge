@@ -1615,6 +1615,8 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     }
     drawList_.clear();
     proxyPending_ = false;
+    proxySyncMs_ = 0.0;
+    coarseWaiting_ = false;
     std::vector<uint32_t> synced; // linked Parts (#94): one mesh, uploaded once (as the active one, if it's one of them)
     for (const SceneMesh& m : scene) {
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
@@ -2031,6 +2033,7 @@ void Renderer::buildProxies(MeshSlot& s, const Mesh& mesh) {
         proxyMsPerCluster_ = proxyMsPerCluster_ > 0.0 ? 0.7 * proxyMsPerCluster_ + 0.3 * perCluster : perCluster;
     }
     gl::BindVertexArray(0);
+    proxySyncMs_ += elapsedMs();
 }
 
 // ---------------------------------------------------------------------------
@@ -3653,6 +3656,7 @@ void Renderer::noteGpuFrame(double gpuMs, uint64_t drawnTriangles, double cpuBef
 }
 
 bool Renderer::coarseUpdatePending() const {
+    if (coarseWaiting_) return true;
     for (const MeshSlot& s : slots_)
         if (s.coarseDone > 0 && !s.coarsePending.empty()) return true; // (computing, or sending the points)
     return false;
@@ -3719,6 +3723,11 @@ void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
 // clusters took 100 ms in one frame, the slowest of a whole run): the edited clusters stay coarseDirty (drawn in full)
 // until the last batch is in, then the levels go up once and the flags clear together.
 void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
+    // (A frame that built motion proxies has spent its slice: the orbit's p99 stayed where it was before the slicing.)
+    if (proxySyncMs_ > 1.0) {
+        coarseWaiting_ = true;
+        return;
+    }
     const auto start = std::chrono::steady_clock::now();
     auto elapsedMs = [&] { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
     static const bool tiny = std::getenv("SF_COARSE_SLICE_MS") != nullptr; // (tests: the smallest slices, so a small mesh takes several)

@@ -499,6 +499,8 @@ private:
     const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
     void markCoarseDirty(MeshSlot& s, uint32_t c);
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
+    double proxySyncMs_ = 0.0;        // this sync's motion-proxy time (updateCoarse waits for a frame without)
+    bool coarseWaiting_ = false;      // updateCoarse stepped aside this sync: another frame is wanted
     double coarseMsPerCluster_ = 0.0; // updateCoarse's measured cost (moving average), 0 = not yet
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
