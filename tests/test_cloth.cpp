@@ -859,7 +859,8 @@ TEST(cloth_drape_collides_where_a_moved_part_is_shown) {
 TEST(cloth_ab_strokes_on_icospheres) {
     // Stroke timings per mode: icospheres of subdivision 6, 8 and 9
     // (41K, 655K, 2.6M vertices, radius 1), seen from the front, one 24-dab stroke along +x (x 0.2 -> 0.545), brush
-    // radius 0.15, per mode: the stroke's time, ms per dab and the undo's time. SF_CLOTH_AB=1 (SF_CLOTH_AB_SUBS=6,8).
+    // radius 0.15, per mode: the stroke's time, ms per dab and the undo's time. SF_CLOTH_AB=1 (SF_CLOTH_AB_SUBS=6,8;
+    // SF_CLOTH_AB_SYM=1: X symmetry on; SF_CLOTH_AB_DRAG=1: only the Drag row).
     const char* on = std::getenv("SF_CLOTH_AB");
     if (!on) return;
     const char* subsEnv = std::getenv("SF_CLOTH_AB_SUBS");
@@ -872,7 +873,7 @@ TEST(cloth_ab_strokes_on_icospheres) {
     auto ms = [](clock::time_point a, clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
     for (int sub : subs) {
         Document d = makeDoc(makeIcosphere(sub, 1.0f));
-        for (int variant = 0; variant < 7; ++variant) {
+        for (int variant = 0; variant < (std::getenv("SF_CLOTH_AB_DRAG") ? 1 : 7); ++variant) {
             // (the six modes, then Drag without self-collision)
             const ClothBrushMode mode = variant < 6 ? modes[variant] : ClothBrushMode::Drag;
             d.sculptor.cloth.mode = mode;
@@ -881,6 +882,7 @@ TEST(cloth_ab_strokes_on_icospheres) {
             const auto t0 = clock::now();
             d.sculptor.beginStroke(d.mesh, "Cloth");
             double worst = 0.0;
+            std::vector<double> dabMs;
             for (int i = 0; i < 24; ++i) {
                 const float x = 0.2f + 0.015f * float(i);
                 DabParams p;
@@ -890,9 +892,11 @@ TEST(cloth_ab_strokes_on_icospheres) {
                 p.strength = 0.5f;
                 p.strokeDelta = i == 0 ? glm::vec3(0.0f) : glm::vec3(0.015f, 0.0f, 0.0f);
                 const auto a = clock::now();
-                d.sculptor.dab(d.mesh, d.bvh, BrushType::Cloth, p, Symmetry{false, false, false});
-                worst = std::max(worst, ms(a, clock::now()));
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::Cloth, p, Symmetry{std::getenv("SF_CLOTH_AB_SYM") != nullptr, false, false});
+                dabMs.push_back(ms(a, clock::now()));
+                worst = std::max(worst, dabMs.back());
             }
+            std::sort(dabMs.begin(), dabMs.end());
             d.undo.push(d.sculptor.endStroke());
             const double stroke = ms(t0, clock::now());
             float out = 0.0f;
@@ -901,9 +905,9 @@ TEST(cloth_ab_strokes_on_icospheres) {
             d.undo.undo(d.mesh, d.bvh);
             const double undo = ms(u, clock::now());
             const SculptTimings& t = d.sculptor.timings;
-            std::printf("AB sub %d verts %u mode %s stroke_ms %.1f ms_per_dab %.2f slowest_dab_ms %.2f region %zu "
+            std::printf("AB sub %d verts %u mode %s stroke_ms %.1f ms_per_dab %.2f p50_dab_ms %.2f slowest_dab_ms %.2f region %zu "
                         "moved_out %.4f undo_ms %.1f | per dab: build %.2f solve %.2f other kernel %.2f writeback %.2f\n",
-                        sub, d.mesh.vertexCount(), variant < 6 ? clothModeName(mode) : "drag-noself", stroke, stroke / 24.0, worst,
+                        sub, d.mesh.vertexCount(), variant < 6 ? clothModeName(mode) : "drag-noself", stroke, stroke / 24.0, dabMs[dabMs.size() / 2], worst,
                         d.sculptor.clothRegion(), out, undo, t.clothBuildMs / 24.0, t.clothSolveMs / 24.0,
                         (t.kernelMs - t.clothSolveMs) / 24.0, t.normalsMs / 24.0);
         }
