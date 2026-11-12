@@ -27,8 +27,9 @@ Codex wasn't logged in on the bench machine and no local open model was installe
 Before: all four runs used up the 80 calls in about three minutes. They added detail at 0.1-1M triangles, one
 hand-placed stroke per call, and never looked closer than the whole model. The forms read well, the surfaces are soft.
 
-After: three of four runs used detail_pass and view_closeup (7-18 calls each). Sonnet's second run shows pores, skin
-texture and forehead wrinkles over the whole head. Haiku's runs show forehead and cheek lines. Sonnet's first run spent
+After: all four runs looked with view_closeup (3-8 calls each) and three used detail_pass (4-11 calls; Sonnet's
+first run none). Sonnet's second run shows pores, skin
+texture and forehead wrinkles over the whole head. Haiku's runs show forehead and cheek lines; after-haiku-1 also lost the scar lines its before-run had. Sonnet's first run spent
 its calls rebuilding the block-out and never got to detail, which is why the instructions now say to keep a third of
 the steps for detail.
 
