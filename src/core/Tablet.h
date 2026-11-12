@@ -71,6 +71,13 @@ struct TabletSettings {
     // the new timing misbehave with someone's tablet: the stroke moves at a sample's motion without waiting for its
     // pressure (App::flushPenMotion), and no lost sample is held (PenPressureTracker::holdLostZero).
     bool classicTiming = false;
+    // Palm rejection (Preferences > Tablet): fingers that land while the pen is near are a resting palm and do
+    // nothing (PalmGuard, core/TouchGesture.h). On for Android; a desktop touch screen with a pen opts in.
+#ifdef __ANDROID__
+    bool palmRejection = true;
+#else
+    bool palmRejection = false;
+#endif
 };
 
 Json toJson(const TabletSettings& t);

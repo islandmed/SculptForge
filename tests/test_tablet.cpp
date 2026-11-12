@@ -281,6 +281,18 @@ TEST(tablet_settings_classic_pen_timing_round_trip) {
     CHECK(!old.classicTiming);
 }
 
+TEST(tablet_settings_palm_rejection_round_trip) {
+    TabletSettings t;
+    t.palmRejection = !t.palmRejection; // (on for Android, off elsewhere: either way it follows the file)
+    TabletSettings back;
+    fromJson(toJson(t), back);
+    CHECK(back.palmRejection == t.palmRejection);
+    TabletSettings old; // ui.json from before the setting: the platform's default
+    const bool def = old.palmRejection;
+    fromJson(Json::object(), old);
+    CHECK(old.palmRejection == def);
+}
+
 // A pen without a pressure axis (Windows Ink off) sends 0 while touching: after a few motions it draws at full
 // pressure instead of never starting the stroke; a pen with pressure never does.
 TEST(pen_pressure_tracker_no_pressure_axis) {

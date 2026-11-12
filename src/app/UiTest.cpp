@@ -1557,6 +1557,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
     if (name == "touch_fingers") return double(app_.touch_.fingers());
+    if (name == "tablet_palm_rejection") return app_.uiPrefs_.tablet.palmRejection ? 1.0 : 0.0;
     if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
@@ -2871,11 +2872,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
-    } else if (verb == "palm_guard") { // palm_guard on|off [hold s]: fingers are ignored while the pen is near (Android's default)
+    } else if (verb == "palm_guard") { // palm_guard on|off [hold s [silent s]]: fingers are ignored while the pen is near (Android's default)
         if (!need(1)) return false;
-        run([this, on = w[1] != "off", hold = num(2, PalmGuard::kAfterPen)] {
-            app_.palmRejection_ = on;
+        run([this, on = w[1] != "off", hold = num(2, PalmGuard::kAfterPen), silent = num(3, PalmGuard::kSilent)] {
+            app_.uiPrefs_.tablet.palmRejection = on;
             app_.palm_.afterPen = hold;
+            app_.palm_.silent = silent;
         });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });

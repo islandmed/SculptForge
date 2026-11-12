@@ -99,5 +99,9 @@ TEST(palm_guard_follows_the_pen) {
     CHECK(g.active(501.0) && g.active(501.0 + PalmGuard::kAfterPen - 0.01)); // the hand is still there for a moment
     CHECK(!g.active(501.0 + PalmGuard::kAfterPen + 0.01)); // then fingers count again
     g.pen(true, 600.0);
-    CHECK(g.active(700.0));
+    CHECK(g.active(600.0 + PalmGuard::kSilent - 0.1));
+    // A pen that never says it left stops counting when it falls silent; any pen event renews it.
+    CHECK(!g.active(600.0 + PalmGuard::kSilent + 0.1));
+    g.pen(true, 700.0);
+    CHECK(g.active(701.0));
 }
