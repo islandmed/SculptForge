@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The start-up splash (idea by @lowenski, #176): our brand bust and wordmark on the dark brand background, shown only while start-up
-// takes longer than kShowAfterMs and gone when the main window has drawn its first frame. This file is the part with no
+// takes longer than kShowAfterMs and gone when the main window has drawn its first frame (but not before it has been up for
+// kMinVisibleMs: a splash that flashes for a frame is worse than none). Start-up is checked between its steps and once more
+// before the first frame; a start that is over within kShowAfterMs never shows it (on a fast laptop that is every start). This file is the part with no
 // window system in it (the decisions, the settings file, the picture); StartupSplashWindow.cpp opens the window.
 #pragma once
 
@@ -18,6 +20,7 @@ struct Image;
 namespace sf::splash {
 
 constexpr double kShowAfterMs = 300.0; // quicker starts never show it
+constexpr double kMinVisibleMs = 700.0; // once shown, it stays at least this long (never added to a start that didn't show it)
 constexpr int kLogicalWidth = 640, kLogicalHeight = 360; // 16:9, like the invite splash
 constexpr uint8_t kBackground[3] = {0x0f, 0x0f, 0x12}; // the site's --bg
 
@@ -31,8 +34,14 @@ struct Setting {
 // True: the main window starts hidden (no flash of an empty window) and the splash may show. False: as before.
 bool enabled(const Setting& s);
 
-// A checkpoint of start-up: open the splash now? (once; only when enabled, and start-up is past kShowAfterMs)
-bool due(bool enabled, bool alreadyShown, double elapsedMs);
+// A checkpoint of start-up: open the splash now? (once; only when enabled, and start-up is past showAfterMs)
+bool due(bool enabled, bool alreadyShown, double elapsedMs, double showAfterMs = kShowAfterMs);
+
+// How much longer the open splash stays before the main window may replace it (0: it has been up long enough).
+double holdMs(double visibleMs);
+
+// SF_SPLASH=1: show the splash on this run whatever the start-up time or the preference (it stays kMinVisibleMs), to see it.
+bool forcedFromEnv(const char* value);
 
 // ui.json's "prefs": "startupSplash" (true when absent or unreadable) and "language" ("en" when absent).
 bool preferenceFromUiJson(const std::string& text);

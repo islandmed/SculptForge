@@ -1,0 +1,113 @@
+# Artist session 1, blockout (tools/qa/artist_pass.py runs it; not a ctest case): a creature head from the default
+# sphere the way a sculptor blocks one in: big Move pulls, Dynamic topology for horns and a snout, overlapping Clay
+# strokes, a remesh to even it out, then undo. Lines starting "print" feed the report (frame times, mesh stats).
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+camera 0 0
+key f
+wait 0.3
+expect_value symmetry_x == 1
+print triangles
+hover_window 0.97 0.5
+wait 0.3
+shot b01-sphere
+
+# Big forms: Move (the brush pulls the clay), a large radius; long slow pulls for the brow and jaw, a quick one for the chin.
+click "Move##brush.move"
+brush_size 140
+print longest_frame_ms
+drag_path 0.62 0.28 0.68 0.22 0.74 0.18 S=1.6
+drag_path 0.64 0.70 0.70 0.78 0.72 0.86 S=1.2
+stroke 0.5 0.82 0.5 0.92 0.15
+print longest_frame_ms
+expect_value open_edges == 0
+hover_window 0.97 0.5
+wait 0.3
+shot b02-move
+
+# Dynamic topology: pull horns out of the top with Snake Hook-style long pulls; detail follows the brush.
+run dyntopo enabled=true detail=50
+remember triangles t_before_dyn
+click "Tendril##brush.tendril"
+brush_size 60
+drag_path 0.62 0.12 0.66 0.02 0.72 -0.06 0.80 -0.10 S=2.0
+drag_path 0.58 0.16 0.60 0.06 0.63 -0.02 S=1.4
+print triangles
+print longest_frame_ms
+expect_value triangles != $t_before_dyn
+expect_value open_edges == 0
+camera -35 -10
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot b03-horns
+
+# Snout: overlapping Clay strokes, varied size and speed, like a person laying in clay.
+camera 0 0
+key f
+wait 0.2
+click "Clay##brush.clay"
+brush_size 70
+drag_path 0.44 0.60 0.50 0.62 0.56 0.60 S=0.7
+drag_path 0.42 0.64 0.50 0.66 0.58 0.64 S=0.5
+brush_size 45
+drag_path 0.45 0.62 0.55 0.62 S=0.25
+drag_path 0.46 0.66 0.54 0.58 S=0.12
+drag_path 0.54 0.66 0.46 0.58 S=0.12
+brush_size 90
+drag_path 0.40 0.58 0.50 0.70 0.60 0.58 S=1.0
+print triangles
+print longest_frame_ms
+expect_value open_edges == 0
+camera -60 -5
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot b04-snout
+camera -30 -12
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot b04b-pre-remesh
+run save_obj path=artist_blockout_pre_remesh.obj
+
+# Remesh (an even surface before dividing), then undo and redo: both must be instant and exact.
+run dyntopo enabled=false
+remember triangles t_pre
+print solid_volume
+print longest_frame_ms
+run remesh resolution=200
+wait_idle 60
+print longest_frame_ms
+print triangles
+print solid_volume
+expect_value open_edges == 0
+camera -30 -12
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot b05-remesh
+run save_obj path=artist_blockout.obj
+
+snapshot
+click "Clay##brush.clay"
+brush_size 60
+stroke 0.40 0.40 0.60 0.40 0.5
+expect_value moved > 0
+print longest_frame_ms
+key ctrl+z
+wait 0.3
+print longest_frame_ms
+expect_value moved == 0
+key ctrl+shift+z
+wait 0.3
+expect_value moved > 0
+print longest_frame_ms
+hover_window 0.97 0.5
+wait 0.3
+shot b06-final

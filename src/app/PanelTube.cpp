@@ -309,6 +309,38 @@ void App::drawTubeContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "tube.insert_point", ImVec2(-1, 0));
     ui::ActionButton(*this, "tube.simplify", ImVec2(full, 0));
+    {   // Repeat along curve: copies of another Part, end to end along this curve, as a new Part
+        tray::GroupLabel(*this, "Repeat a Part along the curve");
+        if (tubeRepeatPart_ != 0 && doc_.partIndex(tubeRepeatPart_) < 0) tubeRepeatPart_ = 0;
+        const int picked = tubeRepeatPart_ ? doc_.partIndex(tubeRepeatPart_) : -1;
+        ImGui::SetNextItemWidth(full);
+        if (ImGui::BeginCombo("##tuberepeatpart", picked >= 0 ? doc_.parts[size_t(picked)].name.c_str() : tr("Pick a Part..."))) {
+            for (int i = 0; i < int(doc_.parts.size()); ++i) {
+                if (i == doc_.activePart) continue;
+                if (ImGui::Selectable((doc_.parts[size_t(i)].name + "##rp" + std::to_string(i)).c_str(), i == picked))
+                    tubeRepeatPart_ = doc_.parts[size_t(i)].id;
+            }
+            ImGui::EndCombo();
+        }
+        ui::HelpText("Part to repeat", nullptr,
+                     "The Part whose copies are laid along the curve: a chain link, a bead, a scale. Its longest side "
+                     "follows the curve.",
+                     kTubePath);
+        ImGui::SetNextItemWidth(full);
+        ui::SliderInside("##tuberepeatspacing", &tubeRepeatSpacing_, kRepeatSpacingMin, 2.0f, tr("Spacing %.2f"));
+        ui::HelpText("Repeat spacing", nullptr,
+                     "How far apart the copies are, in lengths of the Part: 1 is end to end, less overlaps them like chain links.",
+                     kTubePath);
+        ImGui::SetNextItemWidth(full);
+        ui::SliderInside("##tuberepeatturn", &tubeRepeatTurn_, -180.0f, 180.0f, tr("Turn %.0f\xc2\xb0"));
+        ui::HelpText("Repeat turn", nullptr,
+                     "How many degrees each copy is turned about the curve more than the one before: 90 for chain links.",
+                     kTubePath);
+        ImGui::BeginDisabled(picked < 0);
+        if (ImGui::Button(tr("Repeat along curve"), ImVec2(full, 0)))
+            runCommand("tube_repeat", {{"part", std::to_string(picked)}, {"spacing", double(tubeRepeatSpacing_)}, {"turn", double(tubeRepeatTurn_)}});
+        ImGui::EndDisabled();
+    }
     if (t.curve) return; // a curve is baked after Tube from curve
     ui::ActionButton(*this, "tube.bake", ImVec2(half, 0));
     ImGui::SameLine();
@@ -369,6 +401,21 @@ void App::drawTubeShapeControls(float full) {
         slider("##tubespin", &TubeShape::spin, -90.0f, 90.0f, "Spin %.0f\xc2\xb0", "spin", "Spin",
                "Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley "
                "twist.");
+    }
+    if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid) {
+        const bool rope = shown.profile == TubeShape::Profile::Rope;
+        float n = tubeStrandsEdit_ > 0.0f ? tubeStrandsEdit_ : float(shown.strands);
+        ImGui::SetNextItemWidth(full);
+        if (ui::SliderInside("##tubestrands", &n, rope ? 1.0f : 2.0f, float(kTubeMaxStrands), tr("Strands %.0f"))) {
+            tubeStrandsEdit_ = std::round(n);
+            tubeLook_.strands = int(tubeStrandsEdit_);
+        }
+        if (ImGui::IsItemDeactivated() && tubeStrandsEdit_ > 0.0f) {
+            if (active && int(tubeStrandsEdit_) != doc_.mesh.tube.strands) runCommand("tube_set", {{"strands", double(tubeStrandsEdit_)}});
+            tubeStrandsEdit_ = -1.0f;
+        }
+        ui::HelpText("Strands", nullptr,
+                     "How many strands the rope or braid has. One round strand is a spring; Spread opens it up.", kTubePath);
     }
     if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid ||
         shown.profile == TubeShape::Profile::Sleeve)

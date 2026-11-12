@@ -31,6 +31,7 @@ int microBrushSupport(BrushType type) {
     case BrushType::Clay:
     case BrushType::ClayBlock:
     case BrushType::Smooth:
+    case BrushType::SmoothPeaks:
     case BrushType::Inflate:
     case BrushType::Flatten:
     case BrushType::Trim:
@@ -398,7 +399,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
 
     // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
-    const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::Inflate && type != BrushType::Pinch;
+    const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Inflate && type != BrushType::Pinch;
     if (needPlane) {
         const uint32_t stride = n >= 4 ? 2 : 1;
         struct Sum {
@@ -447,7 +448,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     up = glm::normalize(up);
     const glm::vec3 right = glm::cross(up, areaNormal);
     const float layerHeight = r * 0.08f * s;
-    const bool readsNeighbours = type == BrushType::Smooth;
+    const bool readsNeighbours = type == BrushType::Smooth || type == BrushType::SmoothPeaks;
     // Pinch, Crease and Sharp Crease pull the surface towards the centre (PinchSampler), reading the grids as the
     // dab found them: those it writes copied first.
     const bool pinches = !maskBrush && (type == BrushType::Pinch || type == BrushType::Crease || type == BrushType::SharpCrease);
@@ -568,6 +569,12 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         float lo, hi;
                         const float avg = neighbourAverage(lo, hi);
                         delta = (avg - float(before[idx])) * mm.step * std::min(1.0f, s * f);
+                        break;
+                    }
+                    case BrushType::SmoothPeaks: { // the heights above the neighbours' average come down
+                        float lo, hi;
+                        const float avg = neighbourAverage(lo, hi);
+                        delta = std::min(0.0f, avg - float(before[idx])) * mm.step * std::min(1.0f, s * f);
                         break;
                     }
                     case BrushType::Flatten: {

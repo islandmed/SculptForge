@@ -16,8 +16,16 @@ bool enabled(const Setting& s) {
     return s.videoDriver != "offscreen" && s.videoDriver != "dummy";
 }
 
-bool due(bool isEnabled, bool alreadyShown, double elapsedMs) {
-    return isEnabled && !alreadyShown && elapsedMs > kShowAfterMs;
+bool due(bool isEnabled, bool alreadyShown, double elapsedMs, double showAfterMs) {
+    return isEnabled && !alreadyShown && elapsedMs > showAfterMs;
+}
+
+double holdMs(double visibleMs) {
+    return std::clamp(kMinVisibleMs - visibleMs, 0.0, kMinVisibleMs);
+}
+
+bool forcedFromEnv(const char* value) {
+    return value && std::string_view(value) == "1";
 }
 
 bool preferenceFromUiJson(const std::string& text) {

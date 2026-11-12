@@ -33,12 +33,13 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 5. [Install SculptForge on Windows, macOS and Linux](installing.md)
 6. [The interface](interface.md)
 7. [Navigating the view](navigation.md)
+    - [Reference images](reference-images.md)
 
 ## Sculpting
 
 8. [Sculpting and brushes](sculpting.md)
 9. [Brush Lab and sharing brushes](brush-lab.md)
-    - [Brush packs: seventy built-in brushes](brush-packs.md)
+    - [Brush packs: seventy-one built-in brushes](brush-packs.md)
 10. [Masking](masking.md)
 11. [Face Groups and visibility](face-groups.md)
 12. [Selection sets and morph targets](selection-sets.md)

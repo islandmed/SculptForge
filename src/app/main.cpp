@@ -15,6 +15,7 @@
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 #include "core/StudioProfile.h"
+#include "core/ThreadPool.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -26,6 +27,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 #ifndef _WIN32
 #include <unistd.h> // execv (--cli)
@@ -43,6 +45,7 @@ void usage() {
         "  --size WxH               Render size (default 1024x1024)\n"
         "  --measure-idle S         Sit idle, print the frames drawn per second over S seconds, exit\n"
         "                           (SF_CONTINUOUS_REDRAW=1 draws every frame, as before 0.9.5)\n"
+        "  --measure-key-nav        Tap and hold each pan / zoom key (default and rebound) in the interactive loop; exit 1 if the view stays\n"
         "  --measure-stroke S[,R]   Draw a fast scripted circle stroke for S seconds (brush radius R px),\n"
         "                           e.g. after --run \"new_sphere\"; print how far the dabs left the circle and the frame times, exit\n"
         "                           (SF_STROKE_IMMEDIATE=1 places every dab at once, as before 0.9.6)\n"
@@ -62,6 +65,7 @@ void usage() {
         "  --ui-record out.mp4      Also record the UI test, every frame in real time with the pointer drawn (needs ffmpeg)\n"
         "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --reset-layout           Start with the standard layout, every panel back in the main window\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --studio FILE            Start in studio mode with this studio profile (studio.json; docs/studios.md)\n"
@@ -220,6 +224,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--reset-layout") options.resetLayout = true; // the way out of a layout that cannot be used
         else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--studio") studioProfile = next();             // core/StudioProfile.h
@@ -230,6 +235,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--log-dir") logDir = next();
         else if (a == "--crash-test") crashTest = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
+        else if (a == "--measure-key-nav") options.measureKeyNav = true;
         else if (a == "--measure-stroke") {
             const std::string v = next(); // S or S,RADIUS
             options.measureStroke = std::max(0.5f, float(std::atof(v.c_str())));
@@ -317,7 +323,7 @@ static int runMain(int argc, char** argv) {
     if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched
     if (!options.timelapsePath.empty() && !sizeGiven) options.width = 1920, options.height = 1080;
-    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
+    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f || options.measureKeyNav) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;
         options.height *= options.supersample;
@@ -331,6 +337,9 @@ static int runMain(int argc, char** argv) {
         if (studio.active) SDL_Log("Studio mode%s: no outside connections", studio.profile.name.empty() ? "" : (" (" + studio.profile.name + ")").c_str());
     }
     if (!crashTest.empty()) crashOnPurpose(crashTest);
+    // The saved thread count before the App exists: its Document builds the built-in stamps on the shared pool, which
+    // takes its size at first use (#184: a count set after that stayed at 16 on a 48-thread machine).
+    if (sf::App::usesProfileThreads(options)) sf::applyCachedThreadCount();
     auto app = std::make_unique<sf::App>();
     if (!app->init(options)) {
         // A double-clicked app that can't start says why (#109: on a laptop it just vanished, not even in the
@@ -350,6 +359,7 @@ static int runMain(int argc, char** argv) {
         sf::crashlog::stop();
         return 1;
     }
+    SDL_Log("Threads: pool of %d (hardware %u)", sf::ThreadPool::shared().threads(), std::thread::hardware_concurrency()); // (bug reports: #184)
     const auto runStart = std::chrono::steady_clock::now();
     int code = app->run();
     const auto runEnd = std::chrono::steady_clock::now();

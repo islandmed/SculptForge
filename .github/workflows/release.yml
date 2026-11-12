@@ -221,6 +221,7 @@ jobs:
             tests/release_smoke.py
             tests/ui/release_smoke.sfui
             tests/data/marble-bust.glb
+            packaging/linux/apt-retry.sh
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -270,8 +271,8 @@ jobs:
       - name: Linux .deb and AppImage
         if: matrix.kind == 'linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ./pkg/sculptforge_*.deb xvfb libgl1-mesa-dri
+          sudo ./packaging/linux/apt-retry.sh update
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ./pkg/sculptforge_*.deb xvfb libgl1-mesa-dri
           ui() { xvfb-run -a -s "-screen 0 1920x1080x24" env LIBGL_ALWAYS_SOFTWARE=1 "$@" \
                    --ui-test "$PWD/tests/ui/release_smoke.sfui"; }
           echo "== .deb"
@@ -370,7 +371,7 @@ jobs:
       # in this environment. The tools are installed in their own step, which never sees the key.
       - name: Repository tools
         if: ${{ env.HAS_REPO_KEY == 'true' }}
-        run: sudo apt-get update -q && sudo apt-get install -y -q createrepo-c apt-utils
+        run: sudo ./packaging/linux/apt-retry.sh update -q && sudo ./packaging/linux/apt-retry.sh install -y -q createrepo-c apt-utils
       - name: Signed apt and dnf repository metadata
         env:
           REPO_SIGNING_KEY: ${{ secrets.REPO_SIGNING_KEY }}

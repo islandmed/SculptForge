@@ -6,6 +6,7 @@
 // the classic viewport gesture Alt+click to select a Part. Every action goes
 // through the part_* commands (core/Parts.cpp).
 #include "app/App.h"
+#include "app/BooleanPreview.h"
 #include "app/NativeDialog.h"
 #include "io/BridgeProtocol.h"
 #include "app/Demo.h"
@@ -35,7 +36,6 @@ namespace sf {
 
 namespace {
 
-constexpr float kClickSlopPx = 4.0f; // movement that turns an Alt+click into a drag
 constexpr Uint64 kPartClickNs = 500000000ull; // a pen pressed longer than this isn't an Alt+click
 constexpr int kListRows = 6;         // the list scrolls beyond this many Parts
 // The Part list's colours; should become theme tokens (Theme.h).
@@ -84,6 +84,33 @@ void drawEye(ImDrawList* dl, ImVec2 c, float size, bool open, ImU32 col) {
     }
 }
 
+// Boolean mark (core/PartBoolean.h): a plus (Add), a bar (Subtract), two overlapping rings (Intersect), or a small
+// ring (none).
+void drawBooleanMark(ImDrawList* dl, ImVec2 c, float size, PartBoolean mode, ImU32 col) {
+    const float r = size * 0.5f, t = std::max(1.0f, size * 0.14f);
+    switch (mode) {
+    case PartBoolean::Add:
+        dl->AddLine(ImVec2(c.x - r, c.y), ImVec2(c.x + r, c.y), col, t);
+        dl->AddLine(ImVec2(c.x, c.y - r), ImVec2(c.x, c.y + r), col, t);
+        break;
+    case PartBoolean::Subtract: dl->AddLine(ImVec2(c.x - r, c.y), ImVec2(c.x + r, c.y), col, t); break;
+    case PartBoolean::Intersect:
+        dl->AddCircle(ImVec2(c.x - r * 0.38f, c.y), r * 0.62f, col, 0, t * 0.8f);
+        dl->AddCircle(ImVec2(c.x + r * 0.38f, c.y), r * 0.62f, col, 0, t * 0.8f);
+        break;
+    default: dl->AddCircle(c, r * 0.3f, col, 0, t * 0.7f); break;
+    }
+}
+
+const char* booleanLabel(PartBoolean mode) {
+    switch (mode) {
+    case PartBoolean::Add: return "Add";
+    case PartBoolean::Subtract: return "Subtract";
+    case PartBoolean::Intersect: return "Intersect";
+    default: return "None";
+    }
+}
+
 // Shading mark: a shaded disc (smooth) or a faceted hexagon (flat).
 void drawShadeMark(ImDrawList* dl, ImVec2 c, float size, bool flat, ImU32 col) {
     const float r = size * 0.5f, t = std::max(1.0f, size * 0.11f);
@@ -106,34 +133,19 @@ void drawShadeMark(ImDrawList* dl, ImVec2 c, float size, bool flat, ImU32 col) {
 } // namespace
 
 int App::pickPart(float x, float y, RayHit* out) {
-    glm::vec3 origin, dir;
-    canvasRay(x, y, origin, dir);
-    int best = -1;
-    RayHit nearest;
-    for (int i = 0; i < doc_.partCount(); ++i) {
-        Part& s = doc_.parts[size_t(i)];
-        if (!s.visible) continue;
-        RayHit hit;
-        bool found = false;
-        // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
-        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
-        const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
-        found = doc_.partBvh(i).raycast(doc_.partMesh(i), o, d, hit);
-        if (found && s.moved()) {
-            hit.position = glm::vec3(s.transform * glm::vec4(hit.position, 1.0f));
-            hit.normal = glm::normalize(glm::mat3(s.transform) * hit.normal);
-        }
-        if (found && (best < 0 || hit.t < nearest.t)) {
-            best = i;
-            nearest = hit;
-        }
-    }
-    if (out && best >= 0) *out = nearest;
-    return best;
+    return pickPartAt(doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, x, y, 0.0f,
+                      doc_.activePart, out);
+}
+
+// The Part to select by a click: pickPart, and a thin or far Part a few points off the pointer counts (Discord, macOS:
+// Alt+click often missed a Part until zoomed in close). Window points, so a Retina screen needs no scaling.
+int App::pickPartNear(float x, float y, RayHit* out) {
+    return pickPartAt(doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, x, y,
+                      kPartPickTolerance, doc_.activePart, out);
 }
 
 void App::partClickMove(float x, float y) {
-    if (std::hypot(x - partClickX_, y - partClickY_) < kClickSlopPx) return;
+    if (!partClickIsDrag(x - partClickX_, y - partClickY_)) return;
     // A drag, not a click: what an Alt+drag from here does on the active Part
     // (brushes ignore the others): an inverted stroke, or a pan off the model.
     drag_ = Drag::None;
@@ -177,7 +189,7 @@ void App::partSelected(const char* how) {
 void App::sculptPartUnderCursor() {
     if (drag_ != Drag::None) return; // mid-stroke or mid-drag: switching would split it across two Parts
     const bool overCanvas = !ImGui::GetIO().WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_);
-    const int target = overCanvas ? pickPart(mouseX_, mouseY_) : -1;
+    const int target = overCanvas ? pickPartNear(mouseX_, mouseY_) : -1;
     if (target < 0) {
         status_ = tr("No Part under the cursor");
         return;
@@ -280,6 +292,8 @@ void App::drawPartsContents() {
     // The list: name, levels, triangles, shading, eye. Row actions run after the loop (they change the list).
     int selectIndex = -1, toggleIndex = -1, shadeIndex = -1, deleteIndex = -1, duplicateIndex = -1, renameIndex = -1;
     int linkIndex = -1, uniqueIndex = -1; // Linked Duplicate / Make Unique from the right-click menu
+    int booleanIndex = -1; // a Part's Boolean picked (its mark's menu, or the right-click menu)
+    PartBoolean booleanMode = PartBoolean::None;
     std::string renameTo;
     // Folders (#96): pending actions on one, by name; a Part put into a folder ("" = out of its folder).
     PartFolderActions fa;
@@ -328,7 +342,7 @@ void App::drawPartsContents() {
     ImGui::PushStyleColor(ImGuiCol_Header, kRowSelected);
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, kRowHover);
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, kRowPressed);
-    if (ImGui::BeginTable("##parts", 5, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
+    if (ImGui::BeginTable("##parts", 6, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX, ImVec2(-1, listH))) {
         const float eyeW = ImGui::GetTextLineHeight() * 1.2f;
         ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
         // Subdivision levels lists them ("Level 3/5"); empty for meshes without levels.
@@ -336,6 +350,7 @@ void App::drawPartsContents() {
         for (int i = 0; i < count && !anyLevels; ++i) anyLevels = subdivLevelCount(doc_.partMesh(i)) > 0;
         ImGui::TableSetupColumn("level", ImGuiTableColumnFlags_WidthFixed, anyLevels ? ImGui::CalcTextSize("Level 8/8").x : 0.0f);
         ImGui::TableSetupColumn("tris", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("0.00M").x);
+        ImGui::TableSetupColumn("boolean", ImGuiTableColumnFlags_WidthFixed, eyeW);
         ImGui::TableSetupColumn("shade", ImGuiTableColumnFlags_WidthFixed, eyeW);
         ImGui::TableSetupColumn("eye", ImGuiTableColumnFlags_WidthFixed, eyeW);
         // A Part dropped on a row: into that folder, or (on a Part outside folders) out of its folder.
@@ -444,6 +459,14 @@ void App::drawPartsContents() {
                         }
                         ImGui::EndMenu();
                     }
+                    if (ImGui::BeginMenu(tr("Boolean"))) {
+                        for (PartBoolean m : {PartBoolean::None, PartBoolean::Add, PartBoolean::Subtract, PartBoolean::Intersect})
+                            if (ImGui::MenuItem(tr(booleanLabel(m)), nullptr, s.boolean == m) && s.boolean != m) {
+                                booleanIndex = i;
+                                booleanMode = m;
+                            }
+                        ImGui::EndMenu();
+                    }
                     if (ImGui::MenuItem(tr("Linked Duplicate"))) linkIndex = i;
                     if (ImGui::MenuItem(tr("Make Unique"), nullptr, false, links > 1)) uniqueIndex = i;
                     if (ImGui::MenuItem(tr("Delete..."), nullptr, false, count > 1)) deleteIndex = i;
@@ -484,6 +507,33 @@ void App::drawPartsContents() {
             ImGui::TableSetColumnIndex(3);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             {
+                // How this Part takes part in the scene's Boolean: click for None / Add / Subtract / Intersect.
+                const ImVec2 at = ImGui::GetCursorScreenPos();
+                const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
+                if (ImGui::InvisibleButton(("##boolean " + s.name).c_str(), size)) ImGui::OpenPopup("##boolean menu");
+                const bool hovered = ImGui::IsItemHovered();
+                if (hovered)
+                    ImGui::SetTooltip(s.boolean == PartBoolean::None ? tr("%s: no Boolean. Click to add, subtract or intersect it")
+                                                                     : tr("%s: Boolean %s. Click to change"),
+                                      s.name.c_str(), tr(booleanLabel(s.boolean)));
+                const ImU32 col = ImGui::GetColorU32(hovered                         ? style.Colors[ImGuiCol_ButtonHovered]
+                                                     : s.boolean != PartBoolean::None ? style.Colors[ImGuiCol_Text]
+                                                                                      : style.Colors[ImGuiCol_TextDisabled]);
+                drawBooleanMark(ImGui::GetWindowDrawList(), ImVec2(at.x + size.x * 0.5f, at.y + size.y * 0.5f),
+                                ImGui::GetTextLineHeight() * 0.62f, s.boolean, col);
+                if (ImGui::BeginPopup("##boolean menu")) {
+                    ImGui::TextDisabled("%s", tr("Boolean"));
+                    for (PartBoolean m : {PartBoolean::None, PartBoolean::Add, PartBoolean::Subtract, PartBoolean::Intersect})
+                        if (ImGui::MenuItem(tr(booleanLabel(m)), nullptr, s.boolean == m) && s.boolean != m) {
+                            booleanIndex = i;
+                            booleanMode = m;
+                        }
+                    ImGui::EndPopup();
+                }
+            }
+            ImGui::TableSetColumnIndex(4);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
+            {
                 // Smooth / flat shading of this Part: click cycles Scene -> Smooth -> Flat (part_shading).
                 const ImVec2 at = ImGui::GetCursorScreenPos();
                 const ImVec2 size(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
@@ -501,7 +551,7 @@ void App::drawPartsContents() {
                 drawShadeMark(ImGui::GetWindowDrawList(), ImVec2(at.x + size.x * 0.5f, at.y + size.y * 0.5f),
                               ImGui::GetTextLineHeight() * 0.7f, flat, col);
             }
-            ImGui::TableSetColumnIndex(4);
+            ImGui::TableSetColumnIndex(5);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + textDy);
             const ImVec2 eyePos = ImGui::GetCursorScreenPos();
             const ImVec2 eyeSize(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeight());
@@ -533,6 +583,8 @@ void App::drawPartsContents() {
         runCommand("part_shading", {{"index", double(shadeIndex)}, {"mode", std::string(shadingName(next))}});
     }
     if (duplicateIndex >= 0) runCommand("part_duplicate", {{"index", double(duplicateIndex)}});
+    if (booleanIndex >= 0)
+        runCommand("part_boolean", {{"index", double(booleanIndex)}, {"mode", std::string(partBooleanName(booleanMode))}});
     if (newFolderPart >= 0) {
         runCommand("part_folder_new", {{"index", double(newFolderPart)}});
         startFolderRename();
@@ -789,8 +841,76 @@ void App::drawPartsContents() {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", tr("Split copies the triangles into the new Part and leaves this Part as it is"));
     }
+    drawBooleanSection();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
+    if (fontSmall_) ImGui::PopFont();
+}
+
+Args App::booleanArgs() const {
+    return {{"weld", booleanOptions_.weld}, {"keep_groups", booleanOptions_.keepGroups}, {"cut_group", booleanOptions_.cutGroup}};
+}
+
+// Boolean (core/PartBoolean.h): Make Boolean Mesh with its options, and the live preview's switch and state.
+void App::drawBooleanSection() {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const size_t taking = booleanPartIndices(doc_).size();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", tr("Boolean"));
+    ImGui::SameLine();
+    const float optW = ImGui::GetFrameHeight() * 1.4f;
+    ImGui::BeginDisabled(taking < 2);
+    if (ImGui::Button(tr("Make Boolean Mesh"), ImVec2(ImGui::GetContentRegionAvail().x - optW - style.ItemSpacing.x, 0)))
+        runCommand("make_boolean_mesh", booleanArgs());
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal)) {
+        if (taking < 2)
+            ImGui::SetTooltip("%s", tr("Give two or more shown Parts a Boolean (the mark in each row: Add, Subtract or "
+                                       "Intersect) to combine them, in list order"));
+        else
+            ImGui::SetTooltip(tr("Combine the %d Parts with a Boolean into a new Part, in list order. They stay as "
+                                 "they are, hidden. One undo step"),
+                              int(taking));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("...##boolean options", ImVec2(-1, 0))) ImGui::OpenPopup("##boolean options");
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("Make Boolean Mesh options"));
+    if (ImGui::BeginPopup("##boolean options")) {
+        ImGui::Checkbox(tr("Weld seams"), &booleanOptions_.weld);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("One closed surface. Off: each source keeps its own vertices along the cut (a hard edge)"));
+        ImGui::Checkbox(tr("Keep face groups"), &booleanOptions_.keepGroups);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Each source keeps its face groups. Off: one face group per source"));
+        ImGui::Checkbox(tr("New face group on cut faces"), &booleanOptions_.cutGroup);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("The faces a Subtract or Intersect Part leaves behind get a face group of their own"));
+        ImGui::EndPopup();
+    }
+    ImGui::Checkbox(tr("Preview##boolean"), &booleanPreview_);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("%s", tr("Show the result in the view in place of the Parts with a Boolean"));
+    ImGui::SameLine();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::AlignTextToFramePadding();
+    const BooleanPreviewState* p = boolPreview_.get();
+    if (taking < 2) {
+        ImGui::TextDisabled("%s", tr("Set a Boolean in two Parts' rows"));
+    } else if (!booleanPreview_) {
+        ImGui::TextDisabled("%s", tr("Preview off"));
+    } else if (p && p->job.valid() && !p->shown.mesh && p->shown.error.empty()) {
+        ImGui::TextDisabled("%s", tr("Working..."));
+    } else if (p && !p->shown.mesh && !p->shown.error.empty()) {
+        ImGui::TextColored(theme::danger, "%s", tr("Can't preview"));
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", p->shown.error.c_str());
+    } else if (p && p->shown.mesh) {
+        if (p->shown.voxel) {
+            ImGui::TextDisabled("%s", tr("Voxel (a Part isn't closed)"));
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", p->shown.error.c_str());
+        } else {
+            ImGui::TextDisabled(tr("Exact, %d ms"), int(p->shown.ms + 0.5));
+        }
+    }
     if (fontSmall_) ImGui::PopFont();
 }
 

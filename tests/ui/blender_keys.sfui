@@ -332,6 +332,7 @@ expect_value brush_type == 9
 click "Preferences##palette.preferences"
 click "Saving & Layouts##preferences.config"
 click "Reset Layout and Shortcuts##config.restore_standard"
+wait 0.2
 expect_value shortcut_conflicts == 0
 expect_shortcut brush.standard V
 key f1

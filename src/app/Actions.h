@@ -50,6 +50,23 @@ bool isModifierKey(SDL_Keycode key);
 // The individual keys of a chord, for drawing keycaps: "Ctrl+Shift+Z" -> {"Ctrl", "Shift", "Z"}.
 std::vector<std::string> chordKeys(std::string_view chord);
 
+// Two keys in a row (Artizmo on Discord): "A then S". Two different keys, never the same key twice; each step is a
+// chord, so "Ctrl+K then C" works too. In an action's shortcut text a sequence is one more alternative ("A then S / F5").
+constexpr float kKeySequenceSeconds = 0.5f; // the second key must come within this long of the first
+constexpr std::string_view kThen = " then ";
+struct KeySequence {
+    Chord first, second;
+    bool operator==(const KeySequence& o) const { return first == o.first && second == o.second; }
+};
+bool parseSequence(std::string_view text, KeySequence& out); // false for a single chord, or for the same key twice
+std::string sequenceText(const KeySequence& sequence);       // "A then S"
+// The steps of one alternative for drawing keycaps: "A then S" -> {"A", "S"}, "Ctrl+Z" -> {"Ctrl+Z"}.
+std::vector<std::string> shortcutSteps(std::string_view alternative);
+// One alternative ("ctrl+z", "a then s") spelled canonically, or "" if it isn't a chord or a sequence.
+std::string canonicalShortcut(std::string_view alternative);
+// Every alternative of an action's shortcut text (single chords and sequences), canonical, unreadable ones dropped.
+std::vector<std::string> shortcutAlternatives(std::string_view text);
+
 // -1 for Smaller brush (and by 1 px), +1 for Larger brush (and by 1 px), 0 otherwise: these repeat while their
 // key is held, and step through an insert set, on whatever keys they are bound to.
 int brushSizeStep(const Action* a);
@@ -58,6 +75,7 @@ int brushSizeStep(const Action* a);
 // direction as pixels per second of panning at speed 1 and zoom steps per second, or false for any other action.
 bool keyNavMotion(const Action* a, float& panX, float& panY, float& zoomSteps);
 constexpr float kKeyNavPanPixels = 600.0f, kKeyNavZoomSteps = 4.0f; // per second at speed 1.0 (Preferences > Input)
+constexpr float kKeyNavTapSeconds = 0.1f;  // a press counts as held at least this long: a tap moves about a tenth of a second's worth
 constexpr float kKeyNavEaseSeconds = 0.12f; // from standing to full speed on a press, and back to standing on a release
 
 // One pan / zoom key's speed, 0 (standing) to 1 (full), easing linearly over kKeyNavEaseSeconds. advance() moves it
@@ -90,7 +108,15 @@ public:
     const Action* find(std::string_view id) const;
     const std::vector<Action>& all() const { return actions_; }
     // Runs the action bound to this chord; true if consumed. Callers skip it while ImGui wants the keyboard.
+    // A key that starts a sequence waits for the second key: it is consumed, and if it is bound alone that action runs
+    // when no second key comes in time (tick) or when another key that isn't the second one is pressed.
     bool handleKey(SDL_Keycode key, SDL_Keymod mods);
+    // Once a frame, DT seconds: runs a first key that waited its kKeySequenceSeconds out. The registry counts time
+    // from these (no wall clock: scripted tests and the app step it the same way).
+    void tick(float dt);
+    bool sequenceWaiting() const { return pending_.on; } // the app keeps drawing frames until it is over
+    void flushSequence() { flushPending(); } // a click or pen down: the first key waiting runs alone now
+    void dropSequence() { pending_ = {}; }   // focus lost: forget it, nothing runs
     std::string shortcutText(std::string_view id) const; // effective chord after user overrides
     void setShortcut(std::string_view id, std::string chord); // user override ("" clears)
     // Changes an action's default chord (Preferences > Input switches between the classic and SculptForge
@@ -110,6 +136,11 @@ public:
     bool hasOverride(std::string_view id) const;
     // The other actions that already use CHORD (exactly: Ctrl+Z is not Z), for the warning before a key is reassigned.
     std::vector<const Action*> holdersOf(const Chord& chord, std::string_view exceptId) const;
+    // The same for one alternative in any spelling: a chord or a sequence ("A then S" is taken only by the same sequence;
+    // A alone, bound elsewhere, still works as its own key).
+    std::vector<const Action*> holdersOfShortcut(std::string_view alternative, std::string_view exceptId) const;
+    // The action a two-key sequence runs (enabled or not), or nullptr.
+    const Action* actionForSequence(const KeySequence& sequence) const;
     // Back to the action's default chord (the key style's); any action that holds it now loses it. Returns the
     // labels of those actions, ", " separated, or "".
     std::string resetShortcut(std::string_view id);
@@ -128,6 +159,10 @@ public:
 
 private:
     const std::vector<Chord>& chordsOf(size_t index) const;
+    void rebuildChords() const;
+    bool isSequenceStart(const Chord& chord) const;
+    bool runAction(const Action* a); // the enabled check and a copy of run (running may register actions)
+    void flushPending();             // the first key that waited alone: its own action now, if it has one
     std::vector<Action> actions_;
     std::vector<std::pair<std::string, std::string>> overrides_; // id -> chord
     std::vector<std::pair<std::string, std::string>> styleDefaults_; // id -> chord, from setDefaultShortcut
@@ -135,6 +170,14 @@ private:
     unsigned revision_ = 0;
     mutable unsigned chordsRevision_ = ~0u;
     mutable std::vector<std::vector<Chord>> chords_; // parsed effective chords, per action
+    mutable std::vector<std::vector<KeySequence>> sequences_; // parsed effective two-key sequences, per action
+    struct Pending {
+        bool on = false;
+        Chord first;
+        double until = 0.0;       // clock_ time the wait ends
+        std::string aloneId;      // the action the first key runs alone ("" = none)
+    } pending_;
+    double clock_ = 0.0;
 };
 
 } // namespace sf

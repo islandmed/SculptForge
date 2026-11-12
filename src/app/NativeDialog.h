@@ -20,7 +20,7 @@ namespace sf::dialogs {
 enum class Kind { None, OpenFile, SaveFile, OpenFolder, Message, Url };
 
 void openFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
-              int nfilters, const char* defaultLocation, bool allowMany);
+              int nfilters, const char* defaultLocation, bool allowMany, const char* title = nullptr);
 void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
               int nfilters, const char* defaultLocation);
 void openFolder(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const char* defaultLocation,

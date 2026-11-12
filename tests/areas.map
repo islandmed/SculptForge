@@ -154,11 +154,12 @@ bench_take_sphere           sculpt
 ui_idle_*                   sculpt
 ui_calibrate_json           sculpt
 ui_monkey*                  ui
-ui_mode_matrix              ui
+ui_mode_matrix_*            ui
 ui_*                        ui
 sculptforge_tests_*         unit
 figure_pose_bench           mesh
 decimate_valence_ab         mesh
+boolean_bench               mesh
 remesh_bench                mesh
 python_api                  io
 blender_*                   io
@@ -190,6 +191,7 @@ mcp*                        site
 reply_drafts*               site
 sbom                        site
 stale_tree                  site
+apt_retry                   site
 *                           site
 
 [units]
@@ -251,6 +253,7 @@ test_figure_pose            mesh
 test_forgespheres           mesh
 test_generated_remesh       mesh
 test_linked_duplicate       mesh
+test_mesh_boolean           mesh
 test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
@@ -279,6 +282,7 @@ src/app/I18n*                      site
 src/app/IconsUsed.h                ui
 src/app/Panel*Cloth*               cloth
 src/app/PanelDrape*                cloth
+src/app/BooleanPreview*            mesh
 src/app/PanelGarment*              cloth
 src/app/PanelAi*                   ai
 src/app/PanelConnectAi*            ai
@@ -377,6 +381,9 @@ src/core/GeneratedRemesh*          mesh
 src/core/Dyntopo*                  mesh
 src/core/Decimate*                 mesh
 src/core/Cut*                      mesh
+src/core/Arrangement*              mesh
+src/core/MeshBoolean*              mesh
+src/core/PartBoolean*              mesh
 src/core/CloseHoles*               mesh
 src/core/Tube*                     mesh
 src/core/Parts*                    mesh
@@ -445,6 +452,9 @@ ui_first_sculpt
 ui_idle_redraw
 ui_undo_session
 ui_parts_files
-ui_mode_matrix
+ui_mode_matrix_0of4
+ui_mode_matrix_1of4
+ui_mode_matrix_2of4
+ui_mode_matrix_3of4
 ui_monkey
 release_smoke

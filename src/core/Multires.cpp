@@ -1385,6 +1385,31 @@ void remapPaint(Mesh& m, const Mesh& w) {
     m.activePaintLayer = w.activePaintLayer;
 }
 
+// Copies a change of one per-vertex array from the current level `c` down to the parent vertices of every lower
+// level (`changed` = the vertices of `w` that changed).
+template <class T, class Get>
+void spreadVertexDown(MultiresStack& s, int c, const std::vector<T>& w, const std::vector<uint8_t>& changed, T fill, Get get) {
+    std::vector<uint8_t> flags = changed, next;
+    const std::vector<T>* fine = &w;
+    for (int j = c; j >= 1; --j) {
+        std::vector<T>& coarse = get(mutableData(s.levels[size_t(j) - 1]));
+        const bool fresh = coarse.empty();
+        restrictVertices(*s.levels[size_t(j)].topo, *fine, coarse, fill, fresh ? nullptr : &flags, next);
+        flags.swap(next);
+        fine = &coarse;
+    }
+}
+
+// Which vertices of `w` differ from the old current level's `r` (everything but `fill` when `r` doesn't fit).
+template <class T>
+bool changedVertices(const std::vector<T>& w, const std::vector<T>& r, T fill, std::vector<uint8_t>& changed) {
+    changed.assign(w.size(), 0);
+    bool any = false;
+    for (size_t v = 0; v < w.size(); ++v)
+        if (r.size() != w.size() ? !(w[v] == fill) : !(w[v] == r[v])) changed[v] = 1, any = true;
+    return any || r.size() != w.size();
+}
+
 // Spreads a change of one per-vertex array from the current level `c` to every other level: copied down to
 // the parent vertices, interpolated up where it changed. `get` picks the array from a level.
 template <class T, class Get>
@@ -1396,26 +1421,117 @@ void spreadVertexArray(MultiresStack& s, int c, const std::vector<T>& w, const s
             if (j != c) std::vector<T>().swap(get(mutableData(s.levels[size_t(j)])));
         return;
     }
-    std::vector<uint8_t> changed(w.size(), 0);
-    bool any = false;
-    for (size_t v = 0; v < w.size(); ++v)
-        if (r.size() != w.size() ? !(w[v] == fill) : !(w[v] == r[v])) changed[v] = 1, any = true;
-    if (!any && r.size() == w.size()) return;
+    std::vector<uint8_t> changed;
+    if (!changedVertices(w, r, fill, changed)) return;
+    spreadVertexDown(s, c, w, changed, fill, get);
     std::vector<uint8_t> flags = changed, next;
-    const std::vector<T>* fine = &w;
-    for (int j = c; j >= 1; --j) {
-        std::vector<T>& coarse = get(mutableData(s.levels[size_t(j) - 1]));
-        const bool fresh = coarse.empty();
-        restrictVertices(*s.levels[size_t(j)].topo, *fine, coarse, fill, fresh ? nullptr : &flags, next);
-        flags.swap(next);
-        fine = &coarse;
-    }
-    flags = changed;
     const std::vector<T>* coarse = &w;
     for (int j = c + 1; j < n; ++j) {
         std::vector<T>& f = get(mutableData(s.levels[size_t(j)]));
         prolongVertices(*s.levels[size_t(j)].topo, *coarse, f, fill, &flags, next);
         flags.swap(next);
+        coarse = &f;
+    }
+}
+
+// Colours (vertex paint, the paint base) go up as a delta: what was added at the current level (new - old) is
+// interpolated to the levels above and added to the colour they already hold, so detail painted at a high level,
+// then a stroke at a low one, keeps the detail under the blended stroke instead of being overwritten by the
+// interpolated low-level colour. A level with no colours of its own gets the interpolated colour.
+void spreadColorDelta(MultiresStack& s, int c, const std::vector<glm::vec3>& w, const std::vector<glm::vec3>& r,
+                      std::vector<glm::vec3>& (*get)(Mesh&)) {
+    const int n = int(s.levels.size());
+    const glm::vec3 white(1.0f);
+    if (w.empty() && r.empty()) return;
+    if (w.empty() || r.size() != w.size()) {
+        spreadVertexArray(s, c, w, r, white, get);
+        return;
+    }
+    std::vector<uint8_t> changed;
+    if (!changedVertices(w, r, white, changed)) return;
+    spreadVertexDown(s, c, w, changed, white, get);
+    std::vector<glm::vec3> delta(w.size()), fineDelta;
+    for (size_t v = 0; v < w.size(); ++v)
+        if (changed[v]) delta[v] = w[v] - r[v];
+    std::vector<uint8_t> flags = changed, next, reached;
+    const std::vector<glm::vec3>* coarse = &w; // the level below's colours, as they are now
+    for (int j = c + 1; j < n; ++j) {
+        const SubdivTopology& tp = *s.levels[size_t(j)].topo;
+        std::vector<glm::vec3>& f = get(mutableData(s.levels[size_t(j)]));
+        fineDelta.assign(tp.fineVertices, glm::vec3(0.0f));
+        prolongVertices(tp, delta, fineDelta, glm::vec3(0.0f), &flags, reached);
+        if (f.size() != tp.fineVertices) {
+            // No colours stored here yet: interpolate the level below's.
+            prolongVertices(tp, *coarse, f, white, nullptr, next);
+        } else {
+            for (uint32_t v = 0; v < tp.fineVertices; ++v)
+                if (reached[v]) f[v] = glm::clamp(f[v] + fineDelta[v], 0.0f, 1.0f);
+            next = reached;
+        }
+        flags.swap(next);
+        delta.swap(fineDelta);
+        coarse = &f;
+    }
+}
+
+// Paint layers go up as a delta too, on coverage and on colour * coverage (the premultiplied colour, as the
+// layers are interpolated), so a stroke at a low level adds to the coverage and colour painted higher up.
+void spreadLayerDelta(MultiresStack& s, int c, size_t layer, const PaintLayer& w, const PaintLayer& r) {
+    const int n = int(s.levels.size());
+    const size_t nv = w.alpha.size();
+    if (w.color.size() != nv || r.alpha.size() != nv || r.color.size() != nv || nv == 0) {
+        spreadVertexArray(s, c, w.color, r.color, glm::vec3(1.0f),
+                          [layer](Mesh& m) -> std::vector<glm::vec3>& { return m.paintLayers[layer].color; });
+        spreadVertexArray(s, c, w.alpha, r.alpha, 0.0f,
+                          [layer](Mesh& m) -> std::vector<float>& { return m.paintLayers[layer].alpha; });
+        return;
+    }
+    std::vector<uint8_t> changed(nv, 0);
+    bool any = false;
+    for (size_t v = 0; v < nv; ++v)
+        if (!(w.alpha[v] == r.alpha[v]) || !(w.color[v] == r.color[v])) changed[v] = 1, any = true;
+    if (!any) return;
+    auto colorOf = [layer](Mesh& m) -> std::vector<glm::vec3>& { return m.paintLayers[layer].color; };
+    auto alphaOf = [layer](Mesh& m) -> std::vector<float>& { return m.paintLayers[layer].alpha; };
+    spreadVertexDown(s, c, w.color, changed, glm::vec3(1.0f), colorOf);
+    spreadVertexDown(s, c, w.alpha, changed, 0.0f, alphaOf);
+    std::vector<float> dAlpha(nv, 0.0f), fdAlpha;
+    std::vector<glm::vec3> dPre(nv, glm::vec3(0.0f)), fdPre;
+    for (size_t v = 0; v < nv; ++v)
+        if (changed[v]) {
+            dAlpha[v] = w.alpha[v] - r.alpha[v];
+            dPre[v] = w.color[v] * w.alpha[v] - r.color[v] * r.alpha[v];
+        }
+    std::vector<uint8_t> flags = changed, next, reached, reached2;
+    const PaintLayer* coarse = &w;
+    for (int j = c + 1; j < n; ++j) {
+        const SubdivTopology& tp = *s.levels[size_t(j)].topo;
+        PaintLayer& f = mutableData(s.levels[size_t(j)]).paintLayers[layer];
+        fdAlpha.assign(tp.fineVertices, 0.0f);
+        fdPre.assign(tp.fineVertices, glm::vec3(0.0f));
+        prolongVertices(tp, dAlpha, fdAlpha, 0.0f, &flags, reached);
+        prolongVertices(tp, dPre, fdPre, glm::vec3(0.0f), &flags, reached2);
+        if (f.alpha.size() != tp.fineVertices || f.color.size() != tp.fineVertices) {
+            PaintLayer nl;
+            nl.alpha = f.alpha;
+            nl.color = f.color;
+            prolongPaintLayer(tp, *coarse, nl, nullptr);
+            f.alpha = std::move(nl.alpha);
+            f.color = std::move(nl.color);
+            next.assign(tp.fineVertices, 1);
+        } else {
+            for (uint32_t v = 0; v < tp.fineVertices; ++v) {
+                if (!reached[v]) continue;
+                const float a = glm::clamp(f.alpha[v] + fdAlpha[v], 0.0f, 1.0f);
+                const glm::vec3 pre = glm::max(f.color[v] * f.alpha[v] + fdPre[v], glm::vec3(0.0f));
+                f.alpha[v] = a;
+                f.color[v] = a > 0.0f ? glm::min(pre / a, glm::vec3(1.0f)) : glm::vec3(1.0f);
+            }
+            next = reached;
+        }
+        flags.swap(next);
+        dAlpha.swap(fdAlpha);
+        dPre.swap(fdPre);
         coarse = &f;
     }
 }
@@ -1798,15 +1914,11 @@ bool subdivCommit(Mesh& w) {
     spreadShape(s, c, w, *r);
     spreadVertexArray(s, c, w.mask, r->mask, 0.0f, [](Mesh& m) -> std::vector<float>& { return m.mask; });
     if (w.paintLayers.empty()) {
-        spreadVertexArray(s, c, w.colors, r->colors, glm::vec3(1.0f), [](Mesh& m) -> std::vector<glm::vec3>& { return m.colors; });
+        spreadColorDelta(s, c, w.colors, r->colors, [](Mesh& m) -> std::vector<glm::vec3>& { return m.colors; });
     } else {
-        spreadVertexArray(s, c, w.paintBase, r->paintBase, glm::vec3(1.0f),
-                          [](Mesh& m) -> std::vector<glm::vec3>& { return m.paintBase; });
+        spreadColorDelta(s, c, w.paintBase, r->paintBase, [](Mesh& m) -> std::vector<glm::vec3>& { return m.paintBase; });
         for (size_t i = 0; i < w.paintLayers.size(); ++i) {
-            spreadVertexArray(s, c, w.paintLayers[i].color, r->paintLayers[i].color, glm::vec3(1.0f),
-                              [i](Mesh& m) -> std::vector<glm::vec3>& { return m.paintLayers[i].color; });
-            spreadVertexArray(s, c, w.paintLayers[i].alpha, r->paintLayers[i].alpha, 0.0f,
-                              [i](Mesh& m) -> std::vector<float>& { return m.paintLayers[i].alpha; });
+            spreadLayerDelta(s, c, i, w.paintLayers[i], r->paintLayers[i]);
         }
         for (int j = 0; j < n; ++j)
             if (j != c && hasPaintLayers(*s.levels[size_t(j)].data)) compositePaintAll(mutableData(s.levels[size_t(j)]));

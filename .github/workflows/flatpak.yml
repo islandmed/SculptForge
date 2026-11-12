@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+      - run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y flatpak flatpak-builder xvfb
       - name: Build the bundle
         run: packaging/flatpak/build.sh dist
       - name: Install it and run UI tests inside the sandbox (Xvfb, Mesa from the runtime)

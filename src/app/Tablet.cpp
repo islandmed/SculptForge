@@ -146,6 +146,9 @@ bool App::strayMouseMotion(const SDL_Event& e) const {
                       e.button.which != SDL_PEN_MOUSEID && e.button.button == SDL_BUTTON_LEFT;
     if (!motion && !left) return false;
     if (dragFromPen_ && drag_ != Drag::None) return true;
+    // A drag the mouse began (its press got through: the pen had been still for 0.1 s) is the mouse's to the end, so a
+    // fast flick right after a pen stroke keeps every sample of its path, not only the press and the release (#195).
+    if (drag_ != Drag::None) return false;
     if (left) return penInProximity_ && (penTouching_ || clickClockNs() - lastPenTouchNs_ < 100000000ull);
     return penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
 }

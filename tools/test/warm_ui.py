@@ -37,7 +37,7 @@ import time
 import uuid
 
 # Seconds a script may take: ctest gives a ui test 300; a test with its own ctest TIMEOUT sets SF_UI_TIMEOUT a little
-# under it (ui_mode_matrix: 1200, 3-10 min on a loaded CI runner).
+# under it (ui_mode_matrix_*: 600, its four shards 1-3 min each on a loaded CI runner).
 TIMEOUT = int(os.environ.get("SF_UI_TIMEOUT", "290"))
 IDLE_EXIT = 900  # a pool nobody used for this long stops (a ctest run that never reached the cleanup)
 # A server used to grow by ~50 MB per script it ran (7-8 GB after ~150 on the 4-core runner: two of them ran its 16 GB out, and

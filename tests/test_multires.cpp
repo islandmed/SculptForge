@@ -12,6 +12,8 @@
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Parts.h"
+#include "core/PaintLayer.h"
+#include "core/VertexPaint.h"
 #include "io/ObjIO.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -307,6 +309,133 @@ TEST(multires_attributes_follow_levels) {
     CHECK(run(c, "subdiv_level", {{"level", 3.0}}).ok);
     CHECK(c.mesh.colors[0] == glm::vec3(1, 0, 0));
     CHECK(c.mesh.colors[5] == glm::vec3(0, 0, 1));
+}
+
+// Fine red dots at the top level (the vertices the lower levels don't have), then a low-opacity stroke of green at
+// the lowest level, then back up: the red stays, with the stroke added on top (#bug-reports, @masterfull95).
+TEST(multires_low_level_paint_blends_into_the_detail_above) {
+    const glm::vec3 red(1, 0, 0), green(0, 1, 0);
+    Document d = dividedCube(2);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    const size_t nv0 = d.mesh.vertexCount();
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    CHECK(d.mesh.vertexCount() > nv0 * 4);
+    d.mesh.ensureColors();
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) d.mesh.colors[v] = red;
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    CHECK(d.mesh.vertexCount() == nv0);
+    d.mesh.ensureColors();
+    const uint32_t v0 = 0;
+    CHECK(d.mesh.colors[v0] == glm::vec3(1.0f)); // the red dots are not on this level
+    d.mesh.colors[v0] = glm::mix(d.mesh.colors[v0], green, 0.3f);
+    const glm::vec3 low = d.mesh.colors[v0];
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    CHECK(d.mesh.colors[v0] == low);
+    size_t kept = 0, blended = 0;
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) {
+        const glm::vec3 c = d.mesh.colors[v];
+        CHECK(c.y == 0.0f && c.z == 0.0f); // no green leaked into the red dots
+        kept += c == red;
+        blended += c.x < 1.0f; // near the stroke: the red is darker by the blended amount
+    }
+    CHECK(blended > 0 && kept > blended); // only the neighbourhood of the stroke changed
+    CHECK(d.mesh.colors.size() == d.mesh.vertexCount());
+    // A second round trip with no edit changes nothing, bit for bit.
+    const std::vector<glm::vec3> top = d.mesh.colors;
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    CHECK(d.mesh.colors == top);
+}
+
+TEST(multires_low_level_paint_layer_blends_into_the_detail_above) {
+    const glm::vec3 red(1, 0, 0), green(0, 1, 0);
+    Document d = dividedCube(2);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    const size_t nv0 = d.mesh.vertexCount();
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    addPaintLayer(d.mesh, "Detail");
+    PaintLayer& top = d.mesh.paintLayers[size_t(d.mesh.activePaintLayer)];
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) top.color[v] = red, top.alpha[v] = 1.0f;
+    compositePaintAll(d.mesh);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    PaintLayer& low = d.mesh.paintLayers[size_t(d.mesh.activePaintLayer)];
+    CHECK(low.alpha[0] == 0.0f);
+    low.color[0] = green;
+    low.alpha[0] = 0.3f;
+    compositePaintAll(d.mesh);
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    const PaintLayer& up = d.mesh.paintLayers[size_t(d.mesh.activePaintLayer)];
+    CHECK(up.alpha[0] == 0.3f && up.color[0] == green);
+    size_t red_kept = 0;
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) {
+        CHECK(up.alpha[v] >= 1.0f - 1e-6f); // the dots keep their full coverage
+        red_kept += up.color[v].x > 0.99f || up.color[v].y > 0.0f; // red, or red with the green stroke mixed in
+    }
+    CHECK(red_kept == d.mesh.vertexCount() - nv0);
+    CHECK(d.mesh.colors.size() == d.mesh.vertexCount());
+}
+
+TEST(multires_paint_strokes_undo_across_levels_and_remesh_keeps_the_colour) {
+    const glm::vec3 tone(0.8f, 0.4f, 0.4f); // inside the colour range, so the blended delta can be taken back exactly
+    auto near = [](const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) { return maxDistance(a, b) < 1e-5f; };
+    Document d = dividedCube(2);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    const size_t nv0 = d.mesh.vertexCount();
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    d.mesh.ensureColors();
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) d.mesh.colors[v] = tone;
+    const std::vector<glm::vec3> topTone = d.mesh.colors;
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    const std::vector<glm::vec3> lowWhite = d.mesh.colors;
+    // A real Paint stroke at the lowest level (undoable).
+    auto lowStroke = [&] {
+        const glm::vec3 centre = d.mesh.positions[0];
+        DabParams dab;
+        dab.center = centre;
+        dab.viewDir = -glm::normalize(centre);
+        dab.radius = 0.4f;
+        dab.strength = 0.3f;
+        CHECK(d.sculptor.beginStroke(d.mesh, "Paint"));
+        CHECK(paintDab(d.sculptor, d.mesh, d.bvh, dab, glm::vec3(0, 1, 0), Symmetry{}) > 0);
+        d.undo.push(d.sculptor.endStroke());
+    };
+    // Stroke, undo it at once: going up gives the detail back untouched.
+    lowStroke();
+    CHECK(d.mesh.colors != lowWhite);
+    CHECK(d.undo.undo(d.mesh, d.bvh));
+    CHECK(d.mesh.colors == lowWhite);
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    CHECK(d.mesh.colors == topTone);
+    CHECK(run(d, "subdiv_level", {{"level", 1.0}}).ok);
+    // Stroke again, go up: detail kept, stroke blended in.
+    lowStroke();
+    const std::vector<glm::vec3> painted = d.mesh.colors;
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    const std::vector<glm::vec3> topPainted = d.mesh.colors;
+    CHECK(topPainted != topTone);
+    for (size_t v = nv0; v < d.mesh.vertexCount(); ++v) CHECK(std::abs(topPainted[v].y - tone.y) < 1e-6f); // no green in the dots
+    // Undo the step up, then the stroke: the low level is unpainted, and stepping up again gives the detail back.
+    CHECK(run(d, "undo").ok);
+    CHECK(subdivCurrentLevel(d.mesh) == 0);
+    CHECK(d.mesh.colors == painted);
+    CHECK(run(d, "undo").ok);
+    CHECK(d.mesh.colors == lowWhite);
+    // Redo both: the same painted level and the same blended top.
+    CHECK(run(d, "redo").ok);
+    CHECK(d.mesh.colors == painted);
+    CHECK(run(d, "redo").ok);
+    CHECK(near(d.mesh.colors, topPainted));
+    CHECK(run(d, "undo").ok);
+    CHECK(run(d, "undo").ok);
+    CHECK(run(d, "subdiv_level", {{"level", 3.0}}).ok);
+    CHECK(near(d.mesh.colors, topTone));
+    // Voxel Remesh at this level carries the colour over (the levels are dropped, the current one is kept).
+    CHECK(run(d, "remesh", {{"resolution", 64.0}}).ok);
+    CHECK(subdivLevelCount(d.mesh) == 0);
+    CHECK(d.mesh.colors.size() == d.mesh.vertexCount());
+    size_t toned = 0;
+    for (const glm::vec3& c : d.mesh.colors) toned += glm::distance(c, tone) < 1e-4f;
+    CHECK(toned > 0);
 }
 
 TEST(multires_sculpt_layers_work_at_every_level) {

@@ -1,13 +1,11 @@
 {
-  "version": "0.12.5",
+  "version": "0.12.8",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Rgb lays colour on Sub strokes too, for every brush and stroke type",
-    "Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)",
-    "Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)",
-    "Thread counts above 16 set in Preferences > Performance apply at the next start (#184)",
-    "A startup splash shows the bust and version while SculptForge starts"
+    "Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)",
+    "Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)",
+    "Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)"
   ],
   "support": {
     "founding": {

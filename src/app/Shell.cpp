@@ -168,6 +168,15 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         curve(w * 0.9f, hi, w * 0.5f);
         break;
     case BrushType::Smooth: dl->AddCircleFilled(ImVec2(c.x - r * 0.2f, c.y - r * 0.2f), r * 0.35f, IM_COL32(255, 240, 230, 40), 24); break;
+    case BrushType::SmoothPeaks: { // the waves with their crests cut off flat: the hollows stay
+        ImVec2 pts[12];
+        for (int i = 0; i < 12; ++i) {
+            const float u = float(i) / 11.0f;
+            pts[i] = ImVec2(c.x - r * 0.62f + r * 1.24f * u, c.y + std::max(std::sin(u * 6.28f) * r * 0.16f, -r * 0.06f));
+        }
+        dl->AddPolyline(pts, 12, hi, 0, w);
+        break;
+    }
     case BrushType::Move:
     case BrushType::SnakeHook:
     case BrushType::Nudge: {
@@ -391,6 +400,20 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
+    // The Shift / Ctrl brush (Shift+click / Ctrl+click a tile, ModifierBrush.cpp): a small badge in the top right.
+    if (type >= 0 && app.fontTiny_) {
+        float y = p0.y + 1.0f * s;
+        for (ModifierSlot slot : {ModifierSlot::Shift, ModifierSlot::Ctrl}) {
+            if (app.modifierBrushes().brush(slot) != type) continue;
+            ImFont* f = app.fontTiny_;
+            const char* text = modifierSlotName(slot);
+            const ImVec2 ts = f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, text);
+            const ImVec2 b1(p1.x - 1.0f * s, y + ts.y + 1.0f * s), b0(b1.x - ts.x - 4.0f * s, y);
+            dl->AddRectFilled(b0, b1, theme::u32(theme::accent, alpha), theme::rounding(3.0f * s));
+            dl->AddText(f, f->FontSize, ImVec2(b0.x + 2.0f * s, b0.y + 0.5f * s), theme::u32(theme::textOnAccent, alpha), text);
+            y = b1.y + 1.0f * s;
+        }
+    }
     if (leftShelf) {
         if (!fitCaption(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha), label) &&
             hovered)
@@ -448,6 +471,7 @@ void App::registerShellActions() {
         "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
         "Target); Alt pushes away. Works at any subdivision level.",
         "Moves the surface like fabric: drag it and it folds where it bunches up. Mode and fabric in Brush > Cloth.",
+        "Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {
@@ -985,7 +1009,7 @@ void App::updateCameraAspect() {
     camera_.aspect = c.w / std::max(c.h, 1.0f);
 }
 
-// The one-time "Layout changed - ... Save Layout keeps it" hint comes from watchLayoutChanges (Config.cpp),
+// The one-time "Layout changes save themselves - ..." hint comes from watchLayoutChanges (Config.cpp),
 // which compares the layout with the stored one; shell edits only need to change layout_.
 void App::noteLayoutChanged() {}
 
@@ -1000,6 +1024,7 @@ void App::applyPreset(int preset) {
     l.libraryTab = layout_.libraryTab;
     l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
+    l.myPanel = layout_.myPanel; // what you built is not a preset's to change
     static const char* const kNames[] = {"Standard", "Sculpt", "Wide"};
     if (preset == 1) {
         l.leftTrayOpen = l.rightTrayOpen = false;
@@ -1011,7 +1036,7 @@ void App::applyPreset(int preset) {
     layout_ = std::move(l);
     collapsedPalettes_.clear();
     dropdown_.clear();
-    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
+    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)]; // (the layout saves itself)
     lastCommandOk_ = true;
 }
 
@@ -1064,6 +1089,7 @@ void App::drawCanvasFrame() {
 
 void App::drawShell() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    applyPendingLayoutOp(); // (Revert / Reset / Import asked last frame)
     if (lookDirty_) { // Preferences > Interface > Look changed: applied here, outside any pushed style
         lookDirty_ = false;
         applyLook();
@@ -1110,6 +1136,7 @@ void App::drawShell() {
     if (sculptForgeLayout()) drawTaskMenu();
     else drawPaletteDropdown();
     finishShelfDrag();
+    finishMyPanelDrag();
 }
 
 void App::drawTitleStrip(const ShellGeometry& g) {
@@ -1391,6 +1418,9 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     int help = -1;
     for (int i = 0; i < count; ++i) {
         if (!uiPrefs_.alphabeticalPalettes && std::string_view(list[i].id) == "help") help = i; // last, as usual
+        else if (std::string_view(list[i].id) == "mypanel" && layout_.myPanel.empty() && !paletteInShownTray("mypanel") &&
+                 dropdown_ != "mypanel")
+            continue; // (empty and not in use: off the bar, which is full on a tablet; Edit > My Panel opens it)
         else if (std::find(order.begin(), order.end(), i) == order.end()) order.push_back(i);
     }
     if (help >= 0) order.push_back(help);
@@ -3040,6 +3070,13 @@ void App::freezeLevelsAndDynamic() {
 
 void App::setMaskDarkness(float k) { uiPrefs_.maskDarkness = renderSettings_.maskDarkness = std::clamp(k, 0.0f, 1.0f); }
 
+void App::setMaskColor(bool custom, const glm::vec3& srgb) {
+    uiPrefs_.maskColorCustom = custom;
+    uiPrefs_.maskColor = glm::clamp(srgb, 0.0f, 1.0f);
+    renderSettings_.maskColorCustom = custom;
+    renderSettings_.maskColor = srgbToLinear(uiPrefs_.maskColor); // (the shader blends in linear light)
+}
+
 void App::confirmLevelDelete(const std::string& command) {
     pendingLevelDelete_ = command;
     openLevelDelete_ = true;
@@ -3234,7 +3271,8 @@ void App::finishShelfDrag() {
                      : shelfDrag_.shelf == kShelfRight ? layout_.rightShelf
                                                        : layout_.bottomShelf;
         if (shelfDrag_.index >= 0 && shelfDrag_.index < int(list.size())) {
-            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf";
+            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf" +
+                      (list[size_t(shelfDrag_.index)].rfind("widget.", 0) == 0 ? " - Preferences > Saving & Layouts puts it back" : "");
             list.erase(list.begin() + shelfDrag_.index);
             noteLayoutChanged();
         }
@@ -3328,6 +3366,22 @@ void App::drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon
 
 void App::drawBrushTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
+    // A Ctrl brush (Ctrl+click on a shelf brush, ModifierBrush.cpp) shows while Ctrl is held; a click opens the mask
+    // brushes, and picking one makes Ctrl mask again.
+    if (heldBrush() == HeldBrush::Mask && heldSlot() == ModifierSlot::Ctrl) {
+        const int ctrlBrush = uiPrefs_.modifierBrushes.ctrl;
+        ImVec2 a, b;
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, brushLabel(BrushType(ctrlBrush)), s, a, b);
+        if (ImTextureID tex = thumbs_.brush(ctrlBrush)) {
+            squareIn(a, b, 2.0f * s);
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
+        }
+        if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
+        ui::HelpText("Brush", "B", "Ctrl held: the Ctrl brush (Ctrl+click a brush on the bottom shelf sets it). Click to pick "
+                     "a mask brush instead, and Ctrl masks again.", "Left shelf");
+        return;
+    }
     // Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;

@@ -6,6 +6,188 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.8] - 2026-11-11
+
+### Added
+- **Two-key shortcuts** (Preferences > Hotkeys, the >> button beside an action's key): press one key, then a different
+  one within half a second (A then S). Added to the action's other keys; the same key twice is refused; a sequence
+  another action uses asks first (Replace / Cancel); Backspace in that box removes only the two-key shortcuts. A first
+  key that is bound on its own still works: it waits half a second and runs by itself when no second key follows.
+  Requested by Artizmo on Discord.
+- **Reference images** (View > Reference images; idea by Oslen on Discord): add one or more PNG or JPEG images (or
+  drop them on the window while the section shows). Each sits **Behind the model** (fixed to the view) or **In the
+  scene** (a plane at the front, side or top that turns with the view and fades out edge-on), with opacity, flips,
+  lock and hide; **Adjust** moves it and scales it from its corners (Shift keeps its proportions). **Front + side...**
+  makes a front and a side plane from two files in one click. They never take strokes or picks and are left out of
+  renders, exports, thumbnails and the timelapse unless **Show in renders** is on. Projects keep them, embedded or by
+  path; images over 4096 px are scaled down, files over 64 MB, 64 megapixels or 8192 px a side refused (read from the
+  header, before decoding), 8 per project. An image a project names by path opens linked, with Embed off, so saving
+  never copies a file from your computer into it unless you tick Embed. Scriptable: `reference_add`, `reference_set`,
+  `reference_remove`, `reference_pair`.
+
+### Fixed
+- **App would not start on some Linux NVIDIA drivers** (0.12.5 regression): most likely the start-up splash left its
+  own OpenGL context current, so the main shaders compiled in the wrong context ("Shader compile error" with garbage
+  text, thanks @dCo3lh0 (#192)). The main context is made current again after every splash step, the splash draws a
+  plain software surface, and a start-up shader error now says "no current OpenGL context" or "(empty driver log)"
+  instead of random bytes.
+- **A fast mouse or trackpad stroke right after a pen stroke** laid only 2 dabs (a mark at each end instead of a line,
+  #195): while the pen is in range the mouse's motion is ignored, because some tablet drivers send stray mouse events
+  beside the pen's, and that also swallowed a stroke the mouse had started. A stroke the mouse began now keeps all of
+  its motion.
+
+## [0.12.7] - 2026-11-11
+
+### Added
+- "**Alpha pool and jitter** (Sculpt > Alpha): **Scale jitter** and **Position jitter** per dab, kept per brush, and
+  an alpha pool (`brush_alpha_pool`): a Library folder of images or a few picked alphas, one drawn at random for each
+  dab or Drag Stamp, repeatable per stroke. Three procedural wood-grain alphas (Procedural Wood Straight, Cathedral,
+  Weathered) are named as procedural, not scans. Each stroke now starts its Angle jitter from its own seed, so two
+  strokes no longer jitter identically. Thanks Hameron."
+- **Gaussian splats in the Blender bridge** (Blender 5.3+, which draws and imports splats but cannot export them):
+  **Send to SculptForge** sends a selected splat object as a standard 3DGS PLY with its transform; **File > Blender >
+  Send to Blender** sends the loaded splats back and updates the same object in place. Positions, scales, rotations,
+  opacity and spherical harmonics (up to degree 3) are kept, nothing is baked. The add-on also adds **File > Export >
+  Gaussian Splats (.ply)** and a drop handler for `.splat` files; older Blender versions get a message and the mesh
+  bridge is unchanged. The exchange manifest has an optional `splats` key (older versions skip it). The CI add-on job
+  now also runs bpy 5.3.0.
+- **Crisp Flatten** brush in the Hard Surface pack (thanks _tfx on Discord): the plane is taken where the stroke
+  starts and held for the whole stroke, and the edge is hard with a thin anti-aliased band (about 2.5 polygons wide),
+  so one stroke cuts one flat facet and two meet in a crisp bevel. It cuts what is above the plane and fills only
+  shallow dips, so it never builds a wall past a curving form. Works with symmetry, masks and Dynamic topology. Brush
+  Lab recipes get **Lock plane** (off: the plane follows the surface) and **Crisp edge**, also as `planeLock` /
+  `crispEdge` in .sfbrush files and `brush_create`.
+- **Warnings for more destructive operations** (#173, thanks @TheLycanFenrir): Delete Masked, Remove Hidden, Split,
+  Mirror, Make Symmetric and Merge by Distance rebuild the mesh and drop the subdivision levels, so on a Part with
+  levels they now ask first, like Voxel Remesh, Quad Remesh and Decimate do (Freeze Levels and Proceed / Cancel).
+  Ctrl+Z still brings the levels back, a Part without levels is not asked, and "Keep original" splits don't ask.
+  **Preferences > Interface > Ask before dropping subdivision levels** turns the asking off or back on for all of them
+  (and Subdivide).
+- **Shift and Ctrl brushes**: Shift+click a brush on the bottom shelf (or in the brush picker) to make it the Shift
+  brush, Ctrl+click one on the shelf for the Ctrl brush; the main brush stays. Each keeps its own Intensity, the tile
+  shows a Shift / Ctrl badge and the status line names it. Shift+click Smooth, a mask brush picked with Ctrl held, or
+  **Reset Shift brush** / **Reset Ctrl brush** in the command palette go back; Smooth's alternate smooth (#40),
+  Ctrl+Alt unmask, the background mask rectangle and Ctrl+Shift are unchanged. Kept in the preferences; scriptable
+  with `set_modifier_brush shift=trim ctrl=flatten`. Asked for by Cytrick on Discord.
+- **Orbit around the pointer** (Edit > Preferences > Input, every key style; on for new installs, off for existing
+  settings so their orbit doesn't change): a rotation drag that starts over the model turns the view about the surface
+  point under the pointer instead of the scene centre, without the view jumping; the target moves to that point's
+  depth, so zooming afterwards works there too (auto depth). Started over the background or on the axis gizmo's disc,
+  it turns about the target as before. Turntable, orbit locks and Shift snapping are kept. The point is picked once
+  per drag (thanks dm4nd on Discord).
+- **Booleans between Parts** (Tool > Parts): each Part's **Boolean** (None, Add, Subtract, Intersect) is set from the
+  mark in its row or its right-click menu; the shown Parts with one combine in list order, previewed live in the view
+  (as you sculpt or move them on lighter meshes, on release on heavy ones). **Make Boolean Mesh** writes the result
+  into a new Part, one undo step, with options to weld the seams, keep each source's face groups and give the cut
+  faces a face group of their own. The Boolean is exact (watertight when the Parts are; faces away from the cut, with
+  their face groups, vertex paint and UVs, are kept as they are; flush and coplanar faces handled), with a voxel
+  fallback for Parts that aren't closed (the status line says which it used). Saved in projects. Commands
+  `part_boolean`, `make_boolean_mesh`, `boolean_parts` (scripts, Python, MCP). Requested by foirgairwolf and GABO on
+  Discord.
+- "**My Panel** (Edit > My Panel; Requested by Hameron): hold Alt and drag a button or a section's title from any
+  palette or shelf into a panel of your own; a section keeps all its live controls. It sits in a tray or its own
+  window like any palette, or floats at the cursor on F4 (rebindable; Esc closes it). Alt+drag reorders, dragging an
+  entry out or right-click removes it, and it is saved with the layout."
+- "**Smooth Peaks** brush: smooths like Smooth, but only brings down the vertices that sit above the average of their
+  neighbours (along their normal); valleys are never filled. Works on the mesh and on micro levels, with masks,
+  symmetry and alphas. Shift-smooth still uses the plain Smooth. Requested by ABHITAR."
+- **Strands** (Tool > Tube): Rope and Braid take 1 to 8 strands (3 as before); a rope of one strand is a spring, and
+  Spread opens it. `tube_set` and `tube_new` take `strands`.
+- **Repeat along curve** (Tool > Tube, with a Tube or Curve Part active): pick another Part and its copies are laid
+  end to end along the curve as a new Part, with Spacing (1 end to end, less overlaps them like chain links) and Turn
+  (each copy turned that many degrees more than the one before; 90 for chain links). One undo step; the curve and the
+  Part are kept. New command `tube_repeat`. Requested by Artizmo on Discord.
+- **A leaner Welcome**: about half the words, the 10-minute lesson first with the Quick tour beside it, the same
+  looks, keys, starter meshes and AI On/Off. The privacy line is one sentence ("Your art is never uploaded or used for
+  training.") with Details for the full text. Beside the User Guide, small grey icons for Discord, GitHub, X, Bluesky,
+  Instagram and Facebook (also in the About header): a click opens that page in your browser, and the app makes no
+  request to any of them on its own.
+- Layout autosave (thanks raffaele_3d_design on Discord). `ui.json` keeps the layout in use ("layout") and the Save
+  Layout one ("layoutSaved"); older files read as both. Revert to Saved Layout returns only the layout, not shortcuts
+  or preferences. Reset Layout, `--reset-layout` and Reset Layout and Shortcuts still win, and Revert still returns to
+  the Save Layout one afterwards. The console, Library and Customize Shelves being open are not part of it.
+  `ui.prev.json` and `ui.prev2.json` keep the two copies of `ui.json` from before the last sessions that changed the
+  layout.
+
+### Changed
+- **Braid** strands are now flat ribbons that pass over and under each other instead of three round strands like a
+  rope. A saved braid keeps its stored mesh until the tube is edited, then it is rebuilt in the new look. Requested by
+  Artizmo on Discord.
+- The membership links in the app (Become a member, the yearly Member checkout, Founding Studio) carry a source tag,
+  `client_reference_id=app-card`, so a checkout started in the app is attributed to it. Nothing else is sent; no
+  tracking, no new preferences.
+
+### Fixed
+- Layout edits (Customize Shelves, trays, palettes) were lost on quit, a crash or Revert unless Save Layout was
+  pressed first (reported by raffaele_3d_design on Discord).
+- SpaceMouse (#110, thanks @fenixpoints): a SpaceMouse that SDL listed but could not open (3DxWare held it) was never
+  tried again until it was replugged; SculptForge now retries every 3 seconds. Running alongside 3DxWare and the Wacom
+  conflict are still open.
+- **Threads above 16** (#184, thanks @HG4Science): the saved count was read after the built-in stamps had already
+  started the thread pool at the default 16, so a 48-thread machine kept using 16. The saved count is now read before
+  anything starts the pool.
+- **Undo / Redo of a whole-model step on a very dense mesh (#181).** A step that replaces the mesh (Voxel Remesh and
+  the other tools that remesh) now keeps the old mesh's BVH with it, so undo and redo swap the two instead of building
+  a tree again (0.7 s of a 12M-triangle undo, now 0 ms; the tree isn't counted against the undo byte budget, so it
+  doesn't push the remesh step out of the history). Stroke undo and redo were already O(touched vertices); tests now
+  hold that (time and step size). Undoing a Dynamic Topology stroke no longer builds the tree again either: only the
+  triangles the stroke changed are updated (115 ms to 23-30 ms at 1.3M triangles, and it no longer grows with the
+  whole mesh there). Thanks @TheLycanFenrir and @Devon0209 for the reports.
+
+## [0.12.6] - 2026-11-11
+
+### Added
+- **Garments: drape on the body** (Tool > Garments > Drape on the body, `garment_place`, `garment_drape`): each panel
+  placed by a click on the body (in front of it, facing the view; Turn, Wrap, Gap), saved with the pattern; the sewn
+  pattern simulated live on the visible Parts (rest shape = the flat pattern, seams pulled shut).
+- **Garments: Convert to Part**: the draped garment as the Part "Garment": seams welded, UVs from the flat pattern,
+  the pattern's thickness, one undo step.
+- "**Save Visible Parts As...** (File): saves a new .sfproj with only the visible Parts (their materials, layers,
+  folders and linked copies kept, the cameras and settings too). The open project and its file stay as they are. Parts
+  with streamed detail need Save As for now. Requested by phoenix."
+- **Featured creator** card in the Welcome window: a picture, the video's title and creator, and Watch (opens the
+  browser; no embedded player). The list is `featured.json` beside `latest.json` on the same host, read with the daily
+  update check and kept with its thumbnails in the preferences folder; a different entry each start, the x hides one
+  for good. Watch links go only to https youtube.com, youtu.be and vimeo.com, thumbnails only from sculptforge.app;
+  nothing is shown when the list is empty, the site can't be reached or update checks are off. First featured: askNK.
+- **Reset Layout** (Preferences > Saving & Layouts, command palette): the built-in shelves and trays with every panel
+  back in the main window, shortcuts and preferences kept. `sculptforge --reset-layout` does the same at start. A
+  shelf widget (colour picker, brush tiles, sliders) taken off a shelf is listed there with a Put back button.
+- **Mask colour** (Edit > Preferences > Interface): choose the colour masked areas show in the viewport; **Mask
+  darkness** sets how much of it shows, **Reset** goes back to the default darkening look. Saved in the preferences.
+  Requested by ABHITAR.
+
+### Changed
+- **Startup splash**: the start-up is also checked just before the first frame (a slow first frame or panel restore
+  showed no splash), and once the splash is up it stays at least 0.7 s so it is seen, not flashed. A start that is
+  over within 0.3 s still shows no splash and gets no added wait. `SF_SPLASH=1` (environment variable) shows it on
+  that run whatever the start-up time or the preference, for 0.7 s at least, to see it on a fast computer.
+
+### Fixed
+- **Alt+click to select a Part** (also Triple-click and Alt+Q) often missed thin, small or distant Parts, and a
+  trackpad click that moved 4 points began a stroke instead. The pick now takes a Part within 8 points of the pointer
+  when it is in front of the Part being sculpted, and a click may move 6 points (reported by phoenix on macOS).
+- **Drape**: cloth resting on a faceted body no longer creeps sideways
+- **Drape** on a figure modelled in centimetres or millimetres (the Full Body starter, most scans): the Units per
+  metre slider now starts from the size of the scene (centimetres above 20 units tall, millimetres above 600) instead
+  of 1, so the cloth falls and folds at a real-world speed instead of as if the figure were 100 times its size. Move
+  the slider to set it yourself; the `cloth_drape` command still defaults to 1.
+- A project whose Part list is empty no longer fails with "Project has no valid Part list"; it opens as an empty scene
+  (settings, lights, cameras, views and shelves load) and saves back the same.
+- The guide's 3D printing section pointed to File > Bridge > Export STL; Export STL is under **File > Export**.
+- **Pan and zoom keys did nothing** (0.12.5: the keys' glide ran in the test runner's frame loop only, never in the
+  app's own; reported by Artizmo on Discord). A tap now moves the view about a tenth of a second's worth, a hold
+  glides, on the default and on rebound keys. Tests: `ui_key_nav_loop` drives the app's real loop
+  (`--measure-key-nav`), `ui_key_nav` the rest.
+- Revert to Saved Layout, Reset Layout and Import Interface run between frames instead of inside the palette that
+  asked, so they can no longer swap the layout under it (reported by phoenix and raffaele_3d_design on macOS,
+  Discord). Unsaved work is autosaved first; the first autosave of a session keeps the previous session's as
+  `autosave.prev.sfproj` (Library > QuickSave), and the Restore prompt offers it.
+- **Vertex paint lost on a subdivision round trip**: fine colour painted at the highest level was overwritten with the
+  interpolated low-level colour after painting at a lower level and stepping back up. A low-level stroke now goes up
+  as a blended delta added to the colour the higher levels already hold (vertex paint, Base and paint layers). Undo
+  across levels and Voxel Remesh colour transfer are covered by tests. Reported by masterfull95 on Discord.
+
 ## [0.12.5] - 2026-11-10
 
 ### Added

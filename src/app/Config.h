@@ -10,6 +10,7 @@
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
 #include "core/Json.h"
+#include "core/ModifierBrush.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
@@ -55,6 +56,7 @@ struct UiPrefs {
     std::string brushSort = "az", alphaSort = "az", materialSort = "az", librarySort = "az";
     std::string brushSet; // the brush set last switched to (#143): its shelf comes back at the next start; "" = none
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu (#22)
+    ModifierBrushes modifierBrushes; // the Shift and Ctrl brushes (Shift+click / Ctrl+click a shelf brush)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
     // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
@@ -67,6 +69,10 @@ struct UiPrefs {
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
     // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
     bool wheelZoomToPointer = false;
+    // Rotation drags that start over the model turn the view about the surface point under the pointer (and move the
+    // target to its depth); over the background, about the target as before. Every input style. On for new installs;
+    // a ui.json saved before it existed reads as off, so existing users keep the orbit they know.
+    bool orbitAtPointer = true;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;
@@ -110,9 +116,13 @@ struct UiPrefs {
     bool floorGrid = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
-    // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
+    // Preferences > Interface > Mask darkness (and Tool > Masking): how strongly masked areas show, 0-1
     // (RenderSettings::maskDarkness).
     float maskDarkness = 0.7f;
+    // Preferences > Interface > Mask colour: maskColorCustom off = the darkening look; on = masked areas blend towards
+    // maskColor (display values, sRGB) by the same amount (the opacity above).
+    bool maskColorCustom = false;
+    glm::vec3 maskColor{0.20f, 0.22f, 0.30f};
     bool confirmRemeshLevels = true; // Voxel/Quad Remesh and Decimate ask first on a Part with levels (#173)
     bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons

@@ -5,7 +5,7 @@
 // Catmull-Rom through control points, each with its own radius) and a tube is swept along it: rings placed
 // adaptively (closer where the curve bends), oriented by rotation-minimizing frames (double reflection), so the
 // tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
-// the ends are round or flat. Rope and Braid are three strands round the curve, Sleeve is hollow with open ends; Twist
+// the ends are round or flat. Rope and Braid are strands (three by default) round the curve (a rope of one strand is a spring), Sleeve is hollow with open ends; Twist
 // and Spin turn the cross-section along the length. A Curve Part is the same data swept as a thin wire (only the guide
 // line): Resample sets its point count exactly, and Tube from curve makes it a tube. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
@@ -27,6 +27,7 @@ struct CommandResult;
 
 constexpr size_t kTubeMaxPoints = 2000;      // control points per tube
 constexpr size_t kTubeStrokePoints = 500;    // a drawn stroke is simplified to at most this many
+constexpr int kTubeMaxStrands = 8;           // rope / braid strands
 constexpr uint32_t kTubeBodyGroup = 1;       // face groups: the body, the start cap, the end cap
 constexpr uint32_t kTubeStartCapGroup = 2;   // (the mirror copy adds 3)
 constexpr uint32_t kTubeEndCapGroup = 3;
@@ -94,6 +95,14 @@ bool tubeMatchesMesh(const Mesh& mesh);
 // Replaces the active Tube Part's curve (one undo step labelled `label`).
 CommandResult tubeEdit(Document& doc, TubeShape shape, const std::string& label);
 
+// Repeats the Part `source` along the active Tube or Curve Part's curve as a new Part (one undo step): its longest side
+// lies along the curve, each copy turned `turn` degrees more than the one before about the curve (90: chain links).
+// `spacing`: how far apart the copies' centres are, in lengths of the piece (1: end to end, 0.8: overlapping like
+// chain links); adjusted a little so the copies fill the whole curve. `scale`: the size of the copies.
+constexpr float kRepeatSpacingMin = 0.1f, kRepeatSpacingMax = 4.0f;
+constexpr size_t kRepeatMaxCopies = 5000, kRepeatMaxTriangles = 4000000;
+CommandResult tubeRepeat(Document& doc, int source, float spacing, float turn, float scale, int* made = nullptr);
+
 // "x,y,z,radius" per point, a flat array, plus the options; FromJson gives an empty shape for a bad one.
 Json tubeToJson(const TubeShape& shape);
 TubeShape tubeFromJson(const Json& json);
@@ -102,7 +111,7 @@ TubeShape tubeFromJson(const Json& json);
 bool parseTubePoints(const std::string& text, float radius, std::vector<TubePoint>& out, std::string& error);
 
 // tube_new (curve=true: a Curve Part), tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set,
-// tube_simplify, tube_resample, tube_from_curve, tube_bake.
+// tube_simplify, tube_resample, tube_from_curve, tube_bake, tube_repeat.
 void registerTubeCommands(CommandRegistry& registry);
 
 } // namespace sf

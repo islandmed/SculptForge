@@ -46,7 +46,11 @@ sculptforge_tests: adaptive_dabs_leave_small_brushes_alone          21  new on m
 # is split in two (8 s each, full length). ui_texture_transfer (Voxel Remesh at resolution 32), ui_fill_layers (a 20k
 # sphere), ui_make_sculptable (a 30k capture): 9-16 s now.
 # 11-07 (0.11.12 batch): ui_review_fixes split in two (review_fixes + review_fixes_mask_views, each < 20 s); its line is gone.
-ui_mode_matrix                                                     50  every registry action probed (~300) and 22 modes x 8 exits: 34 s on the laptop, 208-582 s on a CI runner; shard by action id (two scripts) when it grows
+ui_mode_matrix_0of4                                                15  a quarter of the registry each (SF_MODE_MATRIX_SHARD): ~9 s on the laptop, 50-150 s on a CI runner
+ui_mode_matrix_1of4                                                15  a quarter of the registry each (SF_MODE_MATRIX_SHARD): ~9 s on the laptop, 50-150 s on a CI runner
+ui_mode_matrix_2of4                                                15  a quarter of the registry each (SF_MODE_MATRIX_SHARD): ~9 s on the laptop, 50-150 s on a CI runner
+ui_mode_matrix_3of4                                                15  a quarter of the registry each (SF_MODE_MATRIX_SHARD): ~9 s on the laptop, 50-150 s on a CI runner
 ui_make_sculptable                                                 22  29.8 s on the PC in the 0.12.4 stage (9-16 s before): a smaller capture than 30k
 ui_language_panels                                                 16  22.6 s on the PC in the 0.12.4 stage: every panel in four languages; split it per language
 ui_e2e_voxel_remesh                                                34  45.4 s alone on the PC in the 0.12.5 stage: Voxel Remesh at 2M triangles is the point; a smaller remesh or nightly if it grows
+ui_key_nav_loop                                                    20  24.4 s alone on the PC in the 0.12.6 stage: drives the real app loop (--measure-key-nav); shorten its holds

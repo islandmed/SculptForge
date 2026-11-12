@@ -937,6 +937,12 @@ TEST(cloth_bench_drape_and_brush_on_a_dense_body) {
     };
     const DrapeResult r = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), opt);
     auto t2 = clock::now();
+    // (frame 0's time includes drapeToRest's setup; which frame is slowest, and the slowest of the rest)
+    const size_t slowAt = size_t(std::max_element(frames.begin(), frames.end()) - frames.begin());
+    const double first = frames.front();
+    const double slowestAfterFirst = frames.size() > 1 ? *std::max_element(frames.begin() + 1, frames.end()) : 0.0;
+    std::printf("  bench drape frames: slowest at frame %zu, frame 0 (with setup) %.1f ms, slowest after frame 0 %.1f ms\n",
+                slowAt, first, slowestAfterFirst);
     std::sort(frames.begin(), frames.end());
     const double total = ms(t0, t2) / 1000.0;
     std::printf("  bench drape: colliders %.0f ms, %d frames (rested %d), total %.2f s, frame p50 %.1f ms, slowest %.1f ms\n",

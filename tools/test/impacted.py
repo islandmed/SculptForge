@@ -60,11 +60,17 @@ HAND_MAP = [
     ("tools/test/*", "test_impact test_affected test_areas"),
     ("tests/ui/data/*", ""),  # step 3 handles these
 ]
-# Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip.
-ALWAYS = ["marks"]
+# Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip. stale_tree
+# (a branch on an old base reverting main's work, ~10 s) too: 11-11 qa-lean replay, 5 of its reds only ran because a
+# CMake edit made the run full.
+ALWAYS = ["marks", "stale_tree"]
 # The app's own sanity set, whenever the app program changed.
 SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke",
-         "ui_mode_matrix", "ui_monkey"]  # (every mode can be left; seeded user-action fuzz: UiTestModes.cpp)
+         "ui_mode_matrix_0of4", "ui_mode_matrix_1of4", "ui_mode_matrix_2of4", "ui_mode_matrix_3of4", "ui_monkey"]  # (every mode can be left; seeded user-action fuzz: UiTestModes.cpp)
+# The per-push tier's smoke (--tier push, docs/testing-flow.md "Tiers"): the app starts, opens a model and sculpts on the
+# real frame loop, undo / redo, a project saved and opened. The mode matrix, the monkey and the co-changed tests wait for
+# the READY T0 (the default tier), which runs SMOKE and the areas as before.
+PUSH_SMOKE = ["ui_release_smoke", "ui_sculpt_basics", "ui_parts_files"]
 # Sources whose change only matters to the app's UI (step 5); a core change reaches every test through the graph.
 APP_DIRS = ("src/app/", "src/render/", "src/link/")
 # Sources the unit tests (sculptforge_tests, all its shards) cover: a change here always runs the shards it reaches, and
@@ -244,13 +250,23 @@ def cmake_owners(text):
     return owner
 
 
-def test_registrations(text, diff):
-    """The tests a CMakeLists.txt diff (-U0) registers or changes, or None when it changes anything else."""
+SOURCE_COMMANDS = {"add_library", "add_executable", "target_sources"}
+GUARD = re.compile(r"(if|endif)\s*\(", re.I)
+
+
+def test_registrations(text, diff, files=None):
+    """The tests a CMakeLists.txt diff (-U0) registers or changes, or None when it changes anything else.
+    Also only a test's area (11-11 qa-lean: 11 of 29 full T0 runs, ~20 min each, were just these):
+    - a changed file added to a source list (files: the branch's changed files): the build graph picks its tests;
+    - an if() and its endif() added in one hunk (-U0: only added lines between them) around added test registrations."""
     owner, names = cmake_owners(text), set()
-    new_line = 0
+    changed = set(files or ())
+    new_line, opened = 0, 0
     for d in diff.split("\n"):
         m = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", d)
         if m:
+            if opened:
+                return None  # a guard opened in one hunk, closed in another: it wraps lines that already existed
             new_line = int(m.group(1))
             continue
         if not d or d[0] not in "+-" or d.startswith(("+++", "---")):
@@ -264,6 +280,14 @@ def test_registrations(text, diff):
         cmd = owner.get(at)
         if d[0] == "-" and re.match(r"(add_test|set_tests_properties|sculptforge_ui_test)\s*\(", body):
             continue  # a test removed or rewritten: its new lines say what runs
+        if d[0] == "+" and GUARD.match(body) and cmd and cmd[1] == at and len(cmd[2]) == 1:
+            opened += -1 if body.lower().startswith("endif") else 1
+            if opened < 0:
+                return None
+            continue  # a guard around new tests (balanced within its hunk; the tests inside are checked as usual)
+        if (d[0] == "+" and cmd and cmd[0] in SOURCE_COMMANDS and cmd[1] != at
+                and all(p in changed for p in body.rstrip(")").split())):
+            continue  # a changed (new) file joins a target: its own path picks what links it (build graph, areas)
         if not cmd or cmd[0] not in TEST_COMMANDS:
             return None
         block = " ".join(cmd[2])
@@ -278,10 +302,11 @@ def test_registrations(text, diff):
         if not found or any("$" in n or not n for n in found):
             return None
         names.update(found)
-    return names
+    return None if opened else names
 
 
-def impacted(root, build, files, verbose=False, graph=None, tests=None, history=True, log_file=None, cmake_diff=None):
+def impacted(root, build, files, verbose=False, graph=None, tests=None, history=True, log_file=None, cmake_diff=None,
+             tier="ready"):
     log = (lambda *a: print(*a, file=sys.stderr)) if verbose else (lambda *a: None)
     tests = load_tests(build) if tests is None else tests
     graph = Graph(build, root) if graph is None else graph
@@ -319,7 +344,7 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
             if fnmatch.fnmatch(f, glob):
                 if targets == "." and f == "CMakeLists.txt" and cmake_diff is not None:
                     path = os.path.join(root, f)
-                    regs = test_registrations(open(path, encoding="utf-8").read(), cmake_diff) if os.path.isfile(path) else None
+                    regs = test_registrations(open(path, encoding="utf-8").read(), cmake_diff, files) if os.path.isfile(path) else None
                     if regs is not None:
                         for n in sorted(regs):
                             add(n, "registered or changed in CMakeLists.txt")
@@ -370,11 +395,11 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
             for n in ui_names:
                 if w & set(n[3:].split("_")):
                     add(n, f"name shares a word with {f}")
-        if history:
+        if history and tier != "push":
             for f, ns in co_changed(root, app_files, ui_names, log_file=log_file).items():
                 for n in ns:
                     add(n, f"changed together with {f}")
-        for n in SMOKE:
+        for n in (PUSH_SMOKE if tier == "push" else SMOKE):
             add(n, "smoke (the app changed)")
     if files:
         for n in ALWAYS:
@@ -420,6 +445,8 @@ def self_test():
         r = lambda *f: impacted(root, b, list(f), graph=g, tests=tests, history=False)
         assert r("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_shell_layout)$", r("src/core/Mesh.h")
         assert r("src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels|ui_shell_layout)$", r("src/app/PanelMicro.cpp")
+        rp = lambda *f: impacted(root, b, list(f), graph=g, tests=tests, history=False, tier="push")
+        assert rp("src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels)$", rp("src/app/PanelMicro.cpp")  # (no PUSH_SMOKE here)
         g0 = Graph(b, root)  # no `ninja -t deps` yet: a core header reaches nothing through the graph
         r0 = lambda *f: impacted(root, b, list(f), graph=g0, tests=tests, history=False)
         assert r0("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2)$", r0("src/core/Mesh.h")
@@ -427,7 +454,7 @@ def self_test():
         assert r("tests/ui/bake.sfui") == "^(marks|ui_bake)$", r("tests/ui/bake.sfui")
         assert r("tests/ui/data/feed.json") == "^(marks|ui_bake)$"
         assert r("tools/guide/lib.py") == "^(guide_site|marks)$", r("tools/guide/lib.py")
-        assert r("changes/x.md") == "^(marks|release_notes_fragments)$"
+        assert r("changes/x.md") == "^(marks|release_notes_fragments)$"  # (stale_tree: not in this fake build)
         assert r("CMakeLists.txt") == "."
         cm = ("project(x)\nadd_executable(sculptforge a.cpp\n  b.cpp)\nif(T)\n  # the bake\n"
               "  add_test(NAME ui_bake COMMAND app --ui-test\n           bake.sfui)\n"
@@ -441,6 +468,17 @@ def self_test():
         assert rc("@@ -9,0 +10 @@\n+sculptforge_ui_test(micro_levels micro_levels --size 2400x1350)\n") == "^(marks|ui_micro_levels)$"
         assert rc("@@ -3 +3 @@\n-  c.cpp)\n+  b.cpp)\n") == "."  # a source list: everything
         assert rc("@@ -1 +1 @@\n-project(y)\n+project(x)\n") == "."
+        rf = lambda diff, *f: impacted(root, b, ["CMakeLists.txt", *f], graph=g, tests=tests, history=False, cmake_diff=diff)
+        assert rf("@@ -2,0 +3 @@\n+  src/app/PanelMicro.cpp\n", "src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels|ui_shell_layout)$"
+        assert rf("@@ -2,0 +3 @@\n+  src/app/PanelMicro.cpp\n") == "."  # a file the branch didn't change joins a target
+        assert rf("@@ -1,0 +2 @@\n+add_executable(sculptforge a.cpp\n", "a.cpp") == "."  # a new target
+        open(os.path.join(root, "CMakeLists.txt"), "w").write(
+            "add_executable(sculptforge a.cpp\n  b.cpp)\nif(T)\n  if(NOT WIN32)\n    add_test(NAME ui_bake COMMAND app)\n  endif()\n"
+            "  if(U)\n  add_executable(x x.cpp)\n  endif()\nendif()\n")
+        assert rc("@@ -3,0 +4,3 @@\n+  if(NOT WIN32)\n+    add_test(NAME ui_bake COMMAND app)\n+  endif()\n") == "^(marks|ui_bake)$"
+        assert rc("@@ -3,0 +4 @@\n+  if(NOT WIN32)\n@@ -5,0 +6 @@\n+  endif()\n") == "."  # a guard around an existing line
+        assert rc("@@ -6,0 +7,3 @@\n+  if(U)\n+  add_executable(x x.cpp)\n+  endif()\n") == "."  # a guard around a build change
+        assert rc("@@ -5,0 +6 @@\n+  endif()\n") == "."
         assert r() == ""
         assert words("src/app/PanelMicroLevels.cpp") == {"micro", "levels", "panelmicrolevels"}
         assert "spacemouse" in words("src/app/SpaceMouse.cpp")
@@ -455,6 +493,8 @@ def main():
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--git-log", help="git log --no-merges --name-only --format=@@ output (a tree without .git)")
     ap.add_argument("--cmake-diff", help="git diff -U0 of CMakeLists.txt against the base (a tree without .git)")
+    ap.add_argument("--tier", choices=("push", "ready"), default="ready",
+                    help="push: the per-push smoke (PUSH_SMOKE, no co-changed tests); ready (default): the T0 before READY")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
@@ -468,7 +508,7 @@ def main():
     cmake_diff = open(a.cmake_diff, encoding="utf-8").read() if a.cmake_diff else None
     if cmake_diff is None and a.files is None and "CMakeLists.txt" in files:
         cmake_diff = sh("git", "diff", "-U0", sh("git", "merge-base", a.base, "HEAD", cwd=root).strip() or a.base, "--", "CMakeLists.txt", cwd=root)
-    print(impacted(root, build, files, a.verbose, log_file=a.git_log, cmake_diff=cmake_diff))
+    print(impacted(root, build, files, a.verbose, log_file=a.git_log, cmake_diff=cmake_diff, tier=a.tier))
     return 0
 
 

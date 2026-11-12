@@ -32,6 +32,7 @@
 #include "core/PathStroke.h"
 #include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Units.h"
 #include "core/VertexPaint.h"
@@ -41,6 +42,7 @@
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "core/Garment.h"
+#include "core/GarmentDrape.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
 #include "core/Sculptable.h"
@@ -301,7 +303,7 @@ CommandRegistry::CommandRegistry() {
                  m = std::move(stitched);
              }
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
-             doc.replaceMeshUndoable(std::move(m), "Remesh");
+             doc.replaceMeshUndoable(std::move(m), "Remesh", true);
              return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
@@ -469,7 +471,7 @@ CommandRegistry::CommandRegistry() {
                                  ? size_t(std::max(4.0, argNumber(a, "triangles", 4)))
                                  : size_t(double(doc.mesh.triangleCount()) *
                                           std::clamp(argNumber(a, "ratio", 0.5), 0.01, 1.0));
-             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate");
+             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate", true);
              return {true, "Decimated to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
 
@@ -628,6 +630,14 @@ CommandRegistry::CommandRegistry() {
         params.push_back({"viewFalloff", T::Bool,
                           "Measure the falloff on screen: a cylinder through the model along the view. Default false.",
                           false});
+        params.push_back({"planeLock", T::Bool,
+                          "Take the plane at the stroke's start and keep it for the whole stroke (false: the plane "
+                          "follows the surface). Default false.",
+                          false});
+        params.push_back({"crispEdge", T::Bool,
+                          "A hard tip edge with a thin anti-aliased band, and the plane pulled all the way: clean, "
+                          "sharp boundaries for hard-surface planes and bevels. Default false.",
+                          false});
         add({"brush_create",
              "Create (or update, by name) a custom sculpting brush from a recipe and make it the active brush. "
              "Omitted parameters use neutral defaults.",
@@ -697,6 +707,7 @@ CommandRegistry::CommandRegistry() {
     registerBrushLibraryCommands(*this); // brush_install, brush_code, brush_delete, ... (BrushLibrary.cpp)
     registerBrushCommands(*this); // brush_set_alpha (BrushAlpha.cpp)
     registerStencilCommands(*this); // stencil_load, stencil_set, stencil_clear (Stencil.cpp)
+    registerReferenceCommands(*this); // reference_add, reference_set, reference_remove, reference_pair (Reference.cpp)
     registerVdmCommands(*this);   // vdm_set, vdm_capture, vdm_stamp, ... (Vdm.cpp)
     registerKelvinletCommands(*this); // kelvinlet_settings (Kelvinlet.cpp)
     registerCaptureCommands(*this); // capture_alpha, capture_vdm: alpha / VDM from the viewport (ViewCapture.cpp)
@@ -862,6 +873,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             doc.syncBvh(); // (a pending rebuild first: a whole-mesh step keeps the tree it swaps out)
              if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
              if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
@@ -871,6 +883,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
+             doc.syncBvh();
              if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
              if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);
@@ -896,6 +909,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
+    registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
@@ -913,6 +927,7 @@ CommandRegistry::CommandRegistry() {
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerGarmentCommands(*this); // garment_* (core/GarmentCommands.cpp)
+    registerGarmentDrapeCommands(*this); // garment_place, garment_drape (core/GarmentDrape.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)

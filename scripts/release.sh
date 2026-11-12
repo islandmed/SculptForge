@@ -25,7 +25,7 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew omarchy replies status (--stage: bump stage)
+# Steps: bump check ci tag release site aur brew omarchy replies social status (--stage: bump stage)
 # bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
 # promoting: only checks main already has it); check then verifies everything the later steps need, so a release
 # either stops in seconds before the tag or runs through to the end.
@@ -52,7 +52,7 @@ AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal add
 AUR_FLAG=${AUR_FLAG:-$HOME/Work/.sf/aur-publish}
 AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
 OMARCHY_PR=1800
-STEPS=(bump check ci tag release site aur brew omarchy replies status)
+STEPS=(bump check ci tag release site aur brew omarchy replies social status)
 
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
@@ -183,6 +183,36 @@ tarball_sha() {
 server_error() {
     grep -Eiq '(HTTP/[0-9.]+|HTTP status code|status code:?|error:|returned error:|response code) ?5[0-9]{2}\b|\b50[234] (Gateway Time-?out|Bad Gateway|Service Unavailable)\b'
 }
+# gh_watch ID: waits for a run to finish through ~/Work/.sf/gh-wait.sh (the ci-status branch by git, else one cached conditional API
+# read shared by every agent; 11-11 per-agent polls used the whole 5000-call hourly budget and blocked 0.12.6). Exit 0 = success.
+gh_watch() {
+    if [ -x "$HOME/Work/.sf/gh-wait.sh" ]; then "$HOME/Work/.sf/gh-wait.sh" "$1" "$REPO"; else gh run watch "$1" -R "$REPO" --exit-status -i 120; fi
+}
+# run_failed_where ID: "job: step; job: step" for the failed jobs ("(runner/setup)": died before any step failed, e.g. runner lost).
+run_failed_where() {
+    gh run view "$1" -R "$REPO" --json jobs -q '[.jobs[] | select(.conclusion=="failure" or .conclusion=="cancelled") | .name as $j | ([.steps[]? | select(.conclusion=="failure") | .name] | (if length==0 then ["(runner/setup)"] else . end)[] | "\($j): \(.)")] | join("; ")' 2>/dev/null
+}
+# infra_retry ID: after a FAILED run, when a setup step broke (apt, network, DNS, checkout, cache, runner lost) or the failed log shows an
+# HTTP 5xx / DNS error: rerun its failed jobs ONCE, log it (~/Work/.sf/logs/infra-retries.log) and wait for the rerun. Returns 0 when it
+# reran (read the conclusion again), 1 when the failure is not an infra flake (INFRA_WHERE says where it failed).
+infra_retry() {
+    local id=$1 n1 log=$HOME/Work/.sf/logs/infra-retries.log
+    INFRA_WHERE=$(run_failed_where "$id")
+    # A cancelled run was stopped on purpose (someone, or a newer push): never rerun it.
+    [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = cancelled ] && { INFRA_WHERE="cancelled: $INFRA_WHERE"; return 1; }
+    if grep -Eiq '(^|: )(Set up|Install|Download|Run actions/|Configure cache|Compiler cache|Initialize|Complete job|\(runner/setup\))' <<<"$INFRA_WHERE" ||
+       gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -Eiq 'Temporary failure (in name )?resolving|Could not resolve|Failed to fetch|Unable to connect|Connection (timed out|reset)|runner .*lost|lost communication|shutdown signal' ||
+       gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
+        echo "   run $id failed in a setup step (${INFRA_WHERE:-unknown}): rerunning its failed jobs once" >&2
+        mkdir -p "$(dirname "$log")" && printf '%s\trelease.sh\t%s\t%s\trerun\t%s\n' "$(date '+%F %H:%M')" "$id" "$V" "$INFRA_WHERE" >> "$log"
+        n1=$("$HOME/Work/.sf/gh-wait.sh" --lines "$id" 2>/dev/null || echo 0)
+        gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || return 1
+        sleep 20
+        SF_GH_WAIT_SKIP=${n1:-0} gh_watch "$id" >/dev/null 2>&1 || true
+        return 0
+    fi
+    return 1
+}
 # Successful run of a workflow on a push to main for a commit; waits for one in progress. The third argument is how
 # many 10-second tries a just-pushed commit's run gets to appear (default 1).
 wait_run() {
@@ -197,20 +227,16 @@ wait_run() {
     status=$(gh run view "$id" -R "$REPO" --json status -q .status)
     if [ "$status" != completed ]; then
         echo "   waiting for $wf run $id ..." >&2
-        gh run watch "$id" -R "$REPO" --exit-status >/dev/null || true
+        gh_watch "$id" >/dev/null || true
     fi
     conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
-    # A job that died on a GitHub/CDN 5xx while downloading (0.11.1: seven 504s in Packages) is rerun once, then judged.
-    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] && gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
-        echo "   $wf run $id failed on an HTTP 5xx download: rerunning its failed jobs once" >&2
+    # A job that died in a setup step (apt mirror DNS 11-11, a GitHub/CDN 5xx 0.11.1: seven 504s in Packages) is rerun once, then judged.
+    if [ "$conclusion" = failure ] && [ -z "$rerun_done" ] && infra_retry "$id"; then
         rerun_done=1
-        gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || true
-        sleep 10
-        gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
         conclusion=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
     fi
     [ "$conclusion" = success ] ||
-        die "$wf run $id on $sha: $conclusion (https://github.com/$REPO/actions/runs/$id)" \
+        die "$wf run $id on $sha: $conclusion, failed: $(run_failed_where "$id") (https://github.com/$REPO/actions/runs/$id)" \
             "fix it on a branch, merge to main, then start again from step check (or re-run the run if it was a runner hiccup: gh run rerun $id --failed -R $REPO)"
     echo "$id"
 }
@@ -226,7 +252,7 @@ ci_reused() {
         [ -n "$id" ] || continue
         if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
             echo "   waiting for ci.yml run $id on ${c:0:8} (the commit before the bump) ..." >&2
-            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+            gh_watch "$id" >/dev/null 2>&1 || true
         fi
         [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" = success ] && { echo "${c:0:8} $id"; return 0; }
     done
@@ -433,8 +459,8 @@ preflight() {
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
-    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/sculptforge/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
-    gh_file "$owner/omarchy-pkgs" pkgbuilds/sculptforge/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
+    [ "$state" = OPEN ] || die "omacom/omarchy-pkgs#$OMARCHY_PR is ${state:-unreadable}" "if it merged, open a version-bump PR for pkgbuilds/omasculpt/PKGBUILD there and set OMARCHY_PR in this script; if it was closed, ask the owner"
+    gh_file "$owner/omarchy-pkgs" pkgbuilds/omasculpt/PKGBUILD "$branch" | grep -E "^sha256sums=\('[0-9a-f]{64}'" >/dev/null ||
         die "the Omarchy PKGBUILD on $owner/omarchy-pkgs $branch has no sha256sums=('<64 hex>' line" "fix it on that branch"
     ok "What's New, home page card, highlights, PKGBUILD, Homebrew tap and Omarchy PR #$OMARCHY_PR are ready"
 }
@@ -606,9 +632,12 @@ step_stage() {
         return 0
     fi
     echo "   waiting for Packages run $id on staging (every platform's package) ..." >&2
-    gh run watch "$id" -R "$REPO" --interval 60 >/dev/null 2>&1 || true
+    gh_watch "$id" >/dev/null 2>&1 || true
     if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" != success ]; then
-        failed=$(gh run view "$id" -R "$REPO" --json jobs -q '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")')
+        infra_retry "$id" || true # a setup-step flake: rerun once (logged); a second failure is reported below with job and step
+    fi
+    if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" != success ]; then
+        failed=$(run_failed_where "$id")
         die "Packages on staging failed (${failed:-see the run}): https://github.com/$REPO/actions/runs/$id" \
             "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
     fi
@@ -706,8 +735,9 @@ step_release() {
         done
         [ -n "$id" ] || die "no Release run for $T after 5 minutes" "gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
         echo "   waiting for Release run $id (https://github.com/$REPO/actions/runs/$id) ..."
-        gh run watch "$id" -R "$REPO" --exit-status >/dev/null ||
-            die "Release run $id failed (https://github.com/$REPO/actions/runs/$id)" \
+        gh_watch "$id" >/dev/null 2>&1 ||
+            { infra_retry "$id" && [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" = success ]; } ||
+            die "Release run $id failed: $(run_failed_where "$id") (https://github.com/$REPO/actions/runs/$id)" \
                 "read the failed job; a runner hiccup: gh run rerun $id --failed -R $REPO; a real bug: fix on main, delete the tag (git push origin :$T; git tag -d $T) and release $V again from step check"
     fi
     release_ready
@@ -733,7 +763,7 @@ website_run() {
     for attempt in 1 2 3 4; do
         if [ "$(gh run view "$id" -R "$REPO" --json status -q .status)" != completed ]; then
             echo "   waiting for the Website run $id ..." >&2
-            gh run watch "$id" -R "$REPO" --exit-status >/dev/null 2>&1 || true
+            gh_watch "$id" >/dev/null 2>&1 || true
         fi
         c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)
         [ "$c" = success ] && return 0
@@ -886,7 +916,7 @@ step_brew() {
 
 step_omarchy() {
     release_ready
-    local state branch owner path=pkgbuilds/sculptforge/PKGBUILD sum pr
+    local state branch owner path=pkgbuilds/omasculpt/PKGBUILD sum pr
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
     read -r state owner branch <<<"$pr" || true
@@ -908,7 +938,7 @@ open(p, "w", encoding="utf-8").write(t)
 PY
     (cd "$work/omarchy" && grep -q "^pkgver=$V\$" "$path" && grep -qF "'$sum'" "$path") ||
         die "couldn't update the Omarchy PKGBUILD" "edit $path on $owner/omarchy-pkgs branch $branch by hand (pkgver=$V, first sha256 $sum)"
-    (cd "$work/omarchy" && git add "$path" && commit -m "sculptforge $V" && gitp push -q origin "HEAD:$branch") ||
+    (cd "$work/omarchy" && git add "$path" && commit -m "omasculpt $V" && gitp push -q origin "HEAD:$branch") ||
         die "pushing to $owner/omarchy-pkgs $branch failed" "check gh auth status, then run again"
     ok "Omarchy PR #$OMARCHY_PR builds $V (author $AUTHOR_EMAIL)"
 }
@@ -922,6 +952,14 @@ step_replies() {
     python3 tools/release/reply_drafts.py "$V" "$work/section" "$REPO" "$T" > "$out" 2> "$work/drafts" ||
         die "couldn't write the reply drafts" "python3 tools/release/reply_drafts.py --self-test"
     ok "$(cat "$work/drafts") in $out: sfmonitor posts these (it reads them first)"
+}
+
+# One approved bust-card post for X/Bluesky/Facebook/Instagram the same hour, handed to the "input" session (~/Work/.sf/social/lockstep.py reads
+# website/latest.json, which the site step wrote). Never blocks a release: no script, an error or no card line only prints a note.
+step_social() {
+    local ls=$HOME/Work/.sf/social/lockstep.py
+    [ -f "$ls" ] || { ok "no social lockstep script here; skipped"; return; }
+    python3 "$ls" "$V" website/latest.json || true
 }
 
 step_status() {

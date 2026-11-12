@@ -5,6 +5,124 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.8
+
+```features
+date: 2026-11-11
+tagline: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.
+highlight: Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)
+highlight: Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)
+highlight: Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)
+highlight: Shortcuts with two keys in a row
+highlight: Reference images to sculpt against
+```
+
+- **Two-key shortcuts**: bind an action to two different keys in a row, like A then S (**Edit > Preferences >
+  Hotkeys**, the small button beside a key).
+- **Reference images**: **View > Reference images** keeps pictures in the view while you sculpt: behind the model, or
+  as planes at its front, side or top that turn with the view. **Front + side...** sets up a character's two drawings
+  in one go. They never take strokes and stay out of renders unless you ask.
+- **Start-up fix**: SculptForge should start again on graphics drivers where 0.12.5 and 0.12.6 stopped with "Shader
+  compile error".
+- **A fast mouse or trackpad stroke right after a pen stroke** keeps its whole line.
+
+## Version 0.12.7
+
+```features
+date: 2026-11-11
+tagline: Booleans between Parts, Gaussian splats with Blender, and a panel of your own.
+highlight: Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview
+highlight: Gaussian splats both ways with Blender 5.3 through the Blender bridge
+highlight: Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)
+highlight: My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)
+highlight: Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)
+highlight: Alpha pool and jitter for non-repeating detail
+highlight: Crisp Flatten: hard planes with a sharp edge
+highlight: Warnings before destructive operations
+highlight: Put any brush on Shift or Ctrl
+highlight: Orbit around the point under the pointer
+highlight: Exact Booleans between Parts, with a live preview
+highlight: My Panel, a panel you build from your own buttons and sections
+highlight: Smooth Peaks brush
+highlight: Repeat a Part along a curve, real braids and springs
+```
+
+- "**Alpha pool and jitter**: **Sculpt > Alpha** has **Scale jitter** and **Position jitter**, and right-clicking an
+  alpha or a folder of images in the Library gives **Add to alpha pool** / **Use folder as alpha pool**: each dab
+  takes a random alpha, for wood grain and scans that never repeat. Three procedural wood grains are included.
+  Requested by a member."
+- **Splats with Blender**: with the Blender add-on and Blender 5.3, Gaussian splats go to Blender and back with one
+  click, view-dependent colour and placement kept. **File > Export > Gaussian Splats (.ply)** in Blender saves them
+  (Blender can't), and a dropped `.splat` file imports there.
+- **Crisp Flatten** (Hard Surface pack; thanks _tfx on Discord): flattens to the plane the stroke starts on with a
+  clean, sharp edge instead of a soft fade, for hard planes and crisp bevels. In Brush Lab, any custom brush can use
+  the new **Lock plane** and **Crisp edge** options.
+- **More warnings before levels go**: Delete Masked, Remove Hidden, Split, Mirror, Make Symmetric and Merge by
+  Distance ask before they drop a Part's subdivision levels.
+- **Shift and Ctrl brushes**: **Shift+click** a brush on the bottom shelf (Trim, Flatten...) and holding Shift sculpts
+  with it instead of Smooth; **Ctrl+click** one and holding Ctrl sculpts with it instead of masking. Your main brush
+  stays.
+- **Orbit around the pointer**: Preferences > Input. A rotation that starts over the model turns the view about the
+  point under the pointer, and zooms after it work at that depth. On for new installs; turn it on there if you used
+  SculptForge before (thanks dm4nd on Discord).
+- **Booleans between Parts**: in **Tool > Parts**, click the mark in a Part's row for **Add**, **Subtract** or
+  **Intersect**; the view shows the result live, and **Make Boolean Mesh** turns it into a new Part (the sources stay,
+  hidden). Exact and watertight, with face groups, vertex paint and UVs kept.
+- "**My Panel** (Edit menu): a panel of your own. Hold Alt and drag any button or whole section from any palette into
+  it, then keep it in a tray or press F4 to open it at the cursor."
+- "**Smooth Peaks brush**: a new brush in the Smooth family that only lowers the high points, the parts that stick out
+  above the surrounding surface, and leaves the hollows alone. Shift-smooth is unchanged. Requested by ABHITAR."
+- **Tube**: Braid now weaves over and under, Rope and Braid take 1 to 8 **Strands** (one is a spring), and **Repeat
+  along curve** lays copies of another Part along a tube or curve (chain links, beads, scales).
+- **A leaner Welcome** (Help > Welcome): the 10-minute lesson and the quick tour side by side, shorter AI and
+  membership lines, and a row of small icons for Discord, GitHub, X, Bluesky, Instagram and Facebook (also in Help >
+  About).
+- The layout now saves itself. Customize Shelves edits, trays and palettes are written a couple of seconds after you
+  change them and when you quit, so a restart or a crash no longer loses them. **Save Layout** now marks the layout
+  that **Revert to Saved Layout** returns to.
+- **SpaceMouse** (macOS, Windows): a SpaceMouse that 3Dconnexion's driver was holding when SculptForge started should
+  be picked up on its own once the driver lets go, no unplugging needed.
+- **More threads, for real**: a **Threads** value above 16 (Preferences > Performance) now reaches the brushes and the
+  remesher after a restart.
+- **Faster Undo after a remesh**: undoing or redoing a Voxel Remesh (or another whole-model step) on a very dense
+  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
+
+## Version 0.12.6
+
+```features
+date: 2026-11-11
+tagline: Pan and zoom keys work again, layouts revert safely, and garments drape on a body.
+highlight: Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)
+highlight: Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)
+highlight: Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)
+highlight: Drape a garment on a body in Tool > Garments, with a steadier cloth rest
+highlight: Save Visible Parts As and a Mask colour preference
+highlight: Save only the visible Parts
+highlight: Featured creator card in the Welcome window
+```
+
+- **Drape a garment on a body**: in **Tool > Garments**, click the body once for each panel, press **Drape** and watch
+  the pattern sew itself shut and settle, then **Convert to Part** to sculpt it (UVs from the flat pattern).
+- "**Save Visible Parts As**: **File > Save Visible Parts As...** writes a copy of the project with only the Parts you
+  can see, keeping their materials, layers and the scene's cameras and settings. The open project is untouched."
+- **Featured creator**: the Welcome window (Help > Welcome) shows one video by an artist who made something about
+  SculptForge, with its picture, title and a **Watch** button that opens it in your browser. The small x hides that
+  video. It comes with the daily update check, so it is off with **Preferences > Updates > Check for updates** and
+  when you are offline.
+- **Alt+click a Part** finds thin and far Parts: a click a few points off the Part counts, and a trackpad click that
+  wobbles is still a click.
+- **Projects with no models** open: a project saved without any Parts loads as an empty scene, with its settings,
+  lights, cameras and views.
+- **Pan and zoom keys work again**: Pan left / right / up / down and Zoom in / out (on their own keys or rebound) move
+  the view again; a tap nudges it, holding glides.
+- **Revert to Saved Layout** should no longer crash (it, Reset Layout and Import Interface now run between frames), a
+  colour picker or tile taken off a shelf can be put back (**Preferences > Saving & Layouts**), and there is always a
+  way out of a broken layout: **Reset Layout** and `--reset-layout`.
+- **Mask colour**: **Edit > Preferences > Interface > Mask colour** picks the colour masked areas show.
+- **Vertex paint keeps its detail across subdivision levels**: paint a stroke at a low level and it blends over the
+  finer colour above instead of replacing it.
+
 ## Version 0.12.5
 
 ```features

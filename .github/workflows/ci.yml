@@ -144,7 +144,7 @@ jobs:
       - run: |
           python3 tools/media_takedown.py --self-test
           python3 tools/check_marks_media.py || { grep -q . <(python3 tools/check_marks_media.py 2>/dev/null | grep "not in tools/marks_media_cache.json") &&
-            sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
+            sudo ./packaging/linux/apt-retry.sh update -qq && sudo ./packaging/linux/apt-retry.sh install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
 
   build:
     name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
@@ -187,7 +187,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri mold # mold: faster links (docs/build-speed.md)
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache xvfb libgl1-mesa-dri mold # mold: faster links (docs/build-speed.md)
       - name: ccache (macOS; the release binary, pinned by hash)
         if: runner.os == 'macOS'
         run: |
@@ -300,7 +300,7 @@ jobs:
           if-no-files-found: ignore
 
   # The Blender add-on inside Blender itself (the bpy wheel is Blender as a Python module), against
-  # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11) and the newest.
+  # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11), the newest, and the one before splats.
   blender-addon:
     name: Blender add-on (bpy ${{ matrix.bpy }})
     needs: changes
@@ -312,6 +312,7 @@ jobs:
         include:
           - { bpy: '4.2.0', python: '3.11' }
           - { bpy: '5.2.3', python: '3.13' }
+          - { bpy: '5.3.0', python: '3.13' } # first with Gaussian splats
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
@@ -331,7 +332,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache
       - name: Compiler cache (restore)
         uses: actions/cache/restore@v5
         with:

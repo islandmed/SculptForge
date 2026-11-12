@@ -38,21 +38,21 @@
      "shipped": ""
     },
     {
-     "slug": "smooth-peaks-brush",
-     "anchor": "vote-smooth-peaks-brush",
-     "title": "Smooth-peaks brush",
-     "line": "Smooths only the high points and leaves the valleys alone.",
-     "where": "Brush picker",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "kitbash-insert-library",
      "anchor": "vote-kitbash-insert-library",
      "title": "Kitbash insert library",
      "line": "A library of ready-made pieces you stamp onto the surface.",
      "where": "Brush picker, new pack",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "move-brush-reach-beyond-the-edge",
+     "anchor": "vote-move-brush-reach-beyond-the-edge",
+     "title": "Move brush reach beyond the edge",
+     "line": "A small buffer distance, so the Move brush still grabs the surface when the cursor is just outside the silhouette, instead of you having to rotate the camera.",
+     "where": "Move brush",
      "votes": 0,
      "status": "open",
      "shipped": ""
@@ -66,6 +66,16 @@
      "votes": 0,
      "status": "shipped",
      "shipped": "0.12.2"
+    },
+    {
+     "slug": "smooth-peaks-brush",
+     "anchor": "vote-smooth-peaks-brush",
+     "title": "Smooth-peaks brush",
+     "line": "Smooths only the high points and leaves the valleys alone.",
+     "where": "Brush picker",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.7"
     }
    ]
   },
@@ -276,26 +286,6 @@
    "slug": "parts-scene",
    "ideas": [
     {
-     "slug": "save-a-project-with-only-some-parts",
-     "anchor": "vote-save-a-project-with-only-some-parts",
-     "title": "Save a project with only some Parts",
-     "line": "Slim a file down by saving only the visible Parts.",
-     "where": "File > Save",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "mesh-boolean-preview",
-     "anchor": "vote-mesh-boolean-preview",
-     "title": "Mesh Boolean preview",
-     "line": "Live Union, Subtract and Intersect preview, then Make Boolean Mesh.",
-     "where": "Parts panel",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "primitive-blockout-kit",
      "anchor": "vote-primitive-blockout-kit",
      "title": "Primitive blockout kit",
@@ -354,6 +344,36 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "smooth-blend-for-booleans-sdf-style",
+     "anchor": "vote-smooth-blend-for-booleans-sdf-style",
+     "title": "Smooth blend for Booleans (SDF style)",
+     "line": "A blend radius on Boolean Parts, so a union or subtract can merge softly like a simple SDF modeller, with control over how far the merge reaches.",
+     "where": "Tool > Parts, Booleans",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "save-a-project-with-only-some-parts",
+     "anchor": "vote-save-a-project-with-only-some-parts",
+     "title": "Save a project with only some Parts",
+     "line": "Slim a file down by saving only the visible Parts.",
+     "where": "File > Save",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.6"
+    },
+    {
+     "slug": "mesh-boolean-preview",
+     "anchor": "vote-mesh-boolean-preview",
+     "title": "Mesh Boolean preview",
+     "line": "Live Union, Subtract and Intersect preview, then Make Boolean Mesh.",
+     "where": "Parts panel",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.7"
     }
    ]
   },
@@ -529,6 +549,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "silhouette-view",
+     "anchor": "vote-silhouette-view",
+     "title": "Silhouette view",
+     "line": "A small window with a flat black outline of the model, with saved camera angles and lens in mm, to judge the shape.",
+     "where": "View menu",
+     "votes": 0,
+     "status": "in progress",
+     "shipped": ""
     }
    ]
   },
@@ -537,16 +567,6 @@
    "emoji": "⌨️",
    "slug": "interface",
    "ideas": [
-    {
-     "slug": "custom-quick-panel",
-     "anchor": "vote-custom-quick-panel",
-     "title": "Custom quick panel",
-     "line": "Drag any buttons and sections from any palette into your own panel; float it on a key or dock it.",
-     "where": "Customize Shelves, then a new panel you build",
-     "votes": 1,
-     "status": "open",
-     "shipped": ""
-    },
     {
      "slug": "tab-hides-one-shelf",
      "anchor": "vote-tab-hides-one-shelf",
@@ -575,16 +595,6 @@
      "where": "Update banner",
      "votes": 0,
      "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "startup-splash-screen",
-     "anchor": "vote-startup-splash-screen",
-     "title": "Startup splash screen",
-     "line": "A splash with the first-run welcome card.",
-     "where": "App start",
-     "votes": 0,
-     "status": "in progress",
      "shipped": ""
     },
     {
@@ -618,30 +628,10 @@
      "shipped": ""
     },
     {
-     "slug": "separate-pan-keys",
-     "anchor": "vote-separate-pan-keys",
-     "title": "Separate Pan keys",
-     "line": "Bind pan left, right, up and down separately for game pads.",
-     "where": "Preferences > Input",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "multi-key-shortcut-sequences",
      "anchor": "vote-multi-key-shortcut-sequences",
      "title": "Multi-key shortcut sequences",
      "line": "Bind sequences like A then A for more keys.",
-     "where": "Preferences > Input",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "shortcut-conflict-warning",
-     "anchor": "vote-shortcut-conflict-warning",
-     "title": "Shortcut conflict warning",
-     "line": "Warn when a key is already used, plus a per-shortcut reset.",
      "where": "Preferences > Input",
      "votes": 0,
      "status": "in progress",
@@ -654,7 +644,7 @@
      "line": "SculptForge on iPad and Android tablets, with pen pressure and a touch-first layout.",
      "where": "New platform",
      "votes": 0,
-     "status": "open",
+     "status": "in progress",
      "shipped": ""
     },
     {
@@ -684,7 +674,7 @@
      "line": "A modern, cleaner alternative to the current layout, with fewer buttons, sliders and tabs on screen at once.",
      "where": "Preferences / Interface",
      "votes": 0,
-     "status": "open",
+     "status": "in progress",
      "shipped": ""
     },
     {
@@ -696,6 +686,46 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "custom-quick-panel",
+     "anchor": "vote-custom-quick-panel",
+     "title": "Custom quick panel",
+     "line": "Drag any buttons and sections from any palette into your own panel; float it on a key or dock it.",
+     "where": "Customize Shelves, then a new panel you build",
+     "votes": 1,
+     "status": "shipped",
+     "shipped": "0.12.7"
+    },
+    {
+     "slug": "startup-splash-screen",
+     "anchor": "vote-startup-splash-screen",
+     "title": "Startup splash screen",
+     "line": "A splash with the first-run welcome card.",
+     "where": "App start",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.5"
+    },
+    {
+     "slug": "separate-pan-keys",
+     "anchor": "vote-separate-pan-keys",
+     "title": "Separate Pan keys",
+     "line": "Bind pan left, right, up and down separately for game pads.",
+     "where": "Preferences > Input",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.4"
+    },
+    {
+     "slug": "shortcut-conflict-warning",
+     "anchor": "vote-shortcut-conflict-warning",
+     "title": "Shortcut conflict warning",
+     "line": "Warn when a key is already used, plus a per-shortcut reset.",
+     "where": "Preferences > Input",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.12.4"
     },
     {
      "slug": "discord-rich-presence",
@@ -804,5 +834,5 @@
    ]
   }
  ],
- "updated": "2026-11-11T10:37:51Z"
+ "updated": "2026-11-11T22:30:01Z"
 }

@@ -10,4 +10,5 @@ wait 0.3
 mode_entry Append > Insert (Cube) | click "Parts/Append" | hover "Insert on the model" | click "Cube##insert"
 mode_entry Append > Insert (a file) | choose_file insert data/stud.obj | wait 0.1
 mode_matrix known=mode_matrix_known.txt
-expect_value modes_found >= 4
+# (per shard: ctest runs four, SF_MODE_MATRIX_SHARD, each finding 3-8 of the ~22 modes; >= 1 each is >= 4 in all)
+expect_value modes_found >= 1

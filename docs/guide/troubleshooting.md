@@ -191,14 +191,19 @@ font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
 ### My layout is gone after a restart
 
-Shortcuts and preferences save themselves; the layout (shelves, trays, open palettes) waits for
-**Edit > Preferences > Saving & Layouts > Save Layout**. See [The interface](interface.md#saving-preferences-and-layouts).
+Shortcuts, preferences and the layout (shelves, trays, open palettes) save themselves: the layout a couple of seconds after
+you change it, and again when you quit. If a layout is not what you left, **Revert to Saved Layout**
+(**Edit > Preferences > Saving & Layouts**) goes back to the one **Save Layout** last kept, and a copy of `ui.json` from
+before each session that changed it is kept as `ui.prev.json` and `ui.prev2.json` in the settings folder (quit, rename one to
+`ui.json`). See [The interface](interface.md#saving-preferences-and-layouts).
 
 ### Reset the interface
 
-- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
-  save themselves; press **Save Layout** afterwards to keep the layout.
-- **Revert to Saved Layout** goes back to the layout the last Save Layout kept.
+- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. Both
+  save themselves; **Revert to Saved Layout** still returns to the layout **Save Layout** last kept.
+- **Reset Layout** (same place, or <kbd>F3</kbd> and type "reset layout") restores only the shelves, trays and panels and keeps your shortcuts and preferences. It works whatever state the layout is in. Starting `sculptforge --reset-layout` does it before the window opens.
+- A colour picker, brush tile or slider you dragged off a shelf is listed in the same section with **Put back on the shelf**.
+- **Revert to Saved Layout** goes back to the layout the last **Save Layout** kept (the layout in use saves itself, so Revert is the way back to the one you marked).
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
   and `imgui.ini` (positions of floating windows such as Brush Lab) from the settings folder below.
 
@@ -220,7 +225,8 @@ SculptForge keeps its settings in one folder per user:
 
 | File or folder | What it holds |
 |---|---|
-| `ui.json` | Shortcut changes and preferences (saved as you change them) and the layout (written by **Save Layout**) |
+| `ui.json` | Shortcut changes, preferences and the layout (saved as you change them), and the layout **Save Layout** kept |
+| `ui.prev.json`, `ui.prev2.json` | Copies of `ui.json` from before the last two sessions that changed the layout |
 | `imgui.ini` | Positions and sizes of floating windows |
 | `ai.json` | AI settings: providers, models, keys, ComfyUI address (readable only by your account) |
 | `project.json` | Recent files and the autosave interval |

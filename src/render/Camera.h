@@ -38,6 +38,12 @@ public:
     // it (as free orbiting would), `rollRadians` (the cursor's sweep around the view's centre) when it points at you.
     void orbitAbout(const glm::vec3& worldAxis, float dxPixels, float dyPixels, float rollRadians);
     void setOrientation(const glm::quat& q);        // as yaw / pitch / roll
+    // Orbit around the pointer: turned to `q` about `pivot` instead of the target. The eye swings round the pivot,
+    // so the pivot stays where it was on screen.
+    void turnAbout(const glm::quat& q, const glm::vec3& pivot);
+    // The target moved along the view axis to the depth of `point` (perspective only): the view stays exactly as it
+    // is, and orbiting and zooming toward the middle work at that depth afterwards (auto depth).
+    void targetDepthOf(const glm::vec3& point);
     // The nearest of the 24 views looking along a world axis with another world axis up (the classic
     // Shift while rotating).
     static glm::quat snapped(const glm::quat& q);
