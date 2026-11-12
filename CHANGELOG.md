@@ -9,7 +9,7 @@ All notable changes to SculptForge are listed here. The format follows
 ### Added
 - **Palm rejection** (Android): fingers that land while the pen is in range, or in the 0.3 s after it leaves, are a
   resting palm and do nothing; a trackpad's fingers are never ignored. Off on desktop touch screens.
-- **Android (early, members first)**: SculptForge builds for Android tablets, phones and Chromebooks (arm64 and
+- **Android (early test build)**: SculptForge builds for Android tablets, phones and Chromebooks (arm64 and
   x86_64, Android 9 or later, OpenGL ES 3.2) as a sideloaded APK. Sculpt with a finger or a stylus with pressure,
   navigate with two fingers (pan, pinch to zoom, twist to roll), undo, save to the app's Projects folder and open any
   file through the system's document picker. The desktop layout for now; a tablet layout of its own comes next
