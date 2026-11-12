@@ -567,7 +567,7 @@
      "line": "A setting for how fast the mouse turns the view, with optional smoothing, so rotating with the middle button (for example in Blender style) feels slower and calmer.",
      "where": "Preferences > Input",
      "votes": 0,
-     "status": "open",
+     "status": "in progress",
      "shipped": ""
     },
     {
@@ -864,5 +864,5 @@
    ]
   }
  ],
- "updated": "2026-11-12T02:07:58Z"
+ "updated": "2026-11-12T04:08:03Z"
 }

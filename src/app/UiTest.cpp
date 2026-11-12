@@ -1566,6 +1566,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
     if (name == "touch_fingers") return double(app_.touch_.fingers());
+    if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
@@ -2879,6 +2880,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
+    } else if (verb == "palm_guard") { // palm_guard on|off [hold s]: fingers are ignored while the pen is near (Android's default)
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off", hold = num(2, PalmGuard::kAfterPen)] {
+            app_.palmRejection_ = on;
+            app_.palm_.afterPen = hold;
+        });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });
     } else if (verb == "quick_tour_offers") {
@@ -3118,6 +3125,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "wait") {
         if (!need(1)) return false;
         wait(num(1, 0));
+    } else if (verb == "wait_real") { // wait_real S: S seconds of the clock (the app's timers run on it; "wait" is frame time)
+        if (!need(1)) return false;
+        const Uint64 ns = Uint64(num(1, 0) * 1e9f);
+        auto from = std::make_shared<Uint64>(0);
+        steps_.push_back([from, ns](float t) {
+            if (t == 0.0f) *from = SDL_GetTicksNS();
+            SDL_Delay(5);
+            return SDL_GetTicksNS() - *from >= ns;
+        });
     } else if (verb == "wait_idle") {
         const float timeout = num(1, 120.0f);
         // Idle for several frames in a row: work is often only requested by the frame after an input (a
@@ -4087,9 +4103,9 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
-                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
-                "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
+                "touch_stroke", "touch_pinch", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";
