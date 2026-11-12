@@ -3,16 +3,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # scripts/release.sh release_card (ctest release_card): the CMO's release card (state/launch/X.Y.Z.card.jpg) is copied to
-# website/media/release-X.Y.Z.jpg and staged with the marks cache when tools/check_marks_media.py passes; a missing card, or one
-# the check flags, is a WARNING and leaves nothing staged; an already committed card is left alone. Never fails.
+# website/media/release-X.Y.Z.jpg and staged with the marks cache when tools/check_marks_media.py passes; a missing card, one
+# the used-images log refuses (picture already used for another release) or one the check flags, is a WARNING and leaves nothing staged; an already committed card is left alone. Never fails.
 # Sandbox git repo with a stand-in check_marks_media.py.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 S=$(mktemp -d)
 trap 'rm -rf "$S"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
-mkdir -p "$S/launch" "$S/wt/website/media" "$S/wt/tools"
-export SF_LAUNCH_DIR=$S/launch V=9.9.9 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+mkdir -p "$S/home" "$S/launch" "$S/wt/website/media" "$S/wt/tools"
+export HOME=$S/home SF_LAUNCH_DIR=$S/launch V=9.9.9 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 cd "$S/wt"
 git init -q .
 git config user.email t@example.org
@@ -64,4 +64,19 @@ grep -q "WARNING: the release card is not clean" <<<"$out" || fail "no warning: 
 [ -z "$(staged)" ] || fail "a flagged card stayed staged: $(staged)"
 [ ! -e website/media/release-9.9.9.jpg ] || fail "a flagged card stayed on disk"
 [ "$(cat tools/marks_media_cache.json)" = '{"card": 1}' ] || fail "the cache was not restored: $(cat tools/marks_media_cache.json)"
+
+# 5. a picture the used-images log refuses (stand-in usedimg.py): WARNING, nothing staged or copied, no failure; a crashing checker lets the card through
+git rm -q -f website/media/release-9.9.9.jpg 2>/dev/null || true; git commit -q -m rm2 --allow-empty
+rm -f website/media/release-9.9.9.jpg
+mkdir -p "$S/home/Work/.sf/social"
+printf 'import sys\nprint("REFUSED " + sys.argv[2] + ": same picture; already used for release:0.12.9")\nsys.exit(1)\n' > "$S/home/Work/.sf/social/usedimg.py"
+printf 'JPEGDATA' > "$S/launch/9.9.9.card.jpg"
+out=$(release_card) || fail "a used picture failed the release"
+grep -q "WARNING: the release card is a picture already used" <<<"$out" || fail "no used-picture warning: $out"
+grep -q "REFUSED" <<<"$out" || fail "the checker's reason was not shown: $out"
+[ -z "$(staged)" ] || fail "a used picture was staged: $(staged)"
+[ ! -e website/media/release-9.9.9.jpg ] || fail "a used picture was copied"
+printf 'import sys\nraise SystemExit("boom")\n' > "$S/home/Work/.sf/social/usedimg.py"
+release_card >/dev/null || fail "a crashing checker failed the release"
+grep -q "website/media/release-9.9.9.jpg" <<<"$(staged)" || fail "a crashing checker blocked the card: $(staged)"
 echo "release_card ok"
