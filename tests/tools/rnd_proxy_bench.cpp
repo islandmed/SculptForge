@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <atomic>
 #include <tuple>
+#include <unordered_set>
+#include <limits>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -158,7 +160,14 @@ int main(int argc, char** argv) {
         GhostStroke g;
         g.kind = ghostKindForBrush(int(BrushType::Clay));
         const float px = 240.0f / s.radius;
-        std::vector<float> err[3];
+        std::vector<float> err[4]; // 0-2 refinements, 3 = the ray vs the moved patch
+        std::unordered_set<uint32_t> patch;
+        std::vector<uint32_t> near;
+        std::unordered_map<uint32_t, glm::vec3> movedAt;
+        std::vector<double> patchMs, patchTris;
+        std::vector<float> pad; // per BVH node: the most the pending dabs move any vertex of its triangles (Micro's pattern)
+        std::vector<double> padMs;
+        std::vector<uint32_t> inSphere;
         int hits = 0;
         for (int i = 0; i < dabs; ++i) {
             const glm::vec3 o = s.origin(i);
@@ -181,6 +190,46 @@ int main(int argc, char** argv) {
                 if (!B.bvh.raycast(B.mesh, shifted, s.dir, rh)) { for (int r2 = step + 1; r2 < 3; ++r2) err[r2].push_back(err[step].back()); break; }
                 pick = moved(rh);
             }
+            // (2) the ray against the drawn surface itself: B's triangles in the pending dabs' reach, moved by the
+            // preview, plus B's own hit where it lies outside them (the mesh there is drawn as it is)
+            if (!g.dabs.empty()) {
+                const auto tp = Clock::now();
+                // candidates: the triangles of every BVH leaf the ray crosses, its box padded by how far the pending
+                // dabs move its vertices (pad, below); everything else cannot reach the ray
+                if (pad.size() != B.bvh.nodeCount()) pad.assign(B.bvh.nodeCount(), 0.0f);
+                near.clear();
+                B.bvh.rayTrianglesPadded(B.mesh, o, s.dir, pad, 0.0f, near);
+                patch.clear();
+                patch.insert(near.begin(), near.end());
+                float best = std::numeric_limits<float>::max();
+                glm::vec3 at = bh.position;
+                movedAt.clear();
+                const auto mv = [&](uint32_t v) {
+                    auto [it, fresh] = movedAt.try_emplace(v);
+                    if (fresh) it->second = ghostMove(g, B.mesh.positions[v], B.mesh.normals[v]);
+                    return it->second;
+                };
+                for (uint32_t t : patch) {
+                    const auto& tri = B.mesh.triangles[t];
+                    const glm::vec3 a = mv(tri[0]), e1 = mv(tri[1]) - a, e2 = mv(tri[2]) - a;
+                    const glm::vec3 pv = glm::cross(s.dir, e2);
+                    const float det = glm::dot(e1, pv);
+                    if (std::abs(det) < 1e-20f) continue;
+                    const glm::vec3 tv = o - a;
+                    const float u = glm::dot(tv, pv) / det;
+                    if (u < 0.0f || u > 1.0f) continue;
+                    const glm::vec3 qv = glm::cross(tv, e1);
+                    const float w = glm::dot(s.dir, qv) / det, tt = glm::dot(e2, qv) / det;
+                    if (w < 0.0f || u + w > 1.0f || tt <= 0.0f || tt >= best) continue;
+                    best = tt, at = o + s.dir * tt;
+                }
+                patchMs.push_back(std::chrono::duration<double, std::milli>(Clock::now() - tp).count());
+                patchTris.push_back(double(patch.size()));
+                err[3].push_back(glm::distance(at, th.position) * px);
+                if (std::getenv("SF_RND_PICK_PATCH")) pick = at;
+            } else {
+                err[3].push_back(err[0].back());
+            }
             ++hits;
             DabParams p;
             p.center = pick;
@@ -199,11 +248,26 @@ int main(int argc, char** argv) {
             gd.strength = p.strength;
             if (std::getenv("SF_RND_CLAYPULL")) gd.weight = clayPull(p.strength); // the preview fixed (Ghost.cpp leaves it out)
             g.dabs.push_back(gd);
+            {   // the new dab's sphere: each vertex's move by ALL pending dabs (the others are unchanged), raised into
+                // the pads of its triangles' leaves and up; a worker's job per placed dab in the app
+                const auto t0 = Clock::now();
+                if (pad.size() != B.bvh.nodeCount()) pad.assign(B.bvh.nodeCount(), 0.0f);
+                inSphere.clear();
+                B.bvh.queryVertices(B.mesh, gd.center, gd.radius, inSphere);
+                for (uint32_t v : inSphere) {
+                    const float m = glm::distance(ghostMove(g, B.mesh.positions[v], B.mesh.normals[v]), B.mesh.positions[v]);
+                    if (m <= 0.0f) continue;
+                    for (uint32_t t : B.mesh.vertexTriangles(v))
+                        for (uint32_t node = B.bvh.leafOf(t); node != ~0u && pad[node] < m; node = B.bvh.parentOf(node)) pad[node] = m;
+                }
+                padMs.push_back(std::chrono::duration<double, std::milli>(Clock::now() - t0).count());
+            }
             if (int(g.dabs.size()) >= k) { // the batch lands: B catches up, the preview empties
                 B.mesh.positions = T.mesh.positions;
                 B.mesh.normals = T.mesh.normals;
                 B.bvh.refitAll(B.mesh);
                 g.dabs.clear();
+                std::fill(pad.begin(), pad.end(), 0.0f);
             }
         }
         // SF_RND_GHOSTCMP=1 (with k >= dabs: the preview holds the whole stroke): the preview's move of every vertex vs
@@ -226,11 +290,21 @@ int main(int argc, char** argv) {
                             double(q(0.5)), std::sqrt(sq / double(std::max<size_t>(1, e.size()))));
             }
         }
-        for (int step = 0; step < 3; ++step) {
+        if (!padMs.empty()) {
+            std::sort(padMs.begin(), padMs.end());
+            std::printf("rnd pick: pad update per placed dab (1 thread): %.1f ms p50 / %.1f max\n", padMs[padMs.size() / 2], padMs.back());
+        }
+        if (!patchMs.empty()) {
+            std::sort(patchMs.begin(), patchMs.end()), std::sort(patchTris.begin(), patchTris.end());
+            std::printf("rnd pick: ray vs moved patch (padded ray leaves, 1 thread): %.2f ms p50 / %.2f max, %.1fk / %.1fk triangles\n",
+                        patchMs[patchMs.size() / 2], patchMs.back(), patchTris[patchTris.size() / 2] / 1e3, patchTris.back() / 1e3);
+        }
+        for (int step = 0; step < 4; ++step) {
             auto& e = err[step];
             std::sort(e.begin(), e.end());
             const auto q = [&](double f) { return e.empty() ? 0.0f : e[std::min(e.size() - 1, size_t(f * double(e.size() - 1)))]; };
-            std::printf("rnd pick: batch %d, %d dabs, %d refinements: pick error max %.2f p99 %.2f p50 %.2f px\n", k, hits, step,
+            std::printf("rnd pick: batch %d, %d dabs, %s: pick error max %.2f p99 %.2f p50 %.2f px\n", k, hits,
+                        step == 3 ? "ray vs moved patch" : step == 0 ? "0 refinements" : step == 1 ? "1 refinements" : "2 refinements",
                         double(q(1.0)), double(q(0.99)), double(q(0.5)));
         }
         return 0;
