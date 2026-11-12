@@ -88,3 +88,16 @@ TEST(touch_pinch_zoom_steps) {
     c.zoom(pinchZoomSteps(2.0f));
     CHECK(near(c.distance, 5.0f, 1e-3f));
 }
+
+TEST(palm_guard_follows_the_pen) {
+    PalmGuard g;
+    CHECK(!g.active(0.0)); // no pen yet: fingers count
+    g.pen(true, 10.0);
+    CHECK(g.active(10.0) && g.active(500.0)); // in range: as long as it stays
+    g.pen(true, 500.0); // (hover, motion, a stroke: every pen event renews it)
+    g.pen(false, 501.0);
+    CHECK(g.active(501.0) && g.active(501.0 + PalmGuard::kAfterPen - 0.01)); // the hand is still there for a moment
+    CHECK(!g.active(501.0 + PalmGuard::kAfterPen + 0.01)); // then fingers count again
+    g.pen(true, 600.0);
+    CHECK(g.active(700.0));
+}
