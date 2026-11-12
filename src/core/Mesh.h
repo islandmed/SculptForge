@@ -220,6 +220,15 @@ public:
     std::vector<glm::vec3> paintBase;
     std::vector<PaintLayer> paintLayers;
     int activePaintLayer = -1;
+    // The colour vertex paint last laid on `colors` / `paintBase` (paintVertex fills it): one target colour (a brush
+    // colour, or white for an erase) lets a stroke at a low subdivision level reach the detail above as
+    // lerp(old, target, amount) instead of a difference (and an undo of it take that back exactly). state 2 = several
+    // colours since subdivCommit took the paint up; `settled` = it did, so the next paintVertex starts afresh.
+    struct PaintTarget {
+        glm::vec3 color{1.0f};
+        uint8_t state = 0; // 0 none, 1 one colour, 2 mixed
+        bool settled = false;
+    } paintTarget;
 
     // Texture painting (core/Texture.h): an RGBA texture on the UVs, shared by copies of the mesh until
     // one of them changes it (mutableTexture copies first). `paintToTexture`: the Paint brush, fills and
