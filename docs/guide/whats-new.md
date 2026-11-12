@@ -19,7 +19,7 @@ highlight: Round, woven Braid strands
 
 ```features
 date: 2026-11-11
-tagline: Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.
+tagline: Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.
 highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
 highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
 highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)
