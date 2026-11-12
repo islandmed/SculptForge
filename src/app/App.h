@@ -1564,7 +1564,7 @@ private:
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
-    void drawVoxelResolution(); // the slider (2/3 of its travel for 32-512) and the estimate line
+    void drawVoxelResolution(bool compact = false); // the slider (2/3 of its travel for 32-512) and the estimate line; compact: the shelf's, the slider alone at the width set before
     void drawVoxelHighResConfirm();
     struct VoxelEstimateCache {
         uint32_t part = ~0u;

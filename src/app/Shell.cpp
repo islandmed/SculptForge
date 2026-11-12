@@ -2784,6 +2784,11 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::SetNextItemWidth((vertical ? 180.0f : 120.0f) * s);
         drawDetailSlider("##dyntopo_detail");
         ImGui::PopStyleVar();
+    } else if (item == "widget.voxel_resolution") { // the Remesh palette's Voxel Resolution slider, on a shelf (Customize Shelves)
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
+        drawVoxelResolution(true);
+        ImGui::PopStyleVar();
     } else if (item == "widget.points") {
         size_t total = 0;
         uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ uint64_t(doc_.activePart) ^
