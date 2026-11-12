@@ -243,7 +243,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Background: Flat Colour", "背景：純色"},
     {"Background: Gradient", "背景：漸層"},
     // --- Command palette ---
-    {"Search commands, brushes and settings", "搜尋命令、筆刷和設定"},
     {"Recently used", "最近使用"},
     {"  No matching commands", "  找不到相符的命令"},
     {" result", " 個結果"},
@@ -5309,6 +5308,20 @@ constexpr Entry kTraditionalChinese[] = {
      "兩張圖片，正面圖與側面圖：各自成為模型後方場景中的平面，高度相同，正面圖在正視圖中顯示，側面圖在右視圖中顯示。"},
     {"What the reference images' textures take on the graphics card. Images over 4096 pixels are scaled down when they load.",
      "參考圖的紋理在顯示卡上佔用的記憶體。超過 4096 像素的圖片在載入時會縮小。"},
+    // --- The command line of the F3 search (CommandBar.cpp) ---
+    {"Search, or say what you want: clay 40, mirror x", "搜尋，或直接輸入指令：clay 40、mirror x"},
+    {"%s - type a number", "%s - 輸入數字"},
+    {"%s - name a Part, or say all", "%s - 輸入部件名稱，或輸入 all"},
+    {"%s - about %s triangles", "%s - 約 %s 個三角面"},
+    {"%s - %s voxels", "%s - %s 體素"},
+    {"Hide all", "全部隱藏"},
+    {"Hide all except %s", "隱藏除 %s 以外的全部"},
+    {"Hide %s", "隱藏 %s"},
+    {"Show all except %s", "顯示除 %s 以外的全部"},
+    {"Show only %s", "只顯示 %s"},
+    {"Show %s", "顯示 %s"},
+    {"Isolate", "獨顯"},
+    {"Isolate %s", "獨顯 %s"},
 };
 
 } // namespace

@@ -78,6 +78,7 @@ add_library(sculptforge_core STATIC
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp
+  src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
@@ -462,6 +463,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Palettes.cpp
     src/app/Theme.cpp
     src/app/CommandPalette.cpp
+    src/app/CommandBar.cpp
     src/app/Console.cpp
     src/app/Config.cpp
     src/app/LibraryBrowser.cpp
@@ -1138,6 +1140,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # The command line in the F3 search (tests/ui/command_bar.sfui).
+    sculptforge_ui_test(command_bar_1440 command_bar --size 1440x900)
+    sculptforge_ui_test(command_bar_2880 command_bar --size 2880x1800)
     # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
     sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
     sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)

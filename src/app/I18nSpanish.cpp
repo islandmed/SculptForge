@@ -252,7 +252,6 @@ constexpr Entry kSpanish[] = {
     {"Background: Gradient", "Fondo: degradado"},
 
     // --- Command palette ---
-    {"Search commands, brushes and settings", "Buscar comandos, pinceles y ajustes"},
     {"Recently used", "Usados recientemente"},
     {"  No matching commands", "  Ningún comando coincide"},
     {" result", " resultado"},
@@ -5794,6 +5793,20 @@ constexpr Entry kSpanish[] = {
      "Dos imágenes, una vista frontal y una lateral: cada una es un plano en la escena detrás del modelo, a la misma altura, de modo que la frontal se ve en la vista Frontal y la lateral en la vista Derecha."},
     {"What the reference images' textures take on the graphics card. Images over 4096 pixels are scaled down when they load.",
      "Lo que ocupan en la tarjeta gráfica las texturas de las imágenes de referencia. Las imágenes de más de 4096 píxeles se reducen al cargarlas."},
+    // --- The command line of the F3 search (CommandBar.cpp) ---
+    {"Search, or say what you want: clay 40, mirror x", "Busca o di lo que quieres: clay 40, mirror x"},
+    {"%s - type a number", "%s - escribe un número"},
+    {"%s - name a Part, or say all", "%s - nombra una Pieza o di todo"},
+    {"%s - about %s triangles", "%s - unos %s triángulos"},
+    {"%s - %s voxels", "%s - %s vóxeles"},
+    {"Hide all", "Ocultar todo"},
+    {"Hide all except %s", "Ocultar todo menos %s"},
+    {"Hide %s", "Ocultar %s"},
+    {"Show all except %s", "Mostrar todo menos %s"},
+    {"Show only %s", "Mostrar solo %s"},
+    {"Show %s", "Mostrar %s"},
+    {"Isolate", "Aislar"},
+    {"Isolate %s", "Aislar %s"},
 };
 
 } // namespace

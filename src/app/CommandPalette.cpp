@@ -159,8 +159,11 @@ void CommandPalette::search(App& app) {
     lastQuery_ = query_;
     lastRevision_ = reg.revision();
     results_.clear();
+    commands_.clear();
     selected_ = 0;
     scrollToSelected_ = true;
+    if (!fromHistory_) app.commandHistory().resetCursor(); // typing ends the walk through the history
+    fromHistory_ = false;
     const auto& all = reg.all();
     if (words(query_).empty()) {
         const std::set<std::string> covered = coveredCommands(reg);
@@ -173,7 +176,45 @@ void CommandPalette::search(App& app) {
         return;
     }
     results_ = find(app, query_, all.size());
+    // The plain-language readings go first when they add something: a number, a switch, Parts, or a word the search
+    // could not find (a typo, another name). A bare action name is already in the list below. Only the readings close
+    // to the best one are listed (three at most), and when the best is a sure one the rest of the search is left out:
+    // "clay 40" is the Clay brush, not a page of every brush with clay in its name.
+    for (const auto& r : cmd::interpret(app.commandCatalog(), query_, 6)) {
+        const bool adds = r.parametrised() || r.needsNumber || r.needsTarget || results_.empty();
+        if (!adds || commands_.size() >= 3 || (!commands_.empty() && r.score < commands_.front().score - 10.0)) continue;
+        commands_.push_back(r);
+    }
+    if (!commands_.empty() && commands_.front().score >= 85.0 && commands_.front().parametrised()) results_.clear();
 }
+
+namespace {
+
+// Up / Down in the field: the last commands, when the field is empty or already walking them. Otherwise the arrows
+// move the selection in the list as before.
+struct HistoryHook {
+    App* app;
+    bool* fromHistory;
+    bool handled = false;
+};
+
+int historyCallback(ImGuiInputTextCallbackData* d) {
+    auto* h = static_cast<HistoryHook*>(d->UserData);
+    cmd::CommandHistory& history = h->app->commandHistory();
+    if (!(d->BufTextLen == 0 || history.browsing())) return 0;
+    std::string text;
+    if (d->EventKey == ImGuiKey_UpArrow) text = history.older();
+    else if (history.browsing()) text = history.newer();
+    else return 0;
+    if (text.empty() && !history.browsing() && d->EventKey == ImGuiKey_UpArrow) return 0; // nothing to walk
+    d->DeleteChars(0, d->BufTextLen);
+    d->InsertChars(0, text.c_str());
+    *h->fromHistory = true;
+    h->handled = true;
+    return 0;
+}
+
+} // namespace
 
 void CommandPalette::draw(App& app, const CanvasRect& area) {
     constexpr const char* kPopup = "##command_palette";
@@ -184,6 +225,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
         ImGui::OpenPopup(kPopup);
         query_[0] = 0;
         lastQuery_ = "\x01";
+        app.commandHistory().resetCursor();
         focus = true;
     }
     const float width = std::min(560.0f * s, area.w - 24.0f * s);
@@ -206,15 +248,18 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::ColorConvertU32ToFloat4(IM_COL32(0x1b, 0x1b, 0x1e, 0xff)));
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (focus) ImGui::SetKeyboardFocusHere();
-        ImGui::InputTextWithHint("##Command palette", tr("Search commands, brushes and settings"), query_, sizeof query_);
+        HistoryHook hook{&app, &fromHistory_};
+        ImGui::InputTextWithHint("##Command palette", tr("Search, or say what you want: clay 40, mirror x"), query_, sizeof query_,
+                                 ImGuiInputTextFlags_CallbackHistory, historyCallback, &hook);
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
         dl->AddText(ImVec2(fieldPos.x + 5.0f * s, fieldPos.y + 6.0f * s), ui::color::textDim, ICON_LC_SEARCH);
         search(app);
 
         const auto& all = app.actions_.all();
-        const int n = int(results_.size());
-        if (n > 0) {
+        const int nc = int(commands_.size());
+        const int n = nc + int(results_.size());
+        if (n > 0 && !hook.handled) {
             if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) selected_ = (selected_ + 1) % n, scrollToSelected_ = true;
             if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) selected_ = (selected_ + n - 1) % n, scrollToSelected_ = true;
             if (ImGui::IsKeyPressed(ImGuiKey_PageDown, true)) selected_ = std::min(n - 1, selected_ + kMaxRows), scrollToSelected_ = true;
@@ -225,7 +270,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
         bool toConsole = false;
         if (n > 0 && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))) {
             run = selected_;
-            toConsole = ImGui::GetIO().KeyShift;
+            toConsole = ImGui::GetIO().KeyShift && run >= nc;
         }
 
         ImGui::Dummy(ImVec2(0, 2.0f * s));
@@ -247,8 +292,11 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
             if (scrollToSelected_) clipper.IncludeItemByIndex(selected_);
             while (clipper.Step()) {
                 for (int r = clipper.DisplayStart; r < clipper.DisplayEnd; ++r) {
-                    const Action& a = all[results_[size_t(r)]];
-                    const bool enabled = !a.enabled || a.enabled();
+                    const bool isCommand = r < nc;
+                    static const Action none;
+                    const Action& a = isCommand ? none : all[results_[size_t(r - nc)]];
+                    const cmd::Interpretation* reading = isCommand ? &commands_[size_t(r)] : nullptr;
+                    const bool enabled = isCommand || !a.enabled || a.enabled();
                     const ImVec2 p = ImGui::GetCursorScreenPos();
                     const float w = ImGui::GetContentRegionAvail().x;
                     rows->ChannelsSetCurrent(1);
@@ -256,30 +304,34 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
                     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 0));
-                    if (ImGui::Selectable((std::string(trAction(a.id, a.label)) + "##pal." + a.id).c_str(), false, ImGuiSelectableFlags_None, ImVec2(w, rowH)))
+                    const std::string commandText = isCommand ? app.commandPreview(*reading) : std::string();
+                    if (ImGui::Selectable(((isCommand ? commandText : std::string(trAction(a.id, a.label))) + "##pal." +
+                                           (isCommand ? "cmd" + std::to_string(r) : a.id)).c_str(),
+                                          false, ImGuiSelectableFlags_None, ImVec2(w, rowH)))
                         run = r;
                     ImGui::PopStyleColor(4);
                     const bool hovered = ImGui::IsItemHovered();
                     if (hovered && (ImGui::GetIO().MouseDelta.x != 0.0f || ImGui::GetIO().MouseDelta.y != 0.0f)) selected_ = r;
-                    ui::HelpAction(app, a.id.c_str());
+                    if (!isCommand) ui::HelpAction(app, a.id.c_str());
                     if (r == selected_ && scrollToSelected_) ImGui::SetScrollHereY(0.5f);
                     // Row: icon, label, dim palette path, shortcut keycaps on the right.
                     const ImU32 fg = enabled ? ui::color::text : ui::color::textDim;
                     const float ty = p.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
                     float x = p.x + 8.0f * s;
+                    const char* icon = isCommand ? app.commandIcon(*reading) : a.icon;
                     rows->AddText(ImVec2(x, ty), r == selected_ ? ui::color::accent : ui::color::textDim,
-                                  a.icon ? a.icon : ICON_LC_CHEVRON_RIGHT);
+                                  icon ? icon : ICON_LC_CHEVRON_RIGHT);
                     x += ImGui::GetFontSize() + 10.0f * s;
-                    const char* shownLabel = trAction(a.id, a.label);
+                    const char* shownLabel = isCommand ? commandText.c_str() : trAction(a.id, a.label);
                     rows->AddText(ImVec2(x, ty), fg, shownLabel);
                     x += ImGui::CalcTextSize(shownLabel).x + 10.0f * s;
                     // Found by another word for it: "Quad Remesh (also: retopo)".
-                    if (const std::string hint = aliasHint(a, query_); !hint.empty()) {
+                    if (const std::string hint = isCommand ? std::string() : aliasHint(a, query_); !hint.empty()) {
                         rows->AddText(ImVec2(x - 4.0f * s, ty), ui::color::accent, hint.c_str());
                         if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s %s", shownLabel, hint.c_str());
                         x += ImGui::CalcTextSize(hint.c_str()).x + 6.0f * s;
                     }
-                    const std::string chord = app.actions_.shortcutText(a.id);
+                    const std::string chord = isCommand ? app.commandKeys(*reading) : app.actions_.shortcutText(a.id);
                     const float keysW = chord.empty() ? 0.0f : ui::KeycapsWidth(chord);
                     const float right = p.x + w - 8.0f * s - keysW;
                     if (!a.palette.empty()) {
@@ -287,7 +339,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                         rows->AddText(nullptr, 0.0f, ImVec2(x, ty), ui::color::textDim, trPath(a.palette).c_str(), nullptr, 0.0f, &clip);
                     }
                     if (!chord.empty()) ui::KeycapsAt(rows, ImVec2(right, ty - 1.0f * s), chord);
-                    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s  %s  %s", trAction(a.id, a.label), trPath(a.palette).c_str(), chord.c_str());
+                    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s  %s  %s", shownLabel, trPath(a.palette).c_str(), chord.c_str());
                     rows->ChannelsSetCurrent(0);
                     if (r == selected_)
                         rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xf0, 0x88, 0x2e, 0x30), theme::rounding(4.0f * s));
@@ -323,8 +375,16 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
         }
 
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) ImGui::CloseCurrentPopup();
-        if (run >= 0 && run < n) {
-            const Action& a = all[results_[size_t(run)]];
+        if (run >= 0 && run < nc) {
+            const cmd::Interpretation reading = commands_[size_t(run)];
+            if (!app.commandRunnable(reading)) {
+                app.status_ = app.commandPreview(reading); // "Intensity - type a number": say what is missing, stay open
+            } else {
+                ImGui::CloseCurrentPopup();
+                pending = [&app, reading] { app.runCommandLine(reading); };
+            }
+        } else if (run >= nc && run < n) {
+            const Action& a = all[results_[size_t(run - nc)]];
             ImGui::CloseCurrentPopup();
             app.actions_.touch(a.id);
             app.saveRecentActions();
@@ -335,7 +395,16 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
             } else if (c && (required || (toConsole && !c->params.empty()))) {
                 prefill = c->name + " ";
             } else {
-                pending = a.run;
+                // Every run says which key does it (teaches the keys) and joins the history (Up arrow runs it again).
+                const std::string id = a.id, label = trAction(a.id, a.label);
+                pending = [&app, run = a.run, id, label] {
+                    const std::string before = app.status_;
+                    run();
+                    app.commandHistory().push(label);
+                    app.saveCommandHistory();
+                    if (const std::string keys = app.actions_.shortcutText(id); !keys.empty() && app.status_ == before)
+                        app.status_ = label + "  (" + keys + ")";
+                };
             }
         }
         ImGui::EndPopup();

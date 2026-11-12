@@ -986,6 +986,7 @@ void App::initActions() {
         for (std::string line; std::getline(f, line);)
             if (!line.empty()) recent.push_back(line);
         actions_.setRecent(std::move(recent));
+        loadCommandHistory();
     }
     layoutBaseline_ = layoutKey();
     actionsReady_ = true;
