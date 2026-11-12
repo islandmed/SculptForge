@@ -9,6 +9,7 @@
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
 #include "app/GizmoAll.h"
+#include "app/OrbitSpeed.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -214,11 +215,11 @@ private:
     void onMouseUp();
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
-    void orbitBy(float x, float y, float dx, float dy);
+    void orbitBy(float x, float y, float dx, float dy, bool mouse = false);
     std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
-    void onKey(SDL_Keycode key, SDL_Keymod mod);
+    void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
 
     bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
@@ -3073,6 +3074,7 @@ private:
         bool paint = false;
     } strokeLatch_;
     uint32_t strokePopupSwallowUp_ = 0; // mouse buttons whose press the popup took: their release is its too
+    SDL_Keycode aloneSavedKey_ = SDLK_UNKNOWN; // keyDown_ while a waiting first key runs alone (Actions setAloneHook)
     SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
     uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
     std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed

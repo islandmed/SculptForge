@@ -9,6 +9,7 @@
 #include "app/UiScale.h"
 #include "app/NativeDialog.h"
 #include "app/Config.h"
+#include "app/OrbitSpeed.h"
 
 #include "app/App.h"
 #include "app/UiServe.h"
@@ -113,8 +114,10 @@ Json toJson(const UiPrefs& p) {
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
     j.set("orbitAtPointer", p.orbitAtPointer);
+    j.set("mouseOrbitSpeed", p.mouseOrbitSpeed);
     j.set("invertZoom", p.invertZoom);
     j.set("keyNavSpeed", p.keyNavSpeed);
+    j.set("twoKeyWindow", p.twoKeyWindow);
     j.set("quickRemesh", p.quickRemesh);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
@@ -213,7 +216,9 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
     p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
+    p.mouseOrbitSpeed = clampMouseOrbitSpeed(float(j["mouseOrbitSpeed"].asNumber(p.mouseOrbitSpeed)));
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
+    p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
@@ -1619,7 +1624,7 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
             return true;
         }
         actions_.assignShortcut(capturingShortcut_, chord, captureSequence_);
-        status_ = label + ": " + chord;
+        status_ = label + ": " + chord + (chord.find(kThen) != std::string::npos ? " (also works pressed together)" : "");
     }
     captureFirst_.clear();
     capturingShortcut_.clear();
@@ -1681,6 +1686,8 @@ void App::drawShortcutConflict() {
             const Action* a = actions_.find(conflict_.actionId);
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w - 28.0f * s);
             ImGui::Text(tr("%s is already used by %s."), conflict_.chord.c_str(), conflict_.holders.c_str());
+            if (conflict_.chord.find(kThen) != std::string::npos)
+                ImGui::TextColored(col(ui::color::textDim), "%s", tr("It also works with both keys pressed together."));
             ImGui::TextColored(col(ui::color::textDim), tr("Replace gives it to '%s' and takes it from there."),
                                a ? trAction(a->id, a->label) : conflict_.actionId.c_str());
             ImGui::PopTextWrapPos();
@@ -2161,8 +2168,12 @@ void drawHotkeysSection(App& app) {
                 app.beginShortcutCapture(a->id);
             if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
             ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
-                         "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                         "the arrow beside it puts the default back.",
+                         chord.find(kThen) != std::string::npos
+                             ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                               "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
+                               "both keys pressed together."
+                             : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                               "the arrow beside it puts the default back.",
                          "Preferences > Hotkeys");
             ImGui::SameLine(0.0f, 2.0f * s);
             const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a->id).c_str());
@@ -2174,8 +2185,9 @@ void drawHotkeysSection(App& app) {
             }
             if (sequenceClicked) app.beginShortcutCapture(a->id, true);
             ui::HelpText("Two keys in a row", nullptr,
-                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within half "
-                         "a second). The first key still works alone if it is bound; it runs when no second key follows.",
+                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
+                         "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
+                         "bound; it runs when the window is up and the other key did not come.",
                          "Preferences > Hotkeys");
             if (reg.hasOverride(a->id)) {
                 ImGui::SameLine(0.0f, 2.0f * s);

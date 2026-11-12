@@ -365,7 +365,7 @@ private:
     bool morphFits_ = false;
     void dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p);
     // `copy`: the symmetry copy's index (Lock plane keeps one plane per copy).
-    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy);
+    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy, const SymCopy& m);
     // Lock plane (BrushRecipe::planeLock): each symmetry copy's plane (normal, point) from the stroke's first dab.
     std::vector<std::pair<glm::vec3, glm::vec3>> lockedPlanes_;
     // Crisp edge on a locked plane: how far toward it each vertex has gone this stroke (0..1; crispStamp_ = the

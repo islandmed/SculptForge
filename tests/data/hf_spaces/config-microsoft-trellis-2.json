@@ -1,0 +1,225 @@
+{
+ "_recorded": "2026-11-11 from https://microsoft-trellis-2.hf.space/config, trimmed to the endpoints Generate 3D calls",
+ "version": "6.1.0",
+ "components": [
+  {
+   "id": 4,
+   "type": "image",
+   "props": {
+    "label": "Image Prompt"
+   }
+  },
+  {
+   "id": 5,
+   "type": "radio",
+   "props": {
+    "label": "Resolution",
+    "value": "1024"
+   }
+  },
+  {
+   "id": 6,
+   "type": "slider",
+   "props": {
+    "label": "Seed",
+    "value": 0
+   }
+  },
+  {
+   "id": 8,
+   "type": "slider",
+   "props": {
+    "label": "Decimation Target",
+    "value": 300000
+   }
+  },
+  {
+   "id": 9,
+   "type": "slider",
+   "props": {
+    "label": "Texture Size",
+    "value": 2048
+   }
+  },
+  {
+   "id": 14,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Strength",
+    "value": 7.5
+   }
+  },
+  {
+   "id": 15,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Rescale",
+    "value": 0.7
+   }
+  },
+  {
+   "id": 16,
+   "type": "slider",
+   "props": {
+    "label": "Sampling Steps",
+    "value": 12
+   }
+  },
+  {
+   "id": 17,
+   "type": "slider",
+   "props": {
+    "label": "Rescale T",
+    "value": 5.0
+   }
+  },
+  {
+   "id": 21,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Strength",
+    "value": 7.5
+   }
+  },
+  {
+   "id": 22,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Rescale",
+    "value": 0.5
+   }
+  },
+  {
+   "id": 23,
+   "type": "slider",
+   "props": {
+    "label": "Sampling Steps",
+    "value": 12
+   }
+  },
+  {
+   "id": 24,
+   "type": "slider",
+   "props": {
+    "label": "Rescale T",
+    "value": 3.0
+   }
+  },
+  {
+   "id": 28,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Strength",
+    "value": 1.0
+   }
+  },
+  {
+   "id": 29,
+   "type": "slider",
+   "props": {
+    "label": "Guidance Rescale",
+    "value": 0.0
+   }
+  },
+  {
+   "id": 30,
+   "type": "slider",
+   "props": {
+    "label": "Sampling Steps",
+    "value": 12
+   }
+  },
+  {
+   "id": 31,
+   "type": "slider",
+   "props": {
+    "label": "Rescale T",
+    "value": 3.0
+   }
+  },
+  {
+   "id": 37,
+   "type": "html",
+   "props": {
+    "label": "3D Asset Preview",
+    "value": "\n<div class=\"previewer-container\">\n    <svg style=\" opacity: .5; height: var(--size-5); color: var(--body-text-color);\"\n    xmlns=\"http://www.w3.org/2000/svg\" width=\"100%\" height=\"100%\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"feather feather-image\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\"></rect><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"></circle><polyline points=\"21 15 16 10 5 21\"></polyline></svg>\n</div>\n"
+   }
+  },
+  {
+   "id": 40,
+   "type": "model3d",
+   "props": {
+    "label": "Extracted GLB"
+   }
+  },
+  {
+   "id": 41,
+   "type": "downloadbutton",
+   "props": {
+    "label": "Download GLB"
+   }
+  },
+  {
+   "id": 45,
+   "type": "state",
+   "props": {}
+  }
+ ],
+ "dependencies": [
+  {
+   "id": 2,
+   "api_name": "start_session",
+   "inputs": [],
+   "outputs": []
+  },
+  {
+   "id": 4,
+   "api_name": "preprocess_image",
+   "inputs": [
+    4
+   ],
+   "outputs": [
+    4
+   ]
+  },
+  {
+   "id": 7,
+   "api_name": "image_to_3d",
+   "inputs": [
+    4,
+    6,
+    5,
+    14,
+    15,
+    16,
+    17,
+    21,
+    22,
+    23,
+    24,
+    28,
+    29,
+    30,
+    31
+   ],
+   "outputs": [
+    45,
+    37
+   ]
+  },
+  {
+   "id": 9,
+   "api_name": "extract_glb",
+   "inputs": [
+    45,
+    8,
+    9
+   ],
+   "outputs": [
+    40,
+    41
+   ]
+  }
+ ],
+ "api_prefix": "/gradio_api"
+}

@@ -129,7 +129,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
@@ -782,6 +782,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
     if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
+    if (name == "mouse_orbit_speed") return std::round(double(app_.uiPrefs_.mouseOrbitSpeed) * 100.0);
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -1036,6 +1037,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
+    if (name == "key_sequence_waiting") return app_.actions_.sequenceWaiting() ? 1.0 : 0.0; // a first key waiting for its second
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
     if (name == "custom_litspheres") {
         int n = 0;
@@ -1381,6 +1383,13 @@ double Demo::query(const std::string& name, bool& known) const {
         size_t n = 0;
         for (uint8_t h : m.hidden) n += h != 0;
         return double(n);
+    }
+    if (name == "moved_raised") { // the most any vertex rose along its snapshot normal since `snapshot` (0 = nothing added)
+        if (basePositions_.size() != m.vertexCount() || baseNormals_.size() != basePositions_.size()) return -1.0;
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v)
+            up = std::max(up, double(glm::dot(m.positions[v] - basePositions_[v], baseNormals_[v])));
+        return up;
     }
     if (name == "moved_masked") { // masked vertices (mask >= 0.5) that moved since `snapshot`
         if (basePositions_.size() != m.vertexCount()) return -1.0;
@@ -2876,6 +2885,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "key_nav_speed") { // key_nav_speed X: Preferences > Input's pan and zoom key speed (0.1 to 5)
         if (!need(1)) return false;
         run([this, v = num(1, 1.0f)] { app_.uiPrefs_.keyNavSpeed = std::clamp(v, 0.1f, 5.0f); });
+    } else if (verb == "mouse_orbit_speed") { // mouse_orbit_speed X: Preferences > Input's mouse orbit speed (0.1 to 2)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1.0f)] { app_.uiPrefs_.mouseOrbitSpeed = clampMouseOrbitSpeed(v); });
+    } else if (verb == "two_key_window") { // two_key_window X: Preferences > Input's two-key window (seconds)
+        if (!need(1)) return false;
+        run([this, v = num(1, 0.4f)] { app_.uiPrefs_.twoKeyWindow = v; });
     } else if (verb == "input_style") {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
@@ -4079,7 +4094,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
-                "run", "key_nav_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
                 "touch_stroke", "touch_pinch", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {

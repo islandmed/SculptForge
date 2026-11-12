@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.9 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.10 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -938,16 +938,29 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
+    if(UNIX)
+      add_test(NAME release_card COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_card_test.sh)
+      set_tests_properties(release_card PROPERTIES TIMEOUT 60)
+    endif()
+    add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks
     # the real release's asset list too).
     add_test(NAME release_install_assets COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py)
     add_test(NAME release_install_assets_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py --self-test)
+    # release.sh --stage warns (never fails) when the CMO's launch headline is missing or its keywords miss HIGHLIGHTS line 1 / the tagline.
+    if(UNIX)
+      add_test(NAME release_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_headline_test.sh)
+      set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
+      set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+    endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
     # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
     add_test(NAME release_staged_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/staged_run.py --self-test)
+    add_test(NAME release_flaky_log COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/flaky_log.py --self-test)
     add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
@@ -960,6 +973,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
+    endif()
+    # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
+      set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
     endif()
     # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
     if(UNIX AND NOT APPLE)
@@ -1104,12 +1122,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
+    sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
+    sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
     # View > Reference images (tests/ui/reference_images.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(reference_images_1440 reference_images --size 1440x900)
     sculptforge_ui_test(reference_images_2880 reference_images --size 2880x1800)
+    # Mouse orbit speed (tests/ui/mouse_orbit_speed.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(mouse_orbit_speed_1440 mouse_orbit_speed --size 1440x900)
+    sculptforge_ui_test(mouse_orbit_speed_2880 mouse_orbit_speed --size 2880x1800)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)

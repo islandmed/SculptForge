@@ -470,7 +470,10 @@ void App::keyNavStep(const std::string& id) { keyNavTap_[id] = kKeyNavTapSeconds
 
 // Once a frame, in the app's own loop and the UI test runner's (a first key of a two-key shortcut that waited its
 // half second out runs alone; the registry counts the frames' time, a hitch counts as 0.1 s at most).
-void App::tickKeySequence(float dt) { actions_.tick(std::min(dt, 0.1f)); }
+void App::tickKeySequence(float dt) {
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    actions_.tick(std::min(dt, 0.1f));
+}
 
 // Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
@@ -735,6 +738,16 @@ void App::drawInputSection() {
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
     {
+        ImGui::TextDisabled("%s", tr("Two-key window"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.two_key_window", &uiPrefs_.twoKeyWindow, kKeySequenceMin, kKeySequenceMax, "%.2f s");
+        ui::HelpText("Two-key window", nullptr,
+                     "How long the second key of a two-key shortcut (\"C then V\") has after the first, whether you press "
+                     "the two together (either one first) or tap them in a row. A key that is part of a two-key shortcut "
+                     "runs its own action once this time is up; every other key runs at once.",
+                     "Preferences > Input");
+    }
+    {
         ImGui::TextDisabled("%s", tr("Pan and zoom key speed"));
         ImGui::SetNextItemWidth(-FLT_MIN);
         ImGui::SliderFloat("##input.key_nav_speed", &uiPrefs_.keyNavSpeed, 0.1f, 5.0f, "%.1fx", ImGuiSliderFlags_Logarithmic);
@@ -801,6 +814,17 @@ void App::drawInputSection() {
                  "zooms work at that depth. Started over the background, it turns about the middle of the view as "
                  "before. In every key style.",
                  "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Mouse orbit speed"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.mouse_orbit_speed", &uiPrefs_.mouseOrbitSpeed, kMouseOrbitSpeedMin, kMouseOrbitSpeedMax,
+                           "%.2fx", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+        ui::HelpText("Mouse orbit speed", nullptr,
+                     "How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x "
+                     "is the usual turn; lower it if the view spins too fast. The pen has its own View speed in "
+                     "Preferences > Tablet.",
+                     "Preferences > Input");
+    }
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
 }

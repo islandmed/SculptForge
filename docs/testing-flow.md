@@ -14,15 +14,16 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 
 | tier | when | what | replay of 98 Actions T0s (11-11) |
 |---|---|---|---|
-| **push** | every push while working: `SF_T0_TIER=push ~/Work/.sf/t0.sh` (ref `t0/push/<branch>`) | impacted.py's direct picks (build graph, own files, hand map, name words) + `PUSH_SMOKE` (start, open a model and sculpt on the real frame loop, undo, save and open a project) + `marks` + `stale_tree` | tests 331 -> 161 s median; 0 failures left for READY |
+| **push** | every push while working: `SF_T0_TIER=push` on the T0 runner (ref `t0/push/<branch>`) | impacted.py's direct picks (build graph, own files, hand map, name words) + `PUSH_SMOKE` (start, open a model and sculpt on the real frame loop, undo, save and open a project) + `marks` + `stale_tree` | tests 331 -> 161 s median; 0 failures left for READY |
 | **ready** | before READY (the default) | the T0 below: smoke incl. the mode matrix shards and the monkey, the changed areas, co-changed UI tests | the verdict a reviewer reads |
 | **batch** / **nightly** / **release** | T1 + T2, T3, release stage | the whole suite; nightly labels, floor benches; packages | unchanged |
 
 A push-tier result says "push tier: not a READY verdict" and is never cached as a verdict. A green READY verdict is
-kept by tree hash and base tree hash (`~/Work/.sf/state/t0-verdicts.tsv`): a squash, a reworded commit or a re-push
+kept by tree hash and base tree hash in the T0 runner's verdict log: a squash, a reworded commit or a re-push
 of the same tree on the same base reuses it (`SF_T0_FRESH=1` runs it again). Known flakes go in
-`tests/quarantine.txt` with an owner and a date: they don't block until then, and block again after it.
-`tools/test/replay_selection.py ~/Work/.sf/t0-ci/results.tsv` replays past runs through a selection change before it lands.
+`tests/quarantine.txt` with an owner, a date and a follow-up task (optionally one case, `[monkey 1064]`: another case of
+the test still blocks, and every quarantined failure names its FAIL lines): they don't block until then, and block again after it.
+`tools/test/replay_selection.py RESULTS.tsv` (the T0 runner's log of past runs) replays past runs through a selection change before it lands.
 
 ## T0: what can this change break?
 

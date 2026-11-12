@@ -356,6 +356,13 @@ bool App::init(const AppOptions& options) {
     splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
+    actions_.setAloneHook([this](SDL_Keycode key, bool begin) { // a first key that waited: a pie menu on it holds open only while it is down
+        if (!begin) keyDown_ = aloneSavedKey_;
+        else {
+            aloneSavedKey_ = keyDown_;
+            keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
+        }
+    });
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
@@ -1888,9 +1895,10 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
-            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
+            onKey(e.key.key, e.key.mod, true); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
+        actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
         std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
@@ -2237,7 +2245,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !fromPen); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2318,7 +2326,7 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float x, float y, float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2333,9 +2341,15 @@ void App::orbitBy(float x, float y, float dx, float dy) {
         orbitStarted_ = true;
     }
     const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    // Preferences > Input > Mouse orbit speed scales the angle per pixel in every input style; the pen's drags were
+    // scaled by its own View speed already. The roll's sweep is an angle about the view's centre: scaled the same.
+    const float speed = mouse && !forceTurntable_ ? clampMouseOrbitSpeed(uiPrefs_.mouseOrbitSpeed) : 1.0f;
+    const float roll = (lock == 2 || lock == 3) ? rollSweep(x, y, dx, dy) : 0.0f;
+    dx *= speed;
+    dy *= speed;
     if (lock == 1) orbitRaw_.orbit(dx, dy);
-    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
-    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, roll * speed);
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, roll * speed);
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
     const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();
@@ -2433,7 +2447,7 @@ void App::onMouseUp() {
     penNavButton_ = 0;
 }
 
-void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
@@ -2485,7 +2499,8 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
-    actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
     keyDown_ = SDLK_UNKNOWN;
 }
 
