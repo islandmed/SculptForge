@@ -4,6 +4,7 @@
 // Cloth solver (core/Cloth.h): edge lengths kept under gravity, energy, contact with a collider, rest, seams,
 // determinism across thread counts, presets, bad setups.
 #include "TestHarness.h"
+#include "GeomInvariants.h"
 
 #include "core/Cloth.h"
 #include "core/Commands.h"
@@ -19,6 +20,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <string>
 #include <vector>
 
 using namespace sf;
@@ -567,6 +570,134 @@ TEST(cloth_brush_mask_holds) {
     }
     CHECK(!maskedMoved);
     CHECK(freeMoved);
+}
+
+namespace {
+
+// A Cloth drag on a unit icosphere along the arc `from` -> `to` (dabs 0.015 apart), brush radius 0.15; `prep` may change
+// the document first (a mask, an uneven mesh).
+Document clothArc(glm::vec3 from, glm::vec3 to, Symmetry sym, const std::function<void(Document&)>& prep = {}) {
+    Document d = makeDoc(makeIcosphere(6, 1.0f));
+    if (prep) prep(d);
+    d.sculptor.beginStroke(d.mesh, "Cloth");
+    glm::vec3 prev = glm::normalize(from);
+    for (int i = 0; i < 24; ++i) {
+        const glm::vec3 c = glm::normalize(glm::mix(from, to, float(i) / 23.0f));
+        DabParams p;
+        p.center = c;
+        p.viewDir = -c;
+        p.radius = 0.15f;
+        p.strength = 0.5f;
+        p.strokeDelta = i == 0 ? glm::vec3(0.0f) : c - prev;
+        prev = c;
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Cloth, p, sym);
+    }
+    d.undo.push(d.sculptor.endStroke());
+    return d;
+}
+
+bool allFinite(const Mesh& m) {
+    for (const glm::vec3& q : m.positions)
+        if (!std::isfinite(q.x) || !std::isfinite(q.y) || !std::isfinite(q.z)) return false;
+    return true;
+}
+
+} // namespace
+
+TEST(cloth_brush_symmetry_off_checksum) {
+    // With no symmetry a Cloth stroke runs exactly as before the symmetry averaging existed (no partner map, no
+    // averaging, no speck pass). The positions' hash is printed; SF_CLOTH_SUM_EXPECT=<hash> (from a run of the base
+    // build, same machine) must match it bit for bit.
+    const Document d = clothArc(glm::vec3(0.2f, 0.0f, 0.98f), glm::vec3(0.55f, 0.0f, 0.83f), Symmetry{false, false, false});
+    uint64_t h = 1469598103934665603ull;
+    for (const glm::vec3& q : d.mesh.positions)
+        for (int k = 0; k < 3; ++k) {
+            uint32_t bits;
+            std::memcpy(&bits, &q[k], 4);
+            h = (h ^ bits) * 1099511628211ull;
+        }
+    char text[32];
+    std::snprintf(text, sizeof text, "%016llx", static_cast<unsigned long long>(h));
+    std::printf("  cloth stroke, symmetry off: position hash %s\n", text);
+    if (const char* expect = std::getenv("SF_CLOTH_SUM_EXPECT")) CHECK(std::string(expect) == text);
+}
+
+TEST(cloth_brush_symmetry_partner_edge_cases) {
+    // The partner map: a vertex on the mirror plane is its own partner (averaged with its mirror image: it stays on the
+    // plane), mirror and radial copies together run, a masked half never moves nor pulls its free partners, and a mesh
+    // that is not symmetric (no partners) just runs as before. None of them crashes or produces a NaN.
+    const float edge = geom::meanEdge(makeIcosphere(6, 1.0f));
+    const std::vector<uint32_t> map = geom::mirrorMapX(makeIcosphere(6, 1.0f));
+
+    // On the plane: a stroke across x = 0.
+    {
+        const Document d = clothArc(glm::vec3(-0.15f, 0.2f, 0.97f), glm::vec3(0.3f, 0.2f, 0.93f), Symmetry{true, false, false});
+        const Mesh ref = makeIcosphere(6, 1.0f);
+        float offPlane = 0.0f;
+        for (uint32_t v = 0; v < ref.vertexCount(); ++v)
+            if (std::abs(ref.positions[v].x) < 1e-6f) offPlane = std::max(offPlane, std::abs(d.mesh.positions[v].x));
+        const float sym = geom::symmetryError(d.mesh, map);
+        std::printf("  plane: vertices on x = 0 end %.2g off it; mirror error %.2g (%.3f edges)\n", offPlane, sym, sym / edge);
+        CHECK(allFinite(d.mesh));
+        CHECK(offPlane < 1e-5f);
+        CHECK(sym < 1e-4f);
+    }
+    // X and Y mirrors together (four copies).
+    {
+        Symmetry sym{true, true, false};
+        const Document d = clothArc(glm::vec3(0.4f, 0.3f, 0.86f), glm::vec3(0.55f, 0.35f, 0.75f), sym);
+        const float err = geom::symmetryError(d.mesh, map);
+        std::printf("  X + Y: mirror error %.2g (%.3f edges)\n", err, err / edge);
+        CHECK(allFinite(d.mesh));
+        CHECK(err < 1e-4f);
+    }
+    // Radial copies (4 around Y), with and without the X mirror.
+    for (int mirror = 0; mirror < 2; ++mirror) {
+        Symmetry sym{mirror != 0, false, false};
+        sym.radialEnabled = true, sym.radial = 4, sym.radialAxis = 1;
+        const Document d = clothArc(glm::vec3(0.4f, 0.3f, 0.86f), glm::vec3(0.55f, 0.35f, 0.75f), sym);
+        const Mesh ref = makeIcosphere(6, 1.0f);
+        float moved = 0.0f;
+        for (uint32_t v = 0; v < ref.vertexCount(); ++v) moved = std::max(moved, glm::distance(d.mesh.positions[v], ref.positions[v]));
+        std::printf("  radial 4%s: moved %.4f\n", mirror ? " + X" : "", moved);
+        CHECK(allFinite(d.mesh));
+        CHECK(moved > 0.1f * edge);
+    }
+    // A masked half: the copy on the masked side asks for nothing, and nothing there moves.
+    {
+        std::vector<glm::vec3> before;
+        const Document d = clothArc(glm::vec3(0.3f, 0.3f, 0.9f), glm::vec3(0.5f, 0.3f, 0.8f), Symmetry{true, false, false}, [&](Document& x) {
+            x.mesh.ensureMask();
+            for (uint32_t v = 0; v < x.mesh.vertexCount(); ++v) x.mesh.mask[v] = x.mesh.positions[v].x < 0.0f ? 1.0f : 0.0f;
+            before = x.mesh.positions;
+        });
+        bool maskedMoved = false, freeMoved = false;
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+            if (d.mesh.mask[v] >= 1.0f && d.mesh.positions[v] != before[v]) maskedMoved = true;
+            if (d.mesh.mask[v] <= 0.0f && d.mesh.positions[v] != before[v]) freeMoved = true;
+        }
+        std::printf("  masked half: masked moved %d, free moved %d\n", int(maskedMoved), int(freeMoved));
+        CHECK(allFinite(d.mesh));
+        CHECK(!maskedMoved);
+        CHECK(freeMoved);
+    }
+    // A mesh that is not symmetric: one side roughened by a third of an edge, so most vertices have no partner.
+    {
+        const Document d = clothArc(glm::vec3(0.3f, 0.3f, 0.9f), glm::vec3(0.5f, 0.3f, 0.8f), Symmetry{true, false, false}, [&](Document& x) {
+            for (uint32_t v = 0; v < x.mesh.vertexCount(); ++v)
+                if (x.mesh.positions[v].x > 0.0f) {
+                    const float h = float((v * 2654435761u) % 1000u) / 1000.0f - 0.5f;
+                    x.mesh.positions[v] += x.mesh.normals[v] * (0.66f * edge * h);
+                }
+            x.bvh.build(x.mesh);
+        });
+        float moved = 0.0f;
+        const Mesh ref = makeIcosphere(6, 1.0f);
+        for (uint32_t v = 0; v < ref.vertexCount(); ++v) moved = std::max(moved, glm::distance(d.mesh.positions[v], ref.positions[v]));
+        std::printf("  uneven mesh: moved %.4f\n", moved);
+        CHECK(allFinite(d.mesh));
+        CHECK(moved > 0.1f * edge);
+    }
 }
 
 TEST(cloth_brush_settle_drapes_down_and_collides) {

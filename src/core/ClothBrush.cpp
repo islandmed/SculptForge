@@ -148,8 +148,8 @@ void matchPartners(ClothStroke& cs, std::span<const SymCopy> copies) {
 // and with a few passes a dab is far from converged, so each side lands somewhere else (0.3 edges after one dab,
 // 4.5 after a stroke). Averaging every vertex with its partners' images makes the result the same on both sides.
 void symmetrize(ClothStroke& cs, std::vector<glm::vec3>& x, std::span<const SymCopy> copies) {
-    if (cs.partner.size() != copies.size() || copies.size() < 2) return;
     const size_t n = x.size();
+    if (cs.partner.size() != copies.size() || copies.size() < 2 || cs.partner[1].size() != n || cs.basePin.size() != n) return;
     cs.mean.resize(n);
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
@@ -376,8 +376,12 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                 if (const auto g = cs.grow.find(cs.verts[i]); g != cs.grow.end()) cs.sim.setRestScale(uint32_t(i), g->second);
         }
         matchPartners(cs, mirrors);
-        cs.tris = setup.triangles;
-        linkTriangles(cs);
+        if (mirrors.size() > 1) { // (with no symmetry, a stroke runs exactly as it did before: no partners, no speck pass)
+            cs.tris = setup.triangles;
+            linkTriangles(cs);
+        } else {
+            cs.tris.clear(), cs.triNbr.clear();
+        }
         cs.builtAt.clear();
         for (const SymCopy& m : mirrors) cs.builtAt.push_back(m.point(p.center));
         cs.builtRadius = r;
@@ -504,8 +508,10 @@ void Sculptor::dabCloth(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) 
                 xm[i] = cs.start[i] + 0.5f * cs.delta[i] + 0.5f * mean / float(r1 - r0);
             }
         }, 8192);
-        symmetrize(cs, xm, mirrors);
-        settleSpecks(cs, xm);
+        if (mirrors.size() > 1) {
+            symmetrize(cs, xm, mirrors);
+            settleSpecks(cs, xm);
+        }
     }
     const double kernel = build + lapMs(clock);
 
