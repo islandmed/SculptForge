@@ -444,6 +444,9 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     topologyHeld_ = false;
     microMesh_ = nullptr;
     microBase_ = -1;
+    cageFree_.clear();
+    cageTriMax_.clear();
+    kelvinMaskBlocked_.v = false;
     active_ = true;
     return true;
 }
@@ -745,9 +748,51 @@ void Sculptor::moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> vert
     else bvh.refit(mesh, verts);
 }
 
+bool Sculptor::kelvinNearMask(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) {
+    if (!mesh.micro || !(mesh.micro->hasMask() || mesh.hasMask()) || !microMaskNear(mesh, bvh, center, radius)) return false;
+    kelvinMaskBlocked_.v.store(true, std::memory_order_relaxed);
+    return true;
+}
+
+void Sculptor::cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts) {
+    const MicroMesh& mm = *mesh.micro;
+    if (cageFree_.size() != mesh.vertexCount()) cageFree_.assign(mesh.vertexCount(), -1.0f);
+    if (cageTriMax_.size() != mesh.triangles.size()) cageTriMax_.assign(mesh.triangles.size(), -1);
+    auto triMax = [&](uint32_t t) {
+        if (cageTriMax_[t] >= 0) return int(cageTriMax_[t]);
+        int worst = 0;
+        if (mm.hasMask())
+            worst = *std::max_element(mm.mask.begin() + std::ptrdiff_t(size_t(t) * mm.samples),
+                                      mm.mask.begin() + std::ptrdiff_t(size_t(t + 1) * mm.samples));
+        if (mesh.hasMask()) { // (the base mesh's own mask: a grid point is masked as much as its corners are, at most)
+            const glm::uvec3 tr = mesh.triangles[t];
+            worst = std::max(worst, int(std::max({mesh.maskAt(tr.x), mesh.maskAt(tr.y), mesh.maskAt(tr.z)}) * 255.0f + 0.5f));
+        }
+        cageTriMax_[t] = int16_t(worst);
+        return worst;
+    };
+    // (serial: the triangles' maxima are shared between neighbouring vertices; a stroke's region is thousands of
+    // base triangles of a few hundred points each)
+    for (uint32_t v : verts) {
+        if (cageFree_[v] >= 0.0f) continue;
+        int worst = 0;
+        auto ring = [&](uint32_t u) {
+            for (uint32_t t : mesh.vertexTriangles(u)) worst = std::max(worst, triMax(t));
+        };
+        ring(v);
+        for (uint32_t u : mesh.neighbors(v)) {
+            if (worst == 255) break;
+            ring(u);
+        }
+        cageFree_[v] = 1.0f - float(worst) / 255.0f;
+    }
+}
+
 void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence,
                            const float* given) {
     const size_t n = verts.size();
+    const bool cage = mesh.micro && (mesh.micro->hasMask() || mesh.hasMask()) && mesh.micro->baseTriangles == mesh.triangles.size();
+    if (cage) cageFreeFor(mesh, verts);
     if (dynTopo_.active()) // the remesher's record keeps them (see touch); their bits then keep them out of ours
         for (uint32_t v : verts)
             if (markBit(touched_, v)) dynTopo_.recordStrokeStart(v);
@@ -758,7 +803,8 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     poolFor(n, [&](size_t b, size_t e) {
         uint32_t count = 0;
         for (size_t i = b; i < e; ++i) {
-            const float k = given ? given[i] : influence ? vertexInfluence(mesh, verts[i]) : 1.0f;
+            float k = given ? given[i] : influence ? vertexInfluence(mesh, verts[i]) : 1.0f;
+            if (cage) k = std::min(k, cageFree_[verts[i]]); // (hidden faces stay: 0)
             influence_[i] = k;
             firstTouch_[i] = k > 0.0f && markBit(touched_, verts[i]);
             count += firstTouch_[i];
@@ -946,6 +992,11 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         return;
     }
     if (isKelvinletBrush(type)) { // Kelvinlet.cpp (no remeshing: they move the surface, as Move does)
+        // On a micro level they move the base cage, which can't hold a mask finer than its triangles: held two rings out they
+        // tear the surface at the mask's edge. Like the other sideways brushes (microBrushSupport 0) they leave a masked
+        // micro level alone where the mask is.
+        for (const SymCopy& m : copies(sym))
+            if (kelvinNearMask(mesh, bvh, m.point(p.center), p.radius)) return;
         dabKelvinlet(mesh, bvh, type, p, sym);
         return;
     }
@@ -1727,7 +1778,12 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     if (!active_) return;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
-    if (microMoveAlongNormals && microReady(mesh)) {
+    // A mask nearby (the micro level's own, or the base mesh's) takes the grid's per-point rule for the whole stroke: the
+    // cage can't hold a mask finer than its triangles (a faceted patch with a hard edge), the grid holds it per point.
+    bool gridGrab = microMoveAlongNormals;
+    if (!gridGrab && mesh.micro && (mesh.micro->hasMask() || mesh.hasMask()))
+        for (const SymCopy& m : copies(sym)) gridGrab = gridGrab || microMaskNear(mesh, bvh, m.point(p.center), p.radius);
+    if (gridGrab && microReady(mesh)) {
         for (const SymCopy& m : copies(sym)) micro_.beginGrab(mesh, bvh, m.point(p.center), p.radius, p.focal, m.m);
         return;
     }

@@ -14,6 +14,7 @@
 #include "core/Undo.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <limits>
 #include <functional>
@@ -264,6 +265,9 @@ public:
     void flushKelvinletFar(Mesh& mesh, BVH& bvh, bool all);
     // The last kelvinletStep found more vertices than kelvinlet.vertexBudget (the app then moves less per frame).
     bool kelvinletOverBudget() const { return kelvinOverBudget_; }
+    // A Kelvin brush skipped a step this stroke because a mask is near on a micro level (see Sculptor::kelvinNearMask); the
+    // app tells the artist once. Set from the solver thread too.
+    bool kelvinMaskBlocked() const { return kelvinMaskBlocked_.v.load(std::memory_order_relaxed); }
 
     // Cloth brush (core/Cloth.h, ClothBrush.cpp): the settings (Brush > Cloth) and the surfaces it collides with,
     // which the app sets for the stroke (the other visible Parts; null = none).
@@ -399,6 +403,16 @@ private:
     void gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&)>& displacement, const glm::vec3& a,
                             const glm::vec3& ab, float radius, const glm::vec3& mid, float reach);
     void applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int group);
+    struct Flag { // (an atomic that copies: the Sculptor moves with its Document)
+        std::atomic<bool> v{false};
+        Flag() = default;
+        Flag(const Flag& o) : v(o.v.load()) {}
+        Flag& operator=(const Flag& o) { return v.store(o.v.load()), *this; }
+    };
+    Flag kelvinMaskBlocked_;
+    // The Kelvin brushes move the base cage, which can't hold a mask finer than its triangles: on a micro level with a mask
+    // near `center` they skip the step (sets kelvinMaskBlocked_).
+    bool kelvinNearMask(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius);
     bool kelvinOverBudget_ = false;  // the last kelvinletStep's region held more than kelvinlet.vertexBudget vertices
     uint64_t kelvinStroke_ = 0;
     size_t kelvinLastVerts_ = 0;     // the last move's region: its vertex count and reach (the next one's prediction)
@@ -414,6 +428,15 @@ private:
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
     void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true,
                      const float* given = nullptr); // given: each vertex's influence (0 = not moved)
+    // A micro level's mask as the base cage sees it. Moving a base vertex shifts the grid points of the triangles
+    // around it (their corners) and, through the corners' normals, those of the ring beyond; so a base vertex is as
+    // free as the freest grid point within two rings leaves it: 1 - the largest mask in the triangles touching it or
+    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Snake Hook, Vdm...) goes through
+    // displaceAll, which scales by it: a fully masked grid point holds still, bit for bit. Computed on demand, kept
+    // for the stroke (no stroke that moves vertices edits the mask).
+    void cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts);
+    std::vector<float> cageFree_;     // per base vertex: -1 = not computed yet
+    std::vector<int16_t> cageTriMax_; // per base triangle: the largest grid mask, -1 = not computed yet
 
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);

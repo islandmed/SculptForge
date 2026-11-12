@@ -1212,6 +1212,7 @@ private:
     glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point
     float kelvinPending_ = 0.0f;   // Twist / Scale: the turn or scale still to apply
     float kelvinAmount_ = 1.0f;
+    bool kelvinMaskHinted_ = false;     // this stroke's "nothing near a mask" hint was shown
     bool kelvinMovedThisFrame_ = false; // kelvinTo moved it since the last kelvinCatchUp
     static void SDLCALL onVdmChosen(void* userdata, const char* const* files, int filter);
     static void SDLCALL onVdmExportChosen(void* userdata, const char* const* files, int filter);

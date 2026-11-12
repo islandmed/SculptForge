@@ -1,0 +1,8 @@
+---
+whats_new: **Masks on Micro levels** now hold: Move no longer pushes masked areas, and the Kelvin brushes and Detail Clone leave a masked Micro level alone where the mask is.
+fixed: **Masks on Micro levels**: Move, the elastic Kelvin brushes and Detail Clone deformed the base mesh under a Micro level, which did not see the mask painted on the Micro level, so masked areas (a sphere's eyes) still moved. Masked areas now stay exactly where they are, with the soft edge of the painted mask, and a partial mask scales the move. A Move that reaches a mask moves the surface along its normals for that stroke (as Move along normals does); the Kelvin brushes and Detail Clone do nothing near a mask on a Micro level (a hint in the status line says so; they work as before elsewhere). A mask set on the Part itself (not painted on the Micro level) also protects the Micro detail. Reported by a user.
+testers:
+  - Any OS: sphere, add a Micro level (Geometry > Micro Detail, level 3), mask a patch with the mask brush, then drag Move across it; the masked patch stays put with a round soft edge, the unmasked surface follows.
+  - Same patch with Kelvin Grab: nothing happens near the mask; away from it, Kelvin Grab works. Undo and redo restore the patch.
+---
+Cause: the Micro level keeps its own mask per grid point, and Move/Kelvin brushes move the base vertices below it, which had no mask. Move over a mask now uses the grid's per-point rule (microMaskNear); the Kelvin brushes skip a dab near a mask (the base cage held two rings out tore the surface at the mask's edge). Invariant tests: tests/test_micro_mask_grab.cpp.

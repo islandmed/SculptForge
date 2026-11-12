@@ -14,6 +14,10 @@
 //   volumeChange          relative change of the enclosed volume
 //   nonFinite, flipped    NaN/inf positions; triangles whose normal turned more than 90 degrees
 //   invertedFaces         triangles turned against all their neighbours (a fold's black speckle; pull brushes too)
+//   microSnapshot, maskedMoved, maskedOvershoot
+//                         a micro level's surface points before and after a stroke: a fully masked sample (mask 255) may
+//                         not move at all (bit-identical), a partly masked one may move at most (1 - mask) of what the
+//                         same stroke moves it unmasked (any brush, any path: the grid's or the base cage's)
 // The artist close-ups (tools/qa/closeup.py) use an absolute umbrella rule on app meshes, where there is no before.
 #pragma once
 
@@ -21,6 +25,7 @@
 
 #include "core/BVH.h"
 #include "core/MeshBoolean.h"
+#include "core/Micro.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
 
@@ -30,6 +35,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -342,6 +348,64 @@ inline std::vector<glm::vec3> centersOf(const std::vector<std::vector<DabParams>
     for (const auto& s : strokes)
         for (const DabParams& p : s) c.push_back(p.center);
     return c;
+}
+
+// --- Micro levels (core/Micro.h) ---
+// Every surface point of the base triangles whose centre faces `facing` (cosine above `minCos`; a patch of the sphere).
+struct MicroSnapshot {
+    std::vector<uint32_t> tris;
+    std::vector<glm::vec3> points; // tris.size() * samples
+};
+inline MicroSnapshot microSnapshot(const Mesh& m, const glm::vec3& facing, float minCos = 0.2f) {
+    MicroSnapshot s;
+    const MicroMesh& mm = *m.micro;
+    const glm::vec3 f = glm::normalize(facing);
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+        const glm::uvec3 tr = m.triangles[t];
+        const glm::vec3 c = (m.positions[tr.x] + m.positions[tr.y] + m.positions[tr.z]) / 3.0f;
+        if (glm::dot(glm::normalize(c), f) >= minCos) s.tris.push_back(t);
+    }
+    s.points.reserve(s.tris.size() * mm.samples);
+    for (uint32_t t : s.tris)
+        for (uint32_t j = 0; j <= mm.n; ++j)
+            for (uint32_t i = 0; i + j <= mm.n; ++i) s.points.push_back(microPoint(m, t, i, j));
+    return s;
+}
+// Samples with mask `fullAt` or more (255 = fully masked) that moved at all; `compared` counts those checked.
+inline size_t maskedMoved(const Mesh& m, const MicroSnapshot& before, const MicroSnapshot& after, size_t* compared = nullptr,
+                          int fullAt = 255) {
+    const MicroMesh& mm = *m.micro;
+    size_t moved = 0, seen = 0;
+    if (!mm.hasMask()) return 0;
+    for (size_t k = 0; k < before.tris.size(); ++k)
+        for (uint32_t s = 0; s < mm.samples; ++s) {
+            if (mm.mask[size_t(before.tris[k]) * mm.samples + s] < fullAt) continue;
+            ++seen;
+            const glm::vec3 a = before.points[k * mm.samples + s], b = after.points[k * mm.samples + s];
+            if (std::memcmp(&a, &b, sizeof a) != 0) ++moved;
+        }
+    if (compared) *compared = seen;
+    return moved;
+}
+// The worst excess, in world units, of a sample's move over (1 - mask) times what `reference` (the same stroke without
+// the mask) moved it: <= 0 when partial masks scale the move down as promised.
+inline float maskedOvershoot(const Mesh& m, const MicroSnapshot& before, const MicroSnapshot& after, const MicroSnapshot& reference,
+                             int* worstMask = nullptr) {
+    const MicroMesh& mm = *m.micro;
+    float worst = 0.0f;
+    if (!mm.hasMask()) return 0.0f;
+    for (size_t k = 0; k < before.tris.size(); ++k)
+        for (uint32_t s = 0; s < mm.samples; ++s) {
+            const float free = 1.0f - float(mm.mask[size_t(before.tris[k]) * mm.samples + s]) / 255.0f;
+            const size_t at = k * mm.samples + s;
+            const float moved = glm::distance(before.points[at], after.points[at]);
+            const float allowed = free * glm::distance(before.points[at], reference.points[at]);
+            if (moved - allowed > worst) {
+                worst = moved - allowed;
+                if (worstMask) *worstMask = mm.mask[size_t(before.tris[k]) * mm.samples + s];
+            }
+        }
+    return worst;
 }
 
 } // namespace sf::geom

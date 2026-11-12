@@ -48,6 +48,24 @@ namespace {
 
 glm::vec3 projectOnPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); }
 
+// The freedom (1 - mask) the base mesh's own mask leaves each grid point of triangle t, interpolated from its corners
+// (the micro level's mask is per grid point, beside it). False, `out` untouched, when its corners are all free.
+bool baseFreedom(const Mesh& m, uint32_t t, uint32_t n, std::vector<float>& out) {
+    if (!m.hasMask()) return false;
+    const glm::uvec3 tr = m.triangles[t];
+    const float m0 = m.maskAt(tr.x), m1 = m.maskAt(tr.y), m2 = m.maskAt(tr.z);
+    if (m0 <= 0.0f && m1 <= 0.0f && m2 <= 0.0f) return false;
+    out.resize(size_t(n + 1) * (n + 2) / 2);
+    const float inv = 1.0f / float(n);
+    size_t k = 0;
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i, ++k) {
+            const float masked = (float(n - i - j) * m0 + float(i) * m1 + float(j) * m2) * inv;
+            out[k] = masked >= 0.9999f ? 0.0f : 1.0f - masked; // (fully masked corners: exactly none, not rounding off)
+        }
+    return true;
+}
+
 // A base triangle's box grown by its Phong bulge and displacement range.
 bool triangleNear(const Mesh& m, const MicroMesh& mm, uint32_t t, const glm::vec3& c, float r) {
     const glm::uvec3 tr = m.triangles[t];
@@ -482,7 +500,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     const PinchSampler pinchSampler{m, mm, snap_.data(), snapOf_.data()};
     poolFor(cand_.size(), [&](size_t b, size_t e) {
         thread_local std::vector<int16_t> before;
-        thread_local std::vector<float> coarse;
+        thread_local std::vector<float> coarse, baseFree;
         thread_local std::vector<glm::vec3> coarsePull; // pinches at stride > 1: the pull on the coarse points
         thread_local std::vector<glm::vec4> coarsePinch; // ... with the depth change
         MicroTriangle T;
@@ -493,6 +511,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
             T.set(m, t, n);
             int16_t* g = mm.disp.data() + size_t(t) * S;
             uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
+            const float* bf = !maskBrush && baseFreedom(m, t, n, baseFree) ? baseFree.data() : nullptr;
             if (readsNeighbours && !maskBrush) before.assign(g, g + S); // Jacobi: neighbours as they were
             const int16_t* old = !maskBrush && type == BrushType::Layer ? oldDisp_.data() + size_t(tileOf_[t] - 1) * S : nullptr;
             coarse.assign(size_t(cm + 1) * (cm + 2) / 2, 0.0f);
@@ -527,6 +546,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     }
                     if (texture) f *= texture(p);
                     if (mk && stride == 1) f *= 1.0f - float(mk[idx]) / 255.0f; // (coarse: the fine points' mask, below)
+                    if (bf && stride == 1) f *= bf[idx];
                     if (f <= 0.0f) continue;
                     const float facingRaw = glm::dot(nn, areaNormal);
                     const float facing = std::max(facingRaw, 0.3f); // moving along nn reaches a plane this much slower
@@ -634,6 +654,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     return;
                 }
                 if (stride > 1 && mk) delta *= 1.0f - float(mk[idx]) * (1.0f / 255.0f);
+                if (stride > 1 && bf) delta *= bf[idx];
                 const float nd = float(g[idx]) + delta * invStep; // (in units of the step)
                 if (std::abs(nd) > 32767.0f) over = std::max(over, std::abs(nd) * mm.step);
                 const int16_t q = quantizeUnits(nd);
@@ -752,7 +773,7 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
         const uint32_t cm = n / gm.stride, cs = (cm + 1) * (cm + 2) / 2;
         const glm::vec3 dm = gm.mirror * delta;
         poolFor(gm.tris, [&](size_t b, size_t e) {
-            thread_local std::vector<float> coarse;
+            thread_local std::vector<float> coarse, baseFree;
             coarse.resize(cs);
             for (size_t k = b; k < e; ++k) {
                 const uint32_t t = grabTris_[gm.firstTri + k];
@@ -766,9 +787,11 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
                 if (!any) continue;
                 int16_t* g = mm.disp.data() + size_t(t) * S;
                 const uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
+                const float* bf = baseFreedom(m, t, n, baseFree) ? baseFree.data() : nullptr;
                 int triMax = mm.triRange[t];
                 interpolateCoarse(coarse.data(), n, gm.stride, [&](uint32_t idx, float dd) {
                     if (mk) dd *= 1.0f - float(mk[idx]) * (1.0f / 255.0f);
+                    if (bf) dd *= bf[idx];
                     const int16_t q = quantizeUnits(float(g[idx]) + dd * invStep);
                     g[idx] = q;
                     triMax = std::max(triMax, q >= 0 ? int(q) : -int(q));

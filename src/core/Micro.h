@@ -239,6 +239,9 @@ void microRaiseBulge(Mesh& m);
 // The base triangles whose displaced surface may come within `radius` of `center` (each BVH node grown by the
 // largest displacement and bulge under it, MicroMesh::Reach), for the caller's exact test per triangle.
 void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, std::vector<uint32_t>& out);
+// True when any grid point (or base corner) within `radius` of `center`, and the two base edges around it, is masked at all:
+// the base cage can't hold a mask finer than its triangles, so a Move over one takes the grid's per-point rule instead.
+bool microMaskNear(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius);
 // ... and those whose displaced surface the ray may cross.
 void microRayTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, std::vector<uint32_t>& out);
 // bvh.raycast, or microRaycast on a mesh with a micro level: what brushes and the cursor pick.
