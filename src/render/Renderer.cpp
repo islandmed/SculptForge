@@ -3766,12 +3766,10 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
                 std::fprintf(stderr, "coarse lod: %zu of %zu points sent in %.1f ms\n", s.coarseUpTo, L.positions.size(), elapsedMs());
             return;
         }
-        if (!L.colors.empty() || !L.mask.empty()) {
-            gl::BindVertexArray(s.coarseVao);
-            uploadCoarseAttributes(s);
-            gl::BindVertexArray(0);
-            gl::BindBuffer(GL_ARRAY_BUFFER, 0);
-        }
+        gl::BindVertexArray(s.coarseVao); // (also when they are gone: it switches their arrays off)
+        uploadCoarseAttributes(s);
+        gl::BindVertexArray(0);
+        gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     }
     for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
     s.coarsePending.clear();
