@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/MicroRenderer.h"
+#include "core/AtomicRef.h"
 
 #include "core/FocusDetail.h"
 #include "render/MicroFocus.h"
@@ -656,7 +657,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
                     if (!runs.empty() && v - runs.back().second <= kGap) runs.back().second = v + 1;
                     else runs.push_back({v, v + 1});
                     for (uint32_t t : mesh.vertexTriangles(v))
-                        std::atomic_ref<uint64_t>(baseBits_[t >> 6]).fetch_or(uint64_t(1) << (t & 63), std::memory_order_relaxed);
+                        AtomicRef<uint64_t>(baseBits_[t >> 6]).fetch_or(uint64_t(1) << (t & 63), std::memory_order_relaxed);
                 }
                 moved.fetch_add(count, std::memory_order_relaxed);
             }, kBlock);

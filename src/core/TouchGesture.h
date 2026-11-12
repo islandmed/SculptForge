@@ -54,12 +54,17 @@ float pinchZoomSteps(float scale);
 class PalmGuard {
 public:
     static constexpr double kAfterPen = 0.3;
+    // A pen in range sends hover events all the while; none for this long means it left without telling us (a driver
+    // that never sends the proximity-out), and fingers count again.
+    static constexpr double kSilent = 3.0;
     double afterPen = kAfterPen; // (a UI test stretches it: its frames run faster than the clock)
-    void pen(bool inRange, double now) { inRange_ = inRange; nearUntil_ = now + afterPen; } // any pen event
-    bool active(double now) const { return inRange_ || now < nearUntil_; }
+    double silent = kSilent;
+    void pen(bool inRange, double now) { inRange_ = inRange; lastEvent_ = now; nearUntil_ = now + afterPen; } // any pen event
+    bool active(double now) const { return (inRange_ && now < lastEvent_ + silent) || now < nearUntil_; }
 
 private:
     bool inRange_ = false;
+    double lastEvent_ = 0.0;
     double nearUntil_ = 0.0;
 };
 

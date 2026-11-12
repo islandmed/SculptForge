@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/Clusters.h"
+#include "core/AtomicRef.h"
 
 #include "core/ThreadPool.h"
 
@@ -518,7 +519,7 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
             const auto& cl = order.clusters()[dirty[d]];
             for (uint32_t l = 0; l < cl.vertexCount; ++l)
                 if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv)
-                    std::atomic_ref<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
+                    AtomicRef<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
         }
     }, 16);
     std::vector<uint32_t> cells;

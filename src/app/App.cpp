@@ -253,7 +253,11 @@ bool App::init(const AppOptions& options) {
     }
     glContext_ = sharedContext_ ? sharedContext_ : SDL_GL_CreateContext(window_);
     if (!glContext_) {
+#ifdef SF_GLES
+        startError_ = std::string("OpenGL ES 3.2 is not available: ") + SDL_GetError();
+#else
         startError_ = std::string("OpenGL 3.3 is not available: ") + SDL_GetError();
+#endif
         SDL_Log("OpenGL 3.3 context creation failed: %s", SDL_GetError());
         return false;
     }
@@ -340,7 +344,11 @@ bool App::init(const AppOptions& options) {
     }
     applyLook(); // Preferences > Interface > Look (after the fonts it may switch to)
     ImGui_ImplSDL3_InitForOpenGL(window_, glContext_);
+#ifdef SF_GLES
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init("#version 330 core");
+#endif
 
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
@@ -511,10 +519,17 @@ void App::closeSplash() {
 }
 
 void App::glWindowAttributes() {
+#ifdef SF_GLES
+    // Android (SCULPTFORGE_GLES): OpenGL ES 3.2; render/GL.cpp compiles the shaders as GLSL ES 3.20.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+#endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     // No multisampling in the window: the 3D view antialiases in its own target (Renderer::drawView), so it can
@@ -1779,6 +1794,16 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         requestQuit();
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_DID_ENTER_BACKGROUND:
+        // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
+        // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
+        autosaveRevision_ = ~uint64_t(0);
+        tickProject(0.0f);
+        autosavePrefs(true);
+        break;
+#endif
     case SDL_EVENT_JOYSTICK_ADDED:
     case SDL_EVENT_JOYSTICK_REMOVED:
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:

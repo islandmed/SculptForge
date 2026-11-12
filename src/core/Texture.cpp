@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Texture.h"
+#include "core/AtomicRef.h"
 #include "core/Parallel.h"
 
 #include "core/ThreadPool.h"
@@ -1240,7 +1241,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
                 for (int ty = ty0; ty <= ty1; ++ty)
                     for (int tx = tx0; tx <= tx1; ++tx) {
                         uint8_t& flag = touchedFlag_[size_t(ty) * size_t(idx.tilesX) + size_t(tx)];
-                        std::atomic_ref<uint8_t> f(flag);
+                        AtomicRef<uint8_t> f(flag);
                         if (!f.load(std::memory_order_relaxed)) f.store(1, std::memory_order_relaxed);
                     }
             }

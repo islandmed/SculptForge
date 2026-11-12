@@ -3,7 +3,7 @@
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=4
 snapshot
-palm_guard on 1
+palm_guard on 1 2
 key f
 camera 0 0
 
@@ -46,6 +46,17 @@ key ctrl+z
 expect_value moved == 0
 touch_pinch 0.5 0.5 2 0 0 0
 expect_value camera_distance < $d0*0.55
+
+# A pen that never says it left (no proximity-out) stops guarding once it falls silent.
+pen_enter 0.9 0.9
+expect_value palm_guard == 1
+wait_real 2.2
+expect_value palm_guard == 0
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+pen_out
 
 # Off (desktop's default): a finger beside a pen in range is a finger.
 palm_guard off
