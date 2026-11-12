@@ -1,0 +1,22 @@
+# The welcome window on a phone (Hameron, Pixel, Android 11-12): the screen is 1080 px wide and Android's UI scale ran
+# at 300 %, so the fixed 500 dp window was wider than the screen and its X and Close button were off it. The window
+# stays inside the 3D view's area, at the phone's portrait size and at a desktop scale, and its X closes it.
+# CMake runs this at 1080x2400.
+ui_scale 300
+run new_sphere subdivisions=3
+key f3
+type "##Command palette" "welcome"
+key enter
+wait_idle 10
+expect_value welcome_open == 1
+expect_value welcome_outside_px == 0
+shot welcome-phone-300
+ui_scale 100
+wait_idle 10
+expect_value welcome_outside_px == 0
+shot welcome-phone-100
+ui_scale 300
+wait_idle 10
+expect_value welcome_outside_px == 0
+click "Close##welcome"
+expect_value welcome_open == 0
