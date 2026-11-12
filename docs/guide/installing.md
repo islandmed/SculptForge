@@ -48,7 +48,8 @@ not in an app store yet; you install the `.apk` from the
    Intel or AMD) and check it against `SHA256SUMS-android.txt`.
 2. Open it from your browser or file manager and allow installs from that app when Android asks.
 3. If you installed an earlier test APK, uninstall it first: it is signed with a different key, and Android won't
-   update over it. Copy projects out of its Projects folder before you do.
+   update over it. Copy projects out of its Projects folder before you do. This is a test build: a later version,
+   signed with our own key, will need one more uninstall and reinstall.
 
 It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 
