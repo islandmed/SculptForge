@@ -2211,7 +2211,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !fromPen); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2292,7 +2292,7 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float x, float y, float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2307,9 +2307,15 @@ void App::orbitBy(float x, float y, float dx, float dy) {
         orbitStarted_ = true;
     }
     const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    // Preferences > Input > Mouse orbit speed scales the angle per pixel in every input style; the pen's drags were
+    // scaled by its own View speed already. The roll's sweep is an angle about the view's centre: scaled the same.
+    const float speed = mouse && !forceTurntable_ ? clampMouseOrbitSpeed(uiPrefs_.mouseOrbitSpeed) : 1.0f;
+    const float roll = (lock == 2 || lock == 3) ? rollSweep(x, y, dx, dy) : 0.0f;
+    dx *= speed;
+    dy *= speed;
     if (lock == 1) orbitRaw_.orbit(dx, dy);
-    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
-    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, roll * speed);
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, roll * speed);
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
     const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();

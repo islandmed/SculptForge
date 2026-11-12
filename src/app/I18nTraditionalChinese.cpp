@@ -1658,6 +1658,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Orbit around the pointer", "以指標為中心環繞"},
     {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
      "從模型上開始的旋轉會以指標下的點為中心旋轉視圖，之後的縮放也在該深度進行。從背景開始時，照舊以視圖中心旋轉。適用於所有按鍵風格。"},
+    {"Mouse orbit speed", "滑鼠環繞速度"},
+    {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "滑鼠或觸控板的旋轉拖曳每移動一個像素，檢視轉動的幅度，適用於所有按鍵風格。1x 為一般的轉速；檢視轉得過快時可調低。畫筆有自己的檢視速度（偏好設定 > 繪圖板）。"},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
      "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
      "滑鼠滾輪會朝指標下的模型位置縮放，該點維持在指標下，而不是朝視圖中央。使用 Maya 按鍵時開啟（選擇風格時會自動設"

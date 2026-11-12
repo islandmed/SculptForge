@@ -446,6 +446,8 @@ constexpr Entry kSpanish[] = {
     {"Orbit around the pointer", "Orbitar alrededor del puntero"},
     {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
      "Una rotación que empieza sobre el modelo gira la vista alrededor del punto bajo el puntero, y los zooms posteriores trabajan a esa profundidad. Si empieza sobre el fondo, gira alrededor del centro de la vista como antes. En todos los estilos de teclas."},
+    {"Mouse orbit speed", "Velocidad de órbita del ratón"},
+    {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "Cuánto gira la vista por cada píxel que avanza un arrastre de rotación con el ratón o el trackpad, en todos los estilos de teclas. 1x es el giro habitual; bájalo si la vista gira demasiado rápido. El lápiz tiene su propia Velocidad de vista en Preferencias > Tableta."},
     {"Fullscreen", "Pantalla completa"},
     {"Gradient", "Degradado"},
     {"Flat Colour", "Color plano"},

@@ -801,6 +801,17 @@ void App::drawInputSection() {
                  "zooms work at that depth. Started over the background, it turns about the middle of the view as "
                  "before. In every key style.",
                  "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Mouse orbit speed"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.mouse_orbit_speed", &uiPrefs_.mouseOrbitSpeed, kMouseOrbitSpeedMin, kMouseOrbitSpeedMax,
+                           "%.2fx", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+        ui::HelpText("Mouse orbit speed", nullptr,
+                     "How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x "
+                     "is the usual turn; lower it if the view spins too fast. The pen has its own View speed in "
+                     "Preferences > Tablet.",
+                     "Preferences > Input");
+    }
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
 }

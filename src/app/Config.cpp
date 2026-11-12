@@ -9,6 +9,7 @@
 #include "app/UiScale.h"
 #include "app/NativeDialog.h"
 #include "app/Config.h"
+#include "app/OrbitSpeed.h"
 
 #include "app/App.h"
 #include "app/UiServe.h"
@@ -113,6 +114,7 @@ Json toJson(const UiPrefs& p) {
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
     j.set("orbitAtPointer", p.orbitAtPointer);
+    j.set("mouseOrbitSpeed", p.mouseOrbitSpeed);
     j.set("invertZoom", p.invertZoom);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("quickRemesh", p.quickRemesh);
@@ -213,6 +215,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
     p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
+    p.mouseOrbitSpeed = clampMouseOrbitSpeed(float(j["mouseOrbitSpeed"].asNumber(p.mouseOrbitSpeed)));
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
