@@ -33,6 +33,16 @@
 #include <unistd.h> // execv (--cli)
 #endif
 
+#if defined(_WIN32)
+// Hybrid-graphics laptops (Intel + NVIDIA / AMD): the drivers read these exports when the program loads and then run
+// OpenGL on the discrete card, with no Settings > Graphics entry needed. Preferences > Performance > Graphics card
+// (app/Calibration.cpp: applyCachedGpuChoice) still sets the per-app Windows preference on top of them.
+extern "C" {
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 namespace {
 
 void usage() {
