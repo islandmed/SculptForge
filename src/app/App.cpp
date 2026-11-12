@@ -1042,6 +1042,7 @@ bool App::wantsFrames(double now) const {
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
+           renderer_.coarseUpdatePending() || // coarse levels still following a stroke's edits, a few ms a frame
            renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
 }
 

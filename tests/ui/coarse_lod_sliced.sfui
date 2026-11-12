@@ -1,0 +1,25 @@
+# The coarse levels follow a stroke's edits a few milliseconds of clusters a frame (Renderer::updateCoarse), not all in
+# one frame: a 33M mesh's 7800 edited clusters took 100 ms in one, the slowest frame of a whole run. With a slice budget
+# of ~0 each sync does one batch (64 clusters) and sends one chunk of points, so a big brush's clusters take several
+# frames; they draw in full until the last is in, then every cluster is coarse again, as without slicing.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+env SF_COARSE_SLICE_MS 0.001
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+expect_value drawn_triangles <= 40000
+expect_value coarse_clusters > 0
+remember coarse_clusters before
+expect_value coarse_pending == 0
+stroke 0.25 0.5 0.75 0.5 0.6 hold
+wait 0.3
+expect_value coarse_pending > 0
+release
+# (the batches follow one per frame: pending is still there a frame or two after the release, then it is gone)
+wait 3
+expect_value coarse_pending == 0
+expect_value coarse_clusters == $before
+expect_value drawn_triangles <= 40000
+shot coarse-sliced-after-stroke

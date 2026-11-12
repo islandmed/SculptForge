@@ -303,6 +303,7 @@ public:
     // enough (the app draws until then).
     bool coarsePreviewOnly() const { return previewOnly_; }
     bool coarseStillWanted() const { return stillWanted_; }
+    bool coarseUpdatePending() const; // the levels follow a stroke's edits a few ms a frame: keep drawing
     // The frame governor's GPU timer: the whole frame's GPU time, the CPU's before the 3D view drew (render/Clusters.h:
     // nextGpuMsPerTriangle)
     void noteGpuFrame(double gpuMs, uint64_t drawnTriangles, double cpuBeforeDrawMs = 0.0);
@@ -432,6 +433,9 @@ private:
         std::unique_ptr<CoarseLevels> coarse;
         std::vector<uint8_t> coarseDirty;
         std::vector<uint32_t> coarsePending; // the dirty clusters, to update
+        size_t coarseDone = 0;               // the first coarseDone of them are in the levels already (CPU side; updateCoarse is sliced)
+        size_t coarseUpTo = 0;               // of the points a finished pass sends, the first coarseUpTo are on the GPU
+        bool coarseChanged = false;          // the levels' points changed since the last upload
         bool coarseTried = false, coarseEdited = false; // (coarseEdited: this sync marked some)
         std::vector<uint32_t> drawnOrder; // the mesh triangle of each drawn triangle (meshes with UVs only)
         size_t drawnTriangles = 0;
@@ -495,6 +499,7 @@ private:
     const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
     void markCoarseDirty(MeshSlot& s, uint32_t c);
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
+    double coarseMsPerCluster_ = 0.0; // updateCoarse's measured cost (moving average), 0 = not yet
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
     void uploadCoarsePoints(MeshSlot& s);

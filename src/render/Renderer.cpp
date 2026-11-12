@@ -2443,7 +2443,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
-        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear();
+        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear(), s.coarseDone = s.coarseUpTo = 0, s.coarseChanged = false;
         s.proxyCount.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
@@ -3652,6 +3652,12 @@ void Renderer::noteGpuFrame(double gpuMs, uint64_t drawnTriangles, double cpuBef
     gpuMsPerTriangle_ = nextGpuMsPerTriangle(gpuMsPerTriangle_, gpuMs, cpuBeforeDrawMs, drawnTriangles);
 }
 
+bool Renderer::coarseUpdatePending() const {
+    for (const MeshSlot& s : slots_)
+        if (s.coarseDone > 0 && !s.coarsePending.empty()) return true; // (computing, or sending the points)
+    return false;
+}
+
 size_t Renderer::coarsePendingClusters() const {
     size_t n = 0;
     for (const MeshSlot& s : slots_) n += s.coarsePending.size();
@@ -3704,23 +3710,75 @@ size_t Renderer::patchErrors(uint32_t id, const Mesh& mesh) {
 void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
     if (!s.coarse || c >= s.coarseDirty.size()) return;
     s.coarseEdited = true;
+    s.coarseDone = s.coarseUpTo = 0; // (a cluster already done may have moved again: the pass starts over)
     if (!s.coarseDirty[c]) s.coarseDirty[c] = 1, s.coarsePending.push_back(c);
 }
 
 // After a stroke: the points of the cells the edited clusters' vertices are in, and up the levels
-// (updateCoarseLevels), sent up whole (a few MB).
+// (updateCoarseLevels), sent up whole (a few MB). A few milliseconds of clusters a sync (a 33M mesh's 7800 edited
+// clusters took 100 ms in one frame, the slowest of a whole run): the edited clusters stay coarseDirty (drawn in full)
+// until the last batch is in, then the levels go up once and the flags clear together.
 void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     const auto start = std::chrono::steady_clock::now();
-    const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
-    gl::BindVertexArray(s.coarseVao);
-    if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
-    gl::BindVertexArray(0);
-    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
-    for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
+    auto elapsedMs = [&] { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
+    static const bool tiny = std::getenv("SF_COARSE_SLICE_MS") != nullptr; // (tests: the smallest slices, so a small mesh takes several)
+    static const double kBudgetMs = tiny ? std::atof(std::getenv("SF_COARSE_SLICE_MS")) : 4.0;
+    const size_t kBatchMin = tiny ? 4 : 64, kBatchMax = tiny ? 4 : 4096; // clusters per batch (each batch also scans the level-0 cells once)
+    std::vector<uint32_t> batch;
+    bool first = true;
+    while (s.coarseDone < s.coarsePending.size()) {
+        const double left = kBudgetMs - elapsedMs();
+        if (!first && left <= 0.0) break;
+        first = false;
+        const size_t fit = coarseMsPerCluster_ > 0.0 ? size_t(std::max(left, 0.0) / coarseMsPerCluster_) : kBatchMin;
+        const size_t n = std::min(std::clamp(fit, kBatchMin, kBatchMax), s.coarsePending.size() - s.coarseDone);
+        batch.assign(s.coarsePending.begin() + std::ptrdiff_t(s.coarseDone), s.coarsePending.begin() + std::ptrdiff_t(s.coarseDone + n));
+        const double before = elapsedMs();
+        if (!updateCoarseLevels(*s.coarse, mesh, s.order, batch).empty()) s.coarseChanged = true;
+        s.coarseDone += n;
+        const double perCluster = (elapsedMs() - before) / double(n);
+        coarseMsPerCluster_ = coarseMsPerCluster_ > 0.0 ? 0.6 * coarseMsPerCluster_ + 0.4 * perCluster : perCluster;
+    }
     if (std::getenv("SF_COARSE_LOG"))
-        std::fprintf(stderr, "coarse lod: %zu clusters, %zu points updated in %.1f ms\n", s.coarsePending.size(), changed.size(),
-                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+        std::fprintf(stderr, "coarse lod: %zu of %zu clusters updated in %.1f ms (%.4f ms a cluster)\n", s.coarseDone, s.coarsePending.size(),
+                     elapsedMs(), coarseMsPerCluster_);
+    if (s.coarseDone < s.coarsePending.size()) return; // (the next sync goes on; the clusters draw in full meanwhile)
+    // The points go up in chunks inside the same budget (a 104M mesh's levels are 100 MB of points); the attributes
+    // (only a painted or masked mesh has them) once the points are all there.
+    if (s.coarseChanged) {
+        const CoarseLevels& L = *s.coarse;
+        const size_t kChunk = tiny ? 256 : size_t(1) << 19; // points
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseVertices);
+        std::vector<PackedVertex> packed;
+        while (s.coarseUpTo < L.positions.size()) {
+            const size_t i0 = s.coarseUpTo, i1 = std::min(i0 + kChunk, L.positions.size());
+            packed.resize(i1 - i0);
+            poolFor(packed.size(), [&](size_t b, size_t e) {
+                for (size_t i = b; i < e; ++i) packVertex(s.grid, L.positions[i0 + i], L.normals[i0 + i], 0.0f, packed[i]);
+            });
+            gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(i0 * sizeof(PackedVertex)), GLsizeiptr(packed.size() * sizeof(PackedVertex)), packed.data());
+            s.coarseUpTo = i1;
+            if (elapsedMs() > kBudgetMs && s.coarseUpTo < L.positions.size()) break;
+        }
+        gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+        if (s.coarseUpTo < L.positions.size()) {
+            if (std::getenv("SF_COARSE_LOG"))
+                std::fprintf(stderr, "coarse lod: %zu of %zu points sent in %.1f ms\n", s.coarseUpTo, L.positions.size(), elapsedMs());
+            return;
+        }
+        if (!L.colors.empty() || !L.mask.empty()) {
+            gl::BindVertexArray(s.coarseVao);
+            uploadCoarseAttributes(s);
+            gl::BindVertexArray(0);
+            gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+    }
+    for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
     s.coarsePending.clear();
+    s.coarseDone = 0;
+    s.coarseUpTo = 0;
+    s.coarseChanged = false;
+    if (std::getenv("SF_COARSE_LOG")) std::fprintf(stderr, "coarse lod: levels in, last slice %.1f ms\n", elapsedMs());
 }
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {

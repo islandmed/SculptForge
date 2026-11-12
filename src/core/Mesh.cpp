@@ -820,8 +820,16 @@ void Mesh::evaluateAll() {
 }
 
 AABB Mesh::bounds() const {
+    // (Min and max are order-free, so the blocks' boxes merge into the same box the serial scan finds. A dense mesh's scan
+    // is 30+ ms on one core: the first UI frame after every stroke asks for it.)
+    constexpr size_t kBlock = size_t(1) << 16;
+    std::vector<AABB> parts((positions.size() + kBlock - 1) / kBlock);
+    poolFor(positions.size(), [&](size_t b0, size_t b1) {
+        AABB& box = parts[b0 / kBlock];
+        for (size_t i = b0; i < b1; ++i) box.expand(positions[i]);
+    }, kBlock, 2);
     AABB b;
-    for (const auto& p : positions) b.expand(p);
+    for (const AABB& box : parts) b.expand(box);
     return b;
 }
 
