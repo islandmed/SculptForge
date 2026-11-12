@@ -1,0 +1,20 @@
+# The other half of stroke_lod_flicker: a mesh over the triangle budget whose full frame fits the still-frame budget rests
+# in full detail, and a stroke (edits waiting for their coarse levels) keeps it in full: no frame of coarse levels
+# before, during or after the strokes.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+run new_sphere subdivisions=6
+wait 0.6
+expect_value coarse_clusters == 0
+stroke 0.35 0.40 0.60 0.45 0.4 hold
+expect_value coarse_clusters == 0
+expect_value stroke_detail_switches == 0
+release
+stroke 0.40 0.55 0.62 0.60 0.15
+stroke 0.30 0.30 0.50 0.35 0.15
+stroke 0.45 0.60 0.30 0.40 0.15
+print drawn_triangles # (a draw first: the stroke's last edits reach the renderer with a frame, and "wait" draws none on a slow runner)
+wait_idle 30 # (then idle: the levels follow 0.35 s after the last edit)
+expect_value coarse_clusters == 0
+expect_value coarse_pending == 0
+expect_value stroke_detail_switches == 0

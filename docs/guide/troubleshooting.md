@@ -70,8 +70,11 @@ documentation** opens links to it).
 - Hide Parts you aren't working on, or **Solo** the active one.
 - A large Gaussian splat capture costs GPU time too: lower the count with **Clean floaters**, or untick
   **Show** in **Render > Gaussian Splats** while you sculpt.
-- On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
-  or the operating system's graphics settings).
+- On laptops with two GPUs, make sure SculptForge runs on the dedicated one. Windows picks it by itself on most
+  machines; to check, start SculptForge from a terminal, or open the log file (see below) and read the
+  `OpenGL ... on ...` line: it names the card that draws. If it names the built-in graphics (Intel UHD, AMD
+  Radeon Graphics), choose **Edit > Preferences > Performance > Graphics card** and restart, or set SculptForge to
+  *High performance* in Windows Settings > System > Display > Graphics (or the GPU maker's control panel).
 - **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), try **View resolution** 75% or 50%,
   keep **Fast Navigation** on, and look at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
