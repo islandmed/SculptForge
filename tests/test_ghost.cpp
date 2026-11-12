@@ -154,7 +154,8 @@ TEST(ghost_matches_solver_per_vertex_at_every_intensity) {
                         const float a = std::abs(glm::dot(o, right)), b = std::abs(glm::dot(o, up));
                         if (std::min(a, b) > 0.02f * p.radius) continue;
                     }
-                    worst = std::max(worst, glm::distance(ghostMove(g, before[v], normals[v]), doc.mesh.positions[v]));
+                    const float dv = glm::distance(ghostMove(g, before[v], normals[v]), doc.mesh.positions[v]);
+                    worst = std::max(worst, dv);
                     moved = std::max(moved, glm::distance(before[v], doc.mesh.positions[v]));
                 }
                 const bool ok = worst <= std::max(moved * 0.01f, 1e-6f);

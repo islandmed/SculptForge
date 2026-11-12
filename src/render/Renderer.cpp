@@ -91,6 +91,8 @@ vec3 ghostFalloff(float d, float r) {
     return vec3(t * t * (3.0 - 2.0 * t), 6.0 * t * (1.0 - t) * dt, (6.0 - 12.0 * t) * dt * dt + 6.0 * t * (1.0 - t) * ddt);
 }
 vec3 onPlane(vec3 v, vec3 n) { return v - n * dot(v, n); }
+// How far a Clay / Clay Block dab pulls (sf::clayPull, core/Sculpt.h): all the way from Intensity 0.5 up, less below.
+float clayPull(float s) { return s >= 0.5 ? 1.0 : 2.0 * max(s, 0.0); }
 // Moves x as the dabs [first, end) would, and follows what the moves do to the surface seen as a height field
 // over the vertex's tangent plane (normal n): the height's gradient g (in that plane) and its Laplacian lap
 // (forward differentiation of each kernel's height change; lateral moves don't count). The shading normal is
@@ -102,7 +104,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
         vec3 c = uGhostA[i].xyz;
         float r = uGhostA[i].w;
         float dist = length((kind == 10 ? ghostStart : x) - c);
-        if (dist >= r) continue;
+        if (dist >= (kind == 4 ? 1.3 * r : r)) continue; // (Clay Block's square corners reach 1.3 radii)
         float w = uGhostC[i].w;
         vec3 F = ghostFalloff(dist, r) * w; // f, f', f'' in the distance
         float f = F.x;
@@ -123,12 +125,20 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             g += radial * (k * a * F.y);
             lap += k * a * radialLap;
         } else if (kind == 3 || kind == 4) { // Clay, Clay Block: everything below a plane pulled up to it
-            float h = dot(x - (ac + an * (sgn * r * (kind == 3 ? 0.05 : 0.08) * s)), an);
+            float standoff = r * (kind == 3 ? 0.05 : 0.08) * s, lift = standoff, pull = clayPull(s);
+            if (kind == 3) { // (PlaneKernel::clayPlaneAt: the plane reaches the cursor, the pull shrinks by how much higher that is)
+                lift = max(standoff, sgn * dot(c - ac, an));
+                if (lift > 1e-12) pull *= standoff / lift;
+            }
+            float h = dot(x - (ac + an * (sgn * lift)), an);
             if (sgn * h < 0.0) {
-                vec3 W = F; // the pull's profile and its derivatives
+                vec3 W = F * pull; // the pull's profile and its derivatives
                 if (kind == 4) {
-                    float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
-                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * w;
+                    // (the round tip, its edge measured in the brush's plane, the corners in space: Ghost.cpp)
+                    float lat = length(onPlane(x - c, an));
+                    float e = clamp((1.0 - lat / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
+                    float corner = clamp((1.3 - dist / r) / 0.3, 0.0, 1.0);
+                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * (w * pull * corner);
                 }
                 x -= an * (h * W.x);
                 lap -= cn * (2.0 * W.y * dot(radial, dh) + W.x * cn * lap + h * (W.z + W.y * inv));

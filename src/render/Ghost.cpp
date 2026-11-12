@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/Ghost.h"
 
+#include "core/Sculpt.h"
+#include "core/SculptKernel.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -31,6 +34,7 @@ float ghostFalloff(float dist, float radius, float focal) {
 }
 
 namespace {
+constexpr float kClayBlockReach = 1.3f; // the square tip's corners reach this far (Sculptor::dabSingle's `reach`), in radii
 glm::vec3 onPlane(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); }
 } // namespace
 
@@ -48,7 +52,7 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
     for (const GhostDab& d : g.dabs) {
         const glm::vec3 o = x - d.center;
         const float dist = glm::length(o);
-        if (dist >= d.radius || d.radius <= 0.0f) continue;
+        if (d.radius <= 0.0f || dist >= d.radius * (g.kind == GhostKind::ClayBlock ? kClayBlockReach : 1.0f)) continue;
         const float f = ghostFalloff(dist, d.radius, g.focal) * d.weight;
         const float s = d.strength, r = d.radius;
         const glm::vec3& an = d.normal;
@@ -56,16 +60,22 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
         case GhostKind::Standard: x += an * (sign * s * r * 0.06f * f); break;
         case GhostKind::Inflate: x += n * (sign * s * r * 0.05f * f); break;
         case GhostKind::Clay: {
-            const float h = glm::dot(x - (d.areaCenter + an * (sign * r * 0.05f * s)), an);
-            if (sign * h < 0.0f) x -= an * (h * f);
+            // The solver's own plane and pull (PlaneKernel::clayPlaneAt, clayPull), not copies of their constants.
+            float k;
+            const glm::vec3 planePoint = PlaneKernel::clayPlaneAt(d.areaCenter, an, d.center, sign, r * 0.05f * s, k);
+            const float h = glm::dot(x - planePoint, an);
+            if (sign * h < 0.0f) x -= an * (h * f * clayPull(s) * k);
             break;
         }
         case GhostKind::ClayBlock: {
-            // (round: the square tip's corners need the brush's screen frame)
-            const float e = std::clamp((1.0f - dist / r) / 0.35f, 0.0f, 1.0f);
-            const float w = e * e * (3.0f - 2.0f * e) * d.weight;
+            // The solver measures the square tip's edge in the brush's plane and its corners in space; the preview has no
+            // screen frame for the square, so it takes the round one: the distance in the plane (exact along the tip's axes).
+            const float lateral = glm::length(onPlane(o, an));
+            const float e = std::clamp((1.0f - lateral / r) / 0.35f, 0.0f, 1.0f);
+            const float corner = std::clamp((kClayBlockReach - dist / r) / 0.3f, 0.0f, 1.0f);
+            const float w = e * e * (3.0f - 2.0f * e) * corner * d.weight;
             const float h = glm::dot(x - (d.areaCenter + an * (sign * r * 0.08f * s)), an);
-            if (sign * h < 0.0f) x -= an * (h * w);
+            if (sign * h < 0.0f) x -= an * (h * w * clayPull(s));
             break;
         }
         case GhostKind::Flatten: {
