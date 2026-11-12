@@ -964,9 +964,11 @@ with open("website/latest.json", "w", encoding="utf-8") as f:
 PY
         sed -i.bak -E "s/\"softwareVersion\": \"[0-9.]+\"/\"softwareVersion\": \"$V\"/; s/Version [0-9]+\.[0-9]+\.[0-9]+\. All builds/Version $V. All builds/" website/index.html
         rm -f website/index.html.bak
+        sed -i -E "s/(Current version: )[0-9]+\.[0-9]+\.[0-9]+\./\1$V./" website/llms.txt # the AI-readable fact sheet
+        grep -qF "Current version: $V." website/llms.txt || die "website/llms.txt's 'Current version:' line didn't update" "set it by hand, commit, run again"
         grep -qF "\"softwareVersion\": \"$V\"" website/index.html && grep -qF "Version $V. All builds" website/index.html ||
             die "website/index.html's version text didn't update" "set softwareVersion and the 'Version X.Y.Z. All builds' line by hand, commit, run again"
-        lockretry git add website/latest.json website/index.html
+        lockretry git add website/latest.json website/index.html website/llms.txt
         commit -m "Website: $V is the current release (feed, download text)"
         push_main
         ok "pushed the feed and home page"
