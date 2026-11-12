@@ -9,11 +9,13 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-highlight: Round, woven Braid strands
+tagline: Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.
+highlight: Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before
+highlight: The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy
+highlight: Inflate over a Crease no longer tears the surface (#194)
+highlight: Palette Knife and Nudge no longer fold the surface (#198, #199)
+highlight: The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)
 ```
-
-- **Tube Braid** is now two round strands twisted over and under each other, and **Spread** opens and closes the weave
-  from a tight rope to a loose twist.
 
 ## Version 0.12.10
 
