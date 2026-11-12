@@ -8,13 +8,20 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.10
 
 ```features
-date: unreleased
+date: 2026-11-11
 tagline: Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.
 highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
 highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
 highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)
 highlight: Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge
 ```
+
+- **Crisp Flatten** only cuts now: it lowers what is above its plane and never raises or adds clay, and the edges of
+  its facets are clean; pen pressure no longer changes how deep it cuts.
+- **Mouse orbit speed** in **Preferences > Input**: slow the mouse or trackpad turn down (0.1x to 2x) if the view
+  spins too fast.
+- **Symmetry with textured brushes**: Dragon Scales, Skin Pores, Wood Grain and the other textured and turning-stamp
+  brushes now sculpt the same pattern on both sides of X symmetry.
 
 ## Version 0.12.9
 

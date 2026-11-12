@@ -6,6 +6,41 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.10] - 2026-11-11
+
+### Added
+- **Mouse orbit speed** in Preferences > Input (thanks hullalmiah on Discord): 0.1x-2x for mouse and trackpad rotation
+  drags in every input style, including orbiting around the pointer; 1x is the turn as it was. The pen keeps its own
+  View speed. Saved in the preferences.
+- **Two-key window** (Preferences > Input): how long the second key of a two-key shortcut has, 0.35 to 1 s (0.4 s by
+  default). The keys of a two-key shortcut can be pressed together, either one first, or one after the other. A key
+  that is part of one runs its own action once the window is up; every other key runs at once.
+
+### Changed
+- Release tooling: the Discord release post has a header, the headline first and the release card as its image, with
+  masked Download and What's new links instead of raw URLs.
+- Release tooling: the release stage warns when the version's launch headline is missing, or when its keywords are not
+  in the first highlight line and the What's New tagline; the promote puts the headline first in the GitHub release
+  body, and stages the README's "New in" line.
+- Release tooling: a staging CI run that fails in a test step gets one rerun of its failed jobs, and a test that
+  passes on the rerun is logged as flaky instead of failing the release. A test that fails twice stays red.
+
+### Fixed
+- **Brush Size and Intensity** keep their value when the pointer goes past the canvas edge while you adjust (S / F, U
+  / Shift+F), instead of snapping back to the old one; only a click on another control cancels.
+- Crisp Flatten only cuts down now and never adds clay (thanks Hameron on Discord). Pen pressure no longer scales the
+  Crisp Flatten cut depth (it left terraces across a facet), so a light-pressure stroke lands on the same plane.
+  Surface below the plane is left alone at any depth, which also removes the scattered spikes, debris and stair-steps
+  along the edges of its facets. The regular Flatten brush is still the one that fills dips. The brush's shelf preview
+  is a little wider so the cut shows.
+- **Generate 3D** (free Hugging Face models): Hunyuan3D 2, 2 mini Turbo and 2.1 and TRELLIS.2 now find their image and
+  prompt inputs by name, so the Spaces adding or reordering inputs (Hunyuan3D now takes 13, TRELLIS.2 15) no longer
+  breaks them. Everything else uses each Space's own defaults.
+- **Symmetry with textured brushes** (#197): with X or radial symmetry the mirrored strokes of the brushes that stamp
+  a pattern or an alpha (Dragon Scales, Skin Pores, Stone Carve, Wood Grain, Woven Cloth and about 25 more) now carry
+  the pattern's mirror image, where they used to lay a different pattern on each side.
+- two-key shortcuts also fire when both keys are pressed together (thanks Artizmo on Discord)
+
 ## [0.12.9] - 2026-11-11
 
 ### Changed
