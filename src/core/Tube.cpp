@@ -321,6 +321,8 @@ struct Builder {
                 }
             }
             const std::vector<vec3> normals = tubeFrames(fine, vec3(0.0f));
+            // The thin strands keep a round outline: about 12 sides each however much of the tube's radius they take.
+            const float strandEdge = edge * lay.radius / std::max(widest, 1e-12f) * (16.0f / 12.0f);
             for (int strand = 0; strand < count; ++strand) {
                 std::vector<TubeSample> sub(fine.size());
                 for (size_t i = 0; i < fine.size(); ++i) {
@@ -334,7 +336,7 @@ struct Builder {
                     const vec3 d = sub[std::min(i + 1, sub.size() - 1)].position - sub[i ? i - 1 : 0].position;
                     if (glm::length(d) > 1e-12f) sub[i].tangent = glm::normalize(d);
                 }
-                sweepLine(sub, std::vector<float>(sub.size(), 0.0f), Profile::Round, uniform, edge, groupOffset, flat, vec3(0.0f), 0.0f);
+                sweepLine(sub, std::vector<float>(sub.size(), 0.0f), Profile::Round, uniform, uniform ? edge : strandEdge, groupOffset, flat, vec3(0.0f), 0.0f);
             }
             return;
         }
