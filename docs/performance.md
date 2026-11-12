@@ -1381,8 +1381,8 @@ dab under 25 ms) is met; with the upload the large dab is still above it.
   up; the Move brush keeps its stroke's leaves. Generic refits (undo, transforms) use a leaf bitmap. At 33M the
   large dab's refit went from 11.7 to 5.5 ms.
 - **Normals**: the vertices to update (moved ones and their ring) are a bitmap, listed in order and ORed straight
-  into the mesh's dirty bits; each vertex sums its faces as before (identical values), with the faces of
-  vertices 16 ahead and their corners 8 ahead prefetched (core/Prefetch.h), about 30% less time on one thread.
+  into the mesh's dirty bits; each vertex sums its faces as before (identical values), about 30% less time on one thread.
+  (Software prefetching of the faces ahead was tried here and later removed: the hardware prefetcher does better, 15% faster without.)
   Symmetric dabs update the normals once after all mirrors moved, so a vertex in both halves (near the symmetry
   plane) is updated once; each mirror still refits the BVH before the next one queries it.
 - **Undo record and Move in parallel**: displaceAll counts per block which vertices the stroke moves for the
@@ -1413,7 +1413,6 @@ to see the first one's).
   lookup and the normal update over 4.6M vertices dominate.
 - Undo of a Mask or Paint stroke is about 0.4 ms slower at 33M (1.2 instead of 0.8 ms): its entries are now in
   index order per dab rather than in BVH order.
-- Prefetching is a no-op with MSVC (core/Prefetch.h uses the GCC / Clang builtin).
 
 #### CPU only, 4.0M triangles
 
