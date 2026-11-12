@@ -416,7 +416,7 @@ TEST(tube_profile_mirror_exact) {
     CHECK(worst < 1e-4f);
 }
 
-TEST(tube_turn_twist_spin_together_on_a_curved_tube) {
+TEST(tube_invariant_turn_twist_spin_together_on_a_curved_tube) {
     // Turn, Twist and Spin all set at once, on a bent tapered tube, for every profile (the round Braid among them): the sweep is
     // closed, oriented and finite, and the X mirror copy is its exact mirror image (all three negate).
     using P = TubeShape::Profile;
