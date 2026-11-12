@@ -604,6 +604,7 @@ void setVoxelSparseAbove(int resolution) { g_sparseAbove = resolution; }
 
 namespace {
 bool g_denoise = true;
+constexpr float kRemeshBand = 3.0f; // cells: the narrow band of the distance field (beyond it the samples read +-band)
 
 // Low-pass of the signed distance (cells, positive inside) that keeps the surface the artist sees. A sculpted mesh is
 // shaded smooth, so micro-facets (dab ripples a fraction of a cell deep, edges shorter than a cell) never show on it; the
@@ -612,45 +613,90 @@ bool g_denoise = true;
 // under 0.06 cell (facet noise), falling to 0 at 0.14 cell (a tip, a crease or a thin part, which stay sharp). A blur
 // pulls a curved surface in a little (a sphere of 90 cells shrinks 0.03%); the returned iso level puts that volume back,
 // so the volume doesn't move. Mesh it at the returned iso.
-float denoiseField(const VoxelGrid& grid, std::vector<float>& field) {
+float denoiseField(const VoxelGrid& grid, std::vector<float>& field, float band) {
+    // Only the blocks that touch the narrow band do any work: a sample 3 cells or more from the surface reads exactly
+    // +-band, so a blur there either changes nothing or sits far past the 0.14 cell cut-off (weight 0). The blur is done
+    // per 8-sample block on a 10^3 copy that stays in cache (three 1-2-1 passes, each one shorter), the results are
+    // kept aside and written back after every block has read the original.
+    constexpr int B = 8, H = B + 2;
+    constexpr size_t kBlockSamples = size_t(B) * B * B;
     const glm::ivec3 dims = grid.dims;
-    const size_t n = grid.size();
-    std::vector<float> blur(field);
-    const glm::ivec3 step(1, dims.x, dims.x * dims.y);
-    for (int axis = 0; axis < 3; ++axis) {
-        const int len = dims[axis], u = (axis + 1) % 3, v = (axis + 2) % 3;
-        if (len < 3) continue;
-        poolFor(size_t(dims[u]) * size_t(dims[v]), [&](size_t b, size_t e) {
-            std::vector<float> ln(static_cast<size_t>(len), 0.0f);
-            for (size_t k = b; k < e; ++k) {
-                const size_t start = (k % size_t(dims[u])) * size_t(step[u]) + (k / size_t(dims[u])) * size_t(step[v]);
-                float* base = blur.data() + start;
-                const size_t st = size_t(step[axis]);
-                for (int i = 0; i < len; ++i) ln[size_t(i)] = base[size_t(i) * st];
-                for (int i = 0; i < len; ++i)
-                    base[size_t(i) * st] = 0.25f * ln[size_t(std::max(i - 1, 0))] + 0.5f * ln[size_t(i)] +
-                                           0.25f * ln[size_t(std::min(i + 1, len - 1))];
-            }
-        }, 64);
-    }
-    // Blend, and the inside volume and surface area (in cells) before and after, from the partly covered samples.
-    constexpr size_t kChunk = 1 << 16;
-    std::vector<double> before((n + kChunk - 1) / kChunk), after(before.size()), area(before.size());
-    poolFor(n, [&](size_t b, size_t e) {
-        double vb = 0.0, va = 0.0, ar = 0.0;
-        for (size_t i = b; i < e; ++i) {
-            const float f = field[i];
-            const float w = std::clamp((0.14f - std::abs(blur[i] - f)) * (1.0f / 0.08f), 0.0f, 1.0f);
-            const float g = f + w * (blur[i] - f);
-            vb += std::clamp(f + 0.5f, 0.0f, 1.0f);
-            va += std::clamp(g + 0.5f, 0.0f, 1.0f);
-            ar += std::abs(g) < 0.5f ? 1.0 : 0.0;
-            field[i] = g;
+    const glm::ivec3 nb = (dims + (B - 1)) / B;
+    const size_t blocks = size_t(nb.x) * size_t(nb.y) * size_t(nb.z);
+    auto blockOrigin = [&](size_t k) {
+        return glm::ivec3(int(k % size_t(nb.x)), int((k / size_t(nb.x)) % size_t(nb.y)), int(k / (size_t(nb.x) * size_t(nb.y)))) * B;
+    };
+    std::vector<uint8_t> active(blocks, 0);
+    poolFor(blocks, [&](size_t kb, size_t ke) {
+        for (size_t k = kb; k < ke; ++k) {
+            const glm::ivec3 o = blockOrigin(k), lo = glm::max(o - 1, glm::ivec3(0)), hi = glm::min(o + (B + 1), dims);
+            bool touches = false;
+            for (int z = lo.z; z < hi.z && !touches; ++z)
+                for (int y = lo.y; y < hi.y && !touches; ++y) {
+                    const float* row = field.data() + grid.index(lo.x, y, z);
+                    for (int x = 0; x < hi.x - lo.x; ++x)
+                        if (std::abs(row[x]) < band) { touches = true; break; }
+                }
+            active[k] = touches;
         }
-        before[b / kChunk] = vb, after[b / kChunk] = va, area[b / kChunk] = ar;
-    }, kChunk);
+    }, 16);
+    std::vector<uint32_t> list;
+    for (size_t k = 0; k < blocks; ++k)
+        if (active[k]) list.push_back(uint32_t(k));
+    std::vector<float> blended(list.size() * kBlockSamples);
+    // Blend, and the inside volume and surface area (in cells) before and after, from the partly covered samples.
+    std::vector<double> before(list.size()), after(list.size()), area(list.size());
+    poolFor(list.size(), [&](size_t jb, size_t je) {
+        std::vector<float> src(size_t(H) * H * H), tx(size_t(H) * H * B), ty(size_t(H) * B * B);
+        for (size_t j = jb; j < je; ++j) {
+            const glm::ivec3 o = blockOrigin(list[j]);
+            for (int z = 0; z < H; ++z)
+                for (int y = 0; y < H; ++y) {
+                    const float* row = field.data() + grid.index(0, std::clamp(o.y + y - 1, 0, dims.y - 1), std::clamp(o.z + z - 1, 0, dims.z - 1));
+                    float* d = src.data() + (size_t(z) * H + size_t(y)) * H;
+                    for (int x = 0; x < H; ++x) d[x] = row[std::clamp(o.x + x - 1, 0, dims.x - 1)];
+                }
+            for (size_t r = 0; r < size_t(H) * H; ++r)
+                for (int x = 0; x < B; ++x)
+                    tx[r * B + size_t(x)] = 0.25f * src[r * H + size_t(x)] + 0.5f * src[r * H + size_t(x) + 1] + 0.25f * src[r * H + size_t(x) + 2];
+            for (int z = 0; z < H; ++z)
+                for (int y = 0; y < B; ++y)
+                    for (int x = 0; x < B; ++x) {
+                        const float* c = tx.data() + (size_t(z) * H + size_t(y)) * B + size_t(x);
+                        ty[(size_t(z) * B + size_t(y)) * B + size_t(x)] = 0.25f * c[0] + 0.5f * c[B] + 0.25f * c[2 * B];
+                    }
+            double vb = 0.0, va = 0.0, ar = 0.0;
+            float* out = blended.data() + j * kBlockSamples;
+            for (int z = 0; z < B; ++z)
+                for (int y = 0; y < B; ++y)
+                    for (int x = 0; x < B; ++x) {
+                        const float* c = ty.data() + (size_t(z) * B + size_t(y)) * B + size_t(x);
+                        const float blur = 0.25f * c[0] + 0.5f * c[B * B] + 0.25f * c[2 * B * B];
+                        const float f = src[((size_t(z) + 1) * H + size_t(y) + 1) * H + size_t(x) + 1];
+                        const float w = std::clamp((0.14f - std::abs(blur - f)) * (1.0f / 0.08f), 0.0f, 1.0f);
+                        const float g = f + w * (blur - f);
+                        out[(size_t(z) * B + size_t(y)) * B + size_t(x)] = g;
+                        if (o.x + x < dims.x && o.y + y < dims.y && o.z + z < dims.z) {
+                            vb += std::clamp(f + 0.5f, 0.0f, 1.0f);
+                            va += std::clamp(g + 0.5f, 0.0f, 1.0f);
+                            ar += std::abs(g) < 0.5f ? 1.0 : 0.0;
+                        }
+                    }
+            before[j] = vb, after[j] = va, area[j] = ar;
+        }
+    }, 1);
+    poolFor(list.size(), [&](size_t jb, size_t je) {
+        for (size_t j = jb; j < je; ++j) {
+            const glm::ivec3 o = blockOrigin(list[j]);
+            const glm::ivec3 n = glm::min(glm::ivec3(B), dims - o);
+            for (int z = 0; z < n.z; ++z)
+                for (int y = 0; y < n.y; ++y)
+                    std::copy_n(blended.data() + j * kBlockSamples + (size_t(z) * B + size_t(y)) * B, size_t(n.x),
+                                field.data() + grid.index(o.x, o.y + y, o.z + z));
+        }
+    }, 4);
     double vb = 0.0, va = 0.0, ar = 0.0;
-    for (size_t c = 0; c < before.size(); ++c) vb += before[c], va += after[c], ar += area[c];
+    for (size_t j = 0; j < list.size(); ++j) vb += before[j], va += after[j], ar += area[j];
     return ar > 0.0 ? -float((vb - va) / ar) : 0.0f;
 }
 } // namespace
@@ -702,12 +748,12 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
     // finer than a cell counts in the area but not in the result, so a dense scan comes out somewhat lower.
     const double cellsOfArea = area / (cell * cell);
     e.triangles = size_t(3.0 * cellsOfArea);
-    // The grid: dense up to 512 (about 22 bytes a sample at its peak); above it the bricks near the surface (about 26
+    // The grid: dense up to 512 (about 18 bytes a sample at its peak); above it the bricks near the surface (about 26
     // samples deep per cell of area, 11 bytes each). Then the result in the app (as the other big commands count it).
     double grid;
     if (resolution <= g_sparseAbove) {
         const glm::dvec3 dims = glm::ceil(glm::dvec3(ext) / cell) + 9.0;
-        grid = dims.x * dims.y * dims.z * 22.0;
+        grid = dims.x * dims.y * dims.z * 18.0;
     } else {
         const glm::dvec3 bricks = glm::ceil((glm::ceil(glm::dvec3(ext) / cell) + 9.0) / 8.0);
         grid = cellsOfArea * 26.0 * 11.0 + bricks.x * bricks.y * bricks.z * 6.0;
@@ -822,10 +868,10 @@ Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const s
     }
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
-    std::vector<float> field = insideDistanceField(mesh, grid, solid, 3.0f);
+    std::vector<float> field = insideDistanceField(mesh, grid, solid, kRemeshBand);
     std::vector<uint8_t>().swap(solid);
     if (!step(0.6f)) return {};
-    const float iso = g_denoise ? denoiseField(grid, field) : 0.0f;
+    const float iso = g_denoise ? denoiseField(grid, field, kRemeshBand) : 0.0f;
     Mesh out = meshFromField(grid, field, iso, 2);
     if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
