@@ -190,6 +190,12 @@ int ChildProcess::wait() {
 
 bool ChildProcess::start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
                          const std::vector<std::pair<std::string, std::string>>& env, std::string& error) {
+#ifdef __ANDROID__
+    // An Android app can't run the desktop's tools (splat trainer, COLMAP, ffmpeg): there are none to find.
+    (void)args, (void)logPath, (void)env;
+    error = program + " can't run on Android";
+    return false;
+#endif
     const std::string exe = findOnPath(program);
     if (exe.empty()) {
         error = "Cannot find " + program;

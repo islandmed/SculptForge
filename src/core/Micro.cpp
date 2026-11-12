@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/AtomicRef.h"
 #include "core/FocusDetail.h"
 
 #include "core/BakeImage.h"
@@ -540,7 +541,7 @@ void syncReach(const Mesh& m, const BVH& bvh) {
     }
     for (size_t w = 0; w < words; ++w) {
         if (!r.bits[w]) continue;
-        const uint64_t bits = std::atomic_ref<uint64_t>(r.bits[w]).exchange(0);
+        const uint64_t bits = AtomicRef<uint64_t>(r.bits[w]).exchange(0);
         for (uint64_t b = bits; b; b &= b - 1) {
             const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(b)));
             const float v = float(mm.triRange[t]) * mm.step;

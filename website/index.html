@@ -28,6 +28,31 @@
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    /* Built in (site/standout): two lead rows in the hero, then a six-tile band. Blender and splats lead on every width. */
+    .stand-lead { list-style: none; margin: 18px 0 4px; padding: 0; display: grid; gap: 10px; max-width: 36em; }
+    .stand-lead a { display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; color: var(--muted); font-size: 0.92rem; line-height: 1.35;
+                    background: rgba(242, 140, 60, 0.07); border: 1px solid #4a3321; border-radius: 14px; }
+    .stand-lead a:hover, .stand-lead a:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-lead img { flex: none; width: 76px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+    .stand-lead strong, .stand-text strong { display: block; color: var(--text); font-weight: 600; }
+    .standout { padding: 64px 0 72px; background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .stand-tile { display: flex; flex-direction: column; height: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--muted); }
+    .stand-tile:hover, .stand-tile:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #14141a; border-bottom: 1px solid var(--border); }
+    .stand-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .stand-img.contain img { object-fit: contain; }
+    .stand-text { display: block; padding: 16px 18px 20px; font-size: 0.95rem; line-height: 1.5; }
+    .stand-text strong { font-size: 1.05rem; margin-bottom: 4px; }
+    .stand-foot { margin: 28px 0 0; color: var(--muted); }
+    @media (max-width: 960px) { .stand-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) {
+      .stand-lead { order: 3; margin: 0 0 16px; }
+      .stand-grid { grid-template-columns: 1fr; gap: 14px; }
+      .standout { padding: 44px 0 52px; }
+    }
+  </style>
 </head>
 <body>
   <div class="scroll-progress" aria-hidden="true"></div>
@@ -75,6 +100,10 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
           <p class="lede-short">We build the orchestration layer, and our agents build the software, openly, with the
             artists who use it. New versions every few days.</p>
           <p class="tagline">Sculpt it. Forge it. Ship it.</p>
+          <ul class="stand-lead" aria-label="Built in">
+            <li><a href="guide/blender.html"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610"><span><strong>Blender round-trip</strong>Send objects over and back in one click.</span></a></li>
+            <li><a href="guide/blender.html#splats-with-blender"><img src="guide/images/splats.jpg" alt="" width="980" height="775"><span><strong>Gaussian splats, with Blender 5.3</strong>Sculpt over a splat, send it back.</span></a></li>
+          </ul>
           <div class="ctas">
             <a class="btn primary" href="#download">Download</a>
             <a class="btn" href="why.html">Why we're doing this</a>
@@ -100,6 +129,26 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
           <figcaption class="hero-credit">Video review by <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK</a>
             on YouTube. It loads from YouTube when you press play.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <!-- Built in (site/standout): what sets us apart, each claim checked against the guide and a shipped release. Splats +
+         Blender 5.3 round-trip: 0.12.7; Blender bridge, Make sculptable, Quad Remesh, Bake, Brush Lab: 0.10.6 or earlier;
+         Garments: 0.11.12. Words: "built in" / "in SculptForge", never "only" or "first". Images are the guide's real shots. -->
+    <section id="standout" class="section standout" aria-labelledby="standout-title">
+      <div class="wrap">
+        <p class="eyebrow">Built in</p>
+        <h2 id="standout-title">What you get in SculptForge</h2>
+        <p class="section-lede">Each of these ships today and has a chapter in the guide.</p>
+        <ul class="stand-grid">
+          <li><a class="stand-tile" href="guide/blender.html"><span class="stand-img"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610" loading="lazy"></span><span class="stand-text"><strong>Blender round-trip</strong>One click sends objects to SculptForge and back. They update in place, with transform, materials and modifiers kept (Blender 4.2+).</span></a></li>
+          <li><a class="stand-tile" href="guide/blender.html#splats-with-blender"><span class="stand-img"><img src="guide/images/splats.jpg" alt="" width="980" height="775" loading="lazy"></span><span class="stand-text"><strong>Gaussian splats, with Blender 5.3</strong>Send a splat from Blender 5.3, sculpt over it, and send the splats back to the same object.</span></a></li>
+          <li><a class="stand-tile" href="guide/scan-to-sculptable.html"><span class="stand-img contain"><img src="guide/images/make-sculptable.jpg" alt="" width="1200" height="507" loading="lazy"></span><span class="stand-text"><strong>Capture to sculptable mesh</strong>One click turns a splat capture into clean quads with its colours.</span></a></li>
+          <li><a class="stand-tile" href="guide/retopology.html"><span class="stand-img"><img src="guide/images/qremesh.jpg" alt="" width="1100" height="660" loading="lazy"></span><span class="stand-text"><strong>Quad retopology and baking</strong>Quad Remesh with your own guide curves, then bake normal, displacement and occlusion maps.</span></a></li>
+          <li><a class="stand-tile" href="guide/garments.html"><span class="stand-img"><img src="guide/images/garments.jpg" alt="" width="600" height="340" loading="lazy"></span><span class="stand-text"><strong>Garments and cloth</strong>Real-size sewing patterns from 8 templates, draped with a cloth brush.</span></a></li>
+          <li><a class="stand-tile" href="guide/brush-lab.html"><span class="stand-img contain"><img src="guide/images/brush-lab.jpg" alt="" width="457" height="230" loading="lazy"></span><span class="stand-text"><strong>Optional AI brushes</strong>Describe a brush in words and Brush Lab makes it. Your own provider, no account, and one switch turns AI off.</span></a></li>
+        </ul>
+        <p class="stand-foot">Free and open source (GPL v3) on Linux, macOS and Windows. <a href="guide/whats-new.html">A new version every few days &rarr;</a></p>
       </div>
     </section>
 

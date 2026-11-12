@@ -7,6 +7,8 @@ Open **Tool > Garments** (the **Pattern** window shows the panels flat): **Templ
 sizes, **Print** writes the pages. Everything here is also a `garment_*` command for **Scripting** and the AI
 assistant ("make me trousers for a 1000 mm hip").
 
+![The Pattern window: front and back panels of a top at real size, in millimetres](images/garments.jpg)
+
 ## Your size chart
 
 Templates are drawn from a size chart saved in the project: type your measurements (or your model's) once and every

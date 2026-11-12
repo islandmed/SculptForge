@@ -29,3 +29,8 @@ build-flatpak/
 /REPORT*.md
 /HANDOFF*.md
 /.design/
+
+# Android (scripts/android-build.sh)
+android/.gradle/
+android/app/build/
+android/local.properties
