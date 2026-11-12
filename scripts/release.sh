@@ -306,6 +306,32 @@ card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
+# headline_check: the launch headline the CMO picked for this version (~/Work/.sf/launch.py headline: state/launch/X.Y.Z.json,
+# {"line", "keywords"}) must show in what the release publishes: HIGHLIGHTS line 1 (Discord post, latest.json lead) and the What's
+# New tagline (site bar, README). Every keyword, case-insensitive. Warnings only, never a failed stage (0.12.7 led with the wrong story).
+headline_check() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json kws k line tag miss said
+    if [ ! -f "$f" ]; then
+        printf '   WARNING: no launch headline for %s (%s missing): the CMO picks it with launch.py headline %s "..." KEYWORD...\n' "$V" "$f" "$V"
+        # In the background, not under timeout(1): macOS has none, and a stuck herdr must not hold the stage.
+        { herdr agent prompt cmo "pick the $V headline: ~/Work/.sf/launch.py headline $V \"<one line>\" KEYWORD... (the release stage is running)" >/dev/null 2>&1 & } 2>/dev/null || true
+        return 0
+    fi
+    kws=$(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1])).get("keywords", [])))' "$f" 2>/dev/null) ||
+        { printf '   WARNING: %s is not valid launch JSON ({"line", "keywords"})\n' "$f"; return 0; }
+    if [ -n "${HIGHLIGHTS:-}" ] && [ -f "$HIGHLIGHTS" ]; then line=$(grep -m1 '[^[:space:]]' "$HIGHLIGHTS" || true)
+    else line=$(python3 tools/release/assemble_notes.py "$BASE" --highlights 2>/dev/null | grep -m1 '[^[:space:]]' || true); fi
+    tag=$(awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f&&/^tagline:/{sub(/^tagline: */,""); print; exit}' docs/guide/whats-new.md || true)
+    said=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("line", ""))' "$f" 2>/dev/null || true)
+    while IFS= read -r k; do
+        [ -n "$k" ] || continue
+        miss=""
+        grep -qiF -- "$k" <<<"$line" || miss="HIGHLIGHTS line 1"
+        grep -qiF -- "$k" <<<"$tag" || miss="${miss:+$miss and }the What's New tagline"
+        [ -z "$miss" ] || printf '   WARNING: launch keyword "%s" (headline "%s") is missing from %s\n' "$k" "$said" "$miss"
+    done <<<"$kws"
+    return 0
+}
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
 # HIGHLIGHTS names a file of 3-5 non-empty lines.
 highlights_ok() {
@@ -574,6 +600,7 @@ PY
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
     git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
+    [ ! -f README.md ] || git add README.md # build_site.py rewrites its "New in" line (a sparse test checkout has no README)
     git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
     if git diff --cached --quiet; then
@@ -599,6 +626,7 @@ step_stage() {
     local sha c with=${STAGE_WITH-}
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
+    headline_check
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
     # The full suite runs once, on the batch (docs/testing-flow.md "Areas"): t1.sh logged that commit green, and the bump
     # on top only adds paperwork (as CI's reuse, ci_reused), so the PC doesn't run the whole suite a second time.
@@ -721,6 +749,39 @@ step_tag() {
     ok "pushed $T"
 }
 
+# release_body_headline: the launch headline as the first line of the GitHub release body, from the CMO's
+# ~/Work/.sf/state/launch/X.Y.Z.json ("line", optional "lede" and "link"): "**<line>.** <lede> [How it works](<link>?utm...)".
+# Skipped when the file or "line" is missing or the body already leads with it; a failure only warns, never fails the release.
+release_body_headline() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json first body
+    [ -f "$f" ] || return 0
+    first=$(python3 - "$f" "$BASE" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    line = str(d.get("line") or "").strip().rstrip(".")
+    if line:
+        out = f"**{line}.**"
+        if str(d.get("lede") or "").strip():
+            out += " " + str(d["lede"]).strip()
+        link = str(d.get("link") or "").strip()
+        if link:
+            base, hash_, frag = link.partition("#")
+            utm = "utm_source=github&utm_campaign=" + sys.argv[2].replace(".", "")
+            out += f" [How it works]({base}{'&' if '?' in base else '?'}{utm}{hash_}{frag})"
+        print(out)
+except Exception:
+    pass
+PY
+)
+    [ -n "$first" ] || return 0
+    body=$(gh release view "$T" -R "$RELEASE_REPO" --json body -q .body 2>/dev/null) || return 0
+    case $(grep -m1 '[^[:space:]]' <<<"$body" || true) in "${first%%\*\* *}"**) return 0 ;; esac
+    { printf '%s\n\n%s\n' "$first" "$body" > "$work/body.md" && gh release edit "$T" -R "$RELEASE_REPO" --notes-file "$work/body.md" >/dev/null 2>&1; } ||
+        printf '   WARNING: could not put the launch headline at the top of the %s release body\n' "$T"
+    return 0
+}
+
 step_release() {
     local assets
     assets=$(gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' 2>/dev/null || true)
@@ -745,6 +806,7 @@ step_release() {
     n=$(wc -l < "$work/assets")
     [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
+    release_body_headline
 }
 
 # website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
