@@ -48,7 +48,12 @@ void App::touchEvent(const SDL_Event& e) {
         ++penDiag_.penTouchEvents;
         return;
     }
-    if (e.type == SDL_EVENT_FINGER_DOWN && palmGuard()) return; // a palm (palmGuard): never part of a gesture
+    if (e.type == SDL_EVENT_FINGER_DOWN && palmGuard()) { // a palm (palmGuard): never part of a gesture
+        // ... unless it's a trackpad's: that is never a palm (pen in one hand, trackpad in the other)
+        const SDL_TouchDeviceType t = f.touchID == kUiTestTrackpad ? SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE
+                                                                  : SDL_GetTouchDeviceType(f.touchID);
+        if (t != SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && t != SDL_TOUCH_DEVICE_INDIRECT_RELATIVE) return;
+    }
     if (e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED) {
         touch_.up(f.fingerID);
         if (e.type == SDL_EVENT_FINGER_CANCELED) touchPalm_ = false; // (no mouse release comes for it)
