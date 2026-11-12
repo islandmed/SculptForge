@@ -2377,6 +2377,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // The GPU keeps the vertices in the slot's cluster layout (core/UploadOrder.h), so a dab re-sends a few
     // short ranges holding what it changed, gathered from the mesh arrays.
     bool indicesDone = false;
+    if (full) ++fullUploads_;
     if (full) {
         // The index buffer is written while the layout is made (mapped: the build's threads write each
         // cluster's drawn triangles straight into it).

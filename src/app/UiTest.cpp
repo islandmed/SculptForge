@@ -662,6 +662,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return sum / double((bx - ax) * (by - ay));
     }
     if (name == "triangles") return double(m.triangleCount());
+    if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
     if (name == "brushes") return double(app_.doc_.brushes.size());
