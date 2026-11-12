@@ -923,7 +923,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
     # The members' beta step creates the release in the insiders repository with --target (its checkout has the tag, that repository not).
-    add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    # That step only runs on ubuntu, and the test's stand-in gh is a /bin/sh script Windows can't run: not on Windows.
+    if(NOT WIN32)
+        add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    endif()
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks
