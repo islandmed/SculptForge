@@ -124,10 +124,13 @@ private:
         r.set("instructions",
               "Live mode: you sculpt in the SculptForge window the user has open, and they watch. Call live_connect "
               "first; the user approves in SculptForge. Then work in small steps and look after each one: "
-              "viewport_image shows what the user sees, view_turntable shows the model from all sides, view_set turns "
-              "the camera. Every step lands in the undo history (labelled AI), so the user can step back. Some actions "
-              "ask the user first (files outside the project folder, overwrites, scripts, network); if they decline, "
-              "don't retry, ask them.");
+              "viewport_image shows what the user sees, view_turntable shows the model from all sides, view_closeup "
+              "shows one spot up close, view_set turns the camera. Every step lands in the undo history (labelled "
+              "AI), so the user can step back. Some actions ask the user first (files outside the project folder, "
+              "overwrites, scripts, network); if they decline, don't retry, ask them. " +
+                  std::string(kMcpSculptWorkflow) +
+                  " stroke_screen's radius is a fraction of the view's height: zoom in (view_set zoom=3 or more) "
+                  "before small detail strokes, or use stroke with scene-unit radii.");
         send(result(id, std::move(r)));
     }
 

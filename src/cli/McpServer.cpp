@@ -61,6 +61,7 @@ Json toolList(const CommandRegistry& registry) {
         tools.push(tool);
     }
     if (policy::mcpToolAllowed("viewport_image", {})) tools.push(viewportImageTool()); // (cli/McpTools.h; reads: "info")
+    if (policy::mcpToolAllowed("view_closeup", {})) tools.push(viewCloseupTool());
     Json result = Json::object();
     result.set("tools", tools);
     return result;
@@ -119,9 +120,9 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
                    "A scene can hold several Parts (separate meshes, see part_list): edits apply to the active "
                    "one, exports write every visible one. "
                    "Check each step by eye with viewport_image and by numbers with mesh_info (splat_info for "
-                   "captures); every tool call is one undo step (undo takes it back). The prompts are ready-made "
-                   "recipes (a creature head, a game-ready asset, rock variations, a lesson). File paths are on "
-                   "the user's computer.");
+                   "captures); every tool call is one undo step (undo takes it back). " + std::string(kMcpSculptWorkflow) +
+                   " The prompts are ready-made recipes (a creature head, a game-ready asset, rock variations, a "
+                   "lesson). File paths are on the user's computer.");
         return reply(id, result).dump();
     }
     if (method == "ping") return reply(id, Json::object()).dump();
@@ -136,12 +137,13 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
     }
     if (method == "tools/call") {
         const std::string name = msg["params"]["name"].asString();
-        if (name == "viewport_image") {
+        if (name == "viewport_image" || name == "view_closeup") {
             Json content;
             std::string error;
             const auto start = std::chrono::steady_clock::now();
             bool ok = policy::mcpToolAllowed(name, {}, &error) && (!audit::required() || audit::writable(&error));
-            ok = ok && renderViewportImage(doc, msg["params"]["arguments"], content, error);
+            ok = ok && (name == "view_closeup" ? renderCloseup(doc, msg["params"]["arguments"], content, error)
+                                               : renderViewportImage(doc, msg["params"]["arguments"], content, error));
             if (!ok) {
                 Json text = Json::object();
                 text.set("type", "text");

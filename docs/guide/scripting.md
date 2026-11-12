@@ -414,6 +414,23 @@ use live mode, above, to watch it work).
   bust from a reference image, a game-ready asset (retopology, UVs, baked maps and LODs for Unreal or Godot),
   rock variations, and a step-by-step lesson.
 
+**Fine detail.** The server tells every agent how a sculpt gets to finished detail: block out, then subdivide to
+about 1 million triangles for the secondary forms, then to 3-6 million before pores and wrinkles, with brush sizes
+for each stage. Three tools help it get there:
+
+- **detail_pass** puts one kind of detail over a region in one undo step: pores, skin texture, wrinkles, scales or
+  scars, pressed in along the surface. It is plain brush work, evenly scattered, and the same seed gives the same
+  result. On a mesh too coarse for the detail it stops and says how far to subdivide.
+- **Detail presets** for strokes: Detail Crease (eyelids, lips, folds), Detail Wrinkle, Detail Pores, Detail Skin,
+  Detail Scales and Detail Scar bring their own size, strength and alpha, so a detail stroke isn't a big soft blob.
+  Your own alpha setting stays as it is.
+- **view_closeup** shows one spot up close, lit low from the side, so the agent can judge pores and creases the way
+  you would zoomed in. It also reports the triangles there and the finest detail the mesh can hold. In live mode
+  your view doesn't move.
+
+Ask for detail by region ("pores on the cheeks and nose, wrinkles around the eyes") and the agent will look at each
+one up close.
+
 ### Your own agent
 
 The [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/mcp/) starts the server itself:

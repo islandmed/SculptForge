@@ -3,6 +3,7 @@
 #include "core/Commands.h"
 
 #include "core/AgentTools.h"
+#include "core/DetailPass.h"
 #include "core/ViewCapture.h"
 
 #include "core/Bake.h"
@@ -716,6 +717,7 @@ CommandRegistry::CommandRegistry() {
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
+    registerDetailCommands(*this);           // detail_pass (core/DetailPass.cpp)
     registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
@@ -726,12 +728,16 @@ CommandRegistry::CommandRegistry() {
          {{"points", T::String,
            "World-space path: \"x,y,z x,y,z ...\" (or separated by '|'). One point stamps a single dab.", true},
           {"brush", T::String,
-           "Custom brush (library name) or built-in brush (Standard, Clay, Crease, Inflate, ...). Default: the "
-           "active brush.",
+           "Custom brush (library name), built-in brush (Standard, Clay, Crease, Inflate, ...) or a detail preset "
+           "(Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar: its own alpha, "
+           "radius and strength, for fine detail on a dense mesh). Default: the active brush.",
            false},
           {"view", T::String, "Direction the path is projected along, \"x,y,z\" (default 0,0,-1: front view).", false},
-          {"radius", T::Number, "Brush radius in world units (default 4% of the mesh size).", false},
-          {"strength", T::Number, "Strength 0-1 (default 0.5).", false},
+          {"radius", T::Number,
+           "Brush radius in world units (default 4% of the mesh size: big forms; a detail preset's own, 0.3-2.5%). "
+           "Secondary forms want 1.5-4%, fine detail 0.3-1% on a mesh whose edges are under radius / 2.5.",
+           false},
+          {"strength", T::Number, "Strength 0-1 (default 0.5; a detail preset's own).", false},
           {"pressure", T::Number, "Constant pen pressure 0-1 (default 1).", false},
           {"invert", T::Bool, "Invert the brush (carve instead of build, like holding Alt).", false},
           {"curve", T::Bool, "Smooth curve through the points (default true); false = straight segments.", false},
@@ -744,12 +750,15 @@ CommandRegistry::CommandRegistry() {
              if (!parsePathPoints(argString(a, "points"), st.points, err)) return {false, err};
              const std::string view = argString(a, "view");
              if (!view.empty() && !parseVec3(view, st.view)) return {false, "Bad view '" + view + "' (expected x,y,z)"};
-             st.radius = float(argNumber(a, "radius", 0.0));
-             st.strength = float(argNumber(a, "strength", 0.5));
+             // A detail preset (core/DetailPass.h) brings its brush, alpha, size and strength; the arguments still win.
+             const DetailPreset* detail = findDetailPreset(argString(a, "brush"));
+             const float diag = glm::length(doc.mesh.bounds().extent());
+             st.radius = float(argNumber(a, "radius", detail ? detail->size * diag : 0.0));
+             st.strength = float(argNumber(a, "strength", detail ? detail->strength : 0.5));
              st.pressure = float(argNumber(a, "pressure", 1.0));
-             st.invert = argBool(a, "invert", false);
+             st.invert = argBool(a, "invert", false) != (detail && detail->invert);
              st.curve = argBool(a, "curve", true);
-             st.spacing = float(argNumber(a, "spacing", -1.0));
+             st.spacing = float(argNumber(a, "spacing", detail ? detail->spacing : -1.0));
              st.seed = uint32_t(std::max(argNumber(a, "seed", 1.0), 0.0));
              if (!symmetryArg(a, doc.mesh, st.symmetry, err)) return {false, err};
              if (const Part& part = doc.activePartInfo(); part.moved()) { // a moved linked copy (#94): into its space
@@ -769,6 +778,18 @@ CommandRegistry::CommandRegistry() {
              };
              const BrushRecipe* recipe = nullptr;
              BrushType type = BrushType::Standard;
+             if (detail) {
+                 // Its alpha for this stroke only: the user's own comes back after.
+                 BrushAlpha alpha;
+                 if (*detail->alpha) BrushAlpha::builtin(detail->alpha, alpha);
+                 std::swap(doc.brushAlpha, alpha);
+                 const int dabs = strokePath(doc, nullptr, detail->type, st, err);
+                 std::swap(doc.brushAlpha, alpha);
+                 if (dabs < 0) return {false, err};
+                 if (dabs == 0) return {false, "The path never crosses the surface (check the points and view)"};
+                 return {true, "Stroked " + std::to_string(dabs) + " dabs with " + detail->name + " (radius " +
+                                   std::to_string(st.radius) + ")"};
+             }
              if (name.empty()) {
                  if (doc.activeBrush >= 0 && doc.activeBrush < int(doc.brushes.size())) recipe = &doc.brushes[doc.activeBrush];
              } else {
