@@ -69,14 +69,28 @@ key escape
 expect_value z_intensity == $i0
 expect_value size_popup_open == 0
 
-# Off the canvas (going for a shelf brush): the old size shows, and a click there cancels and goes on to what it hit.
+# Past the canvas edge the size stays at the edge's value (growing a brush at the right side keeps it); Esc restores.
+brush_size 60
+hover_window 0.6 0.5
+key s
+mouse_by 90 0
+expect_value draw_size == 150
+hover_window 0.8 0.5
+expect_value draw_size > 150
+remember draw_size edge
+hover_window 0.9 0.5
+expect_value draw_size == $edge
+key escape
+expect_value draw_size == 60
+
+# A click on a control (a shelf brush) cancels, and goes on to that control.
 brush_size 60
 hover_window 0.4 0.5
 key s
 mouse_by 90 0
 expect_value draw_size == 150
-hover_window 0.5 0.97
-expect_value draw_size == 60
+hover "Clay##brush.clay"
 click_here
 expect_value size_popup_open == 0
 expect_value draw_size == 60
+expect_value brush_type == 1
