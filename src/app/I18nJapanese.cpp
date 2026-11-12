@@ -6447,6 +6447,10 @@ constexpr Entry kJapanese[] = {
      "チューブ半径1つ分の長さごとに、断面をこの角度ずつ一定に回転させます。ねじ山やより縄のような形になります。"},
     {"What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for stepping between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures with their layers and material channels (only painted 64x64 tiles of a channel use memory), and the GPU buffers of the visible Parts.",
      "シーンが保持するもの：トポロジー付きのメッシュ、BVH、分割レベル間の移動用に保持された分割レベル、取り消し履歴（編集では空きメモリの許す限り保持し、古い操作から削除します）、レイヤーとマテリアルチャンネル付きのペイントテクスチャ（チャンネルのうち描画済みの64x64タイルだけがメモリを使います）、表示中のパーツのGPUバッファ。"},
+    {"Copy log to clipboard", "ログをクリップボードにコピー"},
+    {"Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+     "attached or found.",
+     "sculptforge.log の最後の60行をコピーします。ファイルを添付できない、または見つからない場合に、不具合報告へ貼り付けられます。"},
 };
 
 } // namespace
