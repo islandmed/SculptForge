@@ -1,0 +1,34 @@
+# Masks on a Micro level (a user report: masked eyes still moved). The mask brush paints the Micro level's own mask; Move and
+# the Kelvin brushes move the base mesh below it. Move over a mask uses the grid's per-point rule; Kelvin Grab, started on a
+# masked eye or dragged into it, does nothing near the mask (the cage held two rings out tore the surface), and works as ever
+# away from it (it stops at the mask when dragged into it). tests/test_micro_mask_grab.cpp holds the geometry (every brush, bit-identical masked points).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run micro_divide level=3
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+brush_size 45
+hold ctrl
+stroke 0.38 0.40 0.39 0.41 0.4
+stroke 0.62 0.40 0.61 0.41 0.4
+hold none
+wait_idle 30
+
+# Kelvin Grab pressed on an eye and dragged out: the base mesh doesn't move.
+snapshot
+click "KelvinGrab##brush.kelvingrab"
+brush_size 140
+stroke 0.38 0.40 0.30 0.28 0.6
+wait_idle 30
+expect_value moved == 0
+key ctrl+z
+wait_idle 30
+
+# Away from the eyes (a small brush at the bottom of the sphere) Kelvin Grab moves the surface as ever.
+snapshot
+brush_size 40
+stroke 0.50 0.75 0.56 0.80 0.6
+wait_idle 30
+expect_value moved > 0

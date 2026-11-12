@@ -562,6 +562,24 @@ void microQueryTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& center,
     bvh.queryTrianglesPadded(m, center, radius, mm.reach.pad, mm.bulgeMax, out);
 }
 
+bool microMaskNear(const Mesh& m, const BVH& bvh, const glm::vec3& center, float radius) {
+    if (!m.micro || (!m.micro->hasMask() && !m.hasMask())) return false;
+    const MicroMesh& mm = *m.micro;
+    std::vector<uint32_t> tris;
+    microQueryTriangles(m, bvh, center, radius + 2.0f * mm.baseEdge, tris);
+    for (uint32_t t : tris) {
+        if (mm.hasMask()) {
+            const uint8_t* k = mm.mask.data() + size_t(t) * mm.samples;
+            if (std::any_of(k, k + mm.samples, [](uint8_t v) { return v != 0; })) return true;
+        }
+        if (m.hasMask()) {
+            const glm::uvec3 tr = m.triangles[t];
+            if (m.maskAt(tr.x) > 0.0f || m.maskAt(tr.y) > 0.0f || m.maskAt(tr.z) > 0.0f) return true;
+        }
+    }
+    return false;
+}
+
 void microRayTriangles(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const glm::vec3& dir, std::vector<uint32_t>& out) {
     const MicroMesh& mm = *m.micro;
     std::lock_guard<std::mutex> hold(mm.reach.lock);

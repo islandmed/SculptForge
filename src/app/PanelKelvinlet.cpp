@@ -57,6 +57,7 @@ void App::kelvinBegin(const RayHit& hit) {
     kelvinRadius_ = radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight());
     grabLast_ = kelvinTarget_ = hit.position;
     kelvinPending_ = 0.0f;
+    kelvinMaskHinted_ = false;
     kelvinLastX_ = lastX_;
     lastDabScreen_ = glm::vec2(lastX_, lastY_);
 }
@@ -198,6 +199,10 @@ void App::kelvinAdvance() {
 }
 
 void App::kelvinCatchUp() {
+    if (!kelvinMaskHinted_ && doc_.sculptor.kelvinMaskBlocked()) { // (the solver thread may have found it)
+        kelvinMaskHinted_ = true;
+        status_ = "Kelvin brushes leave a masked Micro level alone near the mask: use Move or Standard there";
+    }
     if (asyncStroke_ && kelvinStrokeBrush() && (drag_ == Drag::Stroke || strokeFinishing_)) {
         if (kelvinPump()) {
             redrawIn(0.0);
