@@ -197,12 +197,33 @@ int main(int argc, char** argv) {
             gd.normal = planes.back().first;
             gd.areaCenter = planes.back().second;
             gd.strength = p.strength;
+            if (std::getenv("SF_RND_CLAYPULL")) gd.weight = clayPull(p.strength); // the preview fixed (Ghost.cpp leaves it out)
             g.dabs.push_back(gd);
             if (int(g.dabs.size()) >= k) { // the batch lands: B catches up, the preview empties
                 B.mesh.positions = T.mesh.positions;
                 B.mesh.normals = T.mesh.normals;
                 B.bvh.refitAll(B.mesh);
                 g.dabs.clear();
+            }
+        }
+        // SF_RND_GHOSTCMP=1 (with k >= dabs: the preview holds the whole stroke): the preview's move of every vertex vs
+        // the solver's, in px; weight = clayPull(s) is the solver's Clay pull at s < 0.5 that the preview leaves out.
+        if (std::getenv("SF_RND_GHOSTCMP")) {
+            for (int pass = 0; pass < 2; ++pass) {
+                for (GhostDab& gd : g.dabs) gd.weight = pass ? clayPull(gd.strength) : 1.0f;
+                std::vector<float> e;
+                double sq = 0.0;
+                for (size_t v = 0; v < nv; ++v) {
+                    const glm::vec3 gm = ghostMove(g, orig[v], origN[v]);
+                    if (gm == orig[v] && T.mesh.positions[v] == orig[v]) continue;
+                    const float d = glm::distance(gm, T.mesh.positions[v]) * px;
+                    e.push_back(d), sq += double(d) * d;
+                }
+                std::sort(e.begin(), e.end());
+                const auto q = [&](double f) { return e.empty() ? 0.0f : e[std::min(e.size() - 1, size_t(f * double(e.size() - 1)))]; };
+                std::printf("rnd ghost vs solver (%s): %zu moved verts, max %.3f p99.9 %.3f p99 %.3f p50 %.3f RMS %.3f px\n",
+                            pass ? "with clayPull" : "as shipped", e.size(), double(q(1.0)), double(q(0.999)), double(q(0.99)),
+                            double(q(0.5)), std::sqrt(sq / double(std::max<size_t>(1, e.size()))));
             }
         }
         for (int step = 0; step < 3; ++step) {
