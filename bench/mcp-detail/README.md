@@ -36,3 +36,8 @@ the steps for detail.
 The numbers back the pictures only in part. `hf` and `curv_var` rise with real detail, but also with faceting and the
 mesh resolution: before-haiku-1 scores high from low-resolution faceting, and before-haiku-2's micro noise was baked
 at 4M vertices. Judge by the close-ups first. A metric at a fixed world scale (resampled) would separate these.
+
+These runs used the first version of detail_pass (b43bf850). The artist close-up review then changed pores, skin and
+scales to round dabs (patterned alphas couldn't mirror under symmetry, and pores spiked and clumped), gave scales a
+cut-in rim, and made scars deeper with Crease. That version isn't benchmarked yet: the re-run, with a 150-call cap, waits
+until the token budget allows it.

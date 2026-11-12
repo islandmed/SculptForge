@@ -31,7 +31,7 @@ struct DetailPreset {
     const char* name;  // "Detail Pores"
     const char* kind;  // detail_pass's kind it matches ("pores"), or a stroke-only one ("crease")
     BrushType type;
-    const char* alpha; // built-in alpha name, "" = round
+    const char* alpha; // built-in alpha name, "" = round (all of them now: round dabs mirror exactly)
     float size;        // radius as a fraction of the Part's size (bounding-box diagonal)
     float strength;
     bool invert;       // carve (true) or build
@@ -61,7 +61,9 @@ struct DetailPassOptions {
 
 // Applies one detail pass to doc's active Part as one undo step. Returns the dabs placed (>= 1), or -1 with `error`.
 // `message` says what it did, in numbers an agent can check.
-int detailPass(Document& doc, const DetailPassOptions& options, std::string& message, std::string& error);
+// `placed`: where each dab (or stroke dab) landed, unmirrored (tests measure the falloff ring around them).
+int detailPass(Document& doc, const DetailPassOptions& options, std::string& message, std::string& error,
+               std::vector<glm::vec3>* placed = nullptr);
 
 // The median edge length of the triangles with a corner within `radius` of `center` (radius <= 0: every triangle;
 // a sample of at most 50k triangles). 0 for an empty mesh or region.

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/DetailPass.h"
 
-#include "core/BrushAlpha.h"
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Masking.h"
@@ -23,20 +22,22 @@ namespace {
 constexpr float kEdgesPerRadius = 2.5f; // a dab narrower than this many edges only roughens the surface
 constexpr int kMaxDabs = 6000;          // one call stays well under a second on a few million triangles
 
-// Sizes are fractions of the Part's bounding-box diagonal: on a head about 25 cm tall, 0.01 is 3-4 mm.
+// Sizes are fractions of the Part's bounding-box diagonal: on a head about 25 cm tall, 0.01 is 3-4 mm. Pores, skin
+// and scales are round dabs, each pore or scale its own: a patterned alpha can only be turned for the mirror copy,
+// not mirrored, so with symmetry the two sides came out different; round dabs mirror exactly, as any stroke.
 const std::vector<DetailPreset> kPresets = {
-    {"Detail Pores", "pores", BrushType::Standard, "pores", 0.012f, 1.0f, true, 0.6f,
-     "skin pores pressed in (cheeks, nose, forehead); stamp it over an area"},
-    {"Detail Skin", "skin", BrushType::Standard, "skin_folds", 0.014f, 0.2f, true, 0.5f,
-     "fine skin texture: tiny folds and grain between the pores"},
+    {"Detail Pores", "pores", BrushType::Standard, "", 0.004f, 1.0f, true, 2.0f,
+     "skin pores pressed in (cheeks, nose, forehead): an even field of small pits of mixed sizes"},
+    {"Detail Skin", "skin", BrushType::Standard, "", 0.004f, 0.15f, true, 1.5f,
+     "fine skin texture: tiny shallow pits and bumps between the pores"},
     {"Detail Wrinkle", "wrinkles", BrushType::Crease, "", 0.004f, 0.5f, false, 0.12f,
      "a thin wrinkle line (around the eyes, the brow, the neck); short strokes"},
     {"Detail Crease", "crease", BrushType::SharpCrease, "", 0.003f, 0.6f, false, 0.1f,
      "a crisp, sharp crease (eyelids, lips, nostrils, folds); one stroke along the line"},
-    {"Detail Scales", "scales", BrushType::Standard, "scales", 0.025f, 0.7f, false, 0.8f,
-     "overlapping scales in rows (reptiles, armoured hide); stamp it over an area"},
-    {"Detail Scar", "scars", BrushType::SharpCrease, "", 0.0035f, 0.7f, false, 0.1f,
-     "a scar or cut: a deep, sharp line a few centimetres long"},
+    {"Detail Scales", "scales", BrushType::Standard, "", 0.012f, 0.6f, false, 1.5f,
+     "scales in offset rows (reptiles, armoured hide): each a raised dab with its lower rim cut in"},
+    {"Detail Scar", "scars", BrushType::Crease, "", 0.005f, 0.9f, false, 0.12f,
+     "a scar or cut: a deep line a few centimetres long"},
 };
 
 std::string squash(std::string_view s) {
@@ -124,7 +125,8 @@ int levelsToReach(float edge, float want) {
     return levels;
 }
 
-int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, std::string& error) {
+int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, std::string& error,
+               std::vector<glm::vec3>* placed) {
     Mesh& mesh = doc.mesh;
     if (mesh.triangleCount() == 0) {
         error = "The active Part is empty";
@@ -150,7 +152,8 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
                 "gives its centre and size)";
         return -1;
     }
-    const float holdable = r / kEdgesPerRadius;
+    const float smallest = o.kind == "pores" ? 0.75f : o.kind == "skin" ? 0.8f : 1.0f; // (mixed sizes)
+    const float holdable = smallest * r / kEdgesPerRadius;
     if (edge > holdable) {
         const int levels = levelsToReach(edge, holdable);
         const double tris = double(mesh.triangleCount()) * std::pow(4.0, levels);
@@ -192,7 +195,9 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
     struct Spot {
         glm::vec3 p, n, t{0.0f};
         float length = 0.0f;
-        float bend = 0.0f; // how far a stroke's middle bows sideways (a wrinkle is rarely straight)
+        float bend = 0.0f;  // how far a stroke's middle bows sideways (a wrinkle is rarely straight)
+        float scale = 1.0f; // this one's radius, times r (pores come in mixed sizes)
+        bool flip = false;  // the other way from the kind's (skin: a bump among the pits)
     };
     std::vector<Spot> spots;
     Rng rng(o.seed);
@@ -203,7 +208,27 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
     bool capped = false;
     int want = 0;
 
-    if (o.kind == "wrinkles" && !o.whole && glm::length(facing) > 0.0f) {
+    if (o.kind == "scales" && !o.whole && glm::length(facing) > 0.0f) {
+        // Scales over a region: offset rows (a hex grid) on the region's tangent plane, rows across `direction`,
+        // 1.5 radii apart so neighbours overlap; denser packs them a little tighter.
+        const glm::vec3 n = glm::normalize(facing), t0 = runOn(n), b = glm::cross(n, t0);
+        glm::vec3 c = o.center;
+        if (RayHit hit; surfaceRaycast(mesh, doc.bvh, o.center + n * o.radius, -n, hit)) c = hit.position;
+        const float step = r * (1.9f - 0.6f * density), rowGap = step * 0.866f;
+        int row = 0;
+        for (float v = -o.radius; v <= o.radius && !capped; v += rowGap, ++row)
+            for (float u = -o.radius + ((row & 1) ? 0.5f * step : 0.0f); u <= o.radius; u += step) {
+                if (u * u + v * v > o.radius * o.radius) continue;
+                if (int(spots.size()) >= kMaxDabs) {
+                    capped = true;
+                    break;
+                }
+                Spot spot{c + t0 * u + b * v, n, t0};
+                spot.scale = 0.9f + 0.2f * rng.unit();
+                spots.push_back(spot);
+            }
+        want = int(spots.size());
+    } else if (o.kind == "wrinkles" && !o.whole && glm::length(facing) > 0.0f) {
         // Wrinkles over a region: parallel rows across it (a forehead's lines, crow's feet with a direction), each
         // row broken into strokes of 12-20 radii with small gaps, a little wavy, `gap` apart (density: 9 to 3 radii).
         const glm::vec3 n = glm::normalize(facing), t0 = runOn(n), b = glm::cross(n, t0);
@@ -225,16 +250,16 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
         capped = int(spots.size()) >= kMaxDabs / 120;
         want = int(spots.size());
     } else {
-        // Scattered evenly: stamps tile the region about 2.5 times over at density 1 (pores and skin need overlap
-        // to read as a surface, not as stamps); strokes keep a few radii apart.
+        // Scattered evenly (a Poisson-disc fill: no two closer than minDist): pores and skin as a field of single
+        // dabs (density: 2.6 to 1.4 radii apart), scales over a whole Part 1.5 radii apart; strokes a few radii apart.
         const float lineLength = (o.kind == "scars" ? 14.0f : 12.0f) * r;
-        const double footprint = lines ? double(lineLength) * double(4.0f * r) : 3.14159265 * double(r) * double(r);
-        const double coverage = lines ? 1.0 : o.kind == "scales" ? 1.4 : 2.5;
-        want = int(std::ceil(density * coverage * area / footprint));
+        const float minDist = lines ? (o.kind == "scars" ? 6.0f * r : 4.0f * r)
+                                    : o.kind == "scales" ? 1.5f * r : r * (2.6f - 1.2f * density);
+        const double footprint = lines ? double(lineLength) * double(4.0f * r) : 0.9 * double(minDist) * double(minDist);
+        want = int(std::ceil((lines ? density : 1.0) * area / footprint));
         if (o.kind == "scars") want = std::clamp(int(std::lround(density * 5.0)), 1, 8);
         const int most = lines ? kMaxDabs / 100 : kMaxDabs;
         if (want > most) want = most, capped = true;
-        const float minDist = lines ? (o.kind == "scars" ? lineLength : 4.0f * r) : r * (o.kind == "scales" ? 1.3f : 0.45f);
         const bool smoothNormals = mesh.normals.size() == mesh.positions.size();
         std::unordered_map<int64_t, std::vector<uint32_t>> grid; // spots by cell (minDist), for the spacing
         auto key = [](const glm::ivec3& c) {
@@ -265,11 +290,14 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
             n = glm::normalize(n);
             grid[key(c)].push_back(uint32_t(spots.size()));
             Spot spot{p, n};
-            // Wrinkles follow the run (+-14 degrees); scars and the stamps turn at random, so no alpha tiles.
+            // Wrinkles follow the run (+-14 degrees), scars go any way; pores come in mixed sizes, skin is mostly
+            // pits with a bump now and then.
             spot.t = runOn(n);
             if (o.kind == "wrinkles") spot.t = rotateAbout(spot.t, n, (rng.unit() - 0.5f) * 0.5f);
-            else if (o.kind != "scales") spot.t = rotateAbout(spot.t, n, rng.unit() * 6.2831853f);
+            else if (o.kind == "scars") spot.t = rotateAbout(spot.t, n, rng.unit() * 6.2831853f);
             if (lines) spot.length = lineLength * (0.7f + 0.6f * rng.unit());
+            if (o.kind == "pores") spot.scale = 0.75f + 0.5f * rng.unit();
+            if (o.kind == "skin") spot.scale = 0.8f + 0.4f * rng.unit(), spot.flip = rng.unit() < 0.35f;
             spots.push_back(spot);
         }
     }
@@ -278,8 +306,6 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
         return -1;
     }
 
-    BrushAlpha alpha;
-    if (*preset->alpha) BrushAlpha::builtin(preset->alpha, alpha);
     if (!doc.sculptor.beginStroke(mesh, std::string("AI detail: ") + o.kind, doc.activeLayer)) {
         error = "Active layer weight is 0 - raise it to sculpt into the layer";
         return -1;
@@ -288,18 +314,50 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
     base.radius = r;
     base.strength = strength;
     base.invert = preset->invert != o.invert;
-    base.alpha = alpha.empty() ? nullptr : &alpha;
+    // A scale's lower rim cut in with Crease: an arc a little inside its edge, so it reads as a plate lying over the
+    // row below, not as a bump.
+    auto scaleRim = [&](const glm::vec3& centre, const Spot& s) {
+        const glm::vec3 down = -glm::cross(s.n, s.t); // (rows run along t; the rim faces away from `direction`'s side)
+        DabParams c = base;
+        c.radius = 0.22f * r * s.scale;
+        c.strength = 0.9f;
+        c.invert = o.invert;
+        c.viewDir = -s.n;
+        c.pickNormal = s.n;
+        int n = 0;
+        glm::vec3 last{0.0f};
+        for (int i = 0; i <= 8; ++i) {
+            const float a = 3.14159265f * (0.15f + 0.7f * float(i) / 8.0f); // the lower half, short of the sides
+            const glm::vec3 q = centre + 0.85f * r * s.scale * (std::cos(a) * s.t + std::sin(a) * down);
+            RayHit hit;
+            if (!surfaceRaycast(mesh, doc.bvh, q + s.n * (4.0f * r), -s.n, hit)) continue;
+            c.center = hit.position;
+            c.strokeDelta = n ? hit.position - last : s.t;
+            last = hit.position;
+            doc.sculptor.dab(mesh, doc.bvh, BrushType::Crease, c, o.symmetry);
+            ++n;
+        }
+        return n;
+    };
     int dabs = 0;
     const float lift = 4.0f * r + (o.whole ? 0.0f : 0.5f * o.radius); // (a row's ends sit off a curved surface)
     for (const Spot& s : spots) {
         DabParams p = base;
         p.viewDir = -s.n;
         p.pickNormal = s.n;
-        p.alphaUp = o.kind == "scales" ? glm::cross(s.n, s.t) : s.t;
+        p.radius = r * s.scale;
+        p.invert = base.invert != s.flip;
         if (s.length <= 0.0f) {
             p.center = s.p;
+            if (o.kind == "scales" && !o.whole) { // (a row's grid point sits on the tangent plane: onto the surface first)
+                RayHit hit;
+                if (!surfaceRaycast(mesh, doc.bvh, s.p + s.n * lift, -s.n, hit)) continue;
+                p.center = hit.position;
+            }
+            if (placed) placed->push_back(p.center);
             doc.sculptor.dab(mesh, doc.bvh, preset->type, p, o.symmetry);
             ++dabs;
+            if (o.kind == "scales") dabs += scaleRim(p.center, s);
             continue;
         }
         // A stroke through the spot along t, each dab found on the surface along the normal, eased in and out
@@ -318,6 +376,7 @@ int detailPass(Document& doc, const DetailPassOptions& o, std::string& message, 
             last = hit.position;
             haveLast = true;
             doc.sculptor.dab(mesh, doc.bvh, preset->type, p, o.symmetry);
+            if (placed) placed->push_back(p.center);
             ++dabs;
         }
     }
@@ -395,16 +454,16 @@ void registerDetailCommands(CommandRegistry& reg) {
     std::vector<ParamSpec> params = {
         {"kind", T::String,
          "pores (pressed-in skin pores), skin (fine folds and grain), wrinkles (parallel rows of lines across the "
-         "region, along direction), scales (overlapping rows) or scars (a few deep cuts).",
+         "region, along direction), scales (offset rows of raised scales) or scars (a few deep cuts).",
          true},
         {"center", T::String, "\"x,y,z\": the middle of the region, in scene units (leave out for the whole Part).", false},
         {"radius", T::Number, "The region's radius in scene units (default 15% of the Part's size).", false},
         {"density", T::Number, "0-1, how much of the region it covers (default 0.5; scars: 0.2 = one, 1 = five).", false},
         {"size", T::Number,
-         "Each stamp's radius as a fraction of the Part's size (default per kind: pores 0.012, skin 0.014, wrinkles "
-         "0.004, scales 0.025, scars 0.0035). The mesh needs edges under size / 2.5: it says so when they aren't.",
+         "Each pore's, scale's or line's radius as a fraction of the Part's size (default per kind: pores 0.004, "
+         "skin 0.004, wrinkles 0.004, scales 0.012, scars 0.005). The mesh needs edges under size / 2.5: it says so when they aren't.",
          false},
-        {"strength", T::Number, "0-1 (default per kind, 0.2-1).", false},
+        {"strength", T::Number, "0-1 (default per kind, 0.15-0.9).", false},
         {"invert", T::Bool, "The other way: raised pores and wrinkles, carved scales.", false},
         {"direction", T::String,
          "\"x,y,z\": which way wrinkles run and scales point, projected onto the surface (default horizontal: "

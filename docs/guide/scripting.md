@@ -422,7 +422,8 @@ for each stage. Three tools help it get there:
   scars, pressed in along the surface. It is plain brush work, evenly scattered, and the same seed gives the same
   result. On a mesh too coarse for the detail it stops and says how far to subdivide.
 - **Detail presets** for strokes: Detail Crease (eyelids, lips, folds), Detail Wrinkle, Detail Pores, Detail Skin,
-  Detail Scales and Detail Scar bring their own size, strength and alpha, so a detail stroke isn't a big soft blob.
+  Detail Scales and Detail Scar bring their own brush, size and strength (round, so symmetry mirrors them exactly), so
+  a detail stroke isn't a big soft blob.
   Your own alpha setting stays as it is.
 - **view_closeup** shows one spot up close, lit low from the side, so the agent can judge pores and creases the way
   you would zoomed in. It also reports the triangles there and the finest detail the mesh can hold. In live mode

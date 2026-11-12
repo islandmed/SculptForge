@@ -729,7 +729,7 @@ CommandRegistry::CommandRegistry() {
            "World-space path: \"x,y,z x,y,z ...\" (or separated by '|'). One point stamps a single dab.", true},
           {"brush", T::String,
            "Custom brush (library name), built-in brush (Standard, Clay, Crease, Inflate, ...) or a detail preset "
-           "(Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar: its own alpha, "
+           "(Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar: its own brush, "
            "radius and strength, for fine detail on a dense mesh). Default: the active brush.",
            false},
           {"view", T::String, "Direction the path is projected along, \"x,y,z\" (default 0,0,-1: front view).", false},
@@ -750,7 +750,7 @@ CommandRegistry::CommandRegistry() {
              if (!parsePathPoints(argString(a, "points"), st.points, err)) return {false, err};
              const std::string view = argString(a, "view");
              if (!view.empty() && !parseVec3(view, st.view)) return {false, "Bad view '" + view + "' (expected x,y,z)"};
-             // A detail preset (core/DetailPass.h) brings its brush, alpha, size and strength; the arguments still win.
+             // A detail preset (core/DetailPass.h) brings its brush, size and strength; the arguments still win.
              const DetailPreset* detail = findDetailPreset(argString(a, "brush"));
              const float diag = glm::length(doc.mesh.bounds().extent());
              st.radius = float(argNumber(a, "radius", detail ? detail->size * diag : 0.0));
