@@ -1,0 +1,99 @@
+# The command line in the F3 search: plain words with numbers, typos and Part names run existing actions, each saying
+# what Enter will do first. Five commands, the key in the result line, the history on the Up arrow, unknown words as a
+# normal search. CMake also runs this at 1440 and 2880 px wide (command_bar_1440 / command_bar_2880).
+run new_sphere subdivisions=3
+run part_append type=cube name=Cube
+run part_append type=sphere name=Ball
+expect_value parts == 3
+expect_value visible_parts == 3
+
+# 1. "clay 40": the Clay brush at size 40, shown before Enter.
+key f3
+type "##Command palette" "clay 40"
+expect_text "Clay - Size 40"
+shot command_bar_clay
+key enter
+expect_value main_brush == 1
+expect_value draw_size == 40
+expect_status "Clay - Size 40"
+expect_value command_palette_open == 0
+
+# 2. "intensity 30" (a typo is forgiven, a number past the end is moved in).
+key f3
+type "##Command palette" "intensty 30"
+expect_text "Intensity 30%"
+key enter
+expect_value z_intensity == 30
+key f3
+type "##Command palette" "intensity 400"
+expect_text "Intensity 100%"
+key enter
+expect_value z_intensity == 100
+
+# 3. Mirror: on by default; "symmetry off" turns every axis off, "mirror x" flips X back.
+expect_value symmetry_x == 1
+key f3
+type "##Command palette" "symmetry off"
+expect_text "Symmetry - Off"
+key enter
+expect_value symmetry_x == 0
+key f3
+type "##Command palette" "mirror x"
+expect_text "Symmetry X - On"
+key enter
+expect_value symmetry_x == 1
+
+# 4. A switch with a typo: "wireframe on" runs the action only when it changes something.
+key f3
+type "##Command palette" "wirefrmae on"
+expect_text "Wireframe - On"
+key enter
+expect_value wireframe == 1
+key f3
+type "##Command palette" "wireframe on"
+key enter
+expect_value wireframe == 1
+key f3
+type "##Command palette" "wireframe off"
+key enter
+expect_value wireframe == 0
+
+# 5. Parts by name: "hide all but ball".
+key f3
+type "##Command palette" "hide all but ball"
+expect_text "Hide all except Ball"
+shot command_bar_hide
+key enter
+expect_value visible_parts == 1
+key f3
+type "##Command palette" "show all"
+key enter
+expect_value visible_parts == 3
+
+# A number the entry cannot use, or a word nothing matches, is a normal search: no command row.
+key f3
+type "##Command palette" "qzxv"
+expect_text "No matching commands"
+key escape
+
+# The Up arrow in an empty field walks the last commands; Enter runs one again.
+key f3
+key up
+expect_text "Show all"
+key up
+expect_text "Hide all but Ball"
+key enter
+expect_value visible_parts == 1
+key f3
+type "##Command palette" "show all"
+key enter
+expect_value visible_parts == 3
+
+# A name that is only half there says what is missing, and stays open.
+key f3
+type "##Command palette" "intensity"
+expect_text "type a number"
+key enter
+expect_value command_palette_open == 1
+shot command_bar_needs_number
+key escape

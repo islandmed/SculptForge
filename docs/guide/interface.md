@@ -506,6 +506,29 @@ to find any action or command by name and run it. It opens at the top centre of 
 
 Everything scriptable is in the command palette, including commands that have no button in the interface.
 
+### Say what you want
+
+You can also just type what you want, in plain words. The first row says what <kbd>Enter</kbd> will do before it
+does it, and nothing runs until you press <kbd>Enter</kbd>.
+
+| Type | What happens |
+|---|---|
+| `clay 40` | Picks the Clay brush and sets its size to 40. `clay 40 30%` also sets its intensity to 30%. |
+| `intensity 30`, `size 40` | Sets that one number. A number past the end of the slider is moved to the end. |
+| `mirror x`, `symmetry off`, `wireframe on` | Flips or sets a switch. `on` and `off` only change it when it is not already so. |
+| `remesh 200k` | Voxel Remesh to about 200 000 triangles. `remesh 300` is 300 voxels across. |
+| `hide all but head`, `show all`, `isolate body` | Shows and hides Parts by name. |
+| `ortho`, `turntable` | A plain action name, as before. |
+
+- It forgives typos (`smoth`, `wirefrmae`) and understands other names for things (`no perspective` finds
+  Orthographic). Names work in every interface language, with or without accents, and numbers may be written
+  `40`, `40px`, `30%`, `200k` or `1.5m`.
+- A word that means nothing here is just a normal search, so nothing odd runs.
+- The result line at the bottom shows the shortcut for what you ran, so the next time it is one key.
+- <kbd>Up</kbd> in an empty field brings back the last command you ran (the last 50 are kept, also
+  when you restart); <kbd>Up</kbd> again goes further back and <kbd>Down</kbd> returns. <kbd>Enter</kbd> runs it again.
+- It never goes online, and it only runs what the buttons and menus already run.
+
 ## The console
 
 Press <kbd>`</kbd> (the backtick key, left of <kbd>1</kbd> on US keyboards) to open the console, a strip

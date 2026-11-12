@@ -30,6 +30,7 @@
 #include "core/BrushSets.h"
 #include "core/BrushSettings.h"
 #include "core/Commands.h"
+#include "core/CommandParse.h"
 #include "core/Image.h"
 #include "link/AiLinkSession.h"
 #include "core/Macro.h"
@@ -2466,6 +2467,16 @@ public:
     void resolveShortcutConflict(bool replace);
     void drawShortcutConflict(); // the Replace / Cancel popup (Config.cpp)
     void openCommandPalette() { palette_.open(); }
+    // The command line of the F3 search (CommandBar.cpp): "clay 40", "mirror x", "hide all but head".
+    const cmd::Catalog& commandCatalog();                          // what the parser matches (names in every language, Parts)
+    std::string commandPreview(const cmd::Interpretation& r);      // "Clay - Size 40": what Enter will do
+    std::string commandKeys(const cmd::Interpretation& r);         // the key of the action behind it, "" when none
+    const char* commandIcon(const cmd::Interpretation& r);
+    bool commandRunnable(const cmd::Interpretation& r) const;
+    std::string runCommandLine(const cmd::Interpretation& r);      // runs it; the result line (with the key)
+    cmd::CommandHistory& commandHistory() { return commandHistory_; }
+    void saveCommandHistory();
+    void loadCommandHistory();
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
     // Save Layout / Reset Layout and Shortcuts / Revert to Saved Layout / Export Interface... / Import Interface...
@@ -2569,6 +2580,9 @@ private:
     UiPrefs uiPrefs_;
     Console console_;
     CommandPalette palette_;
+    cmd::Catalog commandCatalog_;     // rebuilt when the actions, the language or the brushes change
+    std::string commandCatalogKey_;
+    cmd::CommandHistory commandHistory_;
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
     bool captureSequence_ = false;    // ...for two keys in a row (added to its other keys)
