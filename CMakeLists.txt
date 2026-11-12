@@ -779,7 +779,7 @@ if(SCULPTFORGE_BUILD_TESTS)
   # The suite as SCULPTFORGE_TEST_SHARDS processes (sculptforge_tests_0of16 ...; `ctest -j` runs them at once, CI does;
   # more shards than cores balance better), each with its own temporary folder so tests in different shards never
   # share a scratch file.
-  add_executable(sf_rnd_proxy_bench tests/tools/rnd_proxy_bench.cpp) # R&D spike rnd/moved-vertex
+  add_executable(sf_rnd_proxy_bench tests/tools/rnd_proxy_bench.cpp src/render/Ghost.cpp) # R&D spike rnd/moved-vertex
   target_link_libraries(sf_rnd_proxy_bench PRIVATE sculptforge_core)
   set(SCULPTFORGE_TEST_SHARDS 16 CACHE STRING "Number of ctest entries the sculptforge_tests suite is split into")
   math(EXPR last_shard "${SCULPTFORGE_TEST_SHARDS} - 1")

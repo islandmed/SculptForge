@@ -8,6 +8,7 @@
 #include "core/Project.h"
 #include "core/Sculpt.h"
 #include "core/ThreadPool.h"
+#include "render/Ghost.h"
 #include "../GeomInvariants.h"
 #include <algorithm>
 #include <atomic>
@@ -135,6 +136,84 @@ int main(int argc, char** argv) {
     s.sideSize = size[side];
     s.depth = depth;
 
+    // SF_RND_PICK=k: pick through the preview over a long Clay stroke. T = the mesh as drawn (every dab placed at once);
+    // B = what the CPU holds (T as of the last batch of k dabs). Each dab's ray hits B, moved by the pending dabs' kernel
+    // (render/Ghost.h ghostMove, the preview's own), then 0-2 refinements; error in px vs the ray's hit on T (r = 240 px).
+    if (const char* pk = std::getenv("SF_RND_PICK")) {
+        const int k = std::max(1, std::atoi(pk));
+        const auto fresh = [&](Document& x) {
+            Mesh m;
+            m.positions = orig;
+            m.triangles = d.mesh.triangles;
+            m.rebuildTopology();
+            m.normals = origN;
+            x.setMesh(std::move(m));
+        };
+        Document T, B;
+        fresh(T), fresh(B);
+        T.sculptor.analyticNormals = false;
+        T.sculptor.adaptiveDabs = false;
+        T.sculptor.beginStroke(T.mesh, "Clay");
+        std::vector<std::pair<glm::vec3, glm::vec3>> planes;
+        GhostStroke g;
+        g.kind = ghostKindForBrush(int(BrushType::Clay));
+        const float px = 240.0f / s.radius;
+        std::vector<float> err[3];
+        int hits = 0;
+        for (int i = 0; i < dabs; ++i) {
+            const glm::vec3 o = s.origin(i);
+            RayHit th, bh;
+            if (!T.bvh.raycast(T.mesh, o, s.dir, th) || !B.bvh.raycast(B.mesh, o, s.dir, bh)) continue;
+            // the pick: B's hit moved by the pending dabs; each refinement shifts the ray sideways by how far the moved point
+            // landed off the true ray and hits B again (the drawn surface is B moved by the preview's kernel)
+            const auto moved = [&](const RayHit& h) {
+                glm::vec3 n = glm::normalize(h.normal);
+                if (glm::dot(n, s.dir) > 0.0f) n = -n;
+                return g.dabs.empty() ? h.position : ghostMove(g, h.position, n);
+            };
+            glm::vec3 pick = moved(bh), shifted = o;
+            for (int step = 0; step < 3; ++step) {
+                err[step].push_back(glm::distance(pick, th.position) * px);
+                if (step == 2) break;
+                const glm::vec3 off = pick - o, side = off - s.dir * glm::dot(off, s.dir);
+                shifted -= side;
+                RayHit rh;
+                if (!B.bvh.raycast(B.mesh, shifted, s.dir, rh)) { for (int r2 = step + 1; r2 < 3; ++r2) err[r2].push_back(err[step].back()); break; }
+                pick = moved(rh);
+            }
+            ++hits;
+            DabParams p;
+            p.center = pick;
+            p.viewDir = s.dir;
+            p.radius = s.radius;
+            p.strength = 0.35f;
+            p.strokeDelta = i == 0 ? glm::vec3(0.0f) : s.across * s.step;
+            gRndPlanes = &planes, gRndPlanesUse = false;
+            T.sculptor.dab(T.mesh, T.bvh, BrushType::Clay, p, Symmetry{false, false, false});
+            gRndPlanes = nullptr;
+            GhostDab gd;
+            gd.center = pick;
+            gd.radius = s.radius;
+            gd.normal = planes.back().first;
+            gd.areaCenter = planes.back().second;
+            gd.strength = p.strength;
+            g.dabs.push_back(gd);
+            if (int(g.dabs.size()) >= k) { // the batch lands: B catches up, the preview empties
+                B.mesh.positions = T.mesh.positions;
+                B.mesh.normals = T.mesh.normals;
+                B.bvh.refitAll(B.mesh);
+                g.dabs.clear();
+            }
+        }
+        for (int step = 0; step < 3; ++step) {
+            auto& e = err[step];
+            std::sort(e.begin(), e.end());
+            const auto q = [&](double f) { return e.empty() ? 0.0f : e[std::min(e.size() - 1, size_t(f * double(e.size() - 1)))]; };
+            std::printf("rnd pick: batch %d, %d dabs, %d refinements: pick error max %.2f p99 %.2f p50 %.2f px\n", k, hits, step,
+                        double(q(1.0)), double(q(0.99)), double(q(0.5)));
+        }
+        return 0;
+    }
     // The exact stroke: the reference.
     const Run ex = stroke(d, s, dabs);
     const std::vector<glm::vec3> exact = d.mesh.positions;
