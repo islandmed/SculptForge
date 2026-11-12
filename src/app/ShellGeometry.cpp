@@ -125,7 +125,8 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
 
     float left = 0.0f, right = W; // the span between the dividers
     if (g.shelves) {
-        const float lw = l.leftTrayOpen ? trayWidth(l.leftTrayWidth, logicalW) * s : 0.0f;
+        const bool phone = logicalW < kPhoneWidth;
+        const float lw = l.leftTrayOpen && !phone ? trayWidth(l.leftTrayWidth, logicalW) * s : 0.0f;
         const float rw = l.rightTrayOpen && !g.narrow ? trayWidth(l.rightTrayWidth, logicalW) * s : 0.0f;
         const float dw = m.dividerW * s;
         g.leftTray = {0, top, lw, H - top};

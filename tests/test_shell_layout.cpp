@@ -428,3 +428,18 @@ TEST(ui_json_layout_and_saved_layout) {
         CHECK(layoutsFromUiJson(fresh).saved.isNull());
     }
 }
+
+// A phone held upright at 300 % UI scale is 360 logical px wide: an open tray (240 px at least) plus the two shelves left the
+// 3D view nothing, and the tray's edge was too small to drag shut (Hameron, Pixel, 11-12). No tray opens there.
+TEST(shell_phone_width_keeps_the_view) {
+    UiLayout l = standardLayout();
+    l.leftTrayOpen = true;
+    l.rightTrayOpen = true;
+    const float s = 3.0f;
+    const ShellGeometry g = computeShell(l, 1080.0f, 2400.0f, s);
+    CHECK(near(g.leftTray.w, 0.0f) && near(g.rightTray.w, 0.0f));
+    CHECK(g.canvas.w > 1080.0f * 0.5f); // more than half the screen is the 3D view
+    // A tablet (landscape 2000 px at 200 % = 1000 logical) keeps its tray.
+    const ShellGeometry t = computeShell(l, 2000.0f, 1200.0f, 2.0f);
+    CHECK(t.leftTray.w > 0.0f);
+}

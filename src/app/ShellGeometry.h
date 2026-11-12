@@ -58,6 +58,9 @@ namespace shell {
 constexpr float kTitleH = 24, kPaletteBarH = 22, kTopShelfH = 64, kLeftShelfW = 88, kLeftShelfNarrowW = 72;
 constexpr float kRightShelfW = 52, kDividerW = 8, kTrayMinW = 240, kTrayMaxW = 480;
 constexpr float kConsoleMinH = 100, kConsoleMaxH = 400, kNarrowWidth = 1280, kWideWidth = 1920;
+// Below this many logical px (a phone held upright: 360 at 300 %) no tray opens: a tray's 240 px minimum and the two
+// shelves left the 3D view a sliver or nothing (Hameron, Pixel).
+constexpr float kPhoneWidth = 640;
 
 // The bottom shelf for a Shelf tiles setting (UiLayout::shelfTiles): its height and its brush tiles' height and
 // width range (tiles shrink to the minimum, the same for every size, before the shelf scrolls), logical px.
