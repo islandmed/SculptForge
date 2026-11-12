@@ -327,9 +327,10 @@ stage_fix() { echo "stage $V: in the merger's batch checkout, scripts/release.sh
 
 # --- preconditions: what the steps after the tag need, checked before anything is tagged --------------------------
 
-# The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
+# The home page's "new in X.Y.Z" card in #whats-new and the announcement bar for X.Y.Z (the one place the page says the
+# release news; the section lede carries no tagline), written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
-card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
+card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"news-bar\" data-version=\"$V\"" website/index.html; }
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
@@ -985,7 +986,7 @@ step_site() {
         ok "origin/main's website/latest.json already says $V"
     else
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
-        card_ok || die "website/index.html has no 'new in $V' card and lede in What's new" "$card_fix"
+        card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
         python3 - "$V" "$HIGHLIGHTS" <<'PY'
 import json, sys
 v, notes = sys.argv[1], sys.argv[2]

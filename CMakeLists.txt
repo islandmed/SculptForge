@@ -1016,6 +1016,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # The home page says the newest release's news once (the announcement bar), not in the hero, lede and first card too.
+    add_test(NAME guide_home_news COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/home_news_test.py)
     # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
     add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
     # No system dialog or URL opens from a test or an agent's run: every SDL_Show*Dialog / SDL_OpenURL call goes
