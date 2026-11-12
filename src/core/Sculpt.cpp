@@ -20,6 +20,9 @@
 
 namespace sf {
 
+const float* gRndAreaWeight = nullptr; // R&D spike rnd/moved-vertex (tests/tools/rnd_proxy_bench.cpp)
+
+
 const char* brushName(BrushType type) {
     switch (type) {
     case BrushType::Standard: return "Standard";
@@ -1041,6 +1044,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
+        if (gRndAreaWeight) w *= gRndAreaWeight[v]; // spike rnd/moved-vertex: a proxy vertex stands for this many dense ones
         acc.normal += nrm[v] * w;
         acc.center += pos[v] * w;
         acc.weight += w;

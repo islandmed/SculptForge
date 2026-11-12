@@ -22,6 +22,8 @@
 
 using namespace sf;
 
+namespace sf { extern const float* gRndAreaWeight; }
+
 namespace {
 
 using Clock = std::chrono::steady_clock;
@@ -58,6 +60,7 @@ struct Stroke {
 
 struct Run {
     std::vector<glm::vec3> centers; // each dab's surface point
+    std::vector<glm::vec3> areaNormals; // (probe: brushAreaNormal before the dab)
     double dabMs = 0.0;
     size_t touched = 0;
     int hits = 0;
@@ -75,6 +78,7 @@ Run stroke(Document& d, const Stroke& s, int dabs, const std::vector<glm::vec3>*
         DabParams p;
         p.center = given && size_t(r.hits) < given->size() ? (*given)[size_t(r.hits)] : h.position; // (SF_RND_SAME_CENTERS: the exact stroke's)
         r.centers.push_back(p.center);
+        r.areaNormals.push_back(brushAreaNormal(d.mesh, d.bvh, p.center, s.radius));
         ++r.hits;
         p.viewDir = s.dir;
         p.radius = s.radius;
@@ -195,10 +199,16 @@ int main(int argc, char** argv) {
         const double buildMs = msSince(tb);
 
         const bool same = std::getenv("SF_RND_SAME_CENTERS") != nullptr;
+        std::vector<float> weight(count.begin(), count.end()); // SF_RND_AREA_WEIGHT=1: area sums weighted by the dense vertices per proxy vertex
+        if (std::getenv("SF_RND_AREA_WEIGHT")) gRndAreaWeight = weight.data();
         const Run pr = stroke(p, s, dabs, same ? &ex.centers : nullptr);
+        gRndAreaWeight = nullptr;
         double centerOff = 0.0;
         for (size_t i = 0; i < std::min(pr.centers.size(), ex.centers.size()); ++i) centerOff = std::max(centerOff, double(glm::distance(pr.centers[i], ex.centers[i])));
-        std::printf("  dab centres vs exact: max %.2e r\n", centerOff / s.radius);
+        double angle = 0.0;
+        for (size_t i = 0; i < std::min(pr.areaNormals.size(), ex.areaNormals.size()); ++i)
+            angle = std::max(angle, double(std::acos(std::clamp(glm::dot(pr.areaNormals[i], ex.areaNormals[i]), -1.0f, 1.0f))) * 57.29578);
+        std::printf("  dab centres vs exact: max %.2e r; area normals vs exact: max %.2f deg\n", centerOff / s.radius, angle);
 
         // The dense pass: every vertex whose own cell moved takes the trilinear field of the cell displacements.
         const auto tf = Clock::now();
