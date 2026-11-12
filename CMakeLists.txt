@@ -934,6 +934,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
     # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
     add_test(NAME release_staged_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/staged_run.py --self-test)
+    add_test(NAME release_flaky_log COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/flaky_log.py --self-test)
     add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
@@ -946,6 +947,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
+    endif()
+    # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
+      set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
     endif()
     # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
     if(UNIX AND NOT APPLE)

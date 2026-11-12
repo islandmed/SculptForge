@@ -192,23 +192,50 @@ gh_watch() {
 run_failed_where() {
     gh run view "$1" -R "$REPO" --json jobs -q '[.jobs[] | select(.conclusion=="failure" or .conclusion=="cancelled") | .name as $j | ([.steps[]? | select(.conclusion=="failure") | .name] | (if length==0 then ["(runner/setup)"] else . end)[] | "\($j): \(.)")] | join("; ")' 2>/dev/null
 }
-# infra_retry ID: after a FAILED run, when a setup step broke (apt, network, DNS, checkout, cache, runner lost) or the failed log shows an
-# HTTP 5xx / DNS error: rerun its failed jobs ONCE, log it (~/Work/.sf/logs/infra-retries.log) and wait for the rerun. Returns 0 when it
-# reran (read the conclusion again), 1 when the failure is not an infra flake (INFRA_WHERE says where it failed).
+# flaky_note TEST WHERE: TEST failed, then passed on the stage's one rerun. One line here and one row in ~/Work/.sf/logs/flaky.md (the
+# stage summary reads them back); the second rerun of a test within 7 days puts it at the top of that file for a fix owner.
+flaky_note() {
+    local rep
+    echo "   flaky: $1 passed on rerun ($2)" >&2
+    rep=$(python3 "$PWD/tools/release/flaky_log.py" add --log "$HOME/Work/.sf/logs/flaky.md" \
+        --test "$1" --where "$2" --sha "$(git rev-parse --short HEAD 2>/dev/null)" --version "${V:-}" 2>/dev/null) || return 0
+    [ -z "$rep" ] || echo "   $rep: now at the top of ~/Work/.sf/logs/flaky.md for a fix owner" >&2
+}
+# infra_rerun ID KIND WHERE NAMES: the one rerun of a failed run's failed jobs (KIND setup|test; NAMES = the tests that failed first),
+# logged in ~/Work/.sf/logs/infra-retries.log. After a test rerun: green = every name logged by flaky_note; red again = named, not flaky.
+infra_rerun() {
+    local id=$1 kind=$2 where=$3 names=$4 n1 t log=$HOME/Work/.sf/logs/infra-retries.log
+    echo "   run $id failed in a $kind step (${where:-unknown}${names:+; failed first: $(tr '\n' ' ' <<<"$names")}): rerunning its failed jobs once" >&2
+    mkdir -p "$(dirname "$log")" && printf '%s\trelease.sh\t%s\t%s\trerun\t%s\n' "$(date '+%F %H:%M')" "$id" "$V" "$kind: $where" >> "$log"
+    n1=$("$HOME/Work/.sf/gh-wait.sh" --lines "$id" 2>/dev/null || echo 0)
+    gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || return 1
+    sleep 20
+    SF_GH_WAIT_SKIP=${n1:-0} gh_watch "$id" >/dev/null 2>&1 || true
+    [ $kind = test ] || return 0
+    if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = success ]; then
+        for t in ${names:-unnamed-test-step}; do flaky_note "$t" "CI run $id, job rerun"; done
+    else
+        echo "   still red after the rerun, so not flaky: $(gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -oE '(FAILED|TIMEOUT): [A-Za-z0-9_:.-]+' | sort -u | tr '\n' ' ')" >&2
+    fi
+}
+# infra_retry ID: after a FAILED run, when a setup step broke (apt, network, DNS, checkout, cache, runner lost), the failed log shows an
+# HTTP 5xx / DNS error, or a test step failed: rerun its failed jobs ONCE (infra_rerun), wait for the rerun. Returns 0 when it
+# reran (read the conclusion again), 1 when the failure is not retried (INFRA_WHERE says where it failed).
 infra_retry() {
-    local id=$1 n1 log=$HOME/Work/.sf/logs/infra-retries.log
+    local id=$1
     INFRA_WHERE=$(run_failed_where "$id")
     # A cancelled run was stopped on purpose (someone, or a newer push): never rerun it.
     [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = cancelled ] && { INFRA_WHERE="cancelled: $INFRA_WHERE"; return 1; }
     if grep -Eiq '(^|: )(Set up|Install|Download|Run actions/|Configure cache|Compiler cache|Initialize|Complete job|\(runner/setup\))' <<<"$INFRA_WHERE" ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | grep -Eiq 'Temporary failure (in name )?resolving|Could not resolve|Failed to fetch|Unable to connect|Connection (timed out|reset)|runner .*lost|lost communication|shutdown signal' ||
        gh run view "$id" -R "$REPO" --log-failed 2>/dev/null | server_error; then
-        echo "   run $id failed in a setup step (${INFRA_WHERE:-unknown}): rerunning its failed jobs once" >&2
-        mkdir -p "$(dirname "$log")" && printf '%s\trelease.sh\t%s\t%s\trerun\t%s\n' "$(date '+%F %H:%M')" "$id" "$V" "$INFRA_WHERE" >> "$log"
-        n1=$("$HOME/Work/.sf/gh-wait.sh" --lines "$id" 2>/dev/null || echo 0)
-        gh run rerun "$id" --failed -R "$REPO" >/dev/null 2>&1 || return 1
-        sleep 20
-        SF_GH_WAIT_SKIP=${n1:-0} gh_watch "$id" >/dev/null 2>&1 || true
+        infra_rerun "$id" setup "$INFRA_WHERE" "" || return 1
+        return 0
+    fi
+    # A test step failed (run.py already reran the failed tests inside the job): the job's one rerun, then red naming the test.
+    if grep -Eq ': Test' <<<"$INFRA_WHERE"; then
+        infra_rerun "$id" test "$INFRA_WHERE" "$(gh run view "$id" -R "$REPO" --log-failed 2>/dev/null |
+            grep -oE 'rerunning [0-9]+ failed test\(s\) once: .*' | sed 's/^[^:]*: //' | tr ' ' '\n' | sort -u)" || return 1
         return 0
     fi
     return 1
@@ -620,6 +647,17 @@ PY
     ok "version files at $V, guide rebuilt, pushed main $(git rev-parse --short HEAD)"
 }
 
+# The stage summary's line: tests that passed on a rerun in this stage (rows flaky_note wrote for $V).
+stage_flaky_summary() {
+    local f=$HOME/Work/.sf/logs/flaky.md n t
+    n=$({ [ -f "$f" ] && grep -E "^\| 20[0-9-]+ \| .* \| ${V//./\\.} \|$" "$f" | cut -d'|' -f3 | sort -u | tr -d ' ' | tr '\n' ' '; } || true)
+    [ -z "$n" ] || printf '   %s\n' "passed on rerun in this stage: $n(~/Work/.sf/logs/flaky.md)"
+    # A recurring one (2+ reruns in 7 days, the file's "Fix owner needed" list) is said out loud, so the release owner sees it.
+    for t in $n; do
+        sed -n "s/^- \*\*${t}\*\*: \([0-9]*\) reruns in 7 days.*/REPEAT flaky: ${t} (\1 in 7 days)/p" "$f" | sed 's/^/   /'
+    done
+    return 0
+}
 # --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
 # and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
 step_stage() {
@@ -643,8 +681,14 @@ step_stage() {
         reused=""
     fi
     # The release's own suite goes first on the PC (pc.sh priority lane), not behind benches (0.11.14 waited for one).
-    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" ||
-        die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
+    # A failed staging CI run gets one rerun of its failed jobs (merge-queue.sh wait_ci calls the exported infra_retry); a PC test that
+    # failed, then passed on run.py's rerun is logged below. Red twice stays red, named.
+    export REPO V; export -f infra_retry infra_rerun flaky_note run_failed_where server_error gh_watch
+    local mq_rc=0 t
+    SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" || mq_rc=$?
+    for t in $(sed -n 's/^flaky: \([^ ]*\).*/\1/p' "/tmp/merge-queue-with-${sha:0:8}.log" 2>/dev/null | sort -u); do flaky_note "$t" "PC suite, ctest --rerun-failed"; done
+    stage_flaky_summary
+    [ $mq_rc = 0 ] || die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"
     # The staging push's Packages run builds what --yes will promote, the macOS .dmg included (deployment target 11:
     # 0.11.10's std::to_chars(float) passed CI and failed only there, noticed by hand). Wait for it here.
