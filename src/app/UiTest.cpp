@@ -58,6 +58,7 @@
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
+//   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
@@ -318,6 +319,9 @@
 //   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//   click_here [right]       click where the mouse is (the press and the release, no move)
+//   mouse_by DX DY           the mouse moves by DX DY pixels from where it is (no button): the S / U pop-up follows it
+//   expect_value size_ring_value (the preview's value: Size px, Falloff -1..1, Intensity 0..1)
 //
 // Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
 //   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
@@ -1530,6 +1534,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
+    if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
     if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
@@ -2540,6 +2545,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
         wait(0.05f);
+    } else if (verb == "reset_sliders") { // Size, Intensities and Falloff back to the defaults (a case that clicked a S / U pop-up kept its value)
+        run([this] {
+            app_.radiusPx_ = 60.0f;
+            app_.strength_ = app_.smoothStrength_ = 0.5f;
+            app_.rgbIntensity_ = 1.0f;
+            app_.focalShift_ = 0.0f;
+        });
+        wait(0.05f);
     } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });
@@ -3502,6 +3515,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);
+    } else if (verb == "click_here") {
+        const int button = w.size() > 1 && w[1] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        run([this, button] {
+            mouseButton(true, button);
+            mouseButton(false, button);
+        });
+        wait(0.1f);
+    } else if (verb == "mouse_by") {
+        if (!need(2)) return false;
+        run([this, dx = num(1, 0.0f), dy = num(2, 0.0f)] { mouseMotion(app_.mouseX_ + dx, app_.mouseY_ + dy); });
+        wait(0.05f);
     } else if (verb == "touch_pinch" || verb == "touch_stroke") {
         // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
         // that finger's own event), or on a trackpad (no mouse events; the pointer rests over the model).
@@ -4038,9 +4062,9 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
+                "drag_item", "drag_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
-                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
+                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
                 "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +

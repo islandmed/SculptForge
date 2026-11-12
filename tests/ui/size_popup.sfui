@@ -36,13 +36,14 @@ expect_value size_knob_y <= $cy2+2
 key escape
 expect_value size_popup_open == 0
 
-# A click outside closes it without changing the size.
+# Moving the mouse sets the size (size_follow.sfui); a click elsewhere keeps it and closes the pop-up.
+brush_size 60
 mouse_move 0.5 0.5
 key s
-remember draw_size s2
-drag 0.12 0.3 0.12 0.3
+mouse_by 50 0
+click_here
 expect_value size_popup_open == 0
-expect_value draw_size == $s2
+expect_value draw_size == 110
 
 # A hovering pen with a driver's stray mouse event elsewhere: the slider opens at the pen (the brush cursor).
 pen_hover 0.4 0.5
