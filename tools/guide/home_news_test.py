@@ -30,10 +30,17 @@ def count(page_html, tagline):
 
 
 def check_page(page_html, wn, label, problems):
-    tag = wn.versions[0]["tagline"]
+    # The release the page announces: its bar's version (a beta leaves the home page on the stable release, so not
+    # necessarily the newest one in whats-new.md).
+    m = re.search(r'class="news-bar" data-version="([^"]+)"', page_html)
+    v = next((x for x in wn.versions if m and x["version"] == m.group(1)), None)
+    if not v or not v["tagline"]:
+        problems.append(f"{label}: no announcement bar for a release with a tagline")
+        return
+    tag = v["tagline"]
     n = count(page_html, tag)
     if n > 1:
-        problems.append(f"{label}: the tagline of {wn.versions[0]['version']} appears {n} times ('{tag}')")
+        problems.append(f"{label}: the tagline of {v['version']} appears {n} times ('{tag}')")
     hero = re.search(r"<!-- hero-news:start -->(.*?)<!-- hero-news:end -->", page_html, re.S)
     if hero and hero.group(1).strip():
         problems.append(f"{label}: the hero still carries a news line: {hero.group(1).strip()[:80]}")
