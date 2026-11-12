@@ -522,3 +522,98 @@ TEST(crisp_flatten_invariant_overlap_with_pressure_cut_only_and_clean_edges) {
         CHECK(worst < 1e-5f);
     }
 }
+
+// Where a later plane meets an earlier facet the seam is clean: inside the second stroke every vertex above its plane
+// is on it (none left proud by the wall band or a facing fade, which alternate with the vertex along the crease and
+// notch it), and no vertex in the seam's neighbourhood stands out of its ring.
+TEST(crisp_flatten_invariant_crossing_planes_leave_a_clean_seam) {
+    Document d = makeDoc(makeIcosphere(8));
+    const BrushRecipe r = builtin("Crisp Flatten");
+    auto line = [&](glm::vec3 dir, float from, float to) {
+        std::vector<DabParams> dabs;
+        const glm::vec3 up(0, 1, 0);
+        for (float a = from; a <= to + 1e-4f; a += 0.03f) {
+            const glm::vec3 c = glm::normalize(up * std::cos(a) + glm::normalize(dir) * std::sin(a));
+            dabs.push_back(dabAt(c, -c, 0.3f));
+        }
+        return dabs;
+    };
+    const Stroked a = strokeWithPlane(d, r, line(glm::vec3(1, 0, 0), -0.25f, 0.4f)); // (plane A)
+    const std::vector<glm::vec3> mid = d.mesh.positions;
+    const std::vector<DabParams> second = line(glm::vec3(0, 0, 1), -0.25f, 0.4f);
+    const Stroked b = strokeWithPlane(d, r, second);
+    const float spacing = spacingOf(d.mesh);
+    float proud = 0.0f, worst = 0.0f;
+    int nProud = 0, spikes = 0, inside = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        // (the stroke's core: well inside every dab's reach along the line, away from its rim)
+        float across = 1e9f;
+        for (const DabParams& p : second) across = std::min(across, glm::distance(mid[v], p.center));
+        if (across > 0.12f) continue;
+        ++inside;
+        const float h = glm::dot(d.mesh.positions[v] - b.at, b.n);
+        proud = std::max(proud, h);
+        nProud += h > 1e-4f;
+        auto ring = d.mesh.neighbors(v);
+        if (ring.empty()) continue;
+        float mean = 0.0f;
+        for (uint32_t u : ring) mean += glm::dot(d.mesh.positions[u] - b.at, b.n);
+        const float o = std::abs(h - mean / float(ring.size()));
+        worst = std::max(worst, o);
+        spikes += o > 0.25f * spacing;
+    }
+    // The seam itself: the vertices on plane B that border a vertex below it lie on one straight line (a fit through
+    // them leaves at most a fraction of the vertex spacing), where a vertex-by-vertex drop zig-zags by up to a spacing.
+    std::vector<glm::vec2> seam;
+    const glm::vec3 t1 = glm::normalize(glm::cross(b.n, std::abs(b.n.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0)));
+    const glm::vec3 t2 = glm::cross(b.n, t1);
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        if (std::abs(glm::dot(d.mesh.positions[v] - b.at, b.n)) > 1e-5f || glm::distance(mid[v], d.mesh.positions[v]) < 1e-7f) continue;
+        bool edge = false;
+        for (uint32_t u : d.mesh.neighbors(v)) edge = edge || glm::dot(d.mesh.positions[u] - b.at, b.n) < -1e-5f;
+        // (only the crease with the first facet, which was flat: plane A meets plane B along a line)
+        const bool onA = std::abs(glm::dot(mid[v] - a.at, a.n)) < 1e-5f;
+        if (edge && onA) seam.push_back({glm::dot(d.mesh.positions[v], t1), glm::dot(d.mesh.positions[v], t2)});
+    }
+    // (the principal axis of the seam points, then each point's distance from it)
+    glm::vec2 c(0.0f);
+    for (const glm::vec2& q : seam) c += q;
+    if (!seam.empty()) c /= float(seam.size());
+    float sxx = 0, sxy = 0, syy = 0;
+    for (const glm::vec2& q : seam) sxx += (q.x - c.x) * (q.x - c.x), sxy += (q.x - c.x) * (q.y - c.y), syy += (q.y - c.y) * (q.y - c.y);
+    const float ang = 0.5f * std::atan2(2.0f * sxy, sxx - syy);
+    const glm::vec2 axis(std::cos(ang), std::sin(ang));
+    float off = 0.0f;
+    std::vector<float> offs;
+    for (const glm::vec2& q : seam) offs.push_back(std::abs((q.x - c.x) * -axis.y + (q.y - c.y) * axis.x));
+    std::sort(offs.begin(), offs.end());
+    for (float o : offs) off = std::max(off, o);
+    if (!offs.empty()) std::printf("  seam offsets: median %.5f, 90%% %.5f\n", offs[offs.size() / 2], offs[offs.size() * 9 / 10]);
+    std::printf("  seam line: %zu points, farthest %.4f off the fitted line (spacing %.4f)\n", seam.size(), off, spacing);
+    std::printf("  seam: %d core vertices, %d left above plane B (highest %.5f), outlier %.5f (spacing %.4f), %d spikes\n", inside,
+                nProud, proud, worst, spacing, spikes);
+    // The shading normals along the seam are the surface's own (a stale one beside the seam shows as a dark notch).
+    Mesh fresh = d.mesh;
+    fresh.recomputeAllNormals();
+    float stale = 0.0f;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) stale = std::max(stale, glm::distance(d.mesh.normals[v], fresh.normals[v]));
+    std::printf("  seam normals: worst %.5f off the exact ones\n", stale);
+    CHECK(stale < 1e-3f);
+    // Snapping the seam's points onto it folds nothing over (no triangle's facing turns right around from where it was).
+    int flipped = 0, outliers = 0;
+    for (const glm::uvec3& t : d.mesh.triangles) {
+        const glm::vec3 n0 = glm::cross(mid[t.y] - mid[t.x], mid[t.z] - mid[t.x]);
+        const glm::vec3 n1 = glm::cross(d.mesh.positions[t.y] - d.mesh.positions[t.x], d.mesh.positions[t.z] - d.mesh.positions[t.x]);
+        flipped += glm::dot(n0, n1) < 0.0f;
+    }
+    for (float o : offs) outliers += o > 0.0005f;
+    std::printf("  seam: %d triangles folded over, %d of %zu seam points more than 0.0005 off the line\n", flipped, outliers, offs.size());
+    CHECK(flipped == 0);
+    CHECK(offs.size() > 20);
+    // (the seam's points sit within about half a vertex spacing of the line: a fixed mesh can't do better without moving
+    // points onto the crease, which stretched the cut's border into slivers and spikes in the close-ups)
+    CHECK(offs[offs.size() * 9 / 10] < 0.6f * spacing);
+    CHECK(inside > 200);
+    CHECK(nProud == 0);
+    CHECK(spikes == 0);
+}
