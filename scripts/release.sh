@@ -664,7 +664,7 @@ stage_flaky_summary() {
 # packages.yml leaves (check-run annotation "Windows signing"). Fails when the repository variable SIGNING is signpath and the packages
 # are not signed (verify_staged.py --require-signed refuses them at promotion too).
 signing_state() {
-    local jid line want
+    local jid line="" want
     jid=$(gh run view "$1" -R "$REPO" --json jobs -q '.jobs[] | select(.name | startswith("Windows x64")) | .databaseId' 2>/dev/null | head -1)
     [ -z "$jid" ] || line=$(gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1)
     want=$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)
