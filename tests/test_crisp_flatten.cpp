@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 using namespace sf;
 
@@ -41,17 +42,22 @@ void recipeStroke(Document& d, const BrushRecipe& r, const std::vector<DabParams
     d.undo.push(d.sculptor.endStroke());
 }
 
-// How a single dab at the sphere's top left it: per vertex, how far toward the plane it moved (0 = untouched,
-// 1 = on the plane), by distance from the dab centre in radii. `band` is the width (in radii) of the ring where
-// the move is between 10% and 90% of the way; `inside` the worst fraction within 0.75 radii; `outside` the
-// largest move past 1.05 radii.
+// How a single dab left the surface it sat on, per vertex: how far toward the plane it moved (0 = untouched, 1 = on
+// the plane), by distance from the dab centre in radii. The brush only cuts, so the surface under the dab is a
+// plateau 0.02 above a floor (a shallow cut: a deep one widens its wall): the stroke's first dab, on the floor, takes the plane (level with the floor), and the
+// second sits in the middle of the plateau, every vertex under it above the plane. `band` is the width (in radii) of
+// the ring where the move is between 10% and 90% of the way; `inside` the worst fraction within 0.75 radii;
+// `outside` the largest move past 1.05 radii.
 struct Edge { float band = 0.0f, inside = 1.0f, outside = 0.0f; int partial = 0; };
-Edge edgeOf(const BrushRecipe& r, int subdivisions = 5) {
-    Document d = makeDoc(makeIcosphere(subdivisions));
+Edge edgeOf(const BrushRecipe& r, int res = 160) {
+    Mesh m = makePlane(res, 4.0f);
+    for (glm::vec3& x : m.positions) x.y = 0.02f * std::clamp((x.x - 0.3f) / 0.06f, 0.0f, 1.0f);
+    m.recomputeAllNormals();
+    Document d = makeDoc(std::move(m));
     const std::vector<glm::vec3> before = d.mesh.positions;
-    const glm::vec3 c(0, 1, 0);
+    const glm::vec3 c(1.3f, 0.02f, 0.0f);
     const DabParams p = dabAt(c, glm::vec3(0, -1, 0));
-    recipeStroke(d, r, {p});
+    recipeStroke(d, r, {dabAt(glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0, -1, 0)), p});
     const glm::vec3 n = d.sculptor.lastFrame.normal, at = d.sculptor.lastFrame.areaCenter;
     Edge e;
     float lo = 1e9f, hi = 0.0f;
@@ -59,7 +65,7 @@ Edge edgeOf(const BrushRecipe& r, int subdivisions = 5) {
         const float dist = glm::distance(before[v], c) / p.radius;
         const float h0 = glm::dot(before[v] - at, n);
         const float moved = glm::length(d.mesh.positions[v] - before[v]);
-        if (dist > 1.05f) e.outside = std::max(e.outside, moved);
+        if (dist > 1.05f && before[v].x > 0.6f) e.outside = std::max(e.outside, moved);
         if (std::abs(h0) < 1e-3f || dist > 1.05f) continue;
         const float f = std::clamp(1.0f - glm::dot(d.mesh.positions[v] - at, n) / h0, 0.0f, 1.0f);
         if (dist < 0.75f) e.inside = std::min(e.inside, f);
@@ -105,13 +111,14 @@ TEST(crisp_flatten_cuts_a_sharp_anti_aliased_edge) {
     CHECK(crisp.band < 0.25f);
     CHECK(crisp.band < 0.5f * plain.band);
     // On a coarser mesh the band is at least about 2.5 vertex spacings, so it stays smooth.
-    const Edge coarse = edgeOf(builtin("Crisp Flatten"), 4);
+    const Edge coarse = edgeOf(builtin("Crisp Flatten"), 70);
     std::printf("  coarse band %.3f (%d partial)\n", coarse.band, coarse.partial);
     CHECK(coarse.partial > 0 && coarse.band < 0.4f);
 }
 
-// Lock plane: a stroke along a wavy surface, started in a trough, cuts every crest down to the trough's plane;
-// with it off the plane follows each crest, so they keep most of their height. The next stroke takes a new plane.
+// Lock plane: a stroke along a wavy surface, started in a trough, cuts every crest down to the trough's plane and
+// no lower; with it off the plane follows the surface, and keeps lowering it below that first plane. The next stroke
+// takes a new plane.
 TEST(crisp_flatten_lock_plane_holds_the_first_plane) {
     constexpr float kTrough = -0.5890486f; // (sin(8 x) = -1)
     auto run = [&](bool lock, float& above) {
@@ -146,7 +153,8 @@ TEST(crisp_flatten_lock_plane_holds_the_first_plane) {
     std::printf("  highest above the first plane: locked %.4f, following %.4f\n", locked, follow);
     CHECK(n.y > 0.99f);
     CHECK(locked < 0.002f);
-    CHECK(follow > 0.005f);
+    // (cut-only, a plane that follows the surface keeps lowering it: each dab's plane is the mean of what the last left)
+    CHECK(follow < locked - 0.003f);
     // The next stroke takes a new plane.
     BrushRecipe r = builtin("Crisp Flatten");
     Document d = makeDoc(makeIcosphere(5));
@@ -179,7 +187,7 @@ TEST(crisp_flatten_symmetry_and_mask) {
         if (w == v && std::abs(before[v].x) > 1e-5f) continue; // (no exact mirror vertex)
         const glm::vec3 a = d.mesh.positions[v], b = d.mesh.positions[w];
         worst = std::max(worst, glm::distance(a, glm::vec3(-b.x, b.y, b.z)));
-        movedLeft += before[v].x < 0.0f && glm::distance(a, before[v]) > 0.01f;
+        movedLeft += before[v].x < 0.0f && glm::distance(a, before[v]) > 0.002f;
     }
     std::printf("  mirror mismatch %.2g, %d moved on the mirrored side\n", worst, movedLeft);
     CHECK(movedLeft > 20);
@@ -326,4 +334,286 @@ TEST(crisp_flatten_big_region_matches_the_exact_path) {
     CHECK(worst < 0.01f * moved);
     CHECK(nworst < 1e-3f);
     CHECK(eworst < 1e-3f);
+}
+
+namespace {
+
+// A stroke's frame: the first dab's plane (the lock plane the whole stroke keeps).
+struct Stroked { glm::vec3 n{0.0f}, at{0.0f}; };
+Stroked strokeWithPlane(Document& d, const BrushRecipe& r, const std::vector<DabParams>& dabs) {
+    Stroked s;
+    d.sculptor.beginStroke(d.mesh, r.name);
+    for (size_t i = 0; i < dabs.size(); ++i) {
+        d.sculptor.dabRecipe(d.mesh, d.bvh, r, dabs[i], kNoSymmetry);
+        if (i == 0) s.n = d.sculptor.lastFrame.normal, s.at = d.sculptor.lastFrame.areaCenter;
+    }
+    d.undo.push(d.sculptor.endStroke());
+    return s;
+}
+
+} // namespace
+
+// Crisp Flatten only cuts (a member's ask: "it should never raise or add new clay"): on a plane with bumps and a
+// pit, no vertex rises along the plane's normal by more than float noise, whatever its depth, the pit is left
+// exactly as it was, and the bumps in the stroke's path come down onto the plane.
+TEST(crisp_flatten_invariant_cut_only_bumpy_plane_and_pit) {
+    Mesh m = makePlane(160, 2.0f);
+    for (glm::vec3& x : m.positions) {
+        const float pit = std::exp(-((x.x - 0.3f) * (x.x - 0.3f) + x.z * x.z) / 0.012f);
+        x.y = 0.02f * std::sin(9.0f * x.x) * std::cos(7.0f * x.z) - 0.1f * pit;
+    }
+    m.recomputeAllNormals();
+    Document d = makeDoc(std::move(m));
+    const std::vector<glm::vec3> before = d.mesh.positions;
+    std::vector<DabParams> dabs;
+    for (int i = 0; i <= 24; ++i) {
+        DabParams p = dabAt(glm::vec3(-0.7f + 0.06f * float(i), 0.0f, 0.0f), glm::vec3(0, -1, 0), 0.25f);
+        dabs.push_back(p);
+    }
+    const Stroked st = strokeWithPlane(d, builtin("Crisp Flatten"), dabs);
+    float raised = 0.0f, peakLeft = 0.0f, pitMoved = 0.0f;
+    int peaks = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        const float rise = glm::dot(d.mesh.positions[v] - before[v], st.n);
+        raised = std::max(raised, rise);
+        const glm::vec3 b = before[v];
+        const float hb = glm::dot(b - st.at, st.n), ha = glm::dot(d.mesh.positions[v] - st.at, st.n);
+        if (std::abs(b.z) < 0.1f && b.x > -0.5f && b.x < 0.6f && hb > 0.004f) ++peaks, peakLeft = std::max(peakLeft, ha);
+        if (hb < -0.03f) pitMoved = std::max(pitMoved, glm::distance(d.mesh.positions[v], b));
+    }
+    std::printf("  bumpy plane: highest rise %.2g, %d peak vertices in the path leave at most %.4f above the plane, pit moved %.2g\n",
+                raised, peaks, peakLeft, pitMoved);
+    CHECK(raised < 1e-5f);
+    CHECK(peaks > 8);
+    CHECK(peakLeft < 0.002f);
+    CHECK(pitMoved < 1e-6f);
+}
+
+namespace {
+
+struct Invariants { float raised = 0.0f, worst = 0.0f; int spikes = 0, moved = 0; };
+
+// The geometric invariants of a Crisp Flatten stroke on a dense curved mesh, against the stroke's plane (n, at):
+// `raised` = the most any vertex rose along n (cut-only: float noise at most); `spikes` = vertices (the ones
+// `inRegion` picks) whose height stands out from the mean of their ring by more than a quarter of the vertex
+// spacing: the speckle, debris and stair-steps along a facet's falloff edge. `mirror`: vertices on the -x side
+// use the mirrored plane (a symmetry copy's own).
+Invariants invariantsOf(const Mesh& after, const std::vector<glm::vec3>& before, glm::vec3 n, glm::vec3 at, float spacing,
+                        const std::function<bool(const glm::vec3&)>& inRegion, bool mirror = false) {
+    auto plane = [&](const glm::vec3& x, glm::vec3& pn, glm::vec3& pa) {
+        pn = n, pa = at;
+        if (mirror && x.x < 0.0f) pn.x = -n.x, pa.x = -at.x;
+    };
+    auto height = [&](const glm::vec3& x, const glm::vec3& ref) {
+        glm::vec3 pn, pa;
+        plane(ref, pn, pa);
+        return glm::dot(x - pa, pn);
+    };
+    Invariants out;
+    for (uint32_t v = 0; v < after.vertexCount(); ++v) {
+        out.raised = std::max(out.raised, height(after.positions[v], before[v]) - height(before[v], before[v]));
+        out.moved += glm::distance(after.positions[v], before[v]) > 1e-6f;
+        if (!inRegion(before[v])) continue;
+        auto ring = after.neighbors(v);
+        if (ring.empty()) continue;
+        float mean = 0.0f;
+        for (uint32_t u : ring) mean += height(after.positions[u], before[v]);
+        const float o = std::abs(height(after.positions[v], before[v]) - mean / float(ring.size()));
+        out.worst = std::max(out.worst, o);
+        out.spikes += o > 0.25f * spacing;
+    }
+    return out;
+}
+
+// (`shift` slides the arc off the top toward +x, where the form falls away under the plane: 0 and 0.45 both used)
+std::vector<DabParams> arcDabs(float radius, int count, float step, float pressure0 = 1.0f, float pressure1 = 1.0f, float shift = 0.0f) {
+    std::vector<DabParams> dabs;
+    for (int i = 0; i < count; ++i) {
+        const float a = step * float(i);
+        const glm::vec3 c = glm::normalize(glm::vec3(std::sin(a), std::cos(a) * 0.98f, 0.15f * std::sin(a * 3.0f)) + glm::vec3(shift, 0.0f, 0.0f));
+        DabParams p = dabAt(c, -c, radius);
+        p.pressure = pressure0 + (pressure1 - pressure0) * float(i) / float(std::max(count - 1, 1));
+        dabs.push_back(p);
+    }
+    return dabs;
+}
+
+float spacingOf(const Mesh& m) { return 1.9f / std::sqrt(float(m.vertexCount()) / 2.0f); }
+
+} // namespace
+
+// Clean edges: on a dense curved patch the facet's border is a smooth ramp, not speckle. After a stroke nothing
+// sits above where it was, and no vertex stands out from its neighbours' average height (a spike or a dent along
+// the border: the stair-steps and debris of a member's screenshot) by more than a fraction of the vertex spacing.
+TEST(crisp_flatten_invariant_dense_patch_cut_only_and_clean_edges) {
+    for (const float shift : {0.0f, 0.45f}) {
+        Document d = makeDoc(makeIcosphere(6));
+        const std::vector<glm::vec3> before = d.mesh.positions;
+        const std::vector<DabParams> dabs = arcDabs(0.3f, 15, 0.05f, 1.0f, 1.0f, shift);
+        const Stroked st = strokeWithPlane(d, builtin("Crisp Flatten"), dabs);
+        const float spacing = spacingOf(d.mesh);
+        const Invariants inv = invariantsOf(d.mesh, before, st.n, st.at, spacing,
+                                            [&](const glm::vec3& x) { return glm::distance(x, dabs[7].center) < 0.45f; });
+        std::printf("  dense patch (shift %.2f): %d moved, highest rise %.2g, worst outlier %.5f (spacing %.4f), spikes %d\n", shift,
+                    inv.moved, inv.raised, inv.worst, spacing, inv.spikes);
+        CHECK(inv.moved > 150);
+        CHECK(inv.raised < 1e-5f);
+        CHECK(inv.spikes == 0);
+    }
+}
+
+// Symmetry (X): each copy keeps its own plane; both are cut-only and clean.
+TEST(crisp_flatten_invariant_symmetry_cut_only_and_clean_edges) {
+    Document d = makeDoc(makeIcosphere(6));
+    const std::vector<glm::vec3> before = d.mesh.positions;
+    std::vector<DabParams> dabs = arcDabs(0.3f, 15, 0.05f);
+    for (DabParams& p : dabs) { // (off the mirror plane, so the copies are apart)
+        p.center = glm::normalize(p.center + glm::vec3(0.45f, 0.0f, 0.0f));
+        p.viewDir = -p.center;
+    }
+    const BrushRecipe r = builtin("Crisp Flatten");
+    glm::vec3 n(0.0f), at(0.0f);
+    d.sculptor.beginStroke(d.mesh, r.name);
+    for (size_t i = 0; i < dabs.size(); ++i) {
+        d.sculptor.dabRecipe(d.mesh, d.bvh, r, dabs[i], Symmetry{true, false, false});
+        if (i == 0) n = d.sculptor.lastFrame.normal, at = d.sculptor.lastFrame.areaCenter; // (the first copy's)
+    }
+    d.undo.push(d.sculptor.endStroke());
+    const float spacing = spacingOf(d.mesh);
+    const glm::vec3 c = dabs[7].center, cm(-c.x, c.y, c.z);
+    // (the copy on the -x side takes the mirrored plane, so the first copy's side is the one given)
+    const bool firstIsRight = c.x > 0.0f;
+    const Invariants inv = invariantsOf(
+        d.mesh, before, firstIsRight ? n : glm::vec3(-n.x, n.y, n.z), firstIsRight ? at : glm::vec3(-at.x, at.y, at.z), spacing,
+        [&](const glm::vec3& x) { return glm::distance(x, c) < 0.45f || glm::distance(x, cm) < 0.45f; }, true);
+    std::printf("  symmetry: %d moved, highest rise %.2g, worst outlier %.5f (spacing %.4f), spikes %d\n", inv.moved,
+                inv.raised, inv.worst, spacing, inv.spikes);
+    CHECK(inv.moved > 300);
+    CHECK(inv.raised < 1e-5f);
+    CHECK(inv.spikes == 0);
+}
+
+// Overlapping dabs at changing pressure (0.2 to 1 and back: a stroke from a pen): the same invariants hold, the
+// partial pulls of a light dab never leave debris for the next to cut around.
+TEST(crisp_flatten_invariant_overlap_with_pressure_cut_only_and_clean_edges) {
+    for (int dir = 0; dir < 2; ++dir) {
+        Document d = makeDoc(makeIcosphere(6));
+        const std::vector<glm::vec3> before = d.mesh.positions;
+        const std::vector<DabParams> dabs = dir == 0 ? arcDabs(0.3f, 30, 0.025f, 0.2f, 1.0f, 0.45f) : arcDabs(0.3f, 30, 0.025f, 1.0f, 0.2f, 0.45f);
+        const Stroked st = strokeWithPlane(d, builtin("Crisp Flatten"), dabs);
+        const float spacing = spacingOf(d.mesh);
+        const Invariants inv = invariantsOf(d.mesh, before, st.n, st.at, spacing,
+                                            [&](const glm::vec3& x) { return glm::distance(x, dabs[15].center) < 0.45f; });
+        std::printf("  pressure %s: %d moved, highest rise %.2g, worst outlier %.5f, spikes %d\n", dir ? "1 to 0.2" : "0.2 to 1",
+                    inv.moved, inv.raised, inv.worst, inv.spikes);
+        CHECK(inv.moved > 150);
+        CHECK(inv.raised < 1e-5f);
+        CHECK(inv.spikes == 0);
+        // Pressure doesn't scale the cut: a pressure-scaled depth per dab left terraces (contour ridges) across the
+        // facet, so the same stroke at full pressure lands on the same surface.
+        std::vector<DabParams> full = dabs;
+        for (DabParams& p : full) p.pressure = 1.0f;
+        Document f = makeDoc(makeIcosphere(6));
+        strokeWithPlane(f, builtin("Crisp Flatten"), full);
+        float worst = 0.0f;
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v)
+            worst = std::max(worst, glm::distance(d.mesh.positions[v], f.mesh.positions[v]));
+        std::printf("  pressure %s vs full pressure: surfaces differ by at most %.2g\n", dir ? "1 to 0.2" : "0.2 to 1", worst);
+        CHECK(worst < 1e-5f);
+    }
+}
+
+// Where a later plane meets an earlier facet the seam is clean: inside the second stroke every vertex above its plane
+// is on it (none left proud by the wall band or a facing fade, which alternate with the vertex along the crease and
+// notch it), and no vertex in the seam's neighbourhood stands out of its ring.
+TEST(crisp_flatten_invariant_crossing_planes_leave_a_clean_seam) {
+    Document d = makeDoc(makeIcosphere(8));
+    const BrushRecipe r = builtin("Crisp Flatten");
+    auto line = [&](glm::vec3 dir, float from, float to) {
+        std::vector<DabParams> dabs;
+        const glm::vec3 up(0, 1, 0);
+        for (float a = from; a <= to + 1e-4f; a += 0.03f) {
+            const glm::vec3 c = glm::normalize(up * std::cos(a) + glm::normalize(dir) * std::sin(a));
+            dabs.push_back(dabAt(c, -c, 0.3f));
+        }
+        return dabs;
+    };
+    const Stroked a = strokeWithPlane(d, r, line(glm::vec3(1, 0, 0), -0.25f, 0.4f)); // (plane A)
+    const std::vector<glm::vec3> mid = d.mesh.positions;
+    const std::vector<DabParams> second = line(glm::vec3(0, 0, 1), -0.25f, 0.4f);
+    const Stroked b = strokeWithPlane(d, r, second);
+    const float spacing = spacingOf(d.mesh);
+    float proud = 0.0f, worst = 0.0f;
+    int nProud = 0, spikes = 0, inside = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        // (the stroke's core: well inside every dab's reach along the line, away from its rim)
+        float across = 1e9f;
+        for (const DabParams& p : second) across = std::min(across, glm::distance(mid[v], p.center));
+        if (across > 0.12f) continue;
+        ++inside;
+        const float h = glm::dot(d.mesh.positions[v] - b.at, b.n);
+        proud = std::max(proud, h);
+        nProud += h > 1e-4f;
+        auto ring = d.mesh.neighbors(v);
+        if (ring.empty()) continue;
+        float mean = 0.0f;
+        for (uint32_t u : ring) mean += glm::dot(d.mesh.positions[u] - b.at, b.n);
+        const float o = std::abs(h - mean / float(ring.size()));
+        worst = std::max(worst, o);
+        spikes += o > 0.25f * spacing;
+    }
+    // The seam itself: the vertices on plane B that border a vertex below it lie on one straight line (a fit through
+    // them leaves at most a fraction of the vertex spacing), where a vertex-by-vertex drop zig-zags by up to a spacing.
+    std::vector<glm::vec2> seam;
+    const glm::vec3 t1 = glm::normalize(glm::cross(b.n, std::abs(b.n.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0)));
+    const glm::vec3 t2 = glm::cross(b.n, t1);
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+        if (std::abs(glm::dot(d.mesh.positions[v] - b.at, b.n)) > 1e-5f || glm::distance(mid[v], d.mesh.positions[v]) < 1e-7f) continue;
+        bool edge = false;
+        for (uint32_t u : d.mesh.neighbors(v)) edge = edge || glm::dot(d.mesh.positions[u] - b.at, b.n) < -1e-5f;
+        // (only the crease with the first facet, which was flat: plane A meets plane B along a line)
+        const bool onA = std::abs(glm::dot(mid[v] - a.at, a.n)) < 1e-5f;
+        if (edge && onA) seam.push_back({glm::dot(d.mesh.positions[v], t1), glm::dot(d.mesh.positions[v], t2)});
+    }
+    // (the principal axis of the seam points, then each point's distance from it)
+    glm::vec2 c(0.0f);
+    for (const glm::vec2& q : seam) c += q;
+    if (!seam.empty()) c /= float(seam.size());
+    float sxx = 0, sxy = 0, syy = 0;
+    for (const glm::vec2& q : seam) sxx += (q.x - c.x) * (q.x - c.x), sxy += (q.x - c.x) * (q.y - c.y), syy += (q.y - c.y) * (q.y - c.y);
+    const float ang = 0.5f * std::atan2(2.0f * sxy, sxx - syy);
+    const glm::vec2 axis(std::cos(ang), std::sin(ang));
+    float off = 0.0f;
+    std::vector<float> offs;
+    for (const glm::vec2& q : seam) offs.push_back(std::abs((q.x - c.x) * -axis.y + (q.y - c.y) * axis.x));
+    std::sort(offs.begin(), offs.end());
+    for (float o : offs) off = std::max(off, o);
+    if (!offs.empty()) std::printf("  seam offsets: median %.5f, 90%% %.5f\n", offs[offs.size() / 2], offs[offs.size() * 9 / 10]);
+    std::printf("  seam line: %zu points, farthest %.4f off the fitted line (spacing %.4f)\n", seam.size(), off, spacing);
+    std::printf("  seam: %d core vertices, %d left above plane B (highest %.5f), outlier %.5f (spacing %.4f), %d spikes\n", inside,
+                nProud, proud, worst, spacing, spikes);
+    // The shading normals along the seam are the surface's own (a stale one beside the seam shows as a dark notch).
+    Mesh fresh = d.mesh;
+    fresh.recomputeAllNormals();
+    float stale = 0.0f;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) stale = std::max(stale, glm::distance(d.mesh.normals[v], fresh.normals[v]));
+    std::printf("  seam normals: worst %.5f off the exact ones\n", stale);
+    CHECK(stale < 1e-3f);
+    // Snapping the seam's points onto it folds nothing over (no triangle's facing turns right around from where it was).
+    int flipped = 0, outliers = 0;
+    for (const glm::uvec3& t : d.mesh.triangles) {
+        const glm::vec3 n0 = glm::cross(mid[t.y] - mid[t.x], mid[t.z] - mid[t.x]);
+        const glm::vec3 n1 = glm::cross(d.mesh.positions[t.y] - d.mesh.positions[t.x], d.mesh.positions[t.z] - d.mesh.positions[t.x]);
+        flipped += glm::dot(n0, n1) < 0.0f;
+    }
+    for (float o : offs) outliers += o > 0.0005f;
+    std::printf("  seam: %d triangles folded over, %d of %zu seam points more than 0.0005 off the line\n", flipped, outliers, offs.size());
+    CHECK(flipped == 0);
+    CHECK(offs.size() > 20);
+    // (the seam's points sit within about half a vertex spacing of the line: a fixed mesh can't do better without moving
+    // points onto the crease, which stretched the cut's border into slivers and spikes in the close-ups)
+    CHECK(offs[offs.size() * 9 / 10] < 0.6f * spacing);
+    CHECK(inside > 200);
+    CHECK(nProud == 0);
+    CHECK(spikes == 0);
 }

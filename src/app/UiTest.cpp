@@ -129,7 +129,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
@@ -1382,6 +1382,13 @@ double Demo::query(const std::string& name, bool& known) const {
         size_t n = 0;
         for (uint8_t h : m.hidden) n += h != 0;
         return double(n);
+    }
+    if (name == "moved_raised") { // the most any vertex rose along its snapshot normal since `snapshot` (0 = nothing added)
+        if (basePositions_.size() != m.vertexCount() || baseNormals_.size() != basePositions_.size()) return -1.0;
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v)
+            up = std::max(up, double(glm::dot(m.positions[v] - basePositions_[v], baseNormals_[v])));
+        return up;
     }
     if (name == "moved_masked") { // masked vertices (mask >= 0.5) that moved since `snapshot`
         if (basePositions_.size() != m.vertexCount()) return -1.0;

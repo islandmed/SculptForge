@@ -1507,8 +1507,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         lastRegion_ = verts_.size();
         lastRegionRadius_ = p.radius;
     }
-    // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull).
-    const float planePull = r.crispEdge ? clayPull(s) : s;
+    // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull). Pen pressure
+    // doesn't scale the pull: each dab cutting to a pressure-scaled depth left a terrace (a contour ridge) at its rim
+    // across the facet, where the stroke has one plane (pressure still sizes the dab and the tip, if set to).
+    const float planePull = r.crispEdge ? clayPull(std::clamp(p.strength, 0.0f, 1.0f)) : s;
     const bool crispMax = r.crispEdge && r.planeLock && (r.plane == BrushRecipe::Plane::Flatten ||
                                                          r.plane == BrushRecipe::Plane::Fill ||
                                                          r.plane == BrushRecipe::Plane::Scrape);
@@ -1574,12 +1576,14 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             const float t = std::clamp((facing - lo) / (hi - lo), 0.0f, 1.0f);
             f *= t * t * (3.0f - 2.0f * t);
             // Where the tip's edge crosses material far from the plane (the ends of a cut through a ridge), the band
-            // widens to the depth of the cut there, so the wall is a clean slope of about 45 degrees instead of a
-            // cliff a few vertices wide that the triangles can only show as ragged steps.
+            // widens to three times the depth of the cut there, so the wall is a gentle slope instead of a cliff a few
+            // vertices wide that the triangles can only show as ragged steps and spikes (a 45 degree wall still did, on a
+            // dense head).
             const float depth = std::abs(h0) / rad;
+            constexpr float kWall = 3.0f; // (a run of three times the drop: a wall of about 20 degrees, which a facet's edge shows clean)
             if (depth > edge) {
                 const float u = std::clamp(1.0f - brushDistance(p, x) / rad, 0.0f, 1.0f);
-                const float a = std::min(u / edge, 1.0f), b = std::min(u / std::min(depth, 1.0f), 1.0f);
+                const float a = std::min(u / edge, 1.0f), b = std::min(u / std::min(depth * kWall, 1.0f), 1.0f);
                 f *= a > 0.0f ? std::min((b * b * (3.0f - 2.0f * b)) / (a * a * (3.0f - 2.0f * a)), 1.0f) : 0.0f;
             }
         }
@@ -1592,15 +1596,20 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         }
         glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f);
 
-        // Crisp edge: below the plane only shallow dips fill (fading out from 10% to 30% of the radius deep), so
-        // a plane dragged over a curving form cuts it clean instead of building a wall of filled surface that folds.
-        // And only while the dab is on the plane's level: once a locked stroke runs on over a form falling away
-        // below it (5% to 15% of the radius under it), the brush only cuts, so it doesn't lay a ledge down the curve.
+        // Crisp edge: a Flatten plane only cuts (a member's ask: it never raises or adds clay, at any depth; the
+        // regular Flatten brush is the one that fills). A point below the plane stays where it is, so no dip is
+        // filled and no scattered, half-filled points are left along the facet's edges. A Fill plane (a Brush Lab
+        // recipe) still fills, only shallow dips (fading out from 10% to 30% of the radius deep), and only while the
+        // dab is on the plane's level (5% to 15% of the radius under it), so it doesn't lay a ledge down a curve.
         float fill = 1.0f;
         if (r.crispEdge && h0 < 0.0f) {
-            const float t = std::clamp((-h0 / rad - 0.1f) / 0.2f, 0.0f, 1.0f);
-            const float l = std::clamp((-dabLevel - 0.05f) / 0.1f, 0.0f, 1.0f);
-            fill = (1.0f - t * t * (3.0f - 2.0f * t)) * (1.0f - l * l * (3.0f - 2.0f * l));
+            if (r.plane == BrushRecipe::Plane::Flatten) {
+                fill = 0.0f;
+            } else {
+                const float t = std::clamp((-h0 / rad - 0.1f) / 0.2f, 0.0f, 1.0f);
+                const float l = std::clamp((-dabLevel - 0.05f) / 0.1f, 0.0f, 1.0f);
+                fill = (1.0f - t * t * (3.0f - 2.0f * t)) * (1.0f - l * l * (3.0f - 2.0f * l));
+            }
         }
         if (crispMax) {
             // The vertex goes the strongest pull's share of the way from where this stroke found it: what is

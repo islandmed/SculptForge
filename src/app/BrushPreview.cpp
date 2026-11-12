@@ -104,7 +104,9 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
         if (!recipe->alpha.empty()) BrushAlpha::builtin(recipe->alpha, d.brushAlpha); // (as its first pick has)
         // A textured brush (alpha or pattern) strokes wider, so its texture reads at thumbnail size.
         const bool textured = !recipe->alpha.empty() || recipe->pattern != BrushRecipe::Pattern::None;
-        stroke(d, recipe, BrushType::Standard, frontCurve(), textured ? 0.26f : r, 0.9f);
+        // A crisp flatten only cuts: its mark is the top of the ball under the plane, so it strokes wider too.
+        const bool cutOnly = recipe->crispEdge && recipe->plane == BrushRecipe::Plane::Flatten;
+        stroke(d, recipe, BrushType::Standard, frontCurve(), textured || cutOnly ? 0.26f : r, 0.9f);
         return sceneMesh(d);
     }
     // Each brush gets a mark of its own shape that shows what it does, so the shelf tells them apart at a glance
