@@ -197,7 +197,7 @@ run_failed_where() {
 flaky_note() {
     local rep
     echo "   flaky: $1 passed on rerun ($2)" >&2
-    rep=$(python3 "$(git rev-parse --show-toplevel)/tools/release/flaky_log.py" add --log "$HOME/Work/.sf/logs/flaky.md" \
+    rep=$(python3 "$PWD/tools/release/flaky_log.py" add --log "$HOME/Work/.sf/logs/flaky.md" \
         --test "$1" --where "$2" --sha "$(git rev-parse --short HEAD 2>/dev/null)" --version "${V:-}" 2>/dev/null) || return 0
     [ -z "$rep" ] || echo "   $rep: now at the top of ~/Work/.sf/logs/flaky.md for a fix owner" >&2
 }

@@ -34,7 +34,7 @@ def repeats(table, today):
     count = {}
     for d, test, *_ in table:
         try:
-            when = datetime.date.fromisoformat(d)
+            when = datetime.datetime.strptime(d, "%Y-%m-%d").date()
         except ValueError:
             continue
         if since <= when <= today:

@@ -33,11 +33,11 @@ export PATH=$S/bin:$PATH HOME=$S/home GH_STATE=$S/state REPO=x/y V=9.9.9
 mkdir -p "$GH_STATE"
 cd "$ROOT"
 # shellcheck disable=SC1090
-source <(sed -n '/^# server_error < log/,/^# Successful run of a workflow/p' scripts/release.sh)
+eval "$(sed -n '/^# server_error < log/,/^# Successful run of a workflow/p' scripts/release.sh)" # not source <(...): macOS bash 3.2 cannot
 setup() { # setup CONCLUSION STEP LOG RERUN
     rm -f "$GH_STATE"/*; echo "$1" > "$GH_STATE/conclusion"; echo "$2" > "$GH_STATE/step"; printf '%s\n' "$3" > "$GH_STATE/log"; export GH_RERUN=$4
 }
-reruns() { if [ -f "$GH_STATE/reruns" ]; then wc -l < "$GH_STATE/reruns"; else echo 0; fi; }
+reruns() { if [ -f "$GH_STATE/reruns" ]; then wc -l < "$GH_STATE/reruns" | tr -d " "; else echo 0; fi; }
 FLAKY=$HOME/Work/.sf/logs/flaky.md
 TESTLOG=$'macOS (1/1)\tUNKNOWN STEP\t2026-11-11T18:32:58Z rerunning 1 failed test(s) once: ui_env_toggle'
 TESTSTEP="macOS: Test (C++ and Python API)"
@@ -57,7 +57,7 @@ grep -q "repeat: ui_env_toggle (2 in 7 days)" <<<"$out" || fail "no repeat line:
 [ "$(sed -n '/Fix owner needed/,/## Log/p' "$FLAKY" | grep -c 'ui_env_toggle')" = 1 ] || fail "not at the top: $(cat "$FLAKY")"
 
 # 2b. the stage summary names the test and says REPEAT for the recurring one only
-source <(sed -n '/^stage_flaky_summary()/,/^}/p' scripts/release.sh)
+eval "$(sed -n '/^stage_flaky_summary()/,/^}/p' scripts/release.sh)"
 python3 tools/release/flaky_log.py add --log "$FLAKY" --test ui_once_only --where "PC suite" --sha abc --version 9.9.9 >/dev/null
 out=$(stage_flaky_summary)
 grep -q "passed on rerun in this stage: .*ui_env_toggle" <<<"$out" || fail "the summary lacks the test: $out"
