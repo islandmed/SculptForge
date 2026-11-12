@@ -134,7 +134,7 @@
      "title": "Polygon modelling mode",
      "line": "Beginner-friendly Points, Edges and Polygons panels: extrude, smart bevel, bridge, circle from edges, for hard-surface work next to sculpting.",
      "where": "a new Model mode with its own panels",
-     "votes": 2,
+     "votes": 3,
      "status": "open",
      "shipped": ""
     },
@@ -864,5 +864,5 @@
    ]
   }
  ],
- "updated": "2026-11-12T19:38:20Z"
+ "updated": "2026-11-12T23:37:59Z"
 }
