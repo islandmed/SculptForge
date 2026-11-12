@@ -23,10 +23,6 @@ All notable changes to SculptForge are listed here. The format follows
 - **Braid** (Tool > Tube) now builds round strands (two to begin with) that twist over and under each other round the
   curve, instead of flat ribbons. **Spread** sets the weave: 0 packs the strands together so they touch, 1 opens them
   up with longer turns. Saved braids look different. Requested by Artizmo on Discord.
-- Tool > Tube sliders for Rope, Braid and the other profiles are now Twist, Spin, Spread, Strands. **Turn** is gone:
-  **Spin** does what Turn did (turns the cross-section about the curve). A saved Turn loads as Spin; a Spin saved
-  before this (degrees per radius of length) is dropped. `tube_set` and `tube_new` take `spin` (`turn` still works).
-  Requested by Artizmo on Discord.
 - Release tooling: the members' beta is created in the insiders repository with its own tag target, so a beta no
   longer stops at "tag has not been pushed".
 - Why page: the agents are described as testing for speed, stability and feel, with artists deciding what gets built.
