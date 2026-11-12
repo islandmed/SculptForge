@@ -18,6 +18,8 @@ All notable changes to SculptForge are listed here. The format follows
   **Spin** does what Turn did (turns the cross-section about the curve). A saved Turn loads as Spin; a Spin saved
   before this (degrees per radius of length) is dropped. `tube_set` and `tube_new` take `spin` (`turn` still works).
   Requested by Artizmo on Discord.
+- Release tooling: the members' beta is created in the insiders repository with its own tag target, so a beta no
+  longer stops at "tag has not been pushed".
 
 ## [0.12.10] - 2026-11-11
 
