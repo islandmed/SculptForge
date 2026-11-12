@@ -187,13 +187,20 @@ TEST(i18n_language_codes) {
     CHECK(languageFromCode(languageCode(Language::TraditionalChinese)) == Language::TraditionalChinese);
     CHECK(languageFromCode(languageCode(Language::SimplifiedChinese)) == Language::SimplifiedChinese);
     CHECK(std::string(languageName(Language::SimplifiedChinese)) == "\u7b80\u4f53\u4e2d\u6587");
+    CHECK(std::string(languageCode(Language::Japanese)) == "ja");
+    CHECK(languageFromCode("ja") == Language::Japanese);
+    CHECK(languageFromCode("ja-JP") == Language::Japanese);
+    CHECK(languageFromCode("ja_JP") == Language::Japanese);
+    CHECK(languageFromCode(languageCode(Language::Japanese)) == Language::Japanese);
+    CHECK(std::string(languageName(Language::Japanese)) == "\u65e5\u672c\u8a9e"); // 日本語
+    CHECK(languageFromCode("jam") == Language::English);                                // Jamaican Creole is not Japanese
 }
 
 // The first start (App::offerFirstRunLanguage): the OS's own tag -> a shipped language, from what Windows
 // (es-MX, zh-TW), macOS (zh-Hant-TW, es-419) and Linux (es_ES.UTF-8, zh_CN.UTF-8@x, C) hand over.
 TEST(i18n_os_locale_maps_to_a_shipped_language) {
     const Language es = Language::Spanish, tc = Language::TraditionalChinese, sc = Language::SimplifiedChinese,
-                   en = Language::English;
+                   ja = Language::Japanese, en = Language::English;
     for (const char* tag : {"es", "es-ES", "es-MX", "es-419", "es_ES.UTF-8", "es_MX.UTF-8@euro", "ES-es", "es:en"})
         CHECK(languageFromOsLocale(tag) == es);
     for (const char* tag : {"zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-TW", "zh-Hant-HK", "zh_TW.UTF-8", "zh_HK.utf8",
@@ -201,14 +208,16 @@ TEST(i18n_os_locale_maps_to_a_shipped_language) {
         CHECK(languageFromOsLocale(tag) == tc);
     for (const char* tag : {"zh-CN", "zh-SG", "zh-Hans", "zh-Hans-CN", "zh-Hans-HK", "zh_CN.UTF-8", "zh_SG.UTF-8@x", "zh"})
         CHECK(languageFromOsLocale(tag) == sc);
+    for (const char* tag : {"ja", "ja-JP", "ja_JP.UTF-8", "ja_JP.eucJP", "JA-jp", "jpn", "ja:en", "ja-JP-u-ca-japanese"})
+        CHECK(languageFromOsLocale(tag) == ja);
     // Not shipped, English, or no language at all: English (the welcome's language row is the offer).
-    for (const char* tag : {"en-US", "en_GB.UTF-8", "pt-BR", "pt_PT", "fr-FR", "de", "ja-JP", "ko_KR.UTF-8", "esperanto",
+    for (const char* tag : {"en-US", "en_GB.UTF-8", "pt-BR", "pt_PT", "fr-FR", "de", "jam", "ko_KR.UTF-8", "esperanto",
                             "est-EE", "et_EE.UTF-8", "C", "POSIX", "", ".UTF-8", "@euro"})
         CHECK(languageFromOsLocale(tag) == en);
 }
 
 TEST(i18n_tables_are_well_formed) {
-  for (const Language lang : {Language::Spanish, Language::TraditionalChinese, Language::SimplifiedChinese}) {
+  for (const Language lang : {Language::Spanish, Language::TraditionalChinese, Language::SimplifiedChinese, Language::Japanese}) {
     std::set<std::string_view> seen;
     int problems = 0;
     for (const i18n::Entry& e : i18n::table(lang)) {
@@ -248,9 +257,10 @@ TEST(i18n_spanish_table_fits_the_font) {
     CHECK(outside == 0);
 }
 
-TEST(i18n_chinese_table_fits_the_font) {
-    // Chinese text is Inter, the icons, and a Noto Sans CJK subset merged in (App::mergeCjkFont): NotoSansTC-UI.otf for
-    // Traditional, NotoSansSC-UI.otf for Simplified, each with only the characters its table uses. A character it lacks
+TEST(i18n_cjk_table_fits_the_font) {
+    // Chinese and Japanese text is Inter, the icons, and a Noto Sans CJK subset merged in (App::mergeCjkFont): NotoSansTC-UI.otf
+    // for Traditional, NotoSansSC-UI.otf for Simplified, NotoSansJP-UI.otf for Japanese, each with only the characters its
+    // table uses. A character it lacks
     // draws as "?": run tools/i18n/subset_cjk_font.py.
     const std::string fonts = std::string(SF_TEST_DATA_DIR) + "/../../assets/fonts/";
     struct Face {
@@ -258,7 +268,8 @@ TEST(i18n_chinese_table_fits_the_font) {
         const char* file;
     };
     for (const Face face : {Face{Language::TraditionalChinese, "NotoSansTC-UI.otf"},
-                            Face{Language::SimplifiedChinese, "NotoSansSC-UI.otf"}}) {
+                            Face{Language::SimplifiedChinese, "NotoSansSC-UI.otf"},
+                            Face{Language::Japanese, "NotoSansJP-UI.otf"}}) {
         const std::set<unsigned> cjk = fontCodepoints(fonts + face.file);
         CHECK(cjk.size() > 500);
         std::set<unsigned> missing;
@@ -283,6 +294,24 @@ TEST(i18n_chinese_lookup_keeps_ids_and_brush_names) {
     const std::string on = "On"; // a brush setting, not a brush: translated
     CHECK(std::string(trAction("brush.pen_size_on", on)) == "\u958b\u555f");
     CHECK(trPath("Tool > Geometry") == "\u5de5\u5177 > \u5e7e\u4f55");
+}
+
+TEST(i18n_japanese_lookup) {
+    LanguageScope scope(Language::Japanese);
+    CHECK(std::string(tr("Undo")) == "\u5143\u306b\u623b\u3059");                                     // 元に戻す
+    CHECK(std::string(tr("Preferences##palette.preferences")).find("##palette.preferences") != std::string::npos);
+    CHECK(std::string(trAction("brush.move", std::string("Move"))) == "Move");                     // brushes keep their names
+    CHECK(std::string(tr("Frobnicate")) == "Frobnicate");                                          // no entry: English
+    // Our own names stay Latin, the generic words are Japanese (no Chinese-only forms slipped in).
+    CHECK(std::string(tr("Forge Spheres")).find("Forge Spheres") != std::string::npos);
+    int rival = 0;
+    for (const i18n::Entry& e : i18n::japaneseTable())
+        for (const char* simplified : {"\u8bbe\u7f6e", "\u9009\u62e9", "\u7f51\u683c", "\u7ed8\u5236"}) // 设置 选择 网格 绘制
+            if (std::strstr(e.translated, simplified)) {
+                std::printf("  Simplified Chinese form in: \"%s\"\n", e.translated);
+                ++rival;
+            }
+    CHECK(rival == 0);
 }
 
 TEST(i18n_simplified_chinese_lookup) {
@@ -312,7 +341,8 @@ TEST(i18n_builtin_insert_sets_translated) {
         CHECK(sf::listInsertSet(std::string(sf::kBuiltinInsertSetPrefix) + b.id, items, err));
         std::vector<std::string> names{b.name};
         for (const sf::InsertSetItem& it : items) names.push_back(it.name);
-        for (const sf::Language l : {sf::Language::Spanish, sf::Language::TraditionalChinese, sf::Language::SimplifiedChinese})
+        for (const sf::Language l : {sf::Language::Spanish, sf::Language::TraditionalChinese, sf::Language::SimplifiedChinese,
+                                     sf::Language::Japanese})
             for (const std::string& n : names) {
                 if (!sf::i18n::lookup(l, n)) std::printf("  no %s translation for \"%s\"\n", sf::languageCode(l), n.c_str());
                 CHECK(sf::i18n::lookup(l, n) != nullptr);

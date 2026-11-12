@@ -94,6 +94,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char fontCjkSc[];
 extern const unsigned long long fontCjkSc_size;
+extern const unsigned char fontCjkJp[];
+extern const unsigned long long fontCjkJp_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[];
@@ -1609,15 +1611,16 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
-// Noto Sans CJK TC and SC (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
+// Noto Sans CJK TC, SC and JP (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
 // into the font added just before: in Traditional Chinese all of TC, in Simplified Chinese all of SC (mainland glyph
-// shapes). Otherwise only the languages' own names (繁體中文, 简体中文: the Preferences buttons) are merged, so the
-// atlas stays Latin-sized.
+// shapes), in Japanese all of JP. Otherwise only the languages' own names (繁體中文, 简体中文, 日本語: the Preferences
+// buttons) are merged, so the atlas stays Latin-sized.
 void App::mergeCjkFont(float px) {
     // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
     static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
     static const ImWchar kTraditionalName[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
     static const ImWchar kSimplifiedName[] = {0x4E2D, 0x4E2D, 0x4F53, 0x4F53, 0x6587, 0x6587, 0x7B80, 0x7B80, 0};  // 中体文简
+    static const ImWchar kJapaneseName[] = {0x65E5, 0x65E5, 0x672C, 0x672C, 0x8A9E, 0x8A9E, 0};                     // 日本語
     auto merge = [px](const unsigned char* data, unsigned long long size, const ImWchar* ranges) {
         ImFontConfig cjk;
         cjk.MergeMode = true;
@@ -1628,9 +1631,12 @@ void App::mergeCjkFont(float px) {
     // The interface's own face first: a codepoint both have (中文) keeps the glyph merged first.
     const bool traditional = fontsLanguage_ == Language::TraditionalChinese;
     const bool simplified = fontsLanguage_ == Language::SimplifiedChinese;
+    const bool japanese = fontsLanguage_ == Language::Japanese;
+    if (japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kCjkRanges);
     if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
     merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
     if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
+    if (!japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kJapaneseName);
     glyphs::merge(px); // what people typed that the bundled fonts lack, from the system's fonts (UserGlyphs.h)
 }
 
@@ -1640,7 +1646,8 @@ void App::buildUiFonts(float scale) {
     fontsLanguage_ = language();
     { // the bundled fonts a typed character is looked for in first: the interface's Chinese face, then Inter
         const bool tc = fontsLanguage_ == Language::TraditionalChinese;
-        const glyphs::Embedded embedded[] = {{tc ? assets::fontCjk : assets::fontCjkSc, size_t(tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
+        const bool jp = fontsLanguage_ == Language::Japanese;
+        const glyphs::Embedded embedded[] = {{jp ? assets::fontCjkJp : tc ? assets::fontCjk : assets::fontCjkSc, size_t(jp ? assets::fontCjkJp_size : tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
                                              {tc ? assets::fontCjkSc : assets::fontCjk, size_t(tc ? assets::fontCjkSc_size : assets::fontCjk_size)},
                                              {assets::fontRegular, size_t(assets::fontRegular_size)}};
         glyphs::install(embedded, 3, !options_.uiTest.empty());

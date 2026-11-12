@@ -38,7 +38,7 @@ struct UiPrefs {
     // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
     // sizes, Measure), and the unit the numbers in OBJ and PLY files are read in (STL is millimetres by convention).
     std::string lengthUnit = "mm", fileUnit = "m";
-    std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
+    std::string language = "en"; // Preferences > Interface: the interface language, "en", "es", "zh-TW", "zh-CN" or "ja" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     // View > Orbit lock (rotation): 0 free, about the screen axes; 1 turntable (Y up); 2 about world X only; 3 about
     // world Z only (Camera::orbitAbout). Saved as "orbitLock", and "turntable" for older versions.

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The interface language (#44): English, the default, Spanish, Traditional Chinese
-// (#114) and Simplified Chinese. A small, dependency-free layer: the English text is
+// (#114), Simplified Chinese and Japanese. A small, dependency-free layer: the English text is
 // the key, the translations are tables compiled into the binary (I18nSpanish.cpp,
-// I18nTraditionalChinese.cpp, I18nSimplifiedChinese.cpp), and anything without an
+// I18nTraditionalChinese.cpp, I18nSimplifiedChinese.cpp, I18nJapanese.cpp), and anything without an
 // entry stays in English, so a missing line never breaks a label.
 //
 //   ImGui::Button(tr("Decimate"))             "Diezmar" in Spanish
@@ -24,17 +24,17 @@
 
 namespace sf {
 
-enum class Language { English, Spanish, TraditionalChinese, SimplifiedChinese };
-inline constexpr int kLanguageCount = 4;
+enum class Language { English, Spanish, TraditionalChinese, SimplifiedChinese, Japanese };
+inline constexpr int kLanguageCount = 5;
 
 // The language tr() translates into (process-wide; Preferences > Interface sets it).
 void setLanguage(Language language);
 Language language();
-const char* languageCode(Language language);    // "en", "es", "zh-TW", "zh-CN" (ui.json)
+const char* languageCode(Language language);    // "en", "es", "zh-TW", "zh-CN", "ja" (ui.json)
 Language languageFromCode(std::string_view code); // unknown codes are English
-const char* languageName(Language language);    // in that language: "English", "Español", "繁體中文", "简体中文"
+const char* languageName(Language language);    // in that language: "English", "Español", "繁體中文", "简体中文", "日本語"
 // The shipped language for an operating system's locale tag: "es-MX", "es_ES.UTF-8", "zh-Hant-TW", "zh_CN.UTF-8@x", any
-// case. Spanish; Traditional Chinese for zh-TW / zh-HK / zh-MO / zh-Hant; Simplified for the other zh; everything else
+// case. Spanish; Traditional Chinese for zh-TW / zh-HK / zh-MO / zh-Hant; Simplified for the other zh; Japanese for ja; everything else
 // (pt-BR, "C", "POSIX", "") is English. For the first start (App::offerFirstRunLanguage), not for ui.json (languageFromCode).
 Language languageFromOsLocale(std::string_view tag);
 // The language tag the OS interface is in (Windows GetUserDefaultUILanguage, macOS CFLocaleCopyPreferredLanguages, else
@@ -58,10 +58,11 @@ struct Entry {
     const char* english;
     const char* translated;
 };
-// The compiled-in tables (I18nSpanish.cpp, I18nTraditionalChinese.cpp, I18nSimplifiedChinese.cpp), for tests.
+// The compiled-in tables (I18nSpanish.cpp, I18nTraditionalChinese.cpp, I18nSimplifiedChinese.cpp, I18nJapanese.cpp), for tests.
 std::span<const Entry> spanishTable();
 std::span<const Entry> traditionalChineseTable();
 std::span<const Entry> simplifiedChineseTable();
+std::span<const Entry> japaneseTable();
 std::span<const Entry> table(Language language); // empty for English
 // The exact entry for `english` in that language's table, or nullptr (English has no table).
 const char* lookup(Language language, std::string_view english);
