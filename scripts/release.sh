@@ -900,6 +900,29 @@ website_run() {
     done
 }
 
+# release_card: the release card the CMO built (launch.py card: ~/Work/.sf/state/launch/X.Y.Z.card.jpg) goes to website/media/
+# release-X.Y.Z.jpg, which the Discord post attaches. It must pass tools/check_marks_media.py (new file: OCR'd, its cache entry
+# staged with it), and is staged here to ride the site commit. Missing or flagged: a WARNING and no card, never a failed release.
+release_card() {
+    local src=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.card.jpg dst=website/media/release-$V.jpg out
+    git cat-file -e "HEAD:$dst" 2>/dev/null && return 0
+    if [ ! -f "$src" ]; then
+        printf '   WARNING: no release card for %s (%s missing): the Discord post goes out without it; launch.py card %s builds it\n' "$V" "$src" "$V"
+        return 0
+    fi
+    mkdir -p "${dst%/*}" && cp "$src" "$dst" && lockretry git add "$dst" || { printf '   WARNING: could not stage the release card %s\n' "$dst"; return 0; }
+    if out=$(python3 tools/check_marks_media.py 2>&1); then
+        for f in tools/marks_media_cache.json tools/marks_media_flagged.txt; do [ ! -f "$f" ] || lockretry git add "$f"; done
+        ok "release card $dst checked and staged"
+    else
+        printf '   WARNING: the release card is not clean or not checked (the Discord post goes out without it):\n%s\n' "$(tail -5 <<<"$out" | sed 's/^/      /')"
+        git rm -q -f --cached "$dst" >/dev/null 2>&1 || true
+        rm -f "$dst"
+        for f in tools/marks_media_cache.json tools/marks_media_flagged.txt; do git checkout -q -- "$f" 2>/dev/null || true; done
+    fi
+    return 0
+}
+
 step_site() {
     release_ready
     on_main
@@ -912,6 +935,7 @@ step_site() {
         ok "pushed the $ahead commit(s) on main a stopped run had made"
         git fetch -q origin main
     fi
+    release_card
     if git show origin/main:website/latest.json 2>/dev/null | grep -F "\"version\": \"$V\"" >/dev/null; then
         ok "origin/main's website/latest.json already says $V"
     else
@@ -946,6 +970,11 @@ PY
         commit -m "Website: $V is the current release (feed, download text)"
         push_main
         ok "pushed the feed and home page"
+    fi
+    if ! git diff --cached --quiet; then  # the card alone: the feed was already out (a re-run)
+        commit -m "Website: release card for $V"
+        push_main
+        ok "pushed the release card"
     fi
     # The Website workflow deploys main's site and the newest tag's guide. Its run for the feed commit can sit queued
     # longer than any fixed wait (0.11.7: past 10 minutes), so wait for that run, then check what visitors get.

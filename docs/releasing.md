@@ -53,7 +53,9 @@ the gates, what each step does, and how to recover.
    drafted. Read the drafts, then post them.
    - **Discord**: the #announcements post is automatic once the `DISCORD_ANNOUNCE_WEBHOOK` secret is set
      (.github/workflows/discord-announce.yml). It waits for step `site` to put this version's highlights in
-     website/latest.json (up to 45 minutes). Other posts: .github/announcements/*.md, Actions > Discord announcement.
+     website/latest.json (up to 45 minutes), then for the release card at website/media/release-X.Y.Z.jpg to be live on
+     the site (up to 20 more; the launch kit commits it, site lane) and posts "## SculptForge X.Y.Z", the headline, the
+     card and masked Download / What's new links. Other posts: .github/announcements/*.md, Actions > Discord announcement.
 
 ## Build once, promote
 
