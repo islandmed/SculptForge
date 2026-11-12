@@ -1,0 +1,51 @@
+# Palm rejection (Android; here switched on): a finger that lands while the pen is in range, or just after it left, is a
+# resting palm and does nothing; the same finger a moment later sculpts. The pen hand's own stroke is untouched.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+snapshot
+palm_guard on 1
+key f
+camera 0 0
+
+# Pen near the model: a finger stroke and a two-finger pinch are ignored.
+pen_enter 0.9 0.9
+expect_value palm_guard == 1
+remember camera_distance d0
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved == 0
+expect_value stroking == 0
+touch_pinch 0.5 0.5 2 0 0 0
+expect_value camera_distance == $d0
+expect_value touch_fingers == 0
+
+# The pen's own stroke still sculpts while the palm rests.
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+
+# The pen has just left: the hand is still there for a moment.
+pen_out
+expect_value palm_guard == 1
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved == 0
+
+# A moment later fingers count again: one sculpts, two navigate.
+wait_real 1.1
+expect_value palm_guard == 0
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+touch_pinch 0.5 0.5 2 0 0 0
+expect_value camera_distance < $d0*0.55
+
+# Off (desktop's default): a finger beside a pen in range is a finger.
+palm_guard off
+pen_enter 0.9 0.9
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+pen_out
+shot palm_guard_after
