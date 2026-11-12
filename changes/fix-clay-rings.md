@@ -4,7 +4,7 @@ fixed: **Large Clay strokes showed each dab as a ring** (#196): on a form that c
   brush on a sphere) the middle of the dab stood above Clay's plane and stayed untouched, the dab lifted a ring, and the
   ring's edge was a crease, one per dab along the stroke. The plane now reaches the surface under the cursor and the pull
   is scaled by how much higher that is, so the middle lifts as it does on a flat surface and a stroke builds up about as
-  much as before (a flat surface is unchanged). Light Clay strokes no longer leave a raised edge: on a strongly curved form they lift a little less than
+  much as before (a flat surface is unchanged). Light Clay strokes no longer leave a raised edge: on a strongly curved form they build up a little more softly than
   they did, because the ring they used to lift is gone (a heavy stroke moves the same amount of clay). Brush-pack Clay brushes follow the same plane.
 fixed: **Symmetry strokes whose two sides overlap** (a big brush near the mirror plane): the second side's plane
   now reads the surface the first side just left, so a Fast Big Brushes stroke matches the exact one.
