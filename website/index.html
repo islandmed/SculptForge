@@ -52,9 +52,9 @@
 
   <main id="top">
     <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
-    <aside class="news-bar" data-version="0.12.8" aria-label="Latest release">
+    <aside class="news-bar" data-version="0.12.9" aria-label="Latest release">
       <div class="wrap news-bar-inner">
-        <a class="news-bar-link" href="guide/whats-new.html#version-0128"><span class="news-pill">New</span><span class="news-bar-text">Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <a class="news-bar-link" href="guide/whats-new.html#version-0129"><span class="news-pill">New</span><span class="news-bar-text">Brush Size and Intensity follow the mouse, and Undo is faster on dense models</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
         <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
     </aside>
@@ -67,7 +67,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
           <!-- hero-news:start -->
-          <p class="hero-news" data-version="0.12.8"><a href="guide/whats-new.html#version-0128"><strong>New in 0.12.8:</strong> reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</a></p>
+          <p class="hero-news" data-version="0.12.9"><a href="guide/whats-new.html#version-0129"><strong>New in 0.12.9:</strong> brush Size and Intensity follow the mouse, and Undo is faster on dense models.</a></p>
           <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
@@ -464,14 +464,14 @@ rez-env sculptforge -- sculptforge troll.usda \
       <div class="wrap">
         <h2>What's new in 0.12</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.8: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede">New in 0.12.9: Brush Size and Intensity follow the mouse, and Undo is faster on dense models. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-0129"><div class="wn-card-body"><h3>Brush Size and Intensity follow the mouse <small>new in 0.12.9</small></h3><p>Brush Size and Intensity follow the mouse, and Undo is faster on dense models.</p><ul><li>Press S or F (or U, Shift+F), move sideways and the value changes live</li><li>A click elsewhere after moving keeps the new Size or Intensity</li><li>Faster Undo and Redo of a stroke on dense models of several million triangles (#181)</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0128"><div class="wn-card-body"><h3>Reference images, Start-up fix, Two-key shortcuts <small>new in 0.12.8</small></h3><p>Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.</p><ul><li>Your front and side drawings in the view while you sculpt (idea by Oslen on Discord)</li><li>SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)</li><li>Bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)</li><li>Shortcuts with two keys in a row</li><li>Reference images to sculpt against</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-0127"><div class="wn-card-body"><h3>Booleans between Parts, My Panel, Crisp Flatten <small>new in 0.12.7</small></h3><p>Booleans between Parts, Gaussian splats with Blender, and a panel of your own.</p><ul><li>Add, Subtract or Intersect from Tool &gt; Parts, with a live preview</li><li>Gaussian splats both ways with Blender 5.3 through the Blender bridge</li><li>Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)</li><li>A panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)</li><li>Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)</li><li>Alpha pool and jitter for non-repeating detail</li><li>Hard planes with a sharp edge</li><li>Warnings before destructive operations</li><li>Put any brush on Shift or Ctrl</li><li>Orbit around the point under the pointer</li><li>Exact Booleans between Parts, with a live preview</li><li>My Panel, a panel you build from your own buttons and sections</li><li>Smooth Peaks brush</li><li>Repeat a Part along a curve, real braids and springs</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0126"><div class="wn-card-body"><h3>Pan and zoom keys work again <small>new in 0.12.6</small></h3><p>Pan and zoom keys work again, layouts revert safely, and garments drape on a body.</p><ul><li>A tap nudges the view, holding glides (thanks Artizmo on Discord)</li><li>Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)</li><li>Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)</li><li>Drape a garment on a body in Tool &gt; Garments, with a steadier cloth rest</li><li>Save Visible Parts As and a Mask colour preference</li><li>Save only the visible Parts</li><li>Featured creator card in the Welcome window</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0125"><h3>0.12.0 to 0.12.5</h3><ul><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0120-to-0126"><h3>0.12.0 to 0.12.6</h3><ul><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011x"><h3>0.11.x</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->

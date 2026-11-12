@@ -8,12 +8,16 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.9
 
 ```features
-date: unreleased
+date: 2026-11-11
 tagline: Brush Size and Intensity follow the mouse, and Undo is faster on dense models.
 highlight: Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live
 highlight: A click elsewhere after moving keeps the new Size or Intensity
 highlight: Faster Undo and Redo of a stroke on dense models of several million triangles (#181)
 ```
+
+- **Faster Undo and Redo on dense models**: Ctrl+Z / Ctrl+Shift+Z of a brush stroke on a model of several million
+  triangles no longer stalls for half a second; it takes a few milliseconds. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
 
 ## Version 0.12.8
 
