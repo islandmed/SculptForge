@@ -5,6 +5,17 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.12
+
+```features
+date: unreleased
+tagline: The user guide is redesigned, with new pictures, and Voxel Resolution fits on a shelf.
+highlight: The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips
+highlight: 25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded
+highlight: The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)
+highlight: Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times
+```
+
 ## Version 0.12.11
 
 ```features
