@@ -56,7 +56,7 @@ for abi in "${abis[@]}"; do
   cp "$(find "$b" -name libSDL3.so -print -quit)" "$jni/$abi/"
   # Release: no debug sections in the APK (RelWithDebInfo keeps them, for ndk-stack).
   if [ $type = release ]; then "$ndk"/toolchains/llvm/prebuilt/*/bin/llvm-strip --strip-unneeded "$jni/$abi"/*.so; fi
-  sdl=$(sed -nE 's/^sdl3_SOURCE_DIR:INTERNAL=(.*)/\1/p' "$b/CMakeCache.txt")
+  sdl=$(sed -nE 's/^SDL3_SOURCE_DIR:STATIC=(.*)/\1/p' "$b/CMakeCache.txt") # (SDL's own project() sets it)
 done
 [ -d "$sdl/android-project/app/src/main/java" ] || { echo "SDL's Java sources not found in '$sdl'" >&2; exit 1; }
 
