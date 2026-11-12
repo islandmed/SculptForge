@@ -157,6 +157,8 @@ jobs:
     with:
       ref: ${{ needs.locate.outputs.sha }}
       tag: ${{ needs.locate.outputs.tag }}
+    secrets:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }} # the build from the tag signs too (SIGNING=signpath); unused otherwise
 
   # Every package against its run's recorded SHA-256 and its attestation (tools/release/verify_staged.py). Dry runs
   # too; not for promote_run (a dry run's look at any run's packages).
@@ -191,7 +193,8 @@ jobs:
           SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
           STAGED: ${{ needs.locate.outputs.staged }}
           REF: ${{ needs.locate.outputs.built-ref }}
-        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
+          SIGNED: ${{ vars.SIGNING == 'signpath' && '1' || '' }} # signing is on: packages staged unsigned (built before it was turned on) are refused
+        run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"} ${SIGNED:+--require-signed}
 
   smoke:
     name: Smoke test ${{ matrix.name }}

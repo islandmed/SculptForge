@@ -1500,6 +1500,7 @@ private:
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
+    void updateUndoNotice();           // every frame: "Oldest N undo steps removed to free memory" when a history dropped steps
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
@@ -2516,7 +2517,7 @@ private:
     void saveWindowState() const;
     bool rememberWindow_ = false;
     // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
-    // frame, and the splash (opened at a start-up step once start-up is past 300 ms) closes then.
+    // frame, and the splash (opened at the first start-up step) closes then.
     std::unique_ptr<splash::Window> splash_;
     bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
     std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;

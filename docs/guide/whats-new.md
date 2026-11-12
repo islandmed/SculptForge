@@ -8,18 +8,28 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.11
 
 ```features
-date: unreleased
-highlight: Round, woven Braid strands
+date: 2026-11-12
+tagline: Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.
+highlight: Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before
+highlight: The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy
+highlight: Inflate over a Crease no longer tears the surface (#194)
+highlight: Palette Knife and Nudge no longer fold the surface (#198, #199)
+highlight: The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)
 ```
 
-- **Tube Braid** is now two round strands twisted over and under each other, and **Spread** opens and closes the weave
-  from a tight rope to a loose twist.
+- **Nudge and Palette Knife fold the surface less**: a second stroke across a dragged area leaves fewer creases, and
+  Nudge's two halves agree under symmetry.
+- **Startup splash on every start**: the logo and version now show at every start for at least half a second, centred,
+  then fade into the main window, and it now shows on Wayland, where it never appeared. **Preferences > Interface >
+  Show startup splash** turns it off for an instant start.
+- **Inflate over a Crease groove**: stacked Crease and Inflate strokes no longer tear needles and streaks into a
+  divided mesh.
 
 ## Version 0.12.10
 
 ```features
 date: 2026-11-11
-tagline: Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts.
+tagline: Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.
 highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
 highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
 highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)

@@ -56,8 +56,9 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.12.11"
+expect_text "Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less."
 expect_text "Version 0.12.10"
-expect_text "Mouse orbit speed: slow the mouse or trackpad turn; textured brushes mirror exactly; Crisp Flatten only cuts."
+expect_text "Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten."
 expect_text "Version 0.12.9"
 expect_text "Brush Size and Intensity follow the mouse, and Undo is faster on dense models."
 expect_value whats_new_contents == 5   # 3 versions in full, then 0.12.0 to 0.12.2 and 0.11.x (the chapter starts at 0.11.0)

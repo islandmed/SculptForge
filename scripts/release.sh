@@ -327,9 +327,10 @@ stage_fix() { echo "stage $V: in the merger's batch checkout, scripts/release.sh
 
 # --- preconditions: what the steps after the tag need, checked before anything is tagged --------------------------
 
-# The home page's "new in X.Y.Z" card and "New in X.Y.Z:" lede in #whats-new, written by build_site.py (step bump) from
+# The home page's "new in X.Y.Z" card in #whats-new and the announcement bar for X.Y.Z (the one place the page says the
+# release news; the section lede carries no tagline), written by build_site.py (step bump) from
 # the version's ```features block in whats-new.md, which needs a date and a tagline.
-card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"section-lede\">New in $V:" website/index.html; }
+card_ok() { grep -qF "<small>new in $V</small>" website/index.html && grep -qF "class=\"news-bar\" data-version=\"$V\"" website/index.html; }
 features_ok() { awk -v v="## Version $BASE" '$0==v{f=1;next} f&&/^## /{exit} f' docs/guide/whats-new.md | grep '^tagline: .' >/dev/null; }
 card_fix="give '## Version $V' in docs/guide/whats-new.md a \`\`\`features block (date: unreleased, tagline: ..., highlight: ..., cards), commit, push main, run again"
 feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
@@ -660,6 +661,18 @@ stage_flaky_summary() {
 }
 # --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
 # and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
+# signing_state RUN: prints "Windows: signed (SignPath, <subject>)" or "Windows: unsigned (SIGNING off)", the notice the Windows job of
+# packages.yml leaves (check-run annotation "Windows signing"). Fails when the repository variable SIGNING is signpath and the packages
+# are not signed (verify_staged.py --require-signed refuses them at promotion too).
+signing_state() {
+    local jid line="" want
+    jid=$(gh run view "$1" -R "$REPO" --json jobs -q '.jobs[] | select(.name | startswith("Windows x64")) | .databaseId' 2>/dev/null | head -1)
+    [ -z "$jid" ] || line=$(gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1)
+    want=$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)
+    ok "${line:-Windows: signing state unknown (no note in the Windows job: its packages were reused from an earlier run?)}"
+    case "$line" in "Windows: test-signed"*) return 1 ;; esac # SignPath's self-signed test certificate never goes into a release
+    [ "$want" != signpath ] || case "$line" in "Windows: signed"*) ;; *) return 1 ;; esac
+}
 step_stage() {
     local sha c with=${STAGE_WITH-}
     sha=$(git rev-parse HEAD)
@@ -714,6 +727,7 @@ step_stage() {
             "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
     fi
     ok "Packages run $id built every package for ${sha:0:8}"
+    signing_state "$id" || die "the Windows packages of run $id are not release-signed (SIGNING=signpath wants \"Windows: signed\"; a test-signed run never ships)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
     echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
 }
 
@@ -851,6 +865,51 @@ step_release() {
     [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
     release_body_headline
+    release_apk
+}
+
+# release_apk: a beta's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
+# PRIVATE Insiders release, from the android.yml run of the beta's commit. Never the public release: only when a beta
+# publishes to $INSIDERS_REPO. Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
+# beta ships without APKs (scripts/release.sh $V --from release adds them later). SHA256SUMS.txt (signed) is left alone;
+# the APKs' sums are SHA256SUMS-android.txt.
+release_apk() {
+    [ -n "$PRE" ] && [ "$RELEASE_REPO" = "$INSIDERS_REPO" ] || return 0
+    local sha id c dir="$work/apk" abi f n=0 sums
+    if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
+    sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { printf '   WARNING: no APKs on %s: %s is not a commit here\n' "$T" "$T"; return 0; }
+    id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+    if [ -z "$id" ]; then
+        printf '   WARNING: no Android run for %s: the beta ships without APKs; gh workflow run android.yml -R %s --ref %s, then %s\n' \
+            "${sha:0:8}" "$REPO" "$T" "$(resume release)"
+        return 0
+    fi
+    if [ "$(gh run view "$id" -R "$REPO" --json status -q .status 2>/dev/null)" != completed ]; then
+        echo "   waiting for the Android run $id ..."
+        gh_watch "$id" >/dev/null 2>&1 || true
+    fi
+    c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null || true)
+    if [ "$c" != success ]; then
+        printf '   WARNING: the Android run %s is "%s": the beta ships without APKs (https://github.com/%s/actions/runs/%s)\n' "$id" "${c:-unknown}" "$REPO" "$id"
+        return 0
+    fi
+    mkdir -p "$dir"
+    for abi in arm64-v8a x86_64; do
+        gh run download "$id" -R "$REPO" -n "sculptforge-android-test-$abi" -D "$dir/$abi" >/dev/null 2>&1 ||
+            printf '   WARNING: no %s APK from run %s (an artifact expires after 14 days)\n' "$abi" "$id"
+    done
+    local files=()
+    while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -name '*.apk' | sort)
+    [ "${#files[@]}" -gt 0 ] || { printf '   WARNING: no APK files from run %s: the beta ships without them\n' "$id"; return 0; }
+    sums="$dir/SHA256SUMS-android.txt"
+    : > "$sums"
+    for f in "${files[@]}"; do printf '%s  %s\n' "$(sha256 "$f")" "$(basename "$f")" >> "$sums"; n=$((n + 1)); done
+    if gh release upload "$T" -R "$INSIDERS_REPO" --clobber "${files[@]}" "$sums" >/dev/null 2>&1; then
+        ok "$n Android APK(s) from run $id on $INSIDERS_REPO $T (private; SHA256SUMS-android.txt)"
+    else
+        printf '   WARNING: the APK upload to %s %s failed: the beta ships without them; %s\n' "$INSIDERS_REPO" "$T" "$(resume release)"
+    fi
+    return 0
 }
 
 # website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
@@ -940,7 +999,7 @@ step_site() {
         ok "origin/main's website/latest.json already says $V"
     else
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
-        card_ok || die "website/index.html has no 'new in $V' card and lede in What's new" "$card_fix"
+        card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
         python3 - "$V" "$HIGHLIGHTS" <<'PY'
 import json, sys
 v, notes = sys.argv[1], sys.argv[2]

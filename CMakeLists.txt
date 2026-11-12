@@ -5,7 +5,7 @@ if(APPLE)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "beta.2")
+set(SCULPTFORGE_PRERELEASE "")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -789,6 +789,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
+    add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
+    set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
@@ -960,6 +964,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
       add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
       set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
+      set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
     endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
@@ -1010,6 +1016,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # The home page says the newest release's news once (the announcement bar), not in the hero, lede and first card too.
+    add_test(NAME guide_home_news COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/home_news_test.py)
     # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
     add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
     # No system dialog or URL opens from a test or an agent's run: every SDL_Show*Dialog / SDL_OpenURL call goes
@@ -1130,6 +1138,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
     sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
     sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
+    # The undo budget in Preferences > Performance and the status line when steps are dropped (tests/ui/undo_budget.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(undo_budget_1440 undo_budget --size 1440x900)
+    sculptforge_ui_test(undo_budget_2880 undo_budget --size 2880x1800)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)

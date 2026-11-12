@@ -1,12 +1,13 @@
 {
-  "version": "0.12.10",
+  "version": "0.12.11",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)",
-    "Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)",
-    "Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)",
-    "Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge"
+    "Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before",
+    "The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy",
+    "Inflate over a Crease no longer tears the surface (#194)",
+    "Palette Knife and Nudge no longer fold the surface (#198, #199)",
+    "The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)"
   ],
   "support": {
     "founding": {
