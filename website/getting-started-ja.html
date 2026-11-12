@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SculptForge をはじめる</title>
+  <meta name="description" content="SculptForge は無料のオープンソース・スカルプトアプリです。ダウンロード、日本語の表示、最初の一体、ショートカットまでをまとめた日本語の案内です。">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=7">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SculptForge をはじめる">
+  <meta property="og:description" content="無料のオープンソース・スカルプトアプリ SculptForge の日本語ガイド。">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/getting-started-ja.html">
+  <link rel="canonical" href="https://sculptforge.app/getting-started-ja.html">
+  <link rel="alternate" hreflang="ja" href="https://sculptforge.app/getting-started-ja.html">
+  <link rel="alternate" hreflang="x-default" href="https://sculptforge.app/">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=39">
+  <script src="motion.js?v=15" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    .guide-ja > * { max-width: 720px; }
+    .guide-ja h2 { font-size: 1.25rem; margin: 40px 0 10px; }
+    .guide-ja h2:first-child { margin-top: 0; }
+    .guide-ja p, .guide-ja li { line-height: 1.9; }
+    .guide-ja kbd { font-family: inherit; font-size: 0.9em; padding: 1px 6px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 5px; }
+    .guide-ja table { border-collapse: collapse; margin: 12px 0; }
+    .guide-ja td { padding: 6px 18px 6px 0; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
+      <nav aria-label="Main">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#demos">Demos</a>
+        <a href="brushes.html">Brushes</a>
+        <a href="guide/index.html">Guide</a>
+        <a href="studios.html">For studios</a>
+        <a href="why.html">About</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="support.html">Support</a>
+        <a class="nav-dl" href="index.html#download">Download</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">はじめに</p>
+        <h1>SculptForge をはじめる</h1>
+        <p class="lede">無料のオープンソース・スカルプトアプリ。ダウンロードから最初の一体まで、ここだけで始められます。</p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap guide-ja">
+        <h2 id="download">1. ダウンロード</h2>
+        <p>Windows、macOS、Linux 用があります。アカウントも課金もライセンス認証もなく、オフラインで動きます。<a href="index.html#download">ダウンロードページ</a>から、お使いの環境のボタンを押してください。</p>
+
+        <h2 id="language">2. 日本語で使う</h2>
+        <p>コンピューターの表示言語が日本語なら、初回起動から日本語で始まります。あとから切り替えるには、<strong>Edit &gt; Preferences &gt; Interface &gt; Language</strong>（メニューは日本語表示では<strong>編集 &gt; 環境設定 &gt; インターフェース &gt; 言語</strong>）で<strong>日本語</strong>を選びます。再起動は要りません。起動直後の「ようこそ」画面の上にある言語の行からも選べます。</p>
+        <p>ブラシやツールの名前（Clay Block、Quad Remesh、Forge Spheres など）は英語のままです。日本語表示は最初の版で、ネイティブの方の確認を募集しています。不自然な言い回しを見つけたら、<a href="https://discord.gg/gWrYkEmQhH" rel="noopener">Discord</a> の #testers か<a href="https://github.com/islandmed/SculptForge/issues">GitHub の Issue</a> で教えてください。</p>
+
+        <h2 id="first">3. 最初の一体</h2>
+        <p>初めてスカルプトする方は、約10分で球からフクロウの頭を作るレッスン
+          「<a href="guide/first-sculpt.html" hreflang="en" lang="en">Your first sculpt in 10 minutes</a>」（英語）がおすすめです。アプリの <strong>Help &gt; Your first sculpt (10 min)</strong>（日本語表示では <strong>ヘルプ</strong> メニュー）からも開けます。ガイドはまだ英語のみで、画面の写真と手順の番号で進められます。</p>
+
+        <h2 id="basics">4. 基本の操作</h2>
+        <table>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>元に戻す（何度でも試せます）</td></tr>
+          <tr><td>背景をドラッグ</td><td>ビューを回転します（<kbd>Alt</kbd>+ドラッグで移動、スクロールでズーム）</td></tr>
+          <tr><td><kbd>F</kbd></td><td>モデルを画面に収めます</td></tr>
+          <tr><td><kbd>S</kbd></td><td>キャンバス上で押すと、ブラシのサイズを数字で入力できます（<kbd>[</kbd> と <kbd>]</kbd> で小さく、大きく）</td></tr>
+          <tr><td>ツールシェルフの <strong>X</strong></td><td>左右対称（シンメトリ）の切り替え。オンなら片側の操作がもう片側にも反映されます</td></tr>
+        </table>
+        <p>他のスカルプトアプリで慣れたキー操作がある方は、起動直後の画面で<strong>Classic sculpting keys</strong>を選ぶか、<strong>Edit &gt; Preferences &gt; Input</strong> で <strong>Classic</strong> にすると、定番のキーとジェスチャーで使えます。詳しくは<a href="guide/quick-tour.html" hreflang="en" lang="en">Quick tour for experienced sculptors</a>（英語）を見てください。</p>
+
+        <h2 id="community">5. コミュニティとサポート</h2>
+        <p>質問、作品の共有、不具合の報告は<a href="https://discord.gg/gWrYkEmQhH" rel="noopener">Discord</a> と<a href="https://github.com/islandmed/SculptForge/issues">GitHub</a> へ。日本語でも大丈夫です。すべての機能は無料で、<a href="support.html">メンバーシップ</a>はベータ版への参加や次の開発への投票などを加えるものです。</p>
+        <p><a href="guide/index.html" hreflang="en" lang="en">User Guide</a>（英語） ·<a href="index.html">サイトのトップへ</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="index.html"><img class="brand-wordmark" src="img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="performance/">Performance</a>
+        <a href="guide/index.html">User Guide</a>
+        <a href="brushes.html">Community brushes</a>
+        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="press.html">Press kit</a>
+        <a href="support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
+        <a href="supporters.html">Members</a>
+        <a href="terms.html">Terms</a>
+        <a href="jobs.html">Jobs</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></div>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+  <script>
+    // Our email: assembled in the browser, never present in the page source (spam scrapers). data-mail-show also
+    // shows the address as the link text, so the page reads "Email hello@..." with JavaScript on.
+    document.querySelectorAll('a[data-mail]').forEach((a) => {
+      const addr = 'hello' + '@' + 'sculptforge.app';
+      a.href = 'mailto:' + addr + '?subject=' + encodeURIComponent(a.dataset.mail);
+      a.removeAttribute('rel');
+      if (a.hasAttribute('data-mail-show')) a.textContent = addr;
+    });
+  </script>
+</body>
+</html>
