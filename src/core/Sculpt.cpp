@@ -992,14 +992,16 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const SymCopy& m = all[ci];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? p : transformed(p, m);
+        // A copy that meets a later copy's brush hands it the moved surface's normals (the plane brushes' area plane
+        // reads them): dabSingle carries them by the offset's derivative, as an adaptive dab does, and the exact ones
+        // follow below with every copy's.
+        earlyNormals_ = false;
+        if (ci + 1 < all.size() && isPlaneKernelBrush(type))
+            for (size_t cj = ci + 1; cj < all.size() && !earlyNormals_; ++cj)
+                earlyNormals_ = glm::distance(mp.center, all[cj].point(p.center)) < 2.0f * p.radius;
         if (type == BrushType::Vdm) dabVdmSingle(mesh, bvh, mp, m.handedness());
         else dabSingle(mesh, bvh, type, mp);
-        if (ci + 1 < all.size() && isPlaneKernelBrush(type) && !dabVerts_.empty()) {
-            // (a copy that meets the next one's brush: that one's plane reads the moved surface's normals)
-            bool meets = false;
-            for (size_t cj = ci + 1; cj < all.size() && !meets; ++cj) meets = glm::distance(mp.center, all[cj].point(p.center)) < 2.0f * p.radius;
-            if (meets) updateDabNormals(mesh, bvh);
-        }
+        earlyNormals_ = false;
     }
     if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh);
     if (type != BrushType::Move) repairDab(mesh, bvh);
@@ -1043,6 +1045,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         }, 65536);
         adaptiveDab_ = !masked.load();
     }
+    // The normals a later mirror copy of this dab reads, carried now (earlyNormals_); not where the exact path's rings
+    // matter (masks, an alpha, dynamic topology, the draft) or the brush isn't a plane brush.
+    const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !p.viewFalloff && !useAlpha && !useStencil &&
+                               !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
+                               mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
+    earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
     // Weighted area normal and centre of the brush region.
@@ -1207,7 +1215,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         }
         return d;
     };
-    if (!adaptiveDab_) {
+    if (!adaptiveDab_ && !analyticEarly) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);
         });
@@ -1232,7 +1240,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             for (size_t i = begin; i < end; ++i) {
                 const uint32_t v = verts_[i];
                 const glm::vec3 x = pos[v];
-                if (curvatureStamp_[v] != stamp) {
+                if (!analyticEarly && curvatureStamp_[v] != stamp) { // (an early dab's exact normals and cavity terms follow)
                     curvatureStamp_[v] = stamp;
                     curvature_[v] = kKeepCurvature; // (the GPU keeps its cavity term: no ring walk here)
                 }
