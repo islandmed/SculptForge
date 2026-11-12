@@ -166,7 +166,11 @@ int main(int argc, char** argv) {
         std::unordered_map<uint32_t, glm::vec3> movedAt;
         std::vector<double> patchMs, patchTris;
         std::vector<float> pad; // per BVH node: the most the pending dabs move any vertex of its triangles (Micro's pattern)
-        std::vector<double> padMs;
+        std::vector<double> padMs, moveMs;
+        std::vector<float> moves;
+        float padMax = 0.0f;
+        std::vector<std::span<const uint32_t>> leaves;
+        std::vector<float> leafPad;
         std::vector<uint32_t> inSphere;
         int hits = 0;
         for (int i = 0; i < dabs; ++i) {
@@ -253,9 +257,56 @@ int main(int argc, char** argv) {
                 const auto t0 = Clock::now();
                 if (pad.size() != B.bvh.nodeCount()) pad.assign(B.bvh.nodeCount(), 0.0f);
                 inSphere.clear();
-                B.bvh.queryVertices(B.mesh, gd.center, gd.radius, inSphere);
-                for (uint32_t v : inSphere) {
-                    const float m = glm::distance(ghostMove(g, B.mesh.positions[v], B.mesh.normals[v]), B.mesh.positions[v]);
+                if (!std::getenv("SF_RND_PAD_LEAF")) B.bvh.queryVertices(B.mesh, gd.center, gd.radius, inSphere);
+                // the moves in parallel (the pool: SF_THREADS), then the pad walk-up serial (it stops at the first
+                // node already as high, so it's short)
+                if (std::getenv("SF_RND_PAD_LEAF")) inSphere.clear(); // (the leaves compute their own)
+                moves.resize(inSphere.size());
+                poolFor(inSphere.size(), [&](size_t b, size_t e) {
+                    for (size_t i = b; i < e; ++i) {
+                        const uint32_t v = inSphere[i];
+                        moves[i] = glm::distance(ghostMove(g, B.mesh.positions[v], B.mesh.normals[v]), B.mesh.positions[v]);
+                    }
+                });
+                const auto t1 = Clock::now();
+                moveMs.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+                if (std::getenv("SF_RND_PAD_LEAF")) {
+                    // per leaf in the new sphere, in parallel: the most its triangles' corners move (3x redundant
+                    // moves, no scatter), then up from those leaves serially (stops early)
+                    leaves.clear();
+                    B.bvh.forEachLeafInSphere(gd.center, gd.radius, [&](std::span<const uint32_t> tris) { if (!tris.empty()) leaves.push_back(tris); });
+                    leafPad.assign(leaves.size(), 0.0f);
+                    poolFor(leaves.size(), [&](size_t b, size_t e) {
+                        for (size_t li = b; li < e; ++li) {
+                            float m = 0.0f;
+                            for (uint32_t t : leaves[li])
+                                for (int c = 0; c < 3; ++c) {
+                                    const uint32_t v = B.mesh.triangles[t][c];
+                                    m = std::max(m, glm::distance(ghostMove(g, B.mesh.positions[v], B.mesh.normals[v]), B.mesh.positions[v]));
+                                }
+                            leafPad[li] = m;
+                        }
+                    }, 16);
+                    moveMs.back() = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+                    for (size_t li = 0; li < leaves.size(); ++li)
+                        for (uint32_t node = B.bvh.leafOf(leaves[li][0]); node != ~0u && pad[node] < leafPad[li]; node = B.bvh.parentOf(node))
+                            pad[node] = leafPad[li];
+                    inSphere.clear();
+                }
+                if (std::getenv("SF_RND_PAD_SCALAR")) {
+                    // one pad: the most any pending dab moves a vertex (so far), on every leaf in a pending sphere
+                    for (float m : moves) padMax = std::max(padMax, m);
+                    for (const GhostDab& pd : g.dabs)
+                        B.bvh.forEachLeafInSphere(pd.center, pd.radius, [&](std::span<const uint32_t> tris) {
+                            if (tris.empty()) return;
+                            for (uint32_t node = B.bvh.leafOf(tris[0]); node != ~0u && pad[node] < padMax; node = B.bvh.parentOf(node))
+                                pad[node] = padMax;
+                        });
+                    inSphere.clear();
+                }
+                for (size_t i = 0; i < inSphere.size(); ++i) {
+                    const uint32_t v = inSphere[i];
+                    const float m = moves[i];
                     if (m <= 0.0f) continue;
                     for (uint32_t t : B.mesh.vertexTriangles(v))
                         for (uint32_t node = B.bvh.leafOf(t); node != ~0u && pad[node] < m; node = B.bvh.parentOf(node)) pad[node] = m;
@@ -268,6 +319,7 @@ int main(int argc, char** argv) {
                 B.bvh.refitAll(B.mesh);
                 g.dabs.clear();
                 std::fill(pad.begin(), pad.end(), 0.0f);
+                padMax = 0.0f;
             }
         }
         // SF_RND_GHOSTCMP=1 (with k >= dabs: the preview holds the whole stroke): the preview's move of every vertex vs
@@ -292,7 +344,9 @@ int main(int argc, char** argv) {
         }
         if (!padMs.empty()) {
             std::sort(padMs.begin(), padMs.end());
-            std::printf("rnd pick: pad update per placed dab (1 thread): %.1f ms p50 / %.1f max\n", padMs[padMs.size() / 2], padMs.back());
+            std::sort(moveMs.begin(), moveMs.end());
+            std::printf("rnd pick: pad update per placed dab (%d threads): %.1f ms p50 / %.1f max, of it the moves %.1f / %.1f\n",
+                        ThreadPool::shared().threads(), padMs[padMs.size() / 2], padMs.back(), moveMs[moveMs.size() / 2], moveMs.back());
         }
         if (!patchMs.empty()) {
             std::sort(patchMs.begin(), patchMs.end()), std::sort(patchTris.begin(), patchTris.end());
