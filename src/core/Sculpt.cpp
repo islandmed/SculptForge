@@ -1364,11 +1364,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         // surface pattern (Dragon Scales, Skin Pores..., #120: they sculpted plain blobs there). Planes, pinch and
         // drag aren't grid brushes.
         const float patternFreq = 1.0f / std::max(p.radius * recipe.patternScale, 1e-6f);
-        std::function<float(const glm::vec3&)> texture;
-        if (recipe.pattern != BrushRecipe::Pattern::None && recipe.patternAmount > 0.0f)
-            texture = [&recipe, patternFreq](const glm::vec3& x) {
-                return glm::mix(1.0f, samplePattern(recipe.pattern, x * patternFreq), recipe.patternAmount);
-            };
+        const bool patterned = recipe.pattern != BrushRecipe::Pattern::None && recipe.patternAmount > 0.0f;
         const bool invert = p.invert != (recipe.depth < 0.0f);
         // (Standard's 0.08 r layer per full dab against the recipe's 0.12 r * depth)
         const float strength = p.strength * std::min(1.0f, std::abs(recipe.depth) * 1.5f);
@@ -1377,6 +1373,11 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         const uint64_t pts = micro_.points;
         for (const SymCopy& m : copies(sym)) {
             const auto stencil = stencilTexture(p, m);
+            std::function<float(const glm::vec3&)> texture; // (each copy reads the pattern at its source dab's point)
+            if (patterned)
+                texture = [&recipe, patternFreq, &m](const glm::vec3& x) {
+                    return glm::mix(1.0f, samplePattern(recipe.pattern, m.inversePoint(x) * patternFreq), recipe.patternAmount);
+                };
             std::function<float(const glm::vec3&)> both = texture;
             if (stencil && texture) both = [&texture, &stencil](const glm::vec3& x) { return texture(x) * stencil(x); };
             else if (stencil) both = stencil;
@@ -1404,13 +1405,14 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? base : transformed(base, m);
-        dabRecipeSingle(mesh, bvh, recipe, mp, k);
+        dabRecipeSingle(mesh, bvh, recipe, mp, k, m);
     }
     if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh); // (as dab)
     repairDab(mesh, bvh);
 }
 
-void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy) {
+void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy,
+                               const SymCopy& m) {
     auto clock = std::chrono::steady_clock::now();
     // An alpha (if any) modulates the recipe's tip, oriented on the view-facing plane. Falloff shifts the tip
     // (0 keeps the recipe's own Hardness / Tip Sharpness), and so the alpha with it. With an alpha the region
@@ -1426,7 +1428,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     const auto& nrm = mesh.normals;
     glm::vec3 aUp = projectOnPlane(p.alphaUp, p.viewDir);
     aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
-    const glm::vec3 aRight = glm::cross(aUp, -p.viewDir);
+    // (a mirror swaps the handedness of a cross: the stamp reflects with the copy instead of turning, #197)
+    const glm::vec3 aRight = glm::cross(aUp, -p.viewDir) * m.handedness();
     auto alphaWeight = [&](const glm::vec3& x) {
         const glm::vec3 o = x - p.center;
         return p.alpha->sample(glm::dot(o, aRight) / p.radius, glm::dot(o, aUp) / p.radius);
@@ -1453,6 +1456,9 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         exponent = 1.0f;
     }
     const float patternFreq = 1.0f / std::max(rad * r.patternScale, 1e-6f);
+    // Each copy reads the pattern where its source dab does (the mirror image of the surface), so the copies match.
+    const bool copied = !m.identity();
+    auto patternAt = [&](const glm::vec3& x) { return copied ? m.inversePoint(x) : x; };
     const float focalExp = std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f));
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];
@@ -1482,7 +1488,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             }
         }
         if (r.pattern != BrushRecipe::Pattern::None && r.patternAmount > 0.0f)
-            w *= glm::mix(1.0f, samplePattern(r.pattern, pos[v] * patternFreq), r.patternAmount);
+            w *= glm::mix(1.0f, samplePattern(r.pattern, patternAt(pos[v]) * patternFreq), r.patternAmount);
         if (useAlpha) w *= alphaWeight(pos[v]);
         if (stencil.active() && w > 0.0f) w *= stencil.weight(pos[v]);
         weights_[i] = w;
