@@ -597,7 +597,7 @@ PY
     python3 tools/guide/build_site.py --app-credits >/dev/null || die "build_site.py --app-credits failed" "fix website/members-live.json, $(resume bump)"
     python3 tools/guide/build_site.py >/dev/null # the guide, and the home page's What's New area for $V (not a beta's)
     [ -n "$PRE" ] || card_ok || die "website/index.html has no 'new in $V' card after build_site.py" "$card_fix"
-    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md website/index.html docs/guide/whats-new.md
+    git add CMakeLists.txt CITATION.cff packaging/rez/package.py packaging/linux/org.sculptforge.SculptForge.metainfo.xml CHANGELOG.md README.md website/index.html docs/guide/whats-new.md
     git add website/founding.json docs/supporters.txt
     git add -A changes tests/ui/whats_new.sfui
     git add -A website/guide website/sitemap.xml # build_site.py writes both (a new guide page is a new sitemap line)
@@ -747,6 +747,39 @@ step_tag() {
     ok "pushed $T"
 }
 
+# release_body_headline: the launch headline as the first line of the GitHub release body, from the CMO's
+# ~/Work/.sf/state/launch/X.Y.Z.json ("line", optional "lede" and "link"): "**<line>.** <lede> [How it works](<link>?utm...)".
+# Skipped when the file or "line" is missing or the body already leads with it; a failure only warns, never fails the release.
+release_body_headline() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json first body
+    [ -f "$f" ] || return 0
+    first=$(python3 - "$f" "$BASE" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    line = str(d.get("line") or "").strip().rstrip(".")
+    if line:
+        out = f"**{line}.**"
+        if str(d.get("lede") or "").strip():
+            out += " " + str(d["lede"]).strip()
+        link = str(d.get("link") or "").strip()
+        if link:
+            base, hash_, frag = link.partition("#")
+            utm = "utm_source=github&utm_campaign=" + sys.argv[2].replace(".", "")
+            out += f" [How it works]({base}{'&' if '?' in base else '?'}{utm}{hash_}{frag})"
+        print(out)
+except Exception:
+    pass
+PY
+)
+    [ -n "$first" ] || return 0
+    body=$(gh release view "$T" -R "$RELEASE_REPO" --json body -q .body 2>/dev/null) || return 0
+    case $(grep -m1 '[^[:space:]]' <<<"$body" || true) in "${first%%\*\* *}"**) return 0 ;; esac
+    { printf '%s\n\n%s\n' "$first" "$body" > "$work/body.md" && gh release edit "$T" -R "$RELEASE_REPO" --notes-file "$work/body.md" >/dev/null 2>&1; } ||
+        printf '   WARNING: could not put the launch headline at the top of the %s release body\n' "$T"
+    return 0
+}
+
 step_release() {
     local assets
     assets=$(gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' 2>/dev/null || true)
@@ -771,6 +804,7 @@ step_release() {
     n=$(wc -l < "$work/assets")
     [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
+    release_body_headline
 }
 
 # website_run SHA: waits for the Website run of SHA's push. When its deploy job fails, a fresh run of the workflow
