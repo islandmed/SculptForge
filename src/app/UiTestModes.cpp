@@ -299,6 +299,7 @@ std::string Demo::writeReplay(size_t end) const {
 bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::string& error, bool& handled) {
     handled = true;
     const std::string& verb = w[0];
+    if (verb == "drag_item_to") return parseDragItemTo(line, w, error); // not in the chain: MSVC C1061 nesting limit
     if (verb == "expect_latched") {
         if (w.size() < 2) {
             error = "'expect_latched' needs none or what is latched";
