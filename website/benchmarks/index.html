@@ -134,6 +134,19 @@ sculptforge --benchmark core-100m      # micro levels, 104M micro triangles</cod
     Colours: green within a 60 Hz frame (16.7 ms), amber within two, red slower. Raw data:
     <a href="results.json">results.json</a>.</p>
 
+  <h2 id="sizes">Dab time and view speed by mesh size</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Mesh</th><th class="num">One dab, medium brush (ms)</th><th class="num">One dab, large brush (ms)</th><th class="num">Turning the view, 4x antialiasing (fps)</th><th class="num">Turning the view, Fast Navigation (fps)</th></tr></thead>
+    <tbody>
+      <tr><td>4 million triangles</td><td class="num">2.9 (2.9 to 3.0)</td><td class="num">7.2</td><td class="num">1960 (1887 to 1980)</td><td class="num">5554 (5141 to 5584)</td></tr>
+      <tr><td>16 million triangles</td><td class="num">5.2 (5.0 to 5.3)</td><td class="num">18.3</td><td class="num">1137 (1129 to 1143)</td><td class="num">2633 (2553 to 2691)</td></tr>
+      <tr><td>33 million triangles</td><td class="num">8.3 (7.5 to 13.1)</td><td class="num">37.5</td><td class="num">724 (722 to 725)</td><td class="num">2345 (2238 to 2371)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="small muted">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="raw/bench-sizes-1.md">run 1</a>, <a href="raw/bench-sizes-2.md">run 2</a>, <a href="raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure.</p>
+
   <h2 id="submit">Submit your result</h2>
   <div class="grid2">
     <div class="card">

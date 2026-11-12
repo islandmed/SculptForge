@@ -208,6 +208,19 @@
           </div>
           <p class="note">Every figure is the median of three runs of <code>sculptforge --benchmark</code> on the release build of the main branch (the development build, commit 308f83c, after 0.12.10; not yet a released version, no video recording), run on 2026-11-12, one at a time, with no other test running on the machine. Each row links to the three raw result files exactly as the program wrote them (hardware as the program reports it) and to its rows in the results table. The scenes are built from a formula, so they are identical on every computer and anyone can repeat them. Earlier figures that rested on a scan we cannot redistribute (the Lucy orbit, the 28M frame times and the 112M stroke times) were removed; a number returns here when it has a public scene and a raw result. The entry-level rows are the simulated tier on an Apple M1 Pro laptop: the setting limits what the app may use (memory, detail, OpenGL 3.3), not how fast the laptop is, so some rows read faster than the desktop and real entry-level hardware will be slower. They are listed because they exercise the budgets, not as a prediction for a particular computer.</p>
 
+          <h3>Sculpting and turning the view, by mesh size</h3>
+          <div class="tscroll" tabindex="0" role="region" aria-label="Dab time and view speed by mesh size, scrolls sideways">
+          <table class="t">
+    <thead><tr><th>Mesh</th><th class="n">One dab, medium brush (ms)</th><th class="n">One dab, large brush (ms)</th><th class="n">Turning the view, 4x antialiasing (fps)</th><th class="n">Turning the view, Fast Navigation (fps)</th></tr></thead>
+    <tbody>
+      <tr><td>4 million triangles</td><td class="n">2.9 (2.9 to 3.0)</td><td class="n">7.2</td><td class="n">1960 (1887 to 1980)</td><td class="n">5554 (5141 to 5584)</td></tr>
+      <tr><td>16 million triangles</td><td class="n">5.2 (5.0 to 5.3)</td><td class="n">18.3</td><td class="n">1137 (1129 to 1143)</td><td class="n">2633 (2553 to 2691)</td></tr>
+      <tr><td>33 million triangles</td><td class="n">8.3 (7.5 to 13.1)</td><td class="n">37.5</td><td class="n">724 (722 to 725)</td><td class="n">2345 (2238 to 2371)</td></tr>
+    </tbody>
+  </table>
+          </div>
+          <p class="note">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="../benchmarks/raw/bench-sizes-1.md">run 1</a>, <a href="../benchmarks/raw/bench-sizes-2.md">run 2</a>, <a href="../benchmarks/raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure. The same table is on <a href="../benchmarks/#sizes">Benchmarks</a>.</p>
+
           <h3>Micro levels: hundreds of millions of polygons</h3>
           <ul class="facts">
             <li>A micro level stores one 16-bit height per grid point on each triangle of the highest subdivision level, and the micro triangles are worked out on the fly. Micro levels 3 to 7 give 64 to 16,384 micro triangles per base triangle, at 1.4 to 1.05 bytes per micro triangle. Measured: the 201-million-micro-triangle scene peaks at 1.2 GB of RAM for the whole application (first table).</li>
