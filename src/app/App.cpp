@@ -1829,8 +1829,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
+        // (Nor while the S / U / I / O pop-up follows the pointer: that click keeps or cancels the value.)
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
-            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y))) {
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this)) {
             mouseClicks_ = e.button.clicks;
             onMouseDown(e.button.x, e.button.y, e.button.button);
             mouseClicks_ = 1;
@@ -3368,9 +3369,12 @@ void App::generateLods() {
 }
 
 void App::clearLods() {
+    // The LODs go; the shown mesh changes only when one was previewed. Otherwise syncScene keeps sending just what
+    // changed (an undo on a 6M triangle mesh was a full upload and proxy rebuild each, half a second, #181).
+    const bool previewed = previewLod_ >= 0;
     lods_.clear();
     previewLod_ = -1;
-    lastDisplayed_ = nullptr;
+    if (previewed) lastDisplayed_ = nullptr;
 }
 
 void App::updateTitle() {
@@ -4867,8 +4871,11 @@ void App::drawBrushCursor() {
     if (sizeRingPreview_) {
         at = glm::vec2(opened.x, opened.y);
         if (which == PickerUi::Slider::DrawSize) r = value;
-        else focal = value;
+        else if (which == PickerUi::Slider::FocalShift) focal = value;
+        else r = radiusPx_; // Intensity: the ring keeps the size, the disc inside it is the strength
         sizeRingPreviewPx_ = r;
+        sizeRingPreviewValue_ = value;
+        sizeRingPreviewIntensity_ = which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity;
     }
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
@@ -4902,6 +4909,18 @@ void App::drawBrushCursor() {
             dl->AddCircle(c, r * focalRingFraction(focal), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
+        }
+    }
+    if (sizeRingPreview_) {
+        // While a pop-up sets it, the ring must read on any model and in both themes: a dark halo under a full-strength
+        // ring, flat on the screen (the surface ring above lies on the model and can be faint at a glancing angle).
+        const ImU32 solid = (col & 0x00ffffff) | 0xff000000;
+        dl->AddCircle(c, r, IM_COL32(0, 0, 0, 170), 64, 4.0f * uiScale_);
+        dl->AddCircle(c, r, solid, 64, 2.0f * uiScale_);
+        if (sizeRingPreviewIntensity_) { // Intensity: a disc whose radius is the strength, an opacity ring at its rim
+            const float rr = r * std::clamp(sizeRingPreviewValue_, 0.0f, 1.0f);
+            dl->AddCircleFilled(c, rr, (solid & 0x00ffffff) | (150u << 24), 64);
+            dl->AddCircle(c, rr, IM_COL32(255, 255, 255, 230), 64, 1.5f * uiScale_);
         }
     }
     // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
