@@ -28,7 +28,8 @@ removes the action's two-key shortcuts and leaves its single keys.
 - It has to be a different key: the same key twice is not a sequence.
 - A key that is part of a two-key shortcut and is also bound on its own still works: it waits that window and runs by
   itself when its partner does not come. A key with no shortcut of its own does nothing alone. Keys that are in no
-  two-key shortcut run at once.
+  two-key shortcut run at once. The wait is the Two-key window, so keys you press alone all day answer a little late when they
+  are part of a two-key shortcut: pick other keys for those, or set the window to its shortest.
 - Either key can carry <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd>.
 
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
