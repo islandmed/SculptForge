@@ -133,6 +133,11 @@ static class KeyDrive {
             Thread.Sleep(9000); // (first frame, the default model, the welcome popup if any)
             ShowWindow(h, 3);
             SetForegroundWindow(h); Thread.Sleep(1500);
+            if (GetForegroundWindow() != h) { // never send clicks and keys into whatever else has the desktop
+                report.AppendLine(name + ": NOT FOREGROUND (case skipped, nothing sent)");
+                try { p.Kill(); p.WaitForExit(5000); } catch { }
+                continue;
+            }
             RECT rc; GetWindowRect(h, out rc);
             // The first-run membership card is modal and takes every key: "Not now" (0.736, 0.834 of the window) closes it.
             SetCursorPos(rc.L + (int)((rc.R - rc.L) * 0.736), rc.T + (int)((rc.B - rc.T) * 0.834)); Thread.Sleep(300);
@@ -142,6 +147,11 @@ static class KeyDrive {
             mouse_event(2, 0, 0, 0, IntPtr.Zero); Thread.Sleep(60); mouse_event(4, 0, 0, 0, IntPtr.Zero); Thread.Sleep(1200);
             SetCursorPos(rc.L + 10, rc.B - 10); // (off the model: Pick colour finds nothing)
             bool fg = GetForegroundWindow() == h;
+            if (!fg) { // (a click on the way took the focus: no keys then either)
+                report.AppendLine(name + ": NOT FOREGROUND (case skipped before its keys)");
+                try { p.Kill(); p.WaitForExit(5000); } catch { }
+                continue;
+            }
             var before = Mean(Shot(h, Path.Combine(outDir, name + "-before.png")));
             if (name.StartsWith("lat")) {
                 report.AppendLine(name + ": key down -> swap on screen (ms): " + Latency(name, h));
