@@ -4937,6 +4937,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "曲线转管"},
     {"Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: twisted ribbons, beams and ropes.",
      "沿管逐渐多转一些截面，到末端时共转了这么多度：扭转的缎带、横梁和绳索。"},
+    {"Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley twist.",
+     "让截面持续旋转，每个管半径的长度转这么多度：螺纹、麻花。"},
     {"Spread", "展开"},
     {"Spread %.2f", "展开 %.2f"},
     {"Wall", "管壁"},
