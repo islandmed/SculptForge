@@ -133,8 +133,20 @@ and `v*` tags only:
    `verify` also refuses staged Windows packages without a signature when `SIGNING=signpath` (`verify_staged.py
    --require-signed`), so a run staged before the switch can't be promoted unsigned: use `--rebuild`.
 
-Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`, optionally
-`SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
+SignPath artifact configurations (project SculptForge; both zips are flat, files at the root):
+`binaries` = `<zip-file><pe-file-set><include path="*.exe" max-matches="unbounded"/><include path="*.dll" min-matches="0"
+max-matches="unbounded"/><for-each><authenticode-sign/></for-each></pe-file-set></zip-file>` and `installer` =
+`<zip-file><pe-file path="SculptForge-*.exe"><authenticode-sign/></pe-file></zip-file>` (inside the usual
+`<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">`).
+
+**Test signing** (a policy `test-signing` with a self-signed "SculptForge Test" certificate, looks worse to users than
+unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
+do it (check_workflows.py), the notice says `Windows: test-signed (not for release ...)`, `verify_signed.ps1 -Test` accepts the
+untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
+`release.sh --stage` and `verify_staged.py --require-signed` refuse the test certificate anyway).
+
+Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
+`SIGNPATH_TEST_POLICY_SLUG`, `SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
 secret, read only by the two signing steps, which run only when `SIGN` is true; the workflow never runs on pull requests or
 `t0/**`; release.yml passes it to the `--rebuild` call of packages.yml). Pinned action, token and gating are enforced by
 check_workflows.py. The intermediate artifacts are named `signing-*` (never `windows*`: job sums and verify take those

@@ -669,6 +669,7 @@ signing_state() {
     [ -z "$jid" ] || line=$(gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1)
     want=$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)
     ok "${line:-Windows: signing state unknown (no note in the Windows job: its packages were reused from an earlier run?)}"
+    case "$line" in "Windows: test-signed"*) return 1 ;; esac # SignPath's self-signed test certificate never goes into a release
     [ "$want" != signpath ] || case "$line" in "Windows: signed"*) ;; *) return 1 ;; esac
 }
 step_stage() {
@@ -725,7 +726,7 @@ step_stage() {
             "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
     fi
     ok "Packages run $id built every package for ${sha:0:8}"
-    signing_state "$id" || die "SIGNING=signpath, but the Windows packages of run $id are unsigned" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
+    signing_state "$id" || die "the Windows packages of run $id are not release-signed (SIGNING=signpath wants \"Windows: signed\"; a test-signed run never ships)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
     echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
 }
 

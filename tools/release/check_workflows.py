@@ -113,6 +113,14 @@ def check_signing(pk):
         if len(sign) != 1 or "vars.SIGNING == 'signpath'" not in sign[0] or "refs/heads/main" not in sign[0] \
                 or "refs/heads/staging" not in sign[0] or "pull_request" in sign[0] or "t0/" in sign[0]:
             errs.append("packages.yml: job windows needs env SIGN limited to vars.SIGNING == 'signpath' on main, staging and tags")
+        # SignPath's test policy (self-signed certificate: worse than unsigned for users) is only for a maintainer's dispatch
+        for l in lines:
+            if re.search(r"test-signing|SIGNPATH_TEST_POLICY_SLUG|sign_test", l) and not l.lstrip().startswith("#") \
+                    and re.match(r"^      (SIGN|SIGN_TEST|SIGN_POLICY):", l) \
+                    and "github.event_name == 'workflow_dispatch' && inputs.sign_test == true" not in l:
+                errs.append("packages.yml: the SignPath test policy / sign_test must be limited to github.event_name == 'workflow_dispatch'")
+        if "SIGN_POLICY" in body and not any(re.match(r"^      SIGN_POLICY:", l) for l in lines):
+            errs.append("packages.yml: job windows uses SIGN_POLICY without defining it")
         steps = re.split(r"\n(?=      - )", body)
         actions = 0
         for st in steps:
@@ -493,6 +501,10 @@ def self_test():
         "signing no summary": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("title=Windows signing", "title=x")}, 1),
         "signing also on other refs": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "startsWith(github.ref, 'refs/tags/v')", "startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'")}, 1),
+        "signing test policy on every event": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      SIGN: ${{", "      SIGN_POLICY: ${{ vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing' }}\n      SIGN: ${{")}, 1),
+        "signing test via dispatch": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      SIGN: ${{ vars.SIGNING == 'signpath'", "      SIGN_POLICY: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) && 'test-signing' || 'x' }}\n      SIGN: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) || vars.SIGNING == 'signpath'")}, 0),
         "signing without the variable": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("vars.SIGNING == 'signpath' && ", "")}, 1),
         "signing on pull requests": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "    branches: [main, staging]\n", "    branches: [main, staging]\n  pull_request:\n")}, 1),

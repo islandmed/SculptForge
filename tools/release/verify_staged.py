@@ -79,15 +79,33 @@ def check_attestation(path, repo, run, sha, staged, ref="refs/heads/staging"):
 
 def pe_signed(data):
     """True when a PE file has an Authenticode certificate table (data directory 4). Presence only: packages.yml's
-    Windows job verified the signatures; this catches packages that were never signed."""
+    Windows job verified the signatures; this catches packages that were never signed (or test-signed)."""
+    return pe_cert(data) is not None
+
+
+def pe_cert(data):
+    """The bytes of a PE file's Authenticode certificate table (the whole file needed), or None."""
     if data[:2] != b"MZ" or len(data) < 0x40:
-        return False
+        return None
     pe = int.from_bytes(data[0x3C:0x40], "little")
     if data[pe:pe + 4] != b"PE\0\0":
-        return False
+        return None
     opt = pe + 24
     entry = opt + (112 if int.from_bytes(data[opt:opt + 2], "little") == 0x20B else 96) + 4 * 8
-    return int.from_bytes(data[entry:entry + 4], "little") > 0 and int.from_bytes(data[entry + 4:entry + 8], "little") > 0
+    off, size = int.from_bytes(data[entry:entry + 4], "little"), int.from_bytes(data[entry + 4:entry + 8], "little")
+    return data[off:off + size] if off > 0 and size > 0 else None
+
+
+TEST_CERTS = (b"SculptForge Test", "SculptForge Test".encode("utf-16-be"))  # SignPath's test policy: a self-signed certificate, never for a release
+
+
+def signed_problem(name, data):
+    cert = pe_cert(data)
+    if cert is None:
+        return [f"{name}: not code-signed (SIGNING=signpath: rebuild the packages, release.sh --rebuild)"]
+    if any(t in cert for t in TEST_CERTS):
+        return [f"{name}: signed with SignPath's TEST certificate (self-signed, not for release)"]
+    return []
 
 
 def check_signed(dist):
@@ -97,21 +115,19 @@ def check_signed(dist):
         if "windows" not in p.name:
             continue
         if p.suffix == ".exe":
-            with open(p, "rb") as f:
-                if not pe_signed(f.read(4096)):
-                    errs.append(f"{p.name}: not code-signed (SIGNING=signpath: rebuild the packages, release.sh --rebuild)")
+            errs += signed_problem(p.name, p.read_bytes())
         elif p.suffix in (".zip", ".mcpb"):
             with zipfile.ZipFile(p) as z:
                 exes = [n for n in z.namelist() if n.lower().endswith(".exe")]
                 if not exes:
                     errs.append(f"{p.name}: holds no .exe to check")
-                errs += [f"{p.name}: {n} is not code-signed (SIGNING=signpath: rebuild the packages, release.sh --rebuild)"
-                         for n in exes if not pe_signed(z.read(n))]
+                for n in exes:
+                    errs += signed_problem(f"{p.name}: {n}", z.read(n))
     return errs
 
 
-def fake_pe(signed, pe32plus=True):
-    """A PE header with just enough in it for pe_signed (self-test)."""
+def fake_pe(signed, pe32plus=True, cert=b"CN=SculptForge Team"):
+    """A PE header with just enough in it for pe_signed (self-test); the certificate table is `cert`."""
     b = bytearray(0x200)
     b[:2] = b"MZ"
     b[0x3C:0x40] = (0x80).to_bytes(4, "little")
@@ -120,7 +136,8 @@ def fake_pe(signed, pe32plus=True):
     b[opt:opt + 2] = (0x20B if pe32plus else 0x10B).to_bytes(2, "little")
     entry = opt + (112 if pe32plus else 96) + 32
     if signed:
-        b[entry:entry + 8] = (0x1000).to_bytes(4, "little") + (0x2000).to_bytes(4, "little")
+        b[entry:entry + 8] = (0x200).to_bytes(4, "little") + len(cert).to_bytes(4, "little")
+        b += cert
     return bytes(b)
 
 
@@ -165,6 +182,8 @@ def self_test():
             "zip exe unsigned": (signed, unsigned, signed, 1),
             "mcpb exe unsigned": (signed, signed, unsigned, 1),
             "all unsigned": (unsigned, unsigned, unsigned, 3),
+            "installer test-signed": (fake_pe(True, cert=b"CN=SculptForge Test"), signed, signed, 1),
+            "mcpb exe test-signed": (signed, signed, fake_pe(True, cert=b"x CN=SculptForge Test x"), 1),
         }.items():
             dd = Path(d) / name.replace(" ", "_")
             dd.mkdir()
