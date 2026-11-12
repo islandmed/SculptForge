@@ -24,6 +24,7 @@ printf 'Reference images: front and side drawings in the view\nsecond line\nthir
 # 1. no headline file: a WARNING naming the file, the CMO is prompted, the stage goes on
 out=$(headline_check) || fail "a missing headline failed the stage"
 grep -q "WARNING: no launch headline for 9.9.9 ($S/launch/9.9.9.json missing)" <<<"$out" || fail "no warning: $out"
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do [ -s "$S/herdr.log" ] && break; sleep 0.5; done  # herdr runs in the background
 grep -q "^agent prompt cmo pick the 9.9.9 headline" "$S/herdr.log" || fail "the CMO was not prompted: $(cat "$S/herdr.log" 2>&1)"
 
 # 2. every keyword present (case-insensitive) in both: silence, no prompt

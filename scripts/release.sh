@@ -313,7 +313,8 @@ headline_check() {
     local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json kws k line tag miss said
     if [ ! -f "$f" ]; then
         printf '   WARNING: no launch headline for %s (%s missing): the CMO picks it with launch.py headline %s "..." KEYWORD...\n' "$V" "$f" "$V"
-        timeout 5 herdr agent prompt cmo "pick the $V headline: ~/Work/.sf/launch.py headline $V \"<one line>\" KEYWORD... (the release stage is running)" >/dev/null 2>&1 || true
+        # In the background, not under timeout(1): macOS has none, and a stuck herdr must not hold the stage.
+        { herdr agent prompt cmo "pick the $V headline: ~/Work/.sf/launch.py headline $V \"<one line>\" KEYWORD... (the release stage is running)" >/dev/null 2>&1 & } 2>/dev/null || true
         return 0
     fi
     kws=$(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1])).get("keywords", [])))' "$f" 2>/dev/null) ||
