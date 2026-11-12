@@ -334,7 +334,7 @@ TEST(tube_profiles_watertight) {
             TubeShape s = curvy();
             s.profile = p;
             s.flatCaps = variant & 1;
-            s.roll = (variant & 2) ? 30.0f : 0.0f;
+            s.spin = (variant & 2) ? 30.0f : 0.0f;
             if (variant & 4) s.taperStart = 0.3f, s.taperEnd = 0.9f; // (over 1 together: shared out)
             for (bool uniform : {false, true}) {
                 const Mesh m = tubeSweep(s, uniform);
@@ -375,7 +375,7 @@ TEST(tube_profile_outlines) {
         if (v.x > 0.5f && v.x < 1.5f) ymax = std::max(ymax, std::abs(v.y)), zmax = std::max(zmax, std::abs(v.z));
     CHECK(std::abs(ymax - 0.02f) < 1e-4f && zmax > 0.097f && zmax < 0.1001f); // (no vertex need sit on the round tip)
     // Turned 90 degrees, it is thin across instead.
-    s.roll = 90.0f;
+    s.spin = 90.0f;
     m = tubeSweep(s);
     ymax = zmax = 0.0f;
     for (const vec3& v : m.positions)
@@ -399,7 +399,7 @@ TEST(tube_profile_mirror_exact) {
     TubeShape s = curvy();
     for (TubePoint& p : s.points) p.position.x += 1.0f;
     s.profile = TubeShape::Profile::Triangle;
-    s.roll = 25.0f;
+    s.spin = 25.0f;
     s.up = vec3(0.3f, 1.0f, 0.2f);
     s.taperEnd = 0.4f;
     TubeShape one = s;
@@ -456,7 +456,7 @@ TEST(tube_profile_commands_and_project) {
                                         {"profile", std::string("ribbon")}, {"thickness", 0.3}, {"turn", 15.0},
                                         {"taper_start", 0.2}, {"up", std::string("0,0,1")}}).ok);
     doc.selectPart(1);
-    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Ribbon && doc.mesh.tube.roll == 15.0f);
+    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Ribbon && doc.mesh.tube.spin == 15.0f);
     CHECK(reg.execute(doc, "tube_set", {{"profile", std::string("square")}, {"taper_end", 0.5}}).ok);
     CHECK(doc.mesh.tube.profile == TubeShape::Profile::Square && doc.mesh.tube.taperEnd == 0.5f && watertight(doc.mesh));
     CHECK(!reg.execute(doc, "tube_set", {{"thickness", 2.0}}).ok);
@@ -469,7 +469,7 @@ TEST(tube_profile_commands_and_project) {
     Document back;
     CHECK(loadProject(path, back, err));
     const TubeShape& t = back.partMesh(1).tube;
-    CHECK(t.profile == TubeShape::Profile::Ribbon && std::abs(t.thickness - 0.3f) < 1e-6f && t.roll == 15.0f &&
+    CHECK(t.profile == TubeShape::Profile::Ribbon && std::abs(t.thickness - 0.3f) < 1e-6f && t.spin == 15.0f &&
           std::abs(t.taperStart - 0.2f) < 1e-6f && t.up == vec3(0, 0, 1));
     back.selectPart(1);
     CHECK(tubeMatchesMesh(back.mesh));
@@ -546,7 +546,7 @@ TEST(tube_resample_exact_count_even_spacing) {
     CHECK(tubeResample({{vec3(1), 0.1f}, {vec3(1), 0.1f}}, 5).empty());
 }
 
-TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
+TEST(tube_twist_turns_the_profile_along_the_length_and_spin_turns_it_about_the_curve) {
     const float tol = 0.02f;
     TubeShape s = squareLine();
     const double start = cornerAngle(tubeSweep(s), 0.0f, tol);
@@ -557,10 +557,11 @@ TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
     const double half = quarterDiff(cornerAngle(m, 1.0f, tol), start), end = quarterDiff(cornerAngle(m, 2.0f, tol), start);
     CHECK(std::abs(std::abs(end) - 30.0) < 1.5);                 // the whole twist at the end
     CHECK(std::abs(half - end / 2.0) < 1.5 && half * end > 0.0); // linear along the length
-    // Spin: degrees per radius of length (0.25): 20 degrees at x = 0.5 is 40.
+    // Spin (the old Turn): the same turn all along, 20 degrees at x = 0.5 as at the ends.
     TubeShape p = squareLine();
     p.spin = 20.0f;
-    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 0.5f, tol), start)) - 40.0) < 1.5);
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 0.5f, tol), start)) - 20.0) < 1.5);
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 1.5f, tol), start)) - 20.0) < 1.5);
     // Twist the other way for the mirror copy: the X mirror of a twisted tube is its mirror image.
     TubeShape q = squareLine();
     q.twist = 40.0f;
@@ -576,7 +577,6 @@ TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
     }
     // No twist and no spin: exactly the old sweep.
     TubeShape plain = squareLine();
-    plain.roll = 10.0f;
     CHECK(tubeSweep(plain).positions == tubeSweep([&] { TubeShape x = plain; x.twist = x.spin = 0.0f; return x; }()).positions);
 }
 
@@ -616,15 +616,6 @@ TEST(tube_profiles_rope_braid_sleeve) {
     tw.twist = 90.0f;
     const Mesh t0 = tubeSweep(line(L, R)), t1 = tubeSweep(tw);
     CHECK(watertight(t1) && t1.vertexCount() > 0 && t0.vertexCount() > 0);
-    // Braid: wide across, shallow in depth (the first ring's normal is automatic, so look at both axes).
-    TubeShape br = line(L, R);
-    br.profile = TubeShape::Profile::Braid;
-    br.up = vec3(0, 0, 1);
-    m = tubeSweep(br);
-    CHECK(watertight(m) && oriented(m) && components(m) == 3);
-    float across = 0.0f, deep = 0.0f;
-    for (const vec3& p : m.positions) across = std::max(across, std::abs(p.y)), deep = std::max(deep, std::abs(p.z));
-    CHECK(across > 0.97f * R && across < 1.01f * R && deep < 0.8f * R);
     // A one-point rope or sleeve is just a ball.
     TubeShape ball;
     ball.points = {{vec3(0), 0.2f}};
@@ -702,24 +693,109 @@ bool insideStrand(const Mesh& m, const std::vector<uint32_t>& triangles, const v
 
 } // namespace
 
-TEST(tube_braid_strands_pass_over_and_under) {
-    // The strands of a braid weave: no vertex of one strand lies inside another (they interlock, they don't merge).
-    for (int count : {3, 5}) {
-        TubeShape br = line(3.0f, 0.25f);
-        br.profile = TubeShape::Profile::Braid;
-        br.strands = count;
-        const Mesh m = tubeSweep(br);
-        const std::vector<uint32_t> strand = strandOf(m);
-        CHECK(watertight(m) && oriented(m) && components(m) == count);
-        std::map<uint32_t, std::vector<uint32_t>> own; // each strand's triangles
-        for (size_t i = 0; i < m.triangles.size(); ++i) own[strand[m.triangles[i].x]].push_back(uint32_t(i));
-        int inside = 0;
-        const size_t stride = m.positions.size() / 300 + 1;
-        for (size_t i = 0; i < m.positions.size(); i += stride)
-            for (const auto& [id, triangles] : own)
-                if (id != strand[i] && insideStrand(m, triangles, m.positions[i])) ++inside;
-        CHECK(inside == 0);
+// A braid's strands: round, two by default in the panel, winding round the centre line; Spread opens and closes the weave.
+TEST(tube_braid_invariant_round_strands_follow_spread) {
+    const float R = 0.25f, L = 4.0f, pi = 3.14159265f;
+    float lastOrbit = -1.0f, lastPitch = -1.0f;
+    for (float spread : {0.0f, 0.25f, 0.5f, 1.0f}) {
+        for (int count : {2, 3}) {
+            const BraidLayout lay = braidLayout(count, spread, R);
+            CHECK(lay.radius > 0.0f && std::abs(lay.orbit + lay.radius - R) < 1e-6f); // reaches the tube's radius, no further
+            if (count == 2) {
+                CHECK(lay.orbit > lastOrbit && lay.pitch > lastPitch); // looser: further out, longer turns
+                lastOrbit = lay.orbit, lastPitch = lay.pitch;
+            }
+            if (spread == 0.0f) CHECK(lay.orbit * std::sin(pi / float(count)) / lay.radius < 1.2f && lay.orbit * std::sin(pi / float(count)) >= lay.radius); // neighbours all but touch
+            TubeShape br = line(L, R);
+            br.profile = TubeShape::Profile::Braid;
+            br.strands = count;
+            br.spread = spread;
+            const Mesh m = tubeSweep(br);
+            CHECK(watertight(m) && oriented(m) && components(m) == count);
+            float reach = 0.0f, inner = 1e9f;
+            bool finite = true;
+            for (const vec3& p : m.positions) {
+                finite = finite && std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+                reach = std::max(reach, std::hypot(p.y, p.z)), inner = std::min(inner, std::hypot(p.y, p.z));
+            }
+            CHECK(finite);
+            CHECK(reach < R * 1.01f && reach > R * 0.97f);
+            CHECK(std::abs(inner - std::max(0.0f, lay.orbit - lay.radius)) < 0.03f * R); // offset follows Spread
+            // Round: the strands' volume is that of circular tubes along the helix (pi r^2 times its length), within the
+            // faceting of the rings (and the ends' caps).
+            const float helix = L * std::sqrt(1.0f + std::pow(2.0f * pi * lay.orbit / lay.pitch, 2.0f));
+            const double expected = double(count) * pi * lay.radius * lay.radius * helix;
+            CHECK(std::abs(signedVolume(m) / expected - 1.0) < 0.06);
+        }
     }
+}
+
+TEST(tube_braid_invariant_strands_pass_over_and_under) {
+    // The strands of a braid weave: no vertex of one strand lies inside another (they interlock, they don't merge), at the
+    // tightest spread (touching) as well as loose.
+    for (int count : {2, 3, 5}) {
+        for (float spread : {0.0f, 0.5f, 1.0f}) {
+            TubeShape br = line(3.0f, 0.25f);
+            br.profile = TubeShape::Profile::Braid;
+            br.strands = count;
+            br.spread = spread;
+            const Mesh m = tubeSweep(br);
+            const std::vector<uint32_t> strand = strandOf(m);
+            CHECK(watertight(m) && oriented(m) && components(m) == count);
+            std::map<uint32_t, std::vector<uint32_t>> own; // each strand's triangles
+            for (size_t i = 0; i < m.triangles.size(); ++i) own[strand[m.triangles[i].x]].push_back(uint32_t(i));
+            int inside = 0;
+            const size_t stride = m.positions.size() / 300 + 1;
+            for (size_t i = 0; i < m.positions.size(); i += stride)
+                for (const auto& [id, triangles] : own)
+                    if (id != strand[i] && insideStrand(m, triangles, m.positions[i])) ++inside;
+            if (inside) std::printf("  braid %d strands, spread %.1f: %d vertices inside another strand\n", count, spread, inside);
+            CHECK(inside == 0);
+        }
+    }
+}
+
+TEST(tube_braid_invariant_bend_twist_taper_closed_and_finite) {
+    // A curved, tapered, twisted braid stays closed, finite and inside the tube; old saves (no new fields) still load.
+    TubeShape br;
+    br.points = {{vec3(0, 0, 0), 0.2f}, {vec3(1, 0.6f, 0), 0.2f}, {vec3(2, 0.6f, 0.8f), 0.2f}, {vec3(3, 0, 1), 0.2f}};
+    br.profile = TubeShape::Profile::Braid;
+    br.strands = 2;
+    br.spread = 0.0f;
+    br.twist = 180.0f;
+    br.spin = 20.0f;
+    br.taperEnd = 0.5f;
+    for (float spread : {0.0f, 1.0f}) {
+        br.spread = spread;
+        const Mesh m = tubeSweep(br);
+        CHECK(m.vertexCount() > 0 && watertight(m) && components(m) == 2);
+        bool finite = true;
+        for (const vec3& p : m.positions) finite = finite && std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        CHECK(finite);
+    }
+    CHECK(tubeFromJson(tubeToJson(br)).profile == TubeShape::Profile::Braid);
+}
+
+TEST(tube_spin_replaces_turn_in_saved_scenes) {
+    // An old scene: Turn was saved as "roll" and the old per-length Spin as "spin". Turn loads as Spin; the old Spin is dropped.
+    Json old = Json::object();
+    old.set("profile", std::string("braid"));
+    old.set("roll", 30.0);
+    old.set("spin", 50.0);
+    Json points = Json::array();
+    for (double v : {0.0, 0.0, 0.0, 0.1, 1.0, 0.0, 0.0, 0.1}) points.push(v);
+    old.set("points", std::move(points));
+    TubeShape s = tubeFromJson(old);
+    CHECK(s.spin == 30.0f);
+    TubeShape again = tubeFromJson(tubeToJson(s));
+    CHECK(again.spin == 30.0f);
+    // The command accepts the new name and the old one.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,0,0")}, {"radius", 0.1}, {"profile", std::string("braid")}, {"spin", 40.0}}).ok);
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.spin == 40.0f);
+    CHECK(reg.execute(doc, "tube_set", {{"turn", 10.0}}).ok && doc.mesh.tube.spin == 10.0f);
 }
 
 TEST(tube_rope_strand_count_and_spring) {

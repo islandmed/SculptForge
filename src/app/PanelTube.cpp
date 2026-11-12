@@ -86,7 +86,13 @@ void App::registerTubeUiActions() {
     const auto profile = [this](TubeShape::Profile p) {
         return [this, p] {
             tubeLook_.profile = p;
-            if (tubeActive()) runCommand("tube_set", {{"profile", std::string(tubeProfileName(p))}});
+            // A braid is two strands to begin with; a rope or a count set by hand is kept.
+            const bool braidTwo = p == TubeShape::Profile::Braid && (tubeActive() ? doc_.mesh.tube.strands : tubeLook_.strands) == 3;
+            if (braidTwo) tubeLook_.strands = 2;
+            if (tubeActive()) {
+                if (braidTwo) runCommand("tube_set", {{"profile", std::string(tubeProfileName(p))}, {"strands", 2.0}});
+                else runCommand("tube_set", {{"profile", std::string(tubeProfileName(p))}});
+            }
         };
     };
     const auto isProfile = [this](TubeShape::Profile p) {
@@ -109,8 +115,8 @@ void App::registerTubeUiActions() {
         "Spin turn them (for new tubes, and the active Tube Part).",
         "tube_set");
     add("tube.profile_braid", "Braid", profile(TubeShape::Profile::Braid), nullptr, isProfile(TubeShape::Profile::Braid),
-        "Three flat strands woven across each other: plaits, straps, braided hair (for new tubes, and the active Tube "
-        "Part). Spread sets how far apart the strands are.",
+        "Round strands twisted over and under each other, two by default: braided cord, plaits, hair (for new tubes, "
+        "and the active Tube Part). Spread sets how tight the weave is: 0 packs the strands together, 1 opens it up.",
         "tube_set");
     add("tube.profile_sleeve", "Sleeve", profile(TubeShape::Profile::Sleeve), nullptr, isProfile(TubeShape::Profile::Sleeve),
         "A hollow tube with open ends: sleeves, pipes, bracelets, hoses (for new tubes, and the active Tube Part). "
@@ -391,17 +397,19 @@ void App::drawTubeShapeControls(float full) {
     if (shown.profile == TubeShape::Profile::Ribbon)
         slider("##tubethick", &TubeShape::thickness, 0.05f, 1.0f, "Thickness %.2f", "thickness", "Thickness",
                "How thick the ribbon is, as a fraction of its width.");
-    if (shown.profile != TubeShape::Profile::Round)
-        slider("##tuberoll", &TubeShape::roll, -180.0f, 180.0f, "Turn %.0f\xc2\xb0", "turn", "Turn",
-               "Turns the cross-section about the curve, in degrees.");
     if (shown.profile != TubeShape::Profile::Round) {
         slider("##tubetwist", &TubeShape::twist, -720.0f, 720.0f, "Twist %.0f\xc2\xb0", "twist", "Twist",
                "Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: "
                "twisted ribbons, beams and ropes.");
-        slider("##tubespin", &TubeShape::spin, -90.0f, 90.0f, "Spin %.0f\xc2\xb0", "spin", "Spin",
-               "Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley "
-               "twist.");
+        slider("##tubespin", &TubeShape::spin, -180.0f, 180.0f, "Spin %.0f\xc2\xb0", "spin", "Spin",
+               "Turns the cross-section about the curve, in degrees.");
     }
+    if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid ||
+        shown.profile == TubeShape::Profile::Sleeve)
+        slider("##tubespread", &TubeShape::spread, 0.0f, 1.0f,
+               shown.profile == TubeShape::Profile::Sleeve ? "Wall %.2f" : "Spread %.2f", "spread",
+               shown.profile == TubeShape::Profile::Sleeve ? "Wall" : "Spread",
+               "Rope: how far apart the strands are (0.5: touching). Braid: how loose the weave is (0: strands packed together, 1: apart, long turns). Sleeve: how thick the wall is.");
     if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid) {
         const bool rope = shown.profile == TubeShape::Profile::Rope;
         float n = tubeStrandsEdit_ > 0.0f ? tubeStrandsEdit_ : float(shown.strands);
@@ -415,14 +423,8 @@ void App::drawTubeShapeControls(float full) {
             tubeStrandsEdit_ = -1.0f;
         }
         ui::HelpText("Strands", nullptr,
-                     "How many strands the rope or braid has. One round strand is a spring; Spread opens it up.", kTubePath);
+                     "How many strands the rope or braid has (a braid starts with two). One round strand is a spring; Spread opens it up.", kTubePath);
     }
-    if (shown.profile == TubeShape::Profile::Rope || shown.profile == TubeShape::Profile::Braid ||
-        shown.profile == TubeShape::Profile::Sleeve)
-        slider("##tubespread", &TubeShape::spread, 0.0f, 1.0f,
-               shown.profile == TubeShape::Profile::Sleeve ? "Wall %.2f" : "Spread %.2f", "spread",
-               shown.profile == TubeShape::Profile::Sleeve ? "Wall" : "Spread",
-               "Rope and braid: how far apart the strands are (0.5: touching). Sleeve: how thick the wall is.");
     slider("##tubetaper0", &TubeShape::taperStart, 0.0f, 1.0f, "Taper start %.2f", "taper_start", "Taper start",
            "How much of the length narrows to a point at the start (0: none, 1: all of it): horns, claws, spikes.");
     slider("##tubetaper1", &TubeShape::taperEnd, 0.0f, 1.0f, "Taper end %.2f", "taper_end", "Taper end",

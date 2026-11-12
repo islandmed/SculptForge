@@ -54,7 +54,7 @@ in front of the model.
 
 **Shape** sets the cross-section: **Circle**, **Square** (sharp corners: beams, frames, planks), **Triangle**
 (ridges, blades, spines) or **Ribbon** (a flat strip: straps, cloth strips, leaves, hair cards). A ribbon lies flat
-towards you as you draw it; **Thickness** sets how flat it is. **Turn** turns a square, triangle or ribbon about the
+towards you as you draw it; **Thickness** sets how flat it is. **Spin** turns a square, triangle or ribbon about the
 curve.
 
 **Taper start** and **Taper end** narrow the tube to a point over that much of its length (0: none, 1: all of it):
@@ -68,17 +68,16 @@ change on the tube as you drag it, and letting go is one undo step.
 Beside **Circle**, **Square**, **Triangle** and **Ribbon**, three profiles build more than an outline:
 
 - **Rope**: three round strands wound round the curve (rope, cable, twine).
-- **Braid**: three flat strands woven across each other (plaits, straps, braided hair).
+- **Braid**: round strands twisted over and under each other (braided cord, plaits, hair); two to begin with.
 - **Sleeve**: a hollow tube with open ends (sleeves, pipes, bracelets, hoses).
 
-**Strands** sets how many strands a rope or braid has, 1 to 8 (3 by default). A braid's strands are flat ribbons that
-pass over and under each other, so more strands make a wider plait. A rope of one strand is a **spring**: **Spread**
-opens the coils, and **Spin** changes how tightly it winds.
-
 For any profile but Circle, **Twist** turns the cross-section a set number of degrees from the start to the end, and
-**Spin** turns it steadily, so many degrees per tube radius of length (a screw thread). **Spread** is how far apart a
-rope's or braid's strands are (0.5: touching), and for a sleeve how thick the wall is. **Taper** narrows strands and
-walls with the tube. Each one is a live slider on the selected Tube Part and one undo step.
+**Spin** turns it about the curve by a fixed number of degrees (the same turn all along). **Spread** sets a rope's strands
+(0.5: touching) and a braid's weave (0: the strands packed together, touching, a tight rope; 1: wide apart with long
+turns), and for a sleeve how thick the wall is. **Strands** sets how many strands a rope or braid has, 1 to 8 (3 for a
+rope, 2 for a braid to begin with). A braid's round strands twist over and under each other, so more strands make a
+thicker cord. A rope of one strand is a **spring**: **Spread** opens the coils. **Taper** narrows strands and walls with
+the tube. Each one is a live slider on the selected Tube Part and one undo step.
 
 ## Repeat a Part along a curve
 
@@ -151,7 +150,7 @@ tube_set_point index=1 position="0.5,0.6,0" radius=0.1
 tube_insert_point index=0
 tube_delete_point index=2
 tube_set caps=flat radius_scale=1.5
-tube_set profile=ribbon thickness=0.2 turn=30 taper_end=0.5
+tube_set profile=ribbon thickness=0.2 spin=30 taper_end=0.5
 tube_simplify keep=0.5
 tube_new points="0,0,0 1,0.5,0 2,0,0.4" curve=true
 tube_resample count=24

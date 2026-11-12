@@ -752,6 +752,15 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
     if (name == "tube_twist") return double(m.tube.twist);
     if (name == "tube_strands") return double(m.tube.strands);
+    if (name == "tube_spin") return double(m.tube.spin);
+    if (name == "tube_spread") return double(m.tube.spread);
+    if (name == "tube_slider_order") { // 1 when Tool > Tube's Twist, Spin, Spread and Strands sliders sit in that order, top to bottom
+        ImVec2 at[4];
+        const char* const items[4] = {"Tube/##tubetwist", "Tube/##tubespin", "Tube/##tubespread", "Tube/##tubestrands"};
+        for (int i = 0; i < 4; ++i)
+            if (!findItem(items[i], at[i])) return 0.0;
+        return at[0].y < at[1].y && at[1].y < at[2].y && at[2].y < at[3].y ? 1.0 : 0.0;
+    }
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
