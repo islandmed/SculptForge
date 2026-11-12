@@ -789,6 +789,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
+    add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
+    set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)

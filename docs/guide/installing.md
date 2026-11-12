@@ -207,12 +207,24 @@ SculptForge with:
 SDL_VIDEO_DRIVER=x11 sculptforge
 ```
 
+The start-up splash is its own small window with the app id `sculptforge-splash` (the main window's is `sculptforge`). On
+Hyprland 0.56 and newer, this rule in your Lua config keeps the splash floating, centred, opaque and without a border
+or shadow (Omarchy's default opacity would otherwise make it see-through):
+
+```lua
+hl.window_rule({ match = { class = "^sculptforge-splash$" }, tag = "-default-opacity", float = true, center = true,
+                 border_size = 0, no_shadow = true, opacity = "1 1" })
+```
+
 Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the
 desktop's tablet protocol (tablet-v2), so the tablet must be set up in your desktop's settings rather than
 through X11 tools such as `xsetwacom`. If pressure doesn't respond, check **Edit > Preferences > Tablet** for the
 live pressure reading.
 
 ## What you see at start-up
+
+A small splash with the SculptForge logo and version shows for at least half a second while SculptForge loads, then
+fades into the main window. Turn it off in **Edit > Preferences > Interface > Show startup splash** for an instant start.
 
 SculptForge opens a 1600 x 960 window with a sphere ready to sculpt and the **Library** open along the top of
 the canvas on its **Project** tab, so you can reopen recent work with a double-click. Press <kbd>,</kbd>
