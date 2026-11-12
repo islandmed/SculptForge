@@ -5,8 +5,9 @@ Linux-first, scriptable, standards-based, with no licence server and nothing to 
 
 ## VFX Reference Platform
 
-SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). CI builds and tests every commit
-in the platform's reference environments:
+SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). CI builds and tests every code change
+to `main` in the platform's reference environments (the merge queue runs them before a change reaches `main`; changes to the
+website or release paperwork only skip the build):
 
 | | CY2026 (current) | CY2027 | SculptForge |
 |---|---|---|---|
