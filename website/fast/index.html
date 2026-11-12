@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How fast is SculptForge?</title>
-  <meta name="description" content="SculptForge 0.11.2 measured: stroke lag and orbit speed on dense scans, on a low-end budget first, with the exact steps to repeat every number on your own computer.">
+  <meta name="description" content="SculptForge 0.12.11 measured: slowest frames, 240 px brush frames and orbit speed on 33 to 201 million triangles, each number with its raw result file and the command to repeat it.">
   <meta property="og:title" content="How fast is SculptForge? Measured, with the steps to repeat it">
-  <meta property="og:description" content="Stroke lag and orbit speed of SculptForge 0.11.0 and 0.11.2 on the same machines, low-end budget first. One command reproduces it.">
+  <meta property="og:description" content="Slowest frames and orbit speed of SculptForge 0.12.11 on 33 to 201 million triangles, with raw results. One command reproduces it.">
   <meta property="og:url" content="https://sculptforge.app/fast/">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=4">
   <link rel="canonical" href="https://sculptforge.app/fast/">
@@ -78,18 +78,26 @@
 <body>
 <main>
   <p class="small"><a href="../index.html">SculptForge</a> / <a href="../benchmarks/">Benchmarks</a> / How fast? &middot; <a href="../performance/">What we're building</a></p>
-  <h1>How fast is SculptForge 0.11.2?</h1>
+  <h1>How fast is SculptForge 0.12.11?</h1>
   <p class="lede muted">Measured with SculptForge's own benchmark on the same machines, the slowest one first. Every
     number on this page comes with the steps to repeat it. If your computer gives a different answer,
     <a href="../benchmarks/#submit">send it to us</a>; we list results that disagree with ours too.</p>
 
-  <div class="card">
-    <p><strong>The measured numbers are being re-checked and come with the next update.</strong> We found that our
-      test scans had no sculpted detail, which makes some timings look better than real work, so we're measuring
-      again on scans with real surface detail before we publish anything. What 0.11.2 changes, in words: big
-      brushes on dense scans finish sooner after you lift the pen, they follow the pen more closely on faster
-      computers, and orbiting a very dense scan right after a stroke is smoother.</p>
-  </div>
+  <h2 id="numbers">The numbers</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Figure</th><th>Machine and tier</th><th>What was measured</th><th>Raw results</th></tr></thead>
+    <tbody>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">103 ms</span><br>slowest frame, 33M-triangle head</td><td style="white-space: normal; min-width: 14em">Entry-level tier, simulated: Apple M1 Pro laptop limited to the entry-level budgets and OpenGL 3.3 (<code>SF_HW_SIMULATE=floor SF_GOVERNOR=0</code>).</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark standard-33m</code>: the longest single frame in the whole run (Clay at 25, 60 and 120 px, Move, Smooth, a 240 px Clay, then an orbit). Median of 3 runs, range 101 to 103 ms. Build 0.12.11, commit 308f83c.</td><td style="white-space: normal"><a href="../benchmarks/?scene=standard-33m&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/floor-standard-33m-1.json">run 1</a> <a href="../benchmarks/raw/floor-standard-33m-2.json">run 2</a> <a href="../benchmarks/raw/floor-standard-33m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">30 ms</span><br>99th-percentile frame, 240 px brush, 33M-triangle head</td><td style="white-space: normal; min-width: 14em">Entry-level tier, simulated: Apple M1 Pro laptop limited to the entry-level budgets and OpenGL 3.3 (<code>SF_HW_SIMULATE=floor SF_GOVERNOR=0</code>).</td><td style="white-space: normal; min-width: 14em">The same run, the 240 px Clay phase: 1 frame in 100 took longer than this. Median of 3 runs, range 27 to 34 ms. The stroke on screen trailed the pen by 1196 ms at its 99th percentile (range 1191 to 1243): the stroke lands, but late.</td><td style="white-space: normal"><a href="../benchmarks/?scene=standard-33m&amp;phase=240%20px%20brush#results">Results rows</a> <a href="../benchmarks/raw/floor-standard-33m-1.json">run 1</a> <a href="../benchmarks/raw/floor-standard-33m-2.json">run 2</a> <a href="../benchmarks/raw/floor-standard-33m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">208 fps</span><br>orbit, 104M micro triangles</td><td style="white-space: normal; min-width: 14em">Entry-level tier, simulated: Apple M1 Pro laptop limited to the entry-level budgets and OpenGL 3.3 (<code>SF_HW_SIMULATE=floor SF_GOVERNOR=0</code>).</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark core-100m</code>: the procedural head at micro level 5 (104 million micro triangles, drawn at the detail the view allows), strokes, then an orbit. Average frames a second of the orbit, median of 3 runs, range 204 to 225; its slowest frame 24.9 ms (range 14.0 to 29.0).</td><td style="white-space: normal"><a href="../benchmarks/?scene=core-100m&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/floor-core-100m-1.json">run 1</a> <a href="../benchmarks/raw/floor-core-100m-2.json">run 2</a> <a href="../benchmarks/raw/floor-core-100m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">132 ms</span><br>slowest frame, 33M-triangle head</td><td style="white-space: normal; min-width: 14em">Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark standard-33m</code>: the longest single frame in the whole run (Clay at 25, 60 and 120 px, Move, Smooth, a 240 px Clay, then an orbit). Median of 3 runs, range 125 to 134 ms. Build 0.12.11, commit 308f83c.</td><td style="white-space: normal"><a href="../benchmarks/?scene=standard-33m&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/pc-standard-33m-1.json">run 1</a> <a href="../benchmarks/raw/pc-standard-33m-2.json">run 2</a> <a href="../benchmarks/raw/pc-standard-33m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">54 ms</span><br>99th-percentile frame, 240 px brush, 33M-triangle head</td><td style="white-space: normal; min-width: 14em">Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td style="white-space: normal; min-width: 14em">The same run, the 240 px Clay phase: 1 frame in 100 took longer than this. Median of 3 runs, range 41 to 69 ms. The stroke on screen trailed the pen by 1075 ms at its 99th percentile (range 1019 to 1097): the stroke lands, but late.</td><td style="white-space: normal"><a href="../benchmarks/?scene=standard-33m&amp;phase=240%20px%20brush#results">Results rows</a> <a href="../benchmarks/raw/pc-standard-33m-1.json">run 1</a> <a href="../benchmarks/raw/pc-standard-33m-2.json">run 2</a> <a href="../benchmarks/raw/pc-standard-33m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">657 fps</span><br>orbit, 104M micro triangles</td><td style="white-space: normal; min-width: 14em">Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark core-100m</code>: the procedural head at micro level 5 (104 million micro triangles, drawn at the detail the view allows), strokes, then an orbit. Average frames a second of the orbit, median of 3 runs, range 649 to 678; its slowest frame 6.3 ms (range 5.9 to 7.0).</td><td style="white-space: normal"><a href="../benchmarks/?scene=core-100m&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/pc-core-100m-1.json">run 1</a> <a href="../benchmarks/raw/pc-core-100m-2.json">run 2</a> <a href="../benchmarks/raw/pc-core-100m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">348 ms</span><br>slowest frame orbiting 104M real triangles</td><td style="white-space: normal; min-width: 14em">Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark --benchmark-sizes 100</code>: a subdivided sphere of 104 million triangles, all of them drawn, two Standard-brush strokes, then an orbit. The orbit averaged 408 frames a second (range 406 to 409) but its slowest frame was 348 ms (range 334 to 356). A smooth sphere, so not comparable to a scan with surface detail. Median of 3 runs.</td><td style="white-space: normal"><a href="../benchmarks/?scene=spheres&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/pc-sphere-100m-1.json">run 1</a> <a href="../benchmarks/raw/pc-sphere-100m-2.json">run 2</a> <a href="../benchmarks/raw/pc-sphere-100m-3.json">run 3</a></td></tr>
+              <tr><td style="white-space: normal; min-width: 14em"><span class="big" style="white-space: nowrap">1.2 GB</span><br>peak memory, 201M micro triangles</td><td style="white-space: normal; min-width: 14em">Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td style="white-space: normal; min-width: 14em"><code>sculptforge --benchmark core-200m</code>: the whole application's peak RAM during the run (the renderer's buffers on the graphics card are 0.64 GB). Median of 3 runs, range 1189 to 1193 MB. Orbit 558 frames a second, slowest frame 48 ms.</td><td style="white-space: normal"><a href="../benchmarks/?scene=core-200m&amp;phase=orbit#results">Results rows</a> <a href="../benchmarks/raw/pc-core-200m-1.json">run 1</a> <a href="../benchmarks/raw/pc-core-200m-2.json">run 2</a> <a href="../benchmarks/raw/pc-core-200m-3.json">run 3</a></td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">Every figure is the median of three runs of <code>sculptforge --benchmark</code> on the release build of the main branch (0.12.11, commit 308f83c, no video), one run at a time on a machine with nothing else testing. Each row links to the raw result files exactly as the program wrote them and to its rows in the <a href="../benchmarks/#results">results table</a>. The scenes are built from a formula, so they are the same on every computer. We removed earlier figures that rested on a scan we cannot redistribute; a figure comes back when it has a public scene and a raw result. The stroke-lag figures are the honest weak spot: a 240 px brush on a dense mesh lands its stroke about a second behind the pen. The entry-level rows are the simulated tier on an Apple M1 Pro laptop: the setting limits what the app may use (memory, detail, OpenGL 3.3), not how fast the laptop is, so some rows read faster than the desktop and real entry-level hardware will be slower. They are listed because they exercise the budgets, not as a prediction for a particular computer.</p>
 
   <h2 id="machines">The machines, slowest first</h2>
   <p class="small">A speed claim counts only if it holds on the first tier that has a number. Today no real
@@ -108,63 +116,41 @@
 
   <h2 id="limits">What's still slow</h2>
   <ul class="small">
-    <!-- KNOWN_LIMITS: launchkit draft from the scoreboard + floorlucy; the coordinator checks before release -->
     <li>Big brushes (120 and 240 px) on very dense meshes still trail the pen on every machine we test, the desktop
-      included: the stroke lands, but late.</li>
-    <li>On the biggest brushes (240 px) the stroke now follows the pen more closely while you draw; the cost is a
-      slightly longer finish after you lift the pen on fast GPUs.</li>
-    <li>On the low-end budget, orbiting a 112 million triangle scan right after a stroke is still below a smooth
-      30 frames a second: the whole base mesh is drawn every frame. Making that cheaper is being researched.</li>
-    <li>Opening a scan with a micro level takes seconds, not instantly, on every machine (measured on the
-      subdivided Lucy, with no sculpted detail; a file with sculpted micro detail can take longer).</li>
-    <li>Lucy at 112 million triangles needs more memory than an 8 GB integrated-graphics laptop has; on those,
-      the largest Lucy that fits is the 28 million triangle version.</li>
+      included: the stroke lands, but late (the lag row above).</li>
+    <li>Orbiting 104 million real triangles right after a stroke has one very slow frame on the desktop (the 100M sphere row), although the average is far above 30 frames a second.</li>
+    <li>The figures use scenes made from a formula (smooth, with no sculpted detail beyond the head's shape); a file with sculpted micro detail can behave differently. We publish no figure for a scene we cannot share.</li>
+    <li>No real integrated-graphics laptop is in the measured set yet; that tier is simulated, and a simulated result does not say so in its JSON (the command above does).</li>
   </ul>
 
   <h2 id="repeat">Repeat it on your computer</h2>
   <ol class="steps">
-    <li><strong>Install 0.11.2</strong>
-      <p>From the <a href="../index.html#download">download page</a> (free, no account). For the comparison, also
-        unpack <a href="https://github.com/islandmed/SculptForge/releases/tag/v0.11.0">0.11.0</a> (the portable zip or
-        AppImage runs beside the installed version). Close builds, games and renders.</p></li>
-    <li><strong>Get the test scene</strong>
-      <p>The built-in heads need nothing. For Lucy, download <code>lucy.tar.gz</code> (about 320 MB) from the
-        <a href="https://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D Scanning Repository</a> and build the test
-        scenes with the command-line tool that comes with SculptForge (below). We don't redistribute the scan.</p></li>
-    <li><strong>Run the same strokes</strong>
-      <p>Each run opens the scene, draws scripted Clay strokes at 25, 120 and 240 px through the real pen code, then
-        orbits, and writes a JSON result and a video.</p></li>
+    <li><strong>Install</strong>
+      <p>Any build from the <a href="../index.html#download">download page</a> (free, no account), or a build of the commit named in the raw file. Close builds, games and renders.</p></li>
+    <li><strong>Run the same scenes</strong>
+      <p>Each run builds its scene from a formula (nothing to download), draws scripted Clay strokes through the real pen code, then orbits, and writes a JSON result.</p></li>
+    <li><strong>Compare</strong>
+      <p>Run each scene three times and take the median. <a href="../benchmarks/#submit">Send your files</a>; we list results that disagree with ours too.</p></li>
   </ol>
   <div class="card">
     <strong>The exact commands</strong>
-    <pre><code># the built-in 15 million triangle head (identical on every computer)
-sculptforge --benchmark standard-15m --benchmark-out head-0.11.2.json
+    <pre><code>sculptforge --benchmark standard-33m --benchmark-no-video --benchmark-out head-33m.json
+sculptforge --benchmark core-100m    --benchmark-no-video --benchmark-out core-100m.json
+sculptforge --benchmark core-200m    --benchmark-no-video --benchmark-out core-200m.json
+sculptforge --benchmark --benchmark-sizes 100 --benchmark-no-video --benchmark-out sphere-100m.json
 
-# Lucy: build the test scenes once from Stanford's lucy.ply (28 million triangles; 112 million with a micro level)
-tar xzf lucy.tar.gz
-sculptforge-cli -c "open path=lucy.ply; save_project path=lucy-28m.sfproj"
-sculptforge-cli -c "open path=lucy.ply; micro_divide level=1; save_project path=lucy-112m.sfproj"
-
-# Lucy: the same strokes and orbit on the scene
-sculptforge --benchmark-file lucy-112m.sfproj --benchmark-out lucy-0.11.2.json
-
-# the head with 0.11.0 (path to the unpacked 0.11.0)
-./sculptforge-0.11.0/sculptforge --benchmark standard-15m --benchmark-out head-0.11.0.json
-
-# optional: the simulated low-end budget we report first
-SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark-file lucy-28m.sfproj --benchmark-out lucy-floor.json</code></pre>
-    <p class="small muted">On macOS the command-line tool is <code>SculptForge.app/Contents/MacOS/sculptforge-cli</code>; on
-      Windows it is <code>sculptforge-cli.exe</code> in the install folder. On Windows, set the variables first in a Command Prompt (<code>set SF_HW_SIMULATE=floor</code>)
-      and run <code>sculptforge.exe</code> from the install folder. Run each build at least twice, alternating, and
-      take the median. 0.11.0 has no <code>--benchmark-file</code> (it came in 0.11.1), so our 0.11.0 Lucy rows use
-      0.11.0 with only the benchmark's own commits added: the patch that lets 0.11.0 load a project file for the benchmark (no app code changed).</p>
+# the simulated low-end budget we report first
+SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark standard-33m --benchmark-no-video --benchmark-out head-33m-floor.json</code></pre>
+    <p class="small muted">On macOS and Windows, run the same arguments with the installed program; on Windows set the variables first in a Command Prompt (<code>set SF_HW_SIMULATE=floor</code>)
+      and run <code>sculptforge.exe</code> from the install folder. The 100 million triangle sphere needs about 16 GB of free memory. The files' fields are described in <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md">docs/benchmark.md</a>.</p>
   </div>
   <h3>Reading the result</h3>
   <ul class="small">
     <li><strong>Stroke lag</strong> (<code>lag_ms</code>): from the pen sample to the frame on screen that shows its
       dab. p50 is the typical dab, p99 the slow ones you feel.</li>
     <li><strong>Release</strong> (<code>release_done_ms</code>): from pen up to the whole stroke in the mesh and shaded.</li>
-    <li><strong>Orbit</strong>: frames per second while the view turns after the strokes, while the shading catches up.</li>
+    <li><strong>Slowest frame</strong> (<code>worst_stall_ms</code>): the longest frame in the run, including lifting the pen.</li>
+    <li><strong>Orbit</strong>: frames per second while the view turns once in 3 seconds after the strokes.</li>
     <li><strong>Memory</strong>: peak RAM plus GPU buffers.</li>
   </ul>
   <p class="small">Full method, every tier and the raw numbers:
@@ -174,9 +160,9 @@ SF_HW_SIMULATE=floor SF_GOVERNOR=0 sculptforge --benchmark-file lucy-28m.sfproj 
 
   <h2>Comparing with other apps</h2>
   <p class="small">This page lists SculptForge's numbers only. We don't run, publish or test other sculpting
-    applications. Lucy is a public scan, so you can open the same model elsewhere and judge for yourself.</p>
+    applications. The scenes are built from a formula, so you can build a similar mesh elsewhere and judge for yourself.</p>
   <footer>
-    <p class="muted small">Lucy: Stanford 3D Scanning Repository. SculptForge is an independent open-source project
+    <p class="muted small">SculptForge is an independent open-source project
       by Med and contributors. Product names are trademarks of their respective owners.</p>
   </footer>
 </main>
