@@ -55,14 +55,20 @@ float falloff(float dist, float rad) {
     if (uFocal != 0.0) t = pow(t, exp2(2.0 * clamp(uFocal, -1.0, 1.0)));
     return t * t * (3.0 - 2.0 * t);
 }
+float clayPull(float s) { return s >= 0.5 ? 1.0 : 2.0 * max(s, 0.0); } // sf::clayPull (core/Sculpt.h)
 // How far dab i moves P along its area normal (ghostMove's Standard and Clay).
 float amount(int i, vec3 P) {
     float dist = length(P - uDabC[i].xyz), rad = uDabC[i].w;
     if (dist >= rad) return 0.0;
     float f = falloff(dist, rad) * uDabA[i].w, s = uDabN[i].w;
     if (uKind == 1) return s * rad * 0.06 * f;
-    float h = dot(P - (uDabA[i].xyz + uDabN[i].xyz * (rad * 0.05 * s)), uDabN[i].xyz); // Clay: up to its plane
-    return (s > 0.0 ? h < 0.0 : h > 0.0) ? -h * f : 0.0;
+    // Clay: up to its plane, the solver's (PlaneKernel::clayPlaneAt: the plane reaches the cursor, the pull shrinks by how
+    // much higher that is) and its pull (sf::clayPull)
+    float sg = s < 0.0 ? -1.0 : 1.0, st = abs(s), standoff = rad * 0.05 * st;
+    float lift = max(standoff, sg * dot(uDabC[i].xyz - uDabA[i].xyz, uDabN[i].xyz));
+    float pull = clayPull(st) * (lift > 1e-12 ? standoff / lift : 1.0);
+    float h = dot(P - (uDabA[i].xyz + uDabN[i].xyz * (sg * lift)), uDabN[i].xyz);
+    return (sg > 0.0 ? h < 0.0 : h > 0.0) ? -h * f * pull : 0.0;
 }
 // The dabs' displacement of P, and (bend) the tangential gradient of each move that bends the normal n.
 vec3 displace(vec3 P, vec3 n, bool bend, out vec3 g) {

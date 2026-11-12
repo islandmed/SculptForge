@@ -1248,6 +1248,8 @@ int App::run() {
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
                 if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
+            if (const char* v = std::getenv("SF_MEASURE_STRENGTH")) // e.g. 0.35: the Intensity (the preview's pull depends on it)
+                strength_ = std::clamp(float(std::atof(v)), 0.0f, 1.0f);
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
