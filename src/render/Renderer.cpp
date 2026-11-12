@@ -26,7 +26,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
-#include <mutex>
 #include <vector>
 
 namespace sf {
@@ -2477,7 +2476,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
-        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear(), s.clusterAdjStart.clear(), s.clusterAdj.clear();
+        s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear();
         s.proxyCount.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
@@ -3480,7 +3479,6 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
     coarseClusters_.clear();
     coarseLevel_.clear();
     underlayClusters_.clear();
-    underlayCandidates_.clear();
     size_t full = 0;
     for (uint32_t c : drawClusters_) full += size_t(s.drawCount[c]) / 3;
     if (full <= budget) return;
@@ -3503,7 +3501,7 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
     for (uint32_t c : drawClusters_) {
         if (s.coarseDirty[c] || L.clusters[c].levels <= pick) {
             if (s.coarseDirty[c] && L.clusters[c].levels > pick) { // (full, with its coarse level beneath)
-                underlayCandidates_.push_back(c);
+                underlayClusters_.push_back(c);
                 error = std::max(error, L.clusters[c].error[pick]);
             }
             drawClusters_[kept++] = c;
@@ -3513,21 +3511,6 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
         }
     }
     drawClusters_.resize(kept);
-    // The underlay closes the cracks where a full cluster meets a coarse one: only the edited clusters with a coarse neighbour
-    // need it, the interior of a big edit is full beside full (a 240 px brush on a 28M mesh drew thousands of underlay
-    // clusters twice a frame: ~1 ms, and the stroke's last dabs landed later). Few candidates, or no neighbours known: all.
-    if (underlayCandidates_.size() <= kUnderlayAll || s.clusterAdjStart.size() != s.coarseDirty.size() + 1) {
-        underlayClusters_ = underlayCandidates_;
-    } else {
-        underlayMark_.assign(s.coarseDirty.size(), 0);
-        for (uint32_t c : coarseClusters_) underlayMark_[c] = 1;
-        for (uint32_t c : underlayCandidates_)
-            for (uint32_t i = s.clusterAdjStart[c]; i < s.clusterAdjStart[c + 1]; ++i)
-                if (underlayMark_[s.clusterAdj[i]]) {
-                    underlayClusters_.push_back(c);
-                    break;
-                }
-    }
     // Beneath the full clusters by what their vertices may be off their cells (an edit moves them within the cell too)
     underlayPush_ = std::max(2.0f * error, 0.25f * L.cell * float(1 << pick));
 }
@@ -3639,44 +3622,6 @@ size_t Renderer::triangleBudget(const RenderSettings& settings) const {
 }
 
 // The coarse levels (render/Clusters.h): built at once, timed; their own vertices and 32-bit indices.
-// Which clusters touch which (CSR): two clusters are neighbours where a vertex has a slot in each.
-static void buildClusterAdjacency(const UploadOrder& order, size_t vertices, size_t clusters, std::vector<uint32_t>& start,
-                                  std::vector<uint32_t>& list) {
-    std::vector<uint64_t> pairs;
-    std::mutex lock;
-    poolFor(vertices, [&](size_t b, size_t e) {
-        std::vector<uint64_t> mine;
-        std::vector<uint32_t> slots;
-        uint64_t last = ~uint64_t(0);
-        for (size_t v = b; v < e; ++v) {
-            if (!order.shared(uint32_t(v))) continue;
-            order.slotsOf(uint32_t(v), slots);
-            for (size_t i = 0; i < slots.size(); ++i)
-                for (size_t j = i + 1; j < slots.size(); ++j) {
-                    uint32_t a = order.clusterOfSlot(slots[i]), c = order.clusterOfSlot(slots[j]);
-                    if (a == c) continue;
-                    if (a > c) std::swap(a, c);
-                    const uint64_t k = uint64_t(a) << 32 | c;
-                    if (k != last) mine.push_back(k), last = k;
-                }
-        }
-        std::lock_guard<std::mutex> g(lock);
-        pairs.insert(pairs.end(), mine.begin(), mine.end());
-    });
-    std::sort(pairs.begin(), pairs.end());
-    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-    start.assign(clusters + 1, 0);
-    for (uint64_t k : pairs) ++start[uint32_t(k >> 32) + 1], ++start[uint32_t(k) + 1];
-    for (size_t c = 0; c < clusters; ++c) start[c + 1] += start[c];
-    list.assign(start[clusters], 0);
-    std::vector<uint32_t> at(start.begin(), start.end() - 1);
-    for (uint64_t k : pairs) {
-        const uint32_t a = uint32_t(k >> 32), c = uint32_t(k);
-        list[at[a]++] = c;
-        list[at[c]++] = a;
-    }
-}
-
 void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
     s.coarseTried = true;
     const auto start = std::chrono::steady_clock::now();
@@ -3692,7 +3637,6 @@ void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
     }
     s.coarse = std::move(levels);
     s.coarseDirty.assign(s.coarse->clusters.size(), 0);
-    buildClusterAdjacency(s.order, mesh.vertexCount(), s.coarse->clusters.size(), s.clusterAdjStart, s.clusterAdj);
     s.coarsePending.clear();
     gl::BindVertexArray(s.coarseVao);
     uploadCoarsePoints(s);
