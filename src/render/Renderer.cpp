@@ -2498,8 +2498,10 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         const bool attributes = (nv > 0 && mesh.colors.size() == nv) || (nv > 0 && mesh.mask.size() == nv) ||
                                 !s.coarse->colors.empty() || !s.coarse->mask.empty();
         if (!coarseAttributesMatch(*s.coarse, mesh)) {
-            if (s.coarsePending.size() < s.coarseDirty.size()) // (once: then the next quiet sync updates them)
+            if (s.coarsePending.size() < s.coarseDirty.size()) { // (once: then the next quiet sync updates them)
                 for (uint32_t c = 0; c < s.coarseDirty.size(); ++c) markCoarseDirty(s, c);
+                s.coarseEditAt = -1.0e9; // (not a stroke's edits: nothing to wait out, the next frame updates them)
+            }
         } else if (attributes && ranged) {
             for (const auto& [b, e] : dirtyRuns_) {
                 if (b >= e) continue;
