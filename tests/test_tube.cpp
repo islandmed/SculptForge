@@ -334,7 +334,7 @@ TEST(tube_profiles_watertight) {
             TubeShape s = curvy();
             s.profile = p;
             s.flatCaps = variant & 1;
-            s.spin = (variant & 2) ? 30.0f : 0.0f;
+            s.roll = (variant & 2) ? 30.0f : 0.0f;
             if (variant & 4) s.taperStart = 0.3f, s.taperEnd = 0.9f; // (over 1 together: shared out)
             for (bool uniform : {false, true}) {
                 const Mesh m = tubeSweep(s, uniform);
@@ -375,7 +375,7 @@ TEST(tube_profile_outlines) {
         if (v.x > 0.5f && v.x < 1.5f) ymax = std::max(ymax, std::abs(v.y)), zmax = std::max(zmax, std::abs(v.z));
     CHECK(std::abs(ymax - 0.02f) < 1e-4f && zmax > 0.097f && zmax < 0.1001f); // (no vertex need sit on the round tip)
     // Turned 90 degrees, it is thin across instead.
-    s.spin = 90.0f;
+    s.roll = 90.0f;
     m = tubeSweep(s);
     ymax = zmax = 0.0f;
     for (const vec3& v : m.positions)
@@ -399,7 +399,7 @@ TEST(tube_profile_mirror_exact) {
     TubeShape s = curvy();
     for (TubePoint& p : s.points) p.position.x += 1.0f;
     s.profile = TubeShape::Profile::Triangle;
-    s.spin = 25.0f;
+    s.roll = 25.0f;
     s.up = vec3(0.3f, 1.0f, 0.2f);
     s.taperEnd = 0.4f;
     TubeShape one = s;
@@ -414,6 +414,37 @@ TEST(tube_profile_mirror_exact) {
         worst = std::max(worst, best);
     }
     CHECK(worst < 1e-4f);
+}
+
+TEST(tube_turn_twist_spin_together_on_a_curved_tube) {
+    // Turn, Twist and Spin all set at once, on a bent tapered tube, for every profile (the round Braid among them): the sweep is
+    // closed, oriented and finite, and the X mirror copy is its exact mirror image (all three negate).
+    using P = TubeShape::Profile;
+    for (P profile : {P::Square, P::Triangle, P::Ribbon, P::Rope, P::Braid, P::Sleeve}) {
+        TubeShape s = curvy();
+        for (TubePoint& p : s.points) p.position.x += 1.0f;
+        s.profile = profile;
+        s.roll = 25.0f, s.twist = 90.0f, s.spin = 15.0f;
+        s.taperEnd = 0.3f;
+        TubeShape one = s;
+        s.mirrorX = true;
+        const Mesh a = tubeSweep(one), both = tubeSweep(s);
+        bool finite = true;
+        for (const vec3& p : both.positions) finite = finite && std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        CHECK(finite && a.vertexCount() > 0 && watertight(a) && oriented(a) && signedVolume(a) > 0.0);
+        CHECK(both.vertexCount() == 2 * a.vertexCount() && watertight(both));
+        float worst = 0.0f;
+        for (size_t i = 0; i < a.vertexCount(); i += 11) {
+            const vec3 m(-a.positions[i].x, a.positions[i].y, a.positions[i].z);
+            float best = 1e9f;
+            for (size_t j = a.vertexCount(); j < both.vertexCount(); ++j) best = std::min(best, glm::distance(m, both.positions[j]));
+            worst = std::max(worst, best);
+        }
+        CHECK(worst < 1e-3f);
+        // Turn is the same all along, Spin is not: zero them apart and the sweeps differ, saved and read back they agree.
+        TubeShape back = tubeFromJson(tubeToJson(one));
+        CHECK(back.roll == 25.0f && back.twist == 90.0f && back.spin == 15.0f && tubeSweep(back).positions == a.positions);
+    }
 }
 
 TEST(tube_point_spacing_and_simplify) {
@@ -456,7 +487,7 @@ TEST(tube_profile_commands_and_project) {
                                         {"profile", std::string("ribbon")}, {"thickness", 0.3}, {"turn", 15.0},
                                         {"taper_start", 0.2}, {"up", std::string("0,0,1")}}).ok);
     doc.selectPart(1);
-    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Ribbon && doc.mesh.tube.spin == 15.0f);
+    CHECK(doc.mesh.tube.profile == TubeShape::Profile::Ribbon && doc.mesh.tube.roll == 15.0f);
     CHECK(reg.execute(doc, "tube_set", {{"profile", std::string("square")}, {"taper_end", 0.5}}).ok);
     CHECK(doc.mesh.tube.profile == TubeShape::Profile::Square && doc.mesh.tube.taperEnd == 0.5f && watertight(doc.mesh));
     CHECK(!reg.execute(doc, "tube_set", {{"thickness", 2.0}}).ok);
@@ -469,7 +500,7 @@ TEST(tube_profile_commands_and_project) {
     Document back;
     CHECK(loadProject(path, back, err));
     const TubeShape& t = back.partMesh(1).tube;
-    CHECK(t.profile == TubeShape::Profile::Ribbon && std::abs(t.thickness - 0.3f) < 1e-6f && t.spin == 15.0f &&
+    CHECK(t.profile == TubeShape::Profile::Ribbon && std::abs(t.thickness - 0.3f) < 1e-6f && t.roll == 15.0f &&
           std::abs(t.taperStart - 0.2f) < 1e-6f && t.up == vec3(0, 0, 1));
     back.selectPart(1);
     CHECK(tubeMatchesMesh(back.mesh));
@@ -546,7 +577,7 @@ TEST(tube_resample_exact_count_even_spacing) {
     CHECK(tubeResample({{vec3(1), 0.1f}, {vec3(1), 0.1f}}, 5).empty());
 }
 
-TEST(tube_twist_turns_the_profile_along_the_length_and_spin_turns_it_about_the_curve) {
+TEST(tube_twist_and_spin_turn_the_profile_along_the_length) {
     const float tol = 0.02f;
     TubeShape s = squareLine();
     const double start = cornerAngle(tubeSweep(s), 0.0f, tol);
@@ -557,11 +588,15 @@ TEST(tube_twist_turns_the_profile_along_the_length_and_spin_turns_it_about_the_c
     const double half = quarterDiff(cornerAngle(m, 1.0f, tol), start), end = quarterDiff(cornerAngle(m, 2.0f, tol), start);
     CHECK(std::abs(std::abs(end) - 30.0) < 1.5);                 // the whole twist at the end
     CHECK(std::abs(half - end / 2.0) < 1.5 && half * end > 0.0); // linear along the length
-    // Spin (the old Turn): the same turn all along, 20 degrees at x = 0.5 as at the ends.
+    // Spin: degrees per radius of length (0.25): 20 degrees at x = 0.5 is 40.
     TubeShape p = squareLine();
     p.spin = 20.0f;
-    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 0.5f, tol), start)) - 20.0) < 1.5);
-    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 1.5f, tol), start)) - 20.0) < 1.5);
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(p), 0.5f, tol), start)) - 40.0) < 1.5);
+    // Turn: the same turn all along, 20 degrees at x = 0.5 as at the ends.
+    TubeShape r = squareLine();
+    r.roll = 20.0f;
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(r), 0.5f, tol), start)) - 20.0) < 1.5);
+    CHECK(std::abs(std::abs(quarterDiff(cornerAngle(tubeSweep(r), 1.5f, tol), start)) - 20.0) < 1.5);
     // Twist the other way for the mirror copy: the X mirror of a twisted tube is its mirror image.
     TubeShape q = squareLine();
     q.twist = 40.0f;
@@ -577,6 +612,7 @@ TEST(tube_twist_turns_the_profile_along_the_length_and_spin_turns_it_about_the_c
     }
     // No twist and no spin: exactly the old sweep.
     TubeShape plain = squareLine();
+    plain.roll = 10.0f;
     CHECK(tubeSweep(plain).positions == tubeSweep([&] { TubeShape x = plain; x.twist = x.spin = 0.0f; return x; }()).positions);
 }
 
@@ -776,8 +812,9 @@ TEST(tube_braid_invariant_bend_twist_taper_closed_and_finite) {
     CHECK(tubeFromJson(tubeToJson(br)).profile == TubeShape::Profile::Braid);
 }
 
-TEST(tube_spin_replaces_turn_in_saved_scenes) {
-    // An old scene: Turn was saved as "roll" and the old per-length Spin as "spin". Turn loads as Spin; the old Spin is dropped.
+TEST(tube_turn_and_spin_are_separate_in_saved_scenes) {
+    // 0.12.10 saved Turn as "roll" and Spin (degrees per radius) as "spin"; the round-Braid beta saved its Spin, which was Turn's
+    // job, as "roll" and wrote no "spin". Both load as they meant: roll is Turn, spin is Spin.
     Json old = Json::object();
     old.set("profile", std::string("braid"));
     old.set("roll", 30.0);
@@ -786,16 +823,29 @@ TEST(tube_spin_replaces_turn_in_saved_scenes) {
     for (double v : {0.0, 0.0, 0.0, 0.1, 1.0, 0.0, 0.0, 0.1}) points.push(v);
     old.set("points", std::move(points));
     TubeShape s = tubeFromJson(old);
-    CHECK(s.spin == 30.0f);
+    CHECK(s.roll == 30.0f && s.spin == 50.0f);
     TubeShape again = tubeFromJson(tubeToJson(s));
-    CHECK(again.spin == 30.0f);
-    // The command accepts the new name and the old one.
+    CHECK(again.roll == 30.0f && again.spin == 50.0f);
+    // A beta file: "roll" only. It is Turn, Spin stays 0.
+    Json beta = Json::object();
+    beta.set("profile", std::string("braid"));
+    beta.set("roll", 45.0);
+    beta.set("points", old["points"]);
+    const TubeShape b = tubeFromJson(beta);
+    CHECK(b.roll == 45.0f && b.spin == 0.0f && b.profile == TubeShape::Profile::Braid);
+    // What is saved now is what 0.12.10 reads: the same two keys.
+    const Json out = tubeToJson(s);
+    CHECK(out["roll"].asNumber(0.0) == 30.0 && out["spin"].asNumber(0.0) == 50.0 && !out.has("turn"));
+    // The commands: turn is Turn, spin is Spin.
     Document doc;
     CommandRegistry reg;
-    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,0,0")}, {"radius", 0.1}, {"profile", std::string("braid")}, {"spin", 40.0}}).ok);
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,0,0")}, {"radius", 0.1}, {"profile", std::string("braid")}, {"turn", 20.0}, {"spin", 40.0}}).ok);
     doc.selectPart(1);
-    CHECK(doc.mesh.tube.spin == 40.0f);
-    CHECK(reg.execute(doc, "tube_set", {{"turn", 10.0}}).ok && doc.mesh.tube.spin == 10.0f);
+    CHECK(doc.mesh.tube.roll == 20.0f && doc.mesh.tube.spin == 40.0f);
+    CHECK(reg.execute(doc, "tube_set", {{"turn", 10.0}}).ok && doc.mesh.tube.roll == 10.0f && doc.mesh.tube.spin == 40.0f);
+    // Mirror and Curve wire keep the three apart.
+    const TubeShape m = tubeMirrored(s);
+    CHECK(m.roll == -30.0f && m.spin == -50.0f);
 }
 
 TEST(tube_rope_strand_count_and_spring) {

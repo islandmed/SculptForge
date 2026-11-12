@@ -1,5 +1,5 @@
 # Tube Braid (Tool > Tube, PanelTube.cpp; requested by Artizmo on Discord): round strands twisted over and under each other,
-# Spread loose to tight on the same curve; the sliders read Twist, Spin, Spread, Strands (Turn is gone, Spin does its job).
+# Spread loose to tight on the same curve; the sliders read Turn, Twist, Spin, Strands, Spread, as in 0.12.10.
 # The shots feed the guide's Tube chapter.
 run ui_look look=classic layout=classic
 wait 0.3
@@ -14,8 +14,8 @@ click "Tube/Tube from curve"
 expect_value tube_profile == 5
 expect_value tube_strands == 2                 # a braid starts with two round strands
 expect_value open_edges == 0
-expect_not "Tube/##tuberoll"                   # Turn is gone
-expect_value tube_slider_order == 1
+expect "Tube/##tuberoll"                       # Turn is still there
+expect_value tube_slider_order == 1            # Turn, Twist, Spin, Strands, Spread, top to bottom
 run tube_set spread=1
 wait 0.3
 expect_value tube_spread == 1
@@ -25,10 +25,18 @@ wait 0.3
 expect_value tube_spread == 0
 expect_value open_edges == 0
 shot braid-tight
-# Spin turns the weave about the curve (Turn's old job); the slider is live and one undo step.
+# Turn turns the weave about the curve and Spin turns it per radius of length; each slider is live and one undo step.
+drag_item "Tube/##tuberoll" 120 0
+wait 0.2
+expect_value tube_roll != 0
+expect_value tube_spin == 0
+expect_value open_edges == 0
+key ctrl+z
+expect_value tube_roll == 0
 drag_item "Tube/##tubespin" 120 0
 wait 0.2
 expect_value tube_spin != 0
+expect_value tube_roll == 0
 expect_value open_edges == 0
 key ctrl+z
 expect_value tube_spin == 0

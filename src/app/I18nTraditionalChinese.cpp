@@ -4935,6 +4935,8 @@ constexpr Entry kTraditionalChinese[] = {
      "曲線轉管"},
     {"Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: twisted ribbons, beams and ropes.",
      "沿管逐漸多轉一些截面，到末端時共轉了這麼多度：扭轉的緞帶、橫梁與繩索。"},
+    {"Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley twist.",
+     "讓截面持續旋轉，每個管半徑的長度轉這麼多度：螺紋、麻花。"},
     {"Spread", "展開"},
     {"Spread %.2f", "展開 %.2f"},
     {"Wall", "管壁"},

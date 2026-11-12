@@ -5414,6 +5414,8 @@ constexpr Entry kSpanish[] = {
      "Tubo desde curva"},
     {"Turns the cross-section a little more along the tube, so it has turned this many degrees by the far end: twisted ribbons, beams and ropes.",
      "Gira la sección un poco más a lo largo del tubo, de modo que en el extremo final haya girado estos grados: cintas, vigas y cuerdas retorcidas."},
+    {"Turns the cross-section steadily, this many degrees per tube radius of length: a screw thread, a barley twist.",
+     "Gira la sección de forma constante, estos grados por cada radio del tubo de longitud: una rosca, un fuste salomónico."},
     {"Spread", "Extensión"},
     {"Spread %.2f", "Extensión %.2f"},
     {"Wall", "Pared"},

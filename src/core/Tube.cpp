@@ -60,7 +60,7 @@ using Profile = TubeShape::Profile;
 
 // The cross-section's outline, as (u, v) on the ring's (n, b) axes for a radius of 1 (half its width), at `s` (0..1)
 // of the way round by length, counter-clockwise. Every outline is symmetric across its u axis (v -> -v), so the X
-// mirror's sweep (spin negated) is the exact mirror image; corners fall on vertices when the sides are a multiple
+// mirror's sweep (roll negated) is the exact mirror image; corners fall on vertices when the sides are a multiple
 // of profileStep.
 float profilePerimeter(Profile p, float thickness) {
     switch (p) {
@@ -285,10 +285,11 @@ struct Builder {
                 line[i].radius *= 0.03f + 0.97f * std::clamp(k, 0.0f, 1.0f);
             }
         }
-        // Turn at each sample: Spin, plus Twist spread over the length.
-        std::vector<float> angle(line.size(), shape.spin);
-        if (shape.twist != 0.0f)
-            for (size_t i = 0; i < line.size(); ++i) angle[i] += shape.twist * along[i] / length;
+        // Turn at each sample: Turn, plus Twist spread over the length, plus Spin per average radius of it.
+        std::vector<float> angle(line.size(), shape.roll);
+        if (shape.twist != 0.0f || shape.spin != 0.0f)
+            for (size_t i = 0; i < line.size(); ++i)
+                angle[i] += shape.twist * along[i] / length + shape.spin * along[i] / std::max(mean, 1e-12f);
 
         Profile prof = shape.profile;
         if (line.size() < 2 && (prof == Profile::Rope || prof == Profile::Braid || prof == Profile::Sleeve)) prof = Profile::Round;
@@ -453,9 +454,10 @@ std::string tubeValidate(const TubeShape& s) {
     }
     if (!(s.edge >= 0.0f) || !std::isfinite(s.edge)) return "edge length must be 0 (automatic) or more";
     if (!(s.thickness > 0.0f && s.thickness <= 1.0f)) return "thickness must be above 0 and at most 1";
-    if (!std::isfinite(s.spin) || std::abs(s.spin) > 3600.0f) return "spin must be finite degrees";
+    if (!std::isfinite(s.roll) || std::abs(s.roll) > 3600.0f) return "turn must be finite degrees";
     if (!finite(s.up)) return "up must be finite";
     if (!std::isfinite(s.twist) || std::abs(s.twist) > 36000.0f) return "twist must be finite degrees";
+    if (!std::isfinite(s.spin) || std::abs(s.spin) > 36000.0f) return "spin must be finite degrees";
     if (!(s.spread >= 0.0f && s.spread <= 1.0f)) return "spread must be from 0 to 1";
     if (s.strands < 1 || s.strands > kTubeMaxStrands) return "strands must be from 1 to " + std::to_string(kTubeMaxStrands);
     if (!(s.taperStart >= 0.0f && s.taperStart <= 1.0f && s.taperEnd >= 0.0f && s.taperEnd <= 1.0f))
@@ -674,8 +676,9 @@ TubeShape tubeMirrored(const TubeShape& shape) {
     TubeShape m = shape;
     for (TubePoint& p : m.points) p.position.x = -p.position.x;
     m.up.x = -m.up.x;
-    m.spin = -m.spin;
+    m.roll = -m.roll;
     m.twist = -m.twist;
+    m.spin = -m.spin;
     return m;
 }
 
@@ -683,7 +686,7 @@ TubeShape tubeMirrored(const TubeShape& shape) {
 static TubeShape curveWire(TubeShape w) {
     w.curve = false;
     w.profile = Profile::Round;
-    w.spin = w.twist = w.taperStart = w.taperEnd = 0.0f;
+    w.roll = w.twist = w.spin = w.taperStart = w.taperEnd = 0.0f;
     w.flatCaps = false;
     for (TubePoint& p : w.points) p.radius *= kCurveWire;
     return w;
@@ -884,8 +887,9 @@ Json tubeToJson(const TubeShape& s) {
     if (s.edge > 0.0f) out.set("edge", double(s.edge));
     if (s.profile != Profile::Round) out.set("profile", std::string(tubeProfileName(s.profile)));
     if (s.profile == Profile::Ribbon) out.set("thickness", double(s.thickness));
-    if (s.spin != 0.0f) out.set("roll", double(s.spin)); // (the key of the old Turn: saved Turn loads as Spin, a saved old Spin is not read)
+    if (s.roll != 0.0f) out.set("roll", double(s.roll));
     if (s.twist != 0.0f) out.set("twist", double(s.twist));
+    if (s.spin != 0.0f) out.set("spin", double(s.spin));
     if (s.spread != 0.5f) out.set("spread", double(s.spread));
     if (s.strands != 3) out.set("strands", double(s.strands));
     if (s.curve) out.set("curve", true);
@@ -911,8 +915,9 @@ TubeShape tubeFromJson(const Json& json) {
     s.edge = float(json["edge"].asNumber(0.0));
     if (json["profile"].isString() && !parseTubeProfile(json["profile"].asString(), s.profile)) return {};
     s.thickness = float(json["thickness"].asNumber(0.25));
-    s.spin = float(json["roll"].asNumber(0.0));
+    s.roll = float(json["roll"].asNumber(0.0));
     s.twist = float(json["twist"].asNumber(0.0));
+    s.spin = float(json["spin"].asNumber(0.0));
     s.spread = float(json["spread"].asNumber(0.5));
     s.strands = int(json["strands"].asNumber(3.0));
     s.curve = json["curve"].asBool(false);
@@ -968,7 +973,7 @@ std::string applyOptions(TubeShape& s, const Args& a) {
     if (a.contains("profile") && !parseTubeProfile(argString(a, "profile"), s.profile))
         return "profile must be round, square, triangle, ribbon, rope, braid or sleeve";
     if (a.contains("thickness")) s.thickness = float(argNumber(a, "thickness", 0.25));
-    if (a.contains("turn")) s.spin = float(argNumber(a, "turn", 0.0)); // (the old name)
+    if (a.contains("turn")) s.roll = float(argNumber(a, "turn", 0.0));
     if (a.contains("twist")) s.twist = float(argNumber(a, "twist", 0.0));
     if (a.contains("spin")) s.spin = float(argNumber(a, "spin", 0.0));
     if (a.contains("spread")) s.spread = float(argNumber(a, "spread", 0.5));
@@ -996,8 +1001,9 @@ void registerTubeCommands(CommandRegistry& reg) {
          "Cross-section: \"round\" (default), \"square\", \"triangle\", \"ribbon\", \"rope\" or \"braid\" (three strands round the curve), or \"sleeve\" (hollow, open ends).",
          false},
         {"thickness", T::Number, "Ribbon: its thickness as a fraction of its width (0.05 to 1, default 0.25).", false},
-        {"spin", T::Number, "Degrees the cross-section is turned about the curve (default 0; \"turn\" is the old name).", false},
+        {"turn", T::Number, "Degrees the cross-section is turned about the curve (default 0).", false},
         {"twist", T::Number, "Degrees the cross-section turns from the start to the end of the tube (default 0).", false},
+        {"spin", T::Number, "Degrees the cross-section turns per average radius of length (default 0).", false},
         {"spread", T::Number,
          "Rope and braid: how far apart the strands are (0 to 1, default 0.5: touching). Sleeve: how thick the wall is (0.5: a quarter of the radius).",
          false},
@@ -1046,11 +1052,11 @@ void registerTubeCommands(CommandRegistry& reg) {
                  const TubeShape& s = doc.mesh.tube;
                  if (s.empty()) return {false, kNotTube};
                  std::string out = std::to_string(s.points.size()) + " points, " + (s.curve ? "a curve (tube_from_curve makes the tube), " : "") +
-                                   (s.strands != 3 ? std::to_string(s.strands) + " strands, " : std::string()) + (s.twist != 0.0f ? "twist " + num(s.twist) + ", " : "") +
+                                   (s.strands != 3 ? std::to_string(s.strands) + " strands, " : std::string()) + (s.twist != 0.0f ? "twist " + num(s.twist) + ", " : "") + (s.spin != 0.0f ? "spin " + num(s.spin) + ", " : "") +
                                    (s.profile == Profile::Round ? std::string()
                                                                 : std::string(tubeProfileName(s.profile)) + " profile" +
                                                                       (s.profile == Profile::Ribbon ? " (thickness " + num(s.thickness) + ")" : "") +
-                                                                      (s.spin != 0.0f ? ", spun " + num(s.spin) + " degrees" : "") + ", ") +
+                                                                      (s.roll != 0.0f ? ", turned " + num(s.roll) + " degrees" : "") + ", ") +
                                    (s.flatCaps ? "flat" : "round") + " caps" + (s.mirrorX ? ", mirrored in X" : "") +
                                    (s.taperStart > 0.0f ? ", taper start " + num(s.taperStart) : "") +
                                    (s.taperEnd > 0.0f ? ", taper end " + num(s.taperEnd) : "") +

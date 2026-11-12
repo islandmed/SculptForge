@@ -103,10 +103,11 @@ struct TubeShape {
     enum class Profile : uint8_t { Round, Square, Triangle, Ribbon, Rope, Braid, Sleeve };
     Profile profile = Profile::Round; // the cross-section (its "radius" is half its width)
     float thickness = 0.25f;          // Ribbon: its thickness as a fraction of its width
-    float spin = 0.0f;                // degrees the cross-section is turned about the curve (Spin; saved as "roll", the old Turn)
+    float roll = 0.0f;                // degrees the cross-section is turned about the curve
     glm::vec3 up{0.0f};               // the first ring's orientation (0: automatic)
     float taperStart = 0.0f, taperEnd = 0.0f; // fraction of the length narrowing to a point at each end
-    float twist = 0.0f;  // degrees the cross-section turns from the start to the end (on top of spin)
+    float twist = 0.0f;  // degrees the cross-section turns from the start to the end (on top of roll)
+    float spin = 0.0f;   // degrees it turns per average radius of length (on top of roll and twist)
     int strands = 3;     // Rope/Braid: how many strands (1..8; a rope of one strand is a spring)
     float spread = 0.5f; // Rope/Braid: strand spacing (0.5: touching); Sleeve: wall thickness (half of it, as a fraction of the radius)
     bool curve = false;  // a Curve Part: only the guide line (a thin wire) is swept until Tube from curve clears this
