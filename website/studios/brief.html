@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SculptForge for Studios: Technical Brief</title>
+  <meta name="description" content="Checkable facts for pipeline TDs, supervisors and IT: scale and frame times with their method, VFX Reference Platform builds, native Wayland, OpenUSD, headless and MCP automation, signed releases, and what it does not do yet. Every figure links to its source.">
+  <meta name="theme-color" content="#111114" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f5f3" media="(prefers-color-scheme: light)">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SculptForge for studios: technical brief">
+  <meta property="og:description" content="Scale, platforms, pipeline, OpenUSD, automation and security, each figure with its method and a link to its source. Includes a list of what it does not do yet.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/studios/brief">
+  <link rel="canonical" href="https://sculptforge.app/studios/brief">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=39">
+  <style>
+    /* Same tokens and nav as the studios page; it follows the system's light or dark setting. */
+    .brief-page { --card-bd: rgba(255, 255, 255, 0.09); --th: #a3a3ad; --row: rgba(255, 255, 255, 0.025); --warn-bg: rgba(242, 140, 60, 0.07); }
+    .brief-top { position: relative; isolation: isolate; overflow: hidden; background: #0c0c0f; color: #ececf1; padding: 56px 0 40px; }
+    .brief-top::before { content: ""; position: absolute; inset: 0; z-index: -1;
+                         background: radial-gradient(46% 70% at 50% 0%, rgba(242, 140, 60, 0.18), transparent 72%),
+                                     linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 56px 56px,
+                                     linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 56px 56px;
+                         -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+    .brief-top .eyebrow { margin: 0 0 10px; }
+    .brief-top h1 { font-size: clamp(2rem, 4.4vw, 3.2rem); margin: 0 0 14px; color: #fff; text-wrap: balance; }
+    .brief-top .lede { color: #cfcfd6; max-width: 46em; margin-bottom: 18px; }
+    .brief-top .checked { font-size: 0.88rem; color: #a9a9b2; margin: 0 0 22px; }
+    .jump { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+    .jump a { display: inline-block; font-size: 0.85rem; color: #d8d8e0; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 4px 12px; }
+    .jump a:hover { background: rgba(255,255,255,0.08); text-decoration: none; }
+    .nav nav a[aria-current="page"] { color: var(--text); }
+
+    .brief { padding: 56px 0 8px; }
+    .brief section { padding: 0 0 56px; scroll-margin-top: 80px; }
+    .brief h2 { font-size: clamp(1.5rem, 2.6vw, 2rem); margin: 0 0 6px; }
+    .brief h3 { font-size: 1.05rem; margin: 26px 0 8px; }
+    .brief .what { color: var(--muted); max-width: 52em; margin: 0 0 16px; }
+    .brief p, .brief li { color: var(--text); }
+    .brief ul.facts { margin: 8px 0 14px; padding-left: 1.2em; }
+    .brief ul.facts li { margin: 6px 0; }
+    .brief .note { color: var(--muted); font-size: 0.9rem; max-width: 56em; }
+    .brief .num-id { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+    .tscroll { overflow-x: auto; border: 1px solid var(--card-bd); border-radius: 12px; background: var(--panel); margin: 14px 0 6px; -webkit-overflow-scrolling: touch; }
+    .tscroll:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+    table.t { width: 100%; border-collapse: collapse; font-size: 0.92rem; line-height: 1.45; min-width: 680px; }
+    table.t caption { text-align: left; padding: 12px 14px 0; color: var(--muted); font-size: 0.82rem; caption-side: top; }
+    table.t th, table.t td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--card-bd); }
+    table.t thead th { color: var(--th); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+    table.t tbody tr:last-child th, table.t tbody tr:last-child td { border-bottom: 0; }
+    table.t tbody tr:nth-child(even) { background: var(--row); }
+    table.t tbody th { font-weight: 600; width: 14em; }
+    table.t td.src, table.t th.src { white-space: normal; min-width: 11em; font-size: 0.86rem; }
+    table.t td.src a { display: inline-block; margin: 0 8px 2px 0; }
+    table.t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    table.t .big { font-size: 1.15rem; font-weight: 700; color: var(--accent-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    table.t code, .brief li code, .brief p code { font-size: 0.85em; overflow-wrap: anywhere; }
+    table.glance { min-width: 760px; }
+    table.glance td:first-child { width: 2.4em; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    pre.cmd { background: var(--panel); border: 1px solid var(--card-bd); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 0.84rem; line-height: 1.5; margin: 10px 0; }
+    pre.cmd code { background: none; padding: 0; border-radius: 0; white-space: pre; }
+
+    .box { border: 1.5px solid var(--accent); background: var(--warn-bg); border-radius: 14px; padding: 22px 24px; margin-top: 14px; }
+    .box h3 { margin-top: 0; }
+    .box ul { margin: 8px 0 0; padding-left: 1.2em; }
+    .box li { margin: 7px 0; }
+    .reach { font-size: 0.9rem; color: var(--muted); margin: 0; }
+
+    @media (max-width: 760px) {
+      .brief-top { padding: 40px 0 30px; }
+      .brief { padding-top: 36px; }
+      .brief section { padding-bottom: 40px; }
+      .brief .wrap, .brief-top .wrap { padding: 0 16px; }
+      /* The at-a-glance table becomes one block per fact; the others scroll sideways. */
+      .glance-wrap { overflow: visible; border: 0; background: none; }
+      table.glance { min-width: 0; }
+      table.glance thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      table.glance tbody, table.glance tr, table.glance td { display: block; }
+      table.glance tbody tr { background: var(--panel); border: 1px solid var(--card-bd); border-radius: 12px; padding: 12px 14px; margin: 0 0 12px; }
+      table.glance td { border: 0; padding: 3px 0; width: auto; white-space: normal; }
+      table.glance td:first-child { width: auto; font-size: 0.78rem; }
+      table.glance td[data-label]::before { content: attr(data-label); display: block; color: var(--th); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+      table.glance td.src { min-width: 0; }
+      .box { padding: 18px 16px; }
+    }
+
+    /* Light */
+    @media (prefers-color-scheme: light) {
+      :root { color-scheme: light; }
+      .brief-page { --bg: #f6f5f3; --bg-alt: #efede9; --panel: #ffffff; --border: #e2dfda; --text: #1c1c21; --muted: #5d5d66;
+                    --accent: #c8621f; --accent-2: #a84d14; --card-bd: #e2dfda; --th: #5d5d66; --row: #faf9f7; --warn-bg: #fff4e8; }
+      .brief-page a { color: #a84d14; }
+      .brief-page code { background: #ebe8e3; }
+      .brief-page .nav { background: rgba(246, 245, 243, 0.86); }
+      .brief-page .nav nav a { color: #55555e; }
+      .brief-page .brand, .brief-page .nav nav a.gh { color: var(--text); }
+      .brief-page .nav nav a.nav-support { color: #b8561a; border-color: rgba(184, 86, 26, 0.5); }
+      .brief-page .nav nav a.nav-support:hover { color: #fff; background: #c8621f; }
+      .brief-page .nav-toggle span { background: var(--text); }
+      .brief-page .nav-menu a:hover { background: rgba(0, 0, 0, 0.05); }
+      .brief-page .nav nav a[aria-current="page"] { color: var(--text); }
+      .brief-page .footer { background: var(--bg-alt); }
+      .brief-top { background: #f6f5f3; color: var(--text); }
+      .brief-top::before { background: radial-gradient(46% 70% at 50% 0%, rgba(242, 140, 60, 0.2), transparent 72%),
+                                       linear-gradient(rgba(60,40,20,0.06) 1px, transparent 1px) 0 0 / 56px 56px,
+                                       linear-gradient(90deg, rgba(60,40,20,0.06) 1px, transparent 1px) 0 0 / 56px 56px; }
+      .brief-top h1 { color: #16161a; }
+      .brief-top .lede { color: #4d4d56; }
+      .brief-top .checked { color: #5d5d66; }
+      .brief-top .eyebrow { color: #b8561a; }
+      .jump a { color: #3d3d46; border-color: rgba(28,28,33,.22); }
+      .jump a:hover { background: rgba(0,0,0,0.05); }
+    }
+  </style>
+  <script src="../motion.js?v=15" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</head>
+<body class="brief-page">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="../guide/index.html">Guide</a>
+        <a href="../studios.html" aria-current="page">For studios</a>
+        <a href="../why.html">About</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="../support.html">Support</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <div class="brief-top">
+      <div class="wrap">
+        <p class="eyebrow">SculptForge for studios</p>
+        <h1>Technical brief</h1>
+        <p class="lede">For pipeline TDs, supervisors and IT. Each figure below states what was measured and on
+          what, and links to where it can be checked: a guide page, a path in the public repository, the changelog
+          or the benchmark scenes. What is not done yet is listed in <a href="#not-yet">its own section</a>.</p>
+        <p class="checked">Checked on 2026-11-12 against release v0.12.10 and the main branch of the
+          <a href="https://github.com/islandmed/SculptForge">public repository</a>.</p>
+        <ul class="jump" aria-label="Sections">
+          <li><a href="#at-a-glance">At a glance</a></li><li><a href="#performance">Performance</a></li><li><a href="#platforms">Platforms</a></li><li><a href="#linux">Linux desktop</a></li><li><a href="#pipeline">Pipeline</a></li><li><a href="#openusd">OpenUSD</a></li><li><a href="#automation">Automation</a></li><li><a href="#security">Security and IT</a></li><li><a href="#build">How it is built</a></li><li><a href="#not-yet">Not yet</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="brief">
+      <div class="wrap">
+
+        <section id="at-a-glance" aria-labelledby="h-glance">
+          <h2 id="h-glance">At a glance</h2>
+          <p class="what">The ten facts most often asked for. Each is repeated, with its method, in the section named.</p>
+          <div class="tscroll glance-wrap" tabindex="0" role="region" aria-label="At a glance, scrolls sideways">
+          <table class="t glance">
+            <thead><tr><th>#</th><th>Fact</th><th>Method or scope</th><th class="src">Source</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td data-label="Fact">A sculpted 112-million-triangle scan orbits at <strong>33 frames a second</strong> right after a big stroke, from under 1 to 33 in the What's New wording.</td><td data-label="Method or scope">Stanford Lucy scan with sculpted detail, RTX 3060, version 0.11.1. <a href="#performance">Details</a></td><td class="src" data-label="Source"><a href="../guide/whats-new.html#version-0111">What's New 0.11.1</a><a href="../fast/">How fast?</a></td></tr>
+              <tr><td>2</td><td data-label="Fact">Micro levels hold <strong>300 million</strong> micro triangles in about 0.4 GB; a billion fit on a 16 GB machine, partly out of core.</td><td data-label="Method or scope">Memory per micro triangle, 1.05 to 1.4 bytes by micro level. <a href="#performance">Details</a></td><td class="src" data-label="Source"><a href="../guide/micro-levels.html">Micro levels</a></td></tr>
+              <tr><td>3</td><td data-label="Fact">Slowest frames orbiting a 28-million-triangle scan on the entry-level tier: <strong>24 ms to 12 ms</strong> in 0.11.7.</td><td data-label="Method or scope">Simulated entry-level tier (<code>SF_HW_SIMULATE=floor</code>) on an Apple M1 Pro laptop. <a href="#performance">Details</a></td><td class="src" data-label="Source"><a href="../guide/whats-new.html#version-0117">What's New 0.11.7</a><a href="../fast/#machines">Tier definition</a></td></tr>
+              <tr><td>4</td><td data-label="Fact">One 2-second Clay stroke on a 112M-triangle scan: about <strong>98 s</strong> to finish in 0.11.0, <strong>1.4 s</strong> in 0.11.8.</td><td data-label="Method or scope">Entry-level tier, one run per release, timed from screenshot file times. <a href="#performance">Details</a></td><td class="src" data-label="Source"><a href="https://github.com/islandmed/SculptForge/blob/main/docs/design/perf-scoreboard.md">perf-scoreboard.md</a></td></tr>
+              <tr><td>5</td><td data-label="Fact"><strong>VFX Reference Platform CY2026 and CY2027</strong>: Rocky Linux 8 (glibc 2.28) and 9 (glibc 2.34), GCC 14, C++20, Python 3.13.</td><td data-label="Method or scope">Built and tested in those containers on main; CI fails on newer glibc symbols. <a href="#platforms">Details</a></td><td class="src" data-label="Source"><a href="../guide/studios.html#vfx-reference-platform-builds">Studio guide</a><a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/ci.yml">ci.yml</a></td></tr>
+              <tr><td>6</td><td data-label="Fact"><strong>Native Wayland</strong> without XWayland, and X11, from the same build; pen pressure, tilt, eraser and side buttons on both.</td><td data-label="Method or scope">SDL3 Wayland backend, tablet-v2 protocol; fractional scales 125, 150, 200%. <a href="#linux">Details</a></td><td class="src" data-label="Source"><a href="../guide/installing.html#wayland-and-x11">Install guide</a></td></tr>
+              <tr><td>7</td><td data-label="Fact"><strong>OpenUSD</strong> <code>.usda</code> and <code>.usdz</code> read and write, with UsdSkel blend shapes and ParticleField splats. <code>.usdc</code>, references and payloads are not read yet.</td><td data-label="Method or scope">Scope as documented. <a href="#openusd">Details</a></td><td class="src" data-label="Source"><a href="../guide/studios.html#formats-in-a-pipeline">Formats table</a></td></tr>
+              <tr><td>8</td><td data-label="Fact"><strong>Headless</strong>: <code>sculptforge-cli</code>, a Python 3.13 module, and an MCP server over stdio only (no port).</td><td data-label="Method or scope">Same commands in the app, CLI, Python and MCP. <a href="#automation">Details</a></td><td class="src" data-label="Source"><a href="../guide/scripting.html">Scripting guide</a><a href="../guide/security.html#ai-tools-mcp">Security overview</a></td></tr>
+              <tr><td>9</td><td data-label="Fact"><strong>No licence server, no account, no telemetry</strong>; no listening ports by default; offline use; secrets in the OS keychain.</td><td data-label="Method or scope">As documented in the IT security overview; policy file locks settings. <a href="#security">Details</a></td><td class="src" data-label="Source"><a href="../guide/security.html">Security overview</a></td></tr>
+              <tr><td>10</td><td data-label="Fact"><strong>28 releases</strong> between 2026-11-04 and 2026-11-11, each with a changelog entry.</td><td data-label="Method or scope">Count of non-pre-release GitHub releases and of version headings in the changelog. <a href="#build">Details</a></td><td class="src" data-label="Source"><a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">CHANGELOG.md</a><a href="https://github.com/islandmed/SculptForge/releases">Releases</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+        </section>
+
+        <section id="performance" aria-labelledby="h-perf">
+          <h2 id="h-perf">1. Scale and performance</h2>
+          <p class="what">Our own numbers only. Floor tier first: a claim is stated for the entry-level tier when there is one, and the machine is named for every figure.</p>
+
+          <div class="tscroll" tabindex="0" role="region" aria-label="Published measurements, scrolls sideways">
+          <table class="t">
+            <caption>Published measurements</caption>
+            <thead><tr><th>Figure</th><th>Machine and tier</th><th>What was measured</th><th class="src">Source</th></tr></thead>
+            <tbody>
+              <tr><td><span class="big">33 fps</span><br>orbit, 112M triangles</td><td>Windows desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060, 32 GB. A real GPU, not the entry-level tier.</td><td>Frames per second orbiting Lucy (28M base triangles, 112M at its micro level) with sculpted detail, immediately after a big stroke. Version 0.11.1. The What's New note gives the change as "from under 1 to 33 frames a second".</td><td class="src"><a href="../guide/whats-new.html#version-0111">What's New 0.11.1</a><a href="../fast/#repeat">Commands</a></td></tr>
+              <tr><td><span class="big">24 to 12 ms</span><br>slowest frames, 28M triangles</td><td>Entry-level tier, simulated: Apple M1 Pro laptop limited to the entry-level budgets and OpenGL 3.3 (<code>SF_HW_SIMULATE=floor</code>).</td><td>The slowest frames while orbiting a 28-million-triangle scan, 0.11.6 against 0.11.7.</td><td class="src"><a href="../guide/whats-new.html#version-0117">What's New 0.11.7</a><a href="../fast/#machines">Tiers</a></td></tr>
+              <tr><td><span class="big">98 s to 1.4 s</span><br>one stroke, 112M triangles</td><td>Entry-level tier (<code>SF_HW_SIMULATE=floor SF_GOVERNOR=0</code>), laptop, offscreen. Each release built from its own tag as Release.</td><td>One 2-second Clay stroke at the default size across a 112M-triangle scan (28M base triangles plus a micro level): shot before, shot after the stroke, and shot when idle; times are the shots' file times. 0.11.0: about 98 s in all; 0.11.8: 1.4 s. One run per release.</td><td class="src"><a href="https://github.com/islandmed/SculptForge/blob/main/docs/design/perf-scoreboard.md">perf-scoreboard.md</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="note">The page <a href="../fast/">How fast?</a> says that its own result tables are being re-measured on scans with real surface detail, and lists no figures yet. The three rows above are the ones stated in the What's New notes and the scoreboard in the repository. The raw result files for them are not published; the scenes and commands to repeat them are.</p>
+
+          <h3>Sculpting and turning the view, by mesh size</h3>
+          <div class="tscroll" tabindex="0" role="region" aria-label="Dab time and view speed by mesh size, scrolls sideways">
+          <table class="t">
+            <caption>Apple M1 Pro laptop (10 cores, integrated GPU), X symmetry on, medium Size. Closed models.</caption>
+            <thead><tr><th>Mesh</th><th>One dab of a medium brush</th><th>Turning the view</th></tr></thead>
+            <tbody>
+              <tr><td class="n">4 million triangles</td><td class="n">about 2 ms</td><td class="n">about 350 frames a second</td></tr>
+              <tr><td class="n">16 million triangles</td><td class="n">about 4.5 ms</td><td class="n">about 170 frames a second</td></tr>
+              <tr><td class="n">33 million triangles</td><td class="n">about 7.5 ms</td><td class="n">about 110 (4x antialiasing), 270 with Fast Navigation</td></tr>
+              <tr><td class="n">100 million triangles</td><td>not stated</td><td class="n">about 50 (4x antialiasing), 100 with Fast Navigation</td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="note">Source: <a href="../guide/performance.html#what-to-expect">Performance guide, What to expect</a>; the full measurements and the command that reproduces them (<code>sculptforge --bench</code>) are in <a href="https://github.com/islandmed/SculptForge/blob/main/docs/performance.md">docs/performance.md</a>.</p>
+
+          <h3>Micro levels: hundreds of millions of polygons</h3>
+          <ul class="facts">
+            <li>A micro level stores one 16-bit height per grid point on each triangle of the highest subdivision level, and the micro triangles are worked out on the fly. Micro levels 3 to 7 give 64 to 16,384 micro triangles per base triangle, at 1.4 to 1.05 bytes per micro triangle. 300 million micro triangles take about 0.4 GB.</li>
+            <li>A micro level larger than the resident cache the hardware profile allows (a quarter of the memory when there is no profile yet) is kept out of core in a file in the cache folder; only the parts being sculpted or viewed stay in memory. A billion micro triangles fit on a 16 GB machine.</li>
+            <li>The view lowers the detail of far and small areas until a frame fits a budget: 2 million triangles on the laptop profile, 8 million on the workstation profile.</li>
+            <li>Without micro levels, subdivision levels cost about 90 bytes per triangle, which is why a 300-million-triangle mesh would need 27 GB that way.</li>
+          </ul>
+          <p class="note">Source: <a href="../guide/micro-levels.html">Micro levels</a> and <a href="../guide/micro-levels.html#very-large-levels-and-laptops">Very large levels and laptops</a>. Brushes that work on micro levels, and those that do not, are listed on that page.</p>
+
+          <h3>Run it yourself</h3>
+          <pre class="cmd"><code>sculptforge --benchmark standard-15m      # built-in 15M-triangle head, identical on every computer
+sculptforge --benchmark standard-33m      # the 33M head
+sculptforge --bench                       # per-brush and view costs, see docs/performance.md</code></pre>
+          <p class="note">The scene, strokes (scripted pen, 240 pointer samples a second, Clay at 25, 60 and 120 px, Move, Smooth, a 240 px Clay, then an orbit) and the meaning of frame p50, p95, p99, lag and worst stall are described on <a href="../benchmarks/">Benchmarks</a>. The results table on that page has no submitted results today. The method for the Lucy scenes, including how to build them from the Stanford scan, is on <a href="../fast/#repeat">How fast?</a>.</p>
+
+          <h3>Where it is still slow</h3>
+          <ul class="facts">
+            <li>Big brushes (120 and 240 px) on very dense meshes trail the pen on every machine tested, the RTX 3060 desktop included: the stroke lands, but late.</li>
+            <li>On the entry-level budget, orbiting a 112-million-triangle scan right after a stroke was below 30 frames a second when the How fast? page was written (0.11.2), because the whole base mesh is drawn every frame.</li>
+            <li>Opening a scan with a micro level takes seconds, not instantly, on every machine tested.</li>
+            <li>Lucy at 112 million triangles needs more memory than an 8 GB integrated-graphics laptop has; the largest Lucy that fits there is the 28-million-triangle version.</li>
+          </ul>
+          <p class="note">Source: <a href="../fast/#limits">How fast?, What's still slow</a>. No real integrated-graphics laptop is in the measured set yet; that tier is simulated and each result says so.</p>
+        </section>
+
+        <section id="platforms" aria-labelledby="h-plat">
+          <h2 id="h-plat">2. Platforms and deployment</h2>
+          <p class="what">What each release ships for, and the VFX Reference Platform versions it is built and tested against.</p>
+
+          <div class="tscroll" tabindex="0" role="region" aria-label="VFX Reference Platform table, scrolls sideways">
+          <table class="t">
+            <caption>VFX Reference Platform</caption>
+            <thead><tr><th></th><th>CY2026</th><th>CY2027</th><th>SculptForge</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Linux compiler</th><td>GCC 14.2</td><td>GCC 14.2</td><td>Built and tested with <code>gcc-toolset-14</code></td></tr>
+              <tr><th scope="row">glibc</th><td>2.28 (EL8)</td><td>2.34 (EL9)</td><td>Rocky Linux 8 and 9 builds; CI checks that no newer glibc symbols are used</td></tr>
+              <tr><th scope="row">C++</th><td>C++20</td><td>C++20</td><td>C++20</td></tr>
+              <tr><th scope="row">Python</th><td>3.13</td><td>3.13</td><td>The <code>sculptforge</code> module is built and tested against 3.13</td></tr>
+              <tr><th scope="row">Windows</th><td>VS 2022 17.6+</td><td>VS build tools 14.44+</td><td>Visual Studio 2022</td></tr>
+              <tr><th scope="row">macOS minimum</th><td>14.0</td><td>14.0</td><td>Universal binary with deployment target 11.0</td></tr>
+              <tr><th scope="row">FBX</th><td>2020.x</td><td>2020.x</td><td>Writes FBX 7.4 binary, which FBX SDK 2020 reads</td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="note">Source: <a href="../guide/studios.html#vfx-reference-platform-builds">Studio guide, VFX Reference Platform builds</a>; the containers and the glibc check are the <code>vfx-platform</code> job in <a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/ci.yml">ci.yml</a> (Rocky 8, Rocky 9). SculptForge uses no Qt, OpenEXR, Boost or TBB; its few dependencies (SDL3, Dear ImGui, GLM, ufbx) are linked into the binaries, so it cannot conflict with the libraries your other tools load.</p>
+
+          <h3>What each release ships</h3>
+          <div class="tscroll" tabindex="0" role="region" aria-label="Release assets by platform, scrolls sideways">
+          <table class="t">
+            <thead><tr><th>Platform</th><th>Assets</th><th class="src">Source</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Linux x86_64 and ARM64</th><td><code>.deb</code>, <code>.rpm</code>, AppImage, Flatpak, <code>tar.gz</code>, and the Reference Platform archives <code>SculptForge-&lt;version&gt;-linux-&lt;arch&gt;-vfx2026.tar.gz</code> (Rocky 8) and <code>-vfx2027.tar.gz</code> (Rocky 9) with the Python module under <code>lib/sculptforge/python</code>. ARM64 runs on 4, 16 and 64 KiB memory pages.</td><td class="src"><a href="../guide/installing.html">Install guide</a><a href="https://github.com/islandmed/SculptForge/releases/tag/v0.12.10">Assets of v0.12.10</a></td></tr>
+              <tr><th scope="row">Windows 10 and 11, x64</th><td>Installer (NSIS) and portable <code>.zip</code>. Not Authenticode-signed yet; SmartScreen warns. Verify with the signed checksums.</td><td class="src"><a href="../code-signing.html">Code signing</a><a href="../guide/security.html#supply-chain">Supply chain</a></td></tr>
+              <tr><th scope="row">macOS 11 or later</th><td>Universal <code>.dmg</code> (arm64 and x86_64), deployment target 11.0. Ad-hoc signed, not notarized.</td><td class="src"><a href="../guide/security.html#supply-chain">Supply chain</a><a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/packages.yml">packages.yml</a></td></tr>
+              <tr><th scope="row">Android</th><td>An early test build, not in a stable release yet: sideloaded APK for arm64 and x86_64, Android 9 or later, OpenGL ES 3.2. It uses the desktop layout; a tablet layout of its own is not done.</td><td class="src"><a href="https://github.com/islandmed/SculptForge/blob/main/android/README.md">android/README.md</a><a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">CHANGELOG, Unreleased</a></td></tr>
+              <tr><th scope="row">Rez</th><td><code>packaging/rez/package.py</code> builds and installs a Rez package: <code>bin/</code> on <code>PATH</code>, the Python module on <code>PYTHONPATH</code>, <code>SCULPTFORGE_ROOT</code> set. <code>SCULPTFORGE_STUDIO_BRUSHES</code> adds a studio brush share.</td><td class="src"><a href="../guide/studios.html#deploy-with-rez">Deploy with Rez</a><a href="https://github.com/islandmed/SculptForge/blob/main/packaging/rez/package.py">package.py</a></td></tr>
+              <tr><th scope="row">Package managers</th><td>Homebrew cask: available (<code>brew install --cask islandmed/tap/sculptforge</code>). FlatPark (Flatpak): available. winget: submitted and in review, not installable yet. AUR: ready, not published yet. apt and dnf repositories: not live.</td><td class="src"><a href="../guide/installing.html#package-managers">Package managers</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="note">Graphics: OpenGL 3.3 core profile. Every release carries <code>SHA256SUMS.txt</code>; see <a href="#security">Security and IT</a> for its signature. Silent-install switches are not documented for the Windows installer, so none are listed here.</p>
+        </section>
+
+        <section id="linux" aria-labelledby="h-linux">
+          <h2 id="h-linux">3. Linux desktop</h2>
+          <p class="what">One build, native on both display servers.</p>
+          <ul class="facts">
+            <li>Every Linux package (<code>.deb</code>, <code>.rpm</code>, AppImage, Flatpak, <code>tar.gz</code>) opens as a native Wayland window on a Wayland desktop, without XWayland, and as a normal X11 window on an X11 session. <code>SDL_VIDEO_DRIVER=x11</code> forces X11.</li>
+            <li>On Wayland the window stays sharp at fractional and HiDPI scales (125%, 150%, 200%). Title bars come from the desktop, or from libdecor on GNOME.</li>
+            <li>Pen tablets work on both. On Wayland, pressure, tilt, the eraser end and side buttons come through the desktop's tablet protocol (tablet-v2), so the tablet is set up in the desktop's settings, not with X11 tools such as <code>xsetwacom</code>.</li>
+            <li><strong>Edit &gt; Preferences &gt; Tablet &gt; Troubleshooting details</strong> shows the SDL version, the video driver in use (wayland or x11) and what the pen sends, with a Copy button for bug reports.</li>
+            <li>CI builds SDL with Wayland and X11 on Ubuntu 22.04 (Wayland 1.20, the oldest headers the packages build against) on every code change, and fails if the Wayland backend is not built.</li>
+          </ul>
+          <p class="note">Sources: <a href="../guide/installing.html#wayland-and-x11">Install guide, Wayland and X11</a>; <a href="../guide/troubleshooting.html">Troubleshooting</a>; job <code>oldest-linux</code> in <a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/ci.yml">ci.yml</a>. Pen pressure on Wayland and X11 was fixed in 0.12.0 (<a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">CHANGELOG.md</a>, "Pen pressure on Wayland and X11").</p>
+        </section>
+
+        <section id="pipeline" aria-labelledby="h-pipe">
+          <h2 id="h-pipe">4. Pipeline</h2>
+          <p class="what">How a sculpt gets to and from the other tools in a pipeline.</p>
+
+          <div class="tscroll" tabindex="0" role="region" aria-label="Pipeline integrations, scrolls sideways">
+          <table class="t">
+            <thead><tr><th>Tool</th><th>What it does</th><th class="src">Source</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Blender 4.2+</th><td>The Bridge add-on sends the selected objects to SculptForge with one click, and one click in SculptForge sends them back. Objects update in place: transform, materials and modifiers stay. It works through files in a shared folder on Linux, Windows and macOS. On main, CI tests the add-on against Blender's Python module (bpy 4.2.0, 5.2.3 and 5.3.0).</td><td class="src"><a href="../guide/blender.html">Working with Blender</a><a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/ci.yml">ci.yml</a></td></tr>
+              <tr><th scope="row">Maya 2022+</th><td>A shelf script sends the selected meshes through a shared folder and takes them back, replacing each Maya object's mesh by name. It uses plain <code>maya.cmds</code>; nothing of Maya's ships with SculptForge. An opt-in Live link follows a stroke while it is drawn, over a per-user socket or pipe on the same computer, never a network port. The bridge is off until the folder is chosen.</td><td class="src"><a href="../guide/maya.html">Working with Maya</a></td></tr>
+              <tr><th scope="row">Houdini</th><td>Through OpenUSD files (next section). There is no Houdini plug-in. USD files in other units (<code>metersPerUnit</code>, for example centimetres) open at their real size.</td><td class="src"><a href="../guide/exporting.html#export-formats-at-a-glance">Formats and units</a></td></tr>
+              <tr><th scope="row">Unreal Engine 5.x</th><td><strong>Send to Unreal</strong> pushes into a running editor, on this computer or on the network, through Unreal's built-in Python remote execution; nothing is installed in the project. No sculpt layers: a static mesh <code>SM_&lt;Name&gt;</code> with the LOD chain (default 4 levels). Sculpt layers: a skeletal mesh <code>SK_&lt;Name&gt;</code> with one morph target per layer, without the LOD chain.</td><td class="src"><a href="../guide/exporting.html#send-to-unreal">Send to Unreal</a></td></tr>
+              <tr><th scope="row">Other sculpting apps</th><td>The Bridge exchanges Parts through a shared bridge folder (Windows and macOS): face groups, mask, vertex paint and UVs.</td><td class="src"><a href="../guide/exporting.html#exchange-models-through-the-bridge">Bridge</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <h3>Formats, LODs, UVs, textures</h3>
+          <ul class="facts">
+            <li><strong>Formats:</strong> OpenUSD (<code>.usda</code>, <code>.usdz</code>), FBX (reads any version, writes 7.4 binary), glTF/GLB, OBJ, PLY, STL (binary and ASCII read, binary write), Bridge files and the project format <code>.sfproj</code>, which is a documented ZIP of JSON and binary arrays (<code>docs/project-format.md</code>).</li>
+            <li><strong>Units:</strong> glTF, USD and OBJ are written Y-up, 1 unit = 1 metre. FBX is written in centimetres. STL is written in millimetres, Z up.</li>
+            <li><strong>LOD chains:</strong> quadric decimation, 2 to 6 levels, reduction 0.1 to 0.9 per level, blend shapes kept on every level; exported as one <code>.glb</code> per level, as an FBX LOD group, or sent to Unreal. Headless: <code>export_lods path=out/rock.glb levels=4 ratio=0.5</code>.</li>
+            <li><strong>UVs and UDIM:</strong> a UV Editor shows the layout over the UDIM tiles. Bakes write one file per UDIM tile with <code>udim=true</code>. Painting goes into one texture per Part; UVs outside the 0 to 1 square are not painted yet.</li>
+            <li><strong>Bakes:</strong> <code>normal</code>, <code>object_normal</code>, <code>displacement</code>, <code>ao</code>, <code>cavity</code>, <code>color</code>, <code>curvature</code>, <code>thickness</code>, <code>position</code>, <code>id</code>, from a Part, all Parts, a subdivision level or a micro level, 512 to 8192 pixels.</li>
+            <li><strong>PBR:</strong> PBR channel painting with the painted texture carried into GLB, USDZ and OBJ (<code>.mtl</code>) exports.</li>
+          </ul>
+          <p class="note">Sources: <a href="../guide/studios.html#formats-in-a-pipeline">Formats table</a>, <a href="../guide/exporting.html">Exporting</a>, <a href="../guide/baking.html">Baking</a> (<a href="../guide/baking.html#udim-tiles">UDIM tiles</a>), <a href="../guide/uv-editor.html">UV Editor</a>, <a href="../guide/pbr-painting.html">PBR painting</a>. Exports are checked with other tools than our own loaders by a script in the repository, <a href="https://github.com/islandmed/SculptForge/blob/main/tools/export_check/run.sh"><code>tools/export_check/run.sh</code></a>: the Khronos glTF validator, OpenUSD's validation framework, and ufbx in strict mode. That script is run by hand, not by the CI workflows.</p>
+        </section>
+
+        <section id="openusd" aria-labelledby="h-usd">
+          <h2 id="h-usd">5. OpenUSD</h2>
+          <p class="what">Read and write for <code>.usda</code> and <code>.usdz</code>.</p>
+          <div class="tscroll" tabindex="0" role="region" aria-label="What OpenUSD carries, scrolls sideways">
+          <table class="t">
+            <thead><tr><th>Carried</th><th>How</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Meshes</th><td>One Mesh prim per Part, quads kept. Written Y-up, metres per unit 1. Z-up stages are read; <code>metersPerUnit</code> is honoured.</td></tr>
+              <tr><th scope="row">Transforms</th><td>Xform ops are read.</td></tr>
+              <tr><th scope="row">Blend shapes</th><td>Sculpt layers are written as UsdSkel blend shapes, and read back.</td></tr>
+              <tr><th scope="row">Splats</th><td>ParticleField Gaussian splats, read and written.</td></tr>
+              <tr><th scope="row">UVs, colour, textures</th><td>UVs as <code>primvars:st</code>; vertex paint as <code>displayColor</code>; the painted texture through a preview material, inside a <code>.usdz</code>.</td></tr>
+              <tr><th scope="row">Selection sets</th><td>Shown faces of each set as a <code>GeomSubset</code>, face groups as a partition of <code>GeomSubset</code>s, mask and vertex paint as vertex primvars, named in <code>sculptforge:selectionSets</code>. SculptForge turns them back into selection sets on import.</td></tr>
+              <tr><th scope="row">Facial animation</th><td>Blend shape weights as time samples.</td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="note"><strong>Not read yet:</strong> binary <code>.usdc</code> files, and USD references and payloads. Convert with <code>usdcat in.usd -o out.usda</code>. Fuller USD authoring (layers, variants, references, <code>.usdc</code>) is not done. Sources: <a href="../guide/studios.html#formats-in-a-pipeline">Formats in a pipeline</a>, <a href="../guide/exporting.html">Exporting</a>, <a href="../guide/selection-sets.html">Selection sets</a>, <a href="../guide/facial-shapes.html">Facial shapes</a>. Output is checked with OpenUSD's validation framework by <code>tools/export_check/run.sh</code> (see Pipeline).</p>
+        </section>
+
+        <section id="automation" aria-labelledby="h-auto">
+          <h2 id="h-auto">6. Automation</h2>
+          <p class="what">The same commands run in the app, the command line, Python and an MCP server.</p>
+          <ul class="facts">
+            <li><strong>Command line:</strong> <code>sculptforge-cli</code> runs every editing operation without a display: imports, remeshing, decimation, LOD chains, FBX, USD and glTF export, splat conversion and AI generation. <code>sculptforge-cli --list</code> lists every pipeline command. <code>sculptforge --render out.png --turntable 8</code> renders review images and turntables offscreen; it needs an OpenGL 3.3 context, so on a headless Linux node run it under Xvfb.</li>
+            <li><strong>Python:</strong> <code>import sculptforge</code> gives the same commands plus NumPy access to the mesh (<code>doc.vertices</code>, <code>doc.triangles</code>). The Reference Platform builds are built and tested against Python 3.13.</li>
+            <li><strong>Rez:</strong> see Platforms. <code>SCULPTFORGE_BRUSH_PATH</code> and <code>SCULPTFORGE_STUDIO_BRUSHES</code> point the app, CLI and module at read-only studio brush shares; SculptForge never writes into them.</li>
+            <li><strong>MCP, for AI agents:</strong> <code>sculptforge-cli --mcp</code> serves the Model Context Protocol over standard input and output only, with a scene of its own and no window; the AI tool starts it as a child process and nothing listens on a port. <code>sculptforge-cli --mcp --attach</code> lets an AI tool work in an open SculptForge window; it is off by default and the policy file can forbid it. The guide gives the setup for Claude Code, Claude Desktop, Cursor, Codex CLI and Antigravity CLI. Each command is checked against the policy's categories and written to the audit log.</li>
+            <li><strong>ComfyUI, a separate feature:</strong> <strong>Generate 3D</strong> can use "ComfyUI - your server" to run image or text to 3D on your own computer or a studio GPU server. The bundled <code>text-to-3d</code> workflow uses FLUX.1 schnell and Hunyuan3D 2.1, and any other ComfyUI workflow can be chosen. ComfyUI listens on <code>127.0.0.1:8188</code> by default; for another computer start it with <code>--listen</code>, only on a network you trust, because ComfyUI has no login. This is not related to the MCP server.</li>
+            <li><strong>AI is on by default</strong> and can be turned off: <strong>Edit &gt; Preferences &gt; AI</strong>, <code>SF_AI=off</code> or <code>--no-ai</code> (every AI feature off and locked, in the app, CLI, MCP and Python), or <code>ai.enabled: false</code> in the policy file. With AI off the MCP server stays; the AI commands leave its tool list.</li>
+          </ul>
+          <pre class="cmd"><code>sculptforge-cli --set in=/ingest/scan_042.ply --set usd=/assets/scan_042.usda --set glb=/assets/scan_042.glb -c '
+  open path=$in
+  splat_transform rotate_x=180 fit=true
+  splat_clean
+  splat_to_mesh detail=320 preset=game color=texture
+  export_usd path=$usd
+  export_lods path=$glb levels=4 ratio=0.5
+'</code></pre>
+          <p class="note">Sources: <a href="../guide/scripting.html">Scripting and automation</a> (<a href="../guide/scripting.html#ai-agents-mcp">MCP</a>), <a href="../guide/studios.html#headless-and-farm-use">Headless and farm use</a> (the example above is from it), <a href="../guide/generate-3d.html">Image and text to 3D</a>, <a href="../guide/interface.html#what-leaves-your-computer">What leaves your computer</a>, <a href="../guide/studios.html#environment-variables">Environment variables</a>.</p>
+        </section>
+
+        <section id="security" aria-labelledby="h-sec">
+          <h2 id="h-sec">7. Security and IT</h2>
+          <p class="what">What an IT review asks for. The one-page <a href="../guide/security.html">security overview</a> is the reference; this section restates it and adds the checks we ran.</p>
+          <div class="tscroll" tabindex="0" role="region" aria-label="Security facts, scrolls sideways">
+          <table class="t">
+            <thead><tr><th>Topic</th><th>State</th><th class="src">Source</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Licence and accounts</th><td>GPL-3.0-or-later. No licence server, no account, no servers of our own. It runs as the signed-in user with no elevated rights and installs no services, drivers or background processes.</td><td class="src"><a href="../guide/security.html#what-sculptforge-is">What SculptForge is</a><a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">LICENSE</a></td></tr>
+              <tr><th scope="row">Telemetry</th><td>None: no analytics, no crash upload; crash logs stay on the computer.</td><td class="src"><a href="../guide/security.html#network">Network</a></td></tr>
+              <tr><th scope="row">Listening ports</th><td>None by default, and never for AI tools or sign-in. Two features listen while the artist uses them: phone capture (local network, so the phone can reach it) and the Unreal link. With the network off by policy they may use only this computer unless <code>network.localNetwork</code> allows the studio network. The Maya Live link uses a per-user socket or pipe on this computer, never a port.</td><td class="src"><a href="../guide/security.html#network">Network</a></td></tr>
+              <tr><th scope="row">Outbound connections</th><td>Only what the artist uses: the daily update check, the community brush gallery, and the AI service the artist chose. With <code>"network": {"enabled": false}</code> in the policy, or <code>--offline</code> / <code>SF_OFFLINE=1</code>, one gate refuses everything except the addresses you list, before anything is sent, and follows no redirects.</td><td class="src"><a href="../guide/studios.html#offline-deployment">Offline deployment</a></td></tr>
+              <tr><th scope="row">Secrets</th><td>API keys and sign-in tokens live in the OS keychain only: macOS Keychain, Windows Credential Manager, the Linux Secret Service. Never in settings files or logs. <code>SF_KEYCHAIN=none</code> for render nodes.</td><td class="src"><a href="../guide/security.html#data-at-rest">Data at rest</a></td></tr>
+              <tr><th scope="row">Central control</th><td>A read-only <code>policy.json</code> (<code>/etc/sculptforge/</code>, <code>/Library/Application Support/SculptForge/</code>, <code>C:\ProgramData\SculptForge\</code>) locks AI, network, AI providers and addresses, AI tool access, sign-in, the audit log and updates. A broken policy fails closed. <code>sculptforge-cli --policy</code> checks a file before deployment.</td><td class="src"><a href="../guide/studios.html#the-policy-file">The policy file</a></td></tr>
+              <tr><th scope="row">Audit log</th><td>Every AI action is one line of JSON: each MCP command (refused ones too) and each Brush Lab or Generate 3D request. No artwork, no keys, long text cut. Rotation by size.</td><td class="src"><a href="../guide/studios.html#audit-log">Audit log</a></td></tr>
+              <tr><th scope="row">Sign-in</th><td>OpenID Connect device authorization grant (RFC 8628); no local listener, no embedded browser.</td><td class="src"><a href="../guide/studios.html#single-sign-on">Single sign-on</a></td></tr>
+              <tr><th scope="row">Release integrity</th><td>Every release has <code>SHA256SUMS.txt</code> and an Ed25519 signature of it, <code>SHA256SUMS.txt.sig</code>; the app's updater checks both. The public key is in the source, as <code>kUpdatePublicKeyHex</code>, so the check below needs nothing from us. Both files are on the v0.12.10 release, and the signature verifies with that key (command below).</td><td class="src"><a href="../guide/security.html#supply-chain">Supply chain</a><a href="https://github.com/islandmed/SculptForge/blob/main/src/core/SelfUpdate.h">SelfUpdate.h</a><a href="https://github.com/islandmed/SculptForge/releases/tag/v0.12.10">v0.12.10 assets</a></td></tr>
+              <tr><th scope="row">Provenance and SBOM</th><td>Release packages are built by GitHub Actions from tagged commits, each with a build-provenance attestation, and the release workflow re-checks every package against its recorded SHA-256 and attestation before publishing. Each release carries a CycloneDX SBOM (<code>SculptForge-&lt;version&gt;-sbom.cdx.json</code>) covered by the signed checksums. Third-party archives are pinned by SHA-256 (<code>cmake/Fetch.cmake</code>).</td><td class="src"><a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/packages.yml">packages.yml</a><a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/release.yml">release.yml</a><a href="https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md">Notices</a></td></tr>
+              <tr><th scope="row">Code signing</th><td>Not yet. Windows installers are not Authenticode-signed; the macOS app is ad-hoc signed, not notarized. Windows signing through SignPath Foundation is being set up.</td><td class="src"><a href="../code-signing.html">Code signing policy</a></td></tr>
+              <tr><th scope="row">Offline install</th><td>Download the installer or archive for each platform with <code>SHA256SUMS.txt</code> and its signature, check them with <code>sha256sum -c SHA256SUMS.txt --ignore-missing</code> (Windows: <code>Get-FileHash &lt;file&gt; -Algorithm SHA256</code>) and the signature as below, then deploy by installer, portable zip, <code>.rpm</code>/<code>.deb</code>, <code>tar.gz</code> or Rez. <code>sculptforge --offline</code> or <code>SF_OFFLINE=1</code> starts with nothing allowed; the update feed can be pointed at your own mirror (<code>updates.feed</code> in the policy).</td><td class="src"><a href="../guide/studios.html#offline-deployment">Offline deployment</a></td></tr>
+              <tr><th scope="row">Reporting</th><td>Private vulnerability reports on GitHub; fixes go to the latest release.</td><td class="src"><a href="https://github.com/islandmed/SculptForge/blob/main/SECURITY.md">SECURITY.md</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+          <pre class="cmd"><code># the Ed25519 public key (raw, 32 bytes) wrapped as a PEM, then the check
+(printf '302a300506032b6570032100'; echo f6f8f8e9e02123a759a974bffaa07db8ebaa0c70ba746a0a86c644eba6a68642) | xxd -r -p &gt; pub.der
+openssl pkey -pubin -inform DER -in pub.der -out pub.pem
+openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in SHA256SUMS.txt -sigfile SHA256SUMS.txt.sig</code></pre>
+          <p class="note">Checked for this page: on 2026-11-12 the v0.12.10 release lists <code>SHA256SUMS.txt</code>, <code>SHA256SUMS.txt.sig</code> and the CycloneDX SBOM among its assets, the command above prints "Signature Verified Successfully" for the v0.12.10 files, and GitHub's attestations API returns a build-provenance attestation for the v0.12.10 <code>.deb</code> by its SHA-256.</p>
+        </section>
+
+        <section id="build" aria-labelledby="h-build">
+          <h2 id="h-build">8. How it is built</h2>
+          <ul class="facts">
+            <li><strong>Release cadence:</strong> 28 releases in the past 30 days, from 2026-11-04 (0.11.0) to 2026-11-11 (0.12.10). Every release has an entry in the public <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">CHANGELOG.md</a> and notes on the <a href="https://github.com/islandmed/SculptForge/releases">releases page</a>. Counted from the non-pre-release GitHub releases and from the changelog's version headings; both give 28.</li>
+            <li><strong>Public queue and vote:</strong> every feature idea is in the <a href="../queue.html">public feature queue</a>, with its state; members vote on what is built next (<a href="../vote.html">vote</a>). Bug fixes and security fixes go out to everyone the same day.</li>
+            <li><strong>On every push to main and on every pull request</strong> (<a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/ci.yml">ci.yml</a>): build and test on Linux x86_64 and Linux ARM64 (Ubuntu 24.04), macOS (macOS 15) and Windows (Windows Server 2022 runner), each with the full test suite split in parallel shards; the oldest-Linux-headers build (Ubuntu 22.04); and a trademark check of the text and the images. Changes that touch only the website skip the build and test jobs.</li>
+            <li><strong>On main, in each merge batch before it reaches main, and on request:</strong> the VFX Reference Platform builds in Rocky Linux 8 and 9 containers with GCC 14, the Python 3.13 module tests and the glibc check, and the Blender add-on tests (bpy 4.2.0, 5.2.3, 5.3.0). Other branch runs skip these unless labelled.</li>
+            <li><strong>Every day:</strong> a scheduled workflow runs the tests labelled <code>nightly</code> (stress and benchmark checks) on Linux x86_64 (<a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/nightly.yml">nightly.yml</a>).</li>
+            <li><strong>Android:</strong> a workflow builds the APK on every push that changes the Android side (<a href="https://github.com/islandmed/SculptForge/blob/main/.github/workflows/android.yml">android.yml</a>).</li>
+            <li><strong>Source:</strong> GPL-3.0-or-later, public on GitHub; <a href="https://github.com/islandmed/SculptForge/blob/main/docs/testing-flow.md">docs/testing-flow.md</a> describes the test tiers.</li>
+          </ul>
+        </section>
+
+        <section id="not-yet" aria-labelledby="h-not">
+          <h2 id="h-not">9. What it does not do yet</h2>
+          <div class="box">
+            <h3>Known gaps, as of 2026-11-12</h3>
+            <ul>
+              <li><strong>OpenUSD:</strong> binary <code>.usdc</code> files and references or payloads are not read. Layers, variants and references are not authored.</li>
+              <li><strong>Alembic:</strong> no export, and no import.</li>
+              <li><strong>OpenColorIO:</strong> no OCIO viewport display.</li>
+              <li><strong>Signing:</strong> Windows builds are not Authenticode-signed; the macOS app is not notarized.</li>
+              <li><strong>Unreal:</strong> the link has been tested against a stand-in editor that speaks the same protocol, not against every Unreal version. Layered sculpts reach Unreal as skeletal meshes without the LOD chain.</li>
+              <li><strong>Android:</strong> an early test build with the desktop layout; no tablet layout of its own yet; not in a stable release.</li>
+              <li><strong>Packages:</strong> winget is in review, AUR is not published, the apt and dnf repositories are not live.</li>
+              <li><strong>Textures:</strong> painting goes into one texture per Part; UVs outside the 0 to 1 square (other UDIM tiles) are not painted. UDIM tiles do bake.</li>
+              <li><strong>Micro levels:</strong> a micro level moves the surface in and out, never sideways. Tendril, Nudge, VDM stamps and custom recipe brushes do not apply to it, and Vertex Paint, sculpt layers, face group colours and the wireframe are not shown on micro levels yet.</li>
+              <li><strong>Performance:</strong> big brushes (120 and 240 px) on very dense meshes trail the pen on every machine tested; orbiting a 112M-triangle scan on the entry-level budget was below 30 frames a second at last measurement; no real integrated-graphics laptop is in the measured set; the public benchmark results table has no submitted results yet.</li>
+              <li><strong>Maya:</strong> the shelf is an early release.</li>
+              <li><strong>Silent install:</strong> switches for the Windows installer are not documented.</li>
+            </ul>
+          </div>
+          <p class="note">Sources: <a href="../guide/studios.html#not-yet">Studio guide, Not yet</a>, <a href="../guide/micro-levels.html">Micro levels</a>, <a href="../guide/texture-painting.html">Texture painting</a>, <a href="../guide/security.html#supply-chain">Supply chain</a>, <a href="../fast/#limits">How fast?</a>. Pipeline requests are welcome as <a href="https://github.com/islandmed/SculptForge/issues">issues on GitHub</a>.</p>
+          <p class="reach">More for studios: <a href="../studios.html">SculptForge for studios</a>.</p>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="../performance/">Performance</a>
+        <a href="../guide/index.html">User Guide</a>
+        <a href="../guide/studios.html">Studio guide</a>
+        <a href="../studios/brief.html">Technical brief</a>
+        <a href="../brushes.html">Community brushes</a>
+        <a href="../benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="../press.html">Press kit</a>
+        <a href="../support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
+        <a href="../supporters.html">Members</a>
+        <a href="../terms.html">Terms</a>
+        <a href="../jobs.html">Jobs</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
+      </div>
+</body>
+</html>
