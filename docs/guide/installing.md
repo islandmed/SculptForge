@@ -1,5 +1,12 @@
 # Install SculptForge on Windows, macOS and Linux
 
+![The SculptForge window](images/interface-overview.jpg)
+
+> **In short:**
+> - Runs on Windows 10 or 11, macOS 11 or later, and 64-bit Linux.
+> - Download a package, install with one command, or use a package manager.
+> - Also covers the first launch and building from source.
+
 This chapter covers what SculptForge needs, which package to download for your system, what to expect the
 first time you open it, and how to build it from source.
 
@@ -263,29 +270,33 @@ The next chapter, [The interface](interface.md), explains what everything on scr
 
 ## Updating and uninstalling
 
-SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its
-website that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
-**What's new**, **Download**, **Later** and **Skip this version**. Nothing about you or your computer is sent.
-**Help > Check for updates** asks right away, and **Edit > Preferences > Updates** turns the daily check off (and
-picks the update channel: **Stable**, or **Preview** for the betas).
+SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its website
+that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
+**What's new**, **Download**, **Later** and **Skip this version**.
+
+Nothing about you or your computer is sent. **Help > Check for updates** asks right away, and
+**Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
+for the betas).
 
 **One-click update.** The Linux AppImage and the Windows installer and portable zip also get an **Update** button
 on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
 then asks: **Restart now** installs it and starts the new version; **Later** installs it when you quit, so the
 next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.
 
-What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure
-connection; the release's list of checksums must carry the SculptForge release signature (a key built into the
-app); and the download must match its checksum. If any of that fails, nothing is changed and nothing downloaded
-is run: the banner says what went wrong and **Download** still opens the release page. The current version is
-kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as `<folder>.old`) until the
-new version has started once, then removed; if the new version doesn't start, the old one is put back. The
-Windows installer asks for permission to change Program Files, as installing does.
+What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure connection;
+the release's list of checksums must carry the SculptForge release signature (a key built into the app); and the
+download must match its checksum. If any of that fails, nothing is changed and nothing downloaded is run: the banner
+says what went wrong and **Download** still opens the release page.
+
+The current version is kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as
+`<folder>.old`) until the new version has started once, then removed; if the new version doesn't start, the old one is
+put back. The Windows installer asks for permission to change Program Files, as installing does.
 
 **Member builds.** Members get each release early. In **Edit > Preferences > Updates > Member builds**, click
 **Sign in with GitHub**: SculptForge shows a short code; open **github.com/login/device**, sign in with the GitHub
-account that accepted the invitation to the member repository, and enter the code. From then on the update check
-also offers the member builds, and **Update** installs them exactly like releases, with the same signature check.
+account that accepted the invitation to the member repository, and enter the code. From then on the update check also
+offers the member builds, and **Update** installs them exactly like releases, with the same signature check.
+
 The sign-in can only read the member repository's releases (nothing else on your GitHub account), it is kept in your
 system's keychain (Windows Credential Manager, or the Secret Service on Linux such as GNOME Keyring or KWallet; never
 in SculptForge's settings), and **Sign out** removes it. Without a keychain the sign-in lasts until you quit.

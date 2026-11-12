@@ -1,5 +1,12 @@
 # Sculpt layers and blend shapes
 
+![A sculpt layer blended in with its weight](images/hero-layer-weight.jpg)
+
+> **In short:**
+> - Sculpt layers hold changes on top of the base mesh, each with its own weight.
+> - Use them for a smile, a blink, a corrective shape or a variation.
+> - Each layer exports as a blend shape (morph target).
+
 Sculpt layers hold changes on top of the base mesh, each with its own weight: a smile, a blink, a corrective shape
 or a variation you want to dial in and out. Because a layer is a set of per-vertex offsets, it exports straight
 to game engines and DCC tools as a blend shape (morph target). This chapter covers creating, sculpting into,

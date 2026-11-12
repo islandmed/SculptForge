@@ -1,5 +1,12 @@
 # SculptForge for studios
 
+![A game-ready lion bust](images/hero-game-ready.jpg)
+
+> **In short:**
+> - Native on Linux, scriptable and standards-based, with no licence server.
+> - VFX Reference Platform builds, Rez packages and shared brush libraries.
+> - `sculptforge-cli` runs editing operations headless on servers and farms.
+
 SculptForge is built to drop into animation, VFX and game studios that run their own pipelines: native on
 Linux, scriptable, standards-based, with no licence server and no telemetry. This chapter is for
 pipeline TDs and IT: the VFX Reference Platform builds, Rez deployment, shared brush libraries, environment
@@ -153,10 +160,11 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 
 ## Studio membership
 
-SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is
-a flat $300 a month for the whole studio, any number of artists. The first 5 studios become Founding
-Studios at a flat $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
-studio gets:
+SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is a flat
+$300 a month for the whole studio, any number of artists.
+
+The first 5 studios become Founding Studios at a flat $150 a month, locked for as long as they stay subscribed. Each
+artist gets everything in Member, and the studio gets:
 
 - **Its own build** with its brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths and logo built in.
 - **Isolation:** a private release channel, and no outside connections by default (see
@@ -386,11 +394,13 @@ a key typed in lasts until SculptForge quits; the environment variables `ANTHROP
 
 ### Single sign-on
 
-With `signIn` in the policy, **Edit > Preferences > AI > Studio sign-in** signs the artist in with the studio
-account (Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak or any OpenID Connect provider). It uses the
+With `signIn` in the policy, **Edit > Preferences > AI > Studio sign-in** signs the artist in with the studio account
+(Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak or any OpenID Connect provider). It uses the
 **device authorization grant** only: SculptForge shows a short code and opens your provider's page, and the artist
-signs in there, in their browser, with your usual login and MFA. Nothing on the artist's computer listens for the
-answer: no local port, no redirect, no embedded browser. `sculptforge-cli --sign-in` does the same in a terminal.
+signs in there, in their browser, with your usual login and MFA.
+
+Nothing on the artist's computer listens for the answer: no local port, no redirect, no embedded browser.
+`sculptforge-cli --sign-in` does the same in a terminal.
 
 The tokens are kept in the keychain and refreshed when they expire. The access token is sent as
 `Authorization: Bearer` only to the addresses in `signIn.useFor` (default: `ai.endpoints`), such as your AI gateway;

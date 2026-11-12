@@ -1,5 +1,12 @@
 # Projects, autosave and snapshots
 
+![The Library showing project thumbnails](images/library.jpg)
+
+> **In short:**
+> - A project (`.sfproj`) saves the whole scene in one file.
+> - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves; **File > Open...** (<kbd>Ctrl</kbd>+<kbd>O</kbd>) opens.
+> - Autosave, crash recovery and snapshots keep your work safe.
+
 A SculptForge project (`.sfproj`) saves your whole scene in one file, so you can close the app and carry on exactly
 where you stopped. This chapter covers saving and opening projects, the unsaved-changes prompt, recent files,
 autosave and crash recovery, snapshots, and the Library tabs that show your work.
@@ -154,8 +161,6 @@ Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for project
 
 Double-click a tile to open it (you are asked about unsaved changes first). In the **Tool** tab,
 <kbd>Shift</kbd>+double-click a model to append it as a Part instead.
-
-![The Library showing project thumbnails](images/library.jpg)
 
 ## Scripting
 

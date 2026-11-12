@@ -1,5 +1,12 @@
 # Performance and big meshes
 
+![Edit > Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
+
+> **In short:**
+> - Built to sculpt tens of millions of polygons, on every core.
+> - Strokes send the graphics card only what changed; undo stores only touched vertices.
+> - **Edit > Preferences > Performance** holds the settings and your hardware tier.
+
 SculptForge is built to sculpt tens of millions of polygons. Brushes, normal updates and the picking structure
 run on every core of your processor, a stroke sends the graphics card only the part of the mesh it changed, and
 undo stores only the vertices a stroke touched, so it stays quick however big the model is. This chapter
@@ -7,8 +14,6 @@ explains what to expect, the settings in **Edit > Preferences > Performance**, a
 sculpt.
 
 What we're building next, and how each piece works: [Performance: what we're building](https://sculptforge.app/performance/).
-
-![Edit > Preferences > Performance after a stroke: antialiasing, Fast Navigation, multithreading, what the stroke cost per dab, and memory](images/performance-panel.jpg)
 
 ## What to expect
 
@@ -65,11 +70,13 @@ ones give more room for detail.
 
 A graphics card or processor that measures slow keeps a lower tier, whatever its memory says.
 
-The first time SculptForge starts (and when you change the graphics card or the memory), a small card in the
-corner of the 3D view says what it found, for example *Your machine: RTX 3060, 12 GB VRAM, 32 GB RAM. Tier:
-High*, and what that turns on. Click **Got it** (or its close, or press Esc or Enter); it doesn't show again on
-this computer, even on a laptop that starts on either of its two graphics cards. The tier is also in the top bar,
-next to the bolt: click it to open **Edit > Preferences > Performance**.
+The first time SculptForge starts (and when you change the graphics card or the memory), a small card in the corner of
+the 3D view says what it found, for example *Your machine: RTX 3060, 12 GB VRAM, 32 GB RAM. Tier: High*, and what that
+turns on.
+
+Click **Got it** (or its close, or press Esc or Enter); it doesn't show again on this computer, even on a laptop that
+starts on either of its two graphics cards. The tier is also in the top bar, next to the bolt: click it to open
+**Edit > Preferences > Performance**.
 
 There, at the top:
 
@@ -88,18 +95,21 @@ nothing is lost. When there is room again for a minute, it steps back up.
 ### Turbo
 
 The small bolt in the top bar (also **View > Turbo**, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>) gives everything
-your computer can safely spare to sculpting speed: while you sculpt or orbit, the view draws without
-antialiasing and with a lighter version of big scenes, and the tier's top budgets apply. The moment you stop, the
-view is back at full quality. It turns orange while on, and a line in the status bar says what it changed. Turn
-it off and every setting is exactly as you left it. SculptForge remembers it on this computer.
+your computer can safely spare to sculpting speed: while you sculpt or orbit, the view draws without antialiasing and
+with a lighter version of big scenes, and the tier's top budgets apply. The moment you stop, the view is back at full
+quality. It turns orange while on, and a line in the status bar says what it changed.
+
+Turn it off and every setting is exactly as you left it. SculptForge remembers it on this computer.
 
 ## The hardware profile
 
-The first time you start SculptForge, a small window says **Getting to know this computer** for a second or two:
-it checks how fast your graphics card draws and receives data, how fast a brush runs and how fast the memory is,
-and picks settings to match. It does this once, and again only when you change the graphics card, update its
-driver or install a new version. Press <kbd>Esc</kbd> or **Skip** to skip it; the settings then come from the
-type of graphics card and the memory sizes. Nothing is sent anywhere: the results stay in your settings folder.
+The first time you start SculptForge, a small window says **Getting to know this computer** for a second or two: it
+checks how fast your graphics card draws and receives data, how fast a brush runs and how fast the memory is, and
+picks settings to match. It does this once, and again only when you change the graphics card, update its driver or
+install a new version.
+
+Press <kbd>Esc</kbd> or **Skip** to skip it; the settings then come from the type of graphics card and the memory
+sizes. Nothing is sent anywhere: the results stay in your settings folder.
 
 There are two main profiles and a safe mode:
 
@@ -157,12 +167,13 @@ setting is also in the <kbd>F3</kbd> command palette (type "antialiasing", "fast
 
 ## Dynamic topology
 
-[Dynamic topology](dynamic-topology.md) only works where the brush is, so its speed depends on how many
-triangles the brush covers rather than on the size of the mesh: on an M1 Pro a medium dab takes 9 to 13
-milliseconds on a one-million-triangle sphere. It gets slower when a big brush (or a low Detail) has to merge
-many small triangles at once; it then spreads the work over several dabs. Undoing a stroke rebuilds the mesh's
-connections, which takes about a tenth of a second per million triangles. `sculptforge --bench --bench-dyntopo`
-measures it on your machine.
+[Dynamic topology](dynamic-topology.md) only works where the brush is, so its speed depends on how many triangles the
+brush covers rather than on the size of the mesh: on an M1 Pro a medium dab takes 9 to 13 milliseconds on a
+one-million-triangle sphere. It gets slower when a big brush (or a low Detail) has to merge many small triangles at
+once; it then spreads the work over several dabs.
+
+Undoing a stroke rebuilds the mesh's connections, which takes about a tenth of a second per million triangles.
+`sculptforge --bench --bench-dyntopo` measures it on your machine.
 
 ## Proof mode: see it for yourself
 
@@ -229,19 +240,20 @@ updating when it should (a driver that misbehaves), start SculptForge with the e
 `SF_CONTINUOUS_REDRAW=1` to draw every frame as versions before 0.9.5 did, and please
 [report it](troubleshooting.md#report-a-problem); `SF_REDRAW_LOG=1` logs why each frame was drawn.
 
-On a very dense mesh a dab can cost more than a frame. The dabs of a stroke then wait in a queue that
-SculptForge works through for a few milliseconds each frame, reading the pen or mouse in between, so a fast
-curve stays a curve; once more than about 50 ms of dabs are waiting, every second waiting dab is left out (a
-wider spacing), so the brush stays close to the pointer and stops soon after you lift the pen. `sculptforge --run "new_sphere" --measure-stroke 3,200` draws a fast circle for three seconds
-with a 200-pixel brush and prints how far the dabs strayed from it and the frame times.
-`SF_STROKE_IMMEDIATE=1` places every dab as soon as the pointer moves (versions before 0.9.6),
-`SF_STROKE_BACKLOG=0` never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame (with Predictive
-Strokes, each batch the brush thread places and what packing it for the graphics card cost).
-`SF_PREDICTIVE_STROKE=0` / `1` and `SF_DRAFT_STROKE=0` / `1` override the two preferences, and
-`SF_FRAME_LOG=16` logs every frame slower than 16 ms with where its time went. `tools/bench_strokes.sh` in the
-source runs the stroke measurement on 5, 21 and 33 million triangle spheres and prints the frame times (mean,
-95th and 99th percentile), how far the surface and the preview trail the pointer, press and release, for one
-build or two side by side.
+On a very dense mesh a dab can cost more than a frame. The dabs of a stroke then wait in a queue that SculptForge
+works through for a few milliseconds each frame, reading the pen or mouse in between, so a fast curve stays a curve;
+once more than about 50 ms of dabs are waiting, every second waiting dab is left out (a wider spacing), so the brush
+stays close to the pointer and stops soon after you lift the pen. `sculptforge --run "new_sphere" --measure-stroke
+3,200` draws a fast circle for three seconds with a 200-pixel brush and prints how far the dabs strayed from it and
+the frame times.
+
+`SF_STROKE_IMMEDIATE=1` places every dab as soon as the pointer moves (versions before 0.9.6), `SF_STROKE_BACKLOG=0`
+never leaves dabs out, and `SF_STROKE_LOG=1` logs the queue each frame (with Predictive Strokes, each batch the brush
+thread places and what packing it for the graphics card cost). `SF_PREDICTIVE_STROKE=0` / `1` and `SF_DRAFT_STROKE=0`
+/ `1` override the two preferences, and `SF_FRAME_LOG=16` logs every frame slower than 16 ms with where its time went.
+`tools/bench_strokes.sh` in the source runs the stroke measurement on 5, 21 and 33 million triangle spheres and prints
+the frame times (mean, 95th and 99th percentile), how far the surface and the preview trail the pointer, press and
+release, for one build or two side by side.
 
 The `perf_info` command (also in the [Console](scripting.md)) prints the threads in use and the memory the
 scene holds; `set_multithreading enabled=false` turns multithreading off from a script.

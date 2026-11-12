@@ -1,5 +1,12 @@
 # Reference images
 
+![A sculpted head](images/face-landmarks.jpg)
+
+> **In short:**
+> - Pictures that stay in the view while you sculpt: sketches, front and side views, photos.
+> - Add them in **View > Reference images**.
+> - They never take strokes or clicks.
+
 **Reference images** are pictures that stay in the view while you sculpt: a concept sketch, a front and a side
 drawing of a character, a photo of the real object. Match your proportions against them as you work. They never
 take strokes or clicks, so you sculpt, paint and turn the view exactly as without them.

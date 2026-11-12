@@ -1,5 +1,13 @@
 # Dynamic topology
 
+![A head with Dynamic topology on](images/quick-tour/03-dynamic.jpg)
+
+> **In short:**
+> - With **Dynamic** on, the brush adds triangles where it needs detail.
+> - Pull out horns, ears or fingers without stretched triangles or remeshing first.
+> - Triangle size follows the brush size on screen by default.
+> - Works on meshes without subdivision levels.
+
 With **Dynamic** on, the brush adds triangles where it needs detail and removes them where it doesn't, as
 **dynamic topology** and Blender's **Dyntopo** do. Pull a sphere out into horns, ears or fingers and the
 new shapes get triangles of their own instead of stretched ones; block in a creature from a ball without
@@ -67,11 +75,12 @@ It is a preference (saved automatically) and is saved with the project; from a s
 
 ## Subdivision levels
 
-Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md). On a Part
-with levels, clicking **Dynamic** offers **Freeze Levels and Turn On Dynamic**: the level you see becomes one plain
-mesh and the other levels go (<kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them back). To keep a different level, go to it
-first. If you turn Dynamic on and then pick a Part that has levels, strokes sculpt it without remeshing, and the
-**Sculpt > Draw & Tablet** palette shows the same **Freeze Levels + Dynamic** button.
+Dynamic topology works on meshes without [subdivision levels](subdivision-levels.md). On a Part with levels, clicking
+**Dynamic** offers **Freeze Levels and Turn On Dynamic**: the level you see becomes one plain mesh and the other
+levels go (<kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them back).
+
+To keep a different level, go to it first. If you turn Dynamic on and then pick a Part that has levels, strokes sculpt
+it without remeshing, and the **Sculpt > Draw & Tablet** palette shows the same **Freeze Levels + Dynamic** button.
 
 A good workflow: block in with Dynamic, then [Quad Remesh](retopology.md) or [Voxel Remesh](geometry.md) for an even
 base, **Add Level** for levels, and sculpt the fine detail on them.
@@ -81,11 +90,12 @@ base, **Add Level** for levels, and sculpt the fine detail on them.
 Each stroke is one undo step. Undo puts every triangle back exactly, and it only keeps the part of the mesh the
 stroke changed, so it costs little memory even on millions of triangles (a few megabytes per stroke).
 
-Dynamic topology is fastest on meshes of up to a few million triangles. On the benchmark computer (an M1 Pro), a
-dab with a medium brush on a one-million-triangle sphere takes 9 to 13 milliseconds including the screen
-update; undoing a stroke on such a mesh takes about a tenth of a second. A very big brush over very small
-triangles merges them over several dabs rather than all at once, to keep the brush responsive. See
-[Performance and big meshes](performance.md).
+Dynamic topology is fastest on meshes of up to a few million triangles. On the benchmark computer (an M1 Pro), a dab
+with a medium brush on a one-million-triangle sphere takes 9 to 13 milliseconds including the screen update; undoing a
+stroke on such a mesh takes about a tenth of a second.
+
+A very big brush over very small triangles merges them over several dabs rather than all at once, to keep the brush
+responsive. See [Performance and big meshes](performance.md).
 
 ## From a script
 

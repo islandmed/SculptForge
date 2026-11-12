@@ -1,10 +1,18 @@
 # Working with Blender
 
+![The Blender menu](images/blender-menu.jpg)
+
+> **In short:**
+> - The **SculptForge Bridge** add-on sends selected objects to SculptForge with one click.
+> - One click sends them back; transforms, materials and modifiers stay as they were.
+> - Works through a shared folder on Linux, Windows and macOS, with Blender 4.2 or newer.
+
 Keep Blender for the scene, rigging, shading and animation, and sculpt in SculptForge: the **SculptForge Bridge**
-add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends
-them back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
-It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer. Gaussian
-splats go the same way with Blender 5.3 or newer ([Splats with Blender](#splats-with-blender)).
+add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends them
+back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
+
+It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer. Gaussian splats go
+the same way with Blender 5.3 or newer ([Splats with Blender](#splats-with-blender)).
 
 ## Install the add-on
 
@@ -35,8 +43,6 @@ add-on's preferences (**Edit > Preferences > Add-ons > SculptForge Bridge**).
 
 Sending again from Blender updates the same Parts: each update is one undo step on that Part in
 SculptForge, and each receive in Blender is one undo step there.
-
-![File > Blender in SculptForge](images/blender-menu.jpg)
 
 ## What comes across
 
@@ -87,10 +93,12 @@ The add-on's preferences add the path of SculptForge and the exchange folder (be
 
 ## Classic sculpting keys in Sculpt Mode
 
-Sculpting in Blender too? Turn on **The Classic sculpting keys in Sculpt Mode** in the add-on's preferences (**Edit >
-Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to the Classic sculpting keys where Blender
-has the same thing. Turning it off removes them again, and Blender's own keys are back; so does disabling the
-add-on. The preferences list every key while it's on.
+Sculpting in Blender too? Turn on **The Classic sculpting keys in Sculpt Mode** in the add-on's preferences
+(**Edit > Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to the Classic sculpting
+keys where Blender has the same thing.
+
+Turning it off removes them again, and Blender's own keys are back; so does disabling the add-on. The preferences list
+every key while it's on.
 
 | Classic key | In Blender's Sculpt Mode |
 |---|---|
@@ -148,10 +156,11 @@ SculptForge's VDM brushes and Blender's use the same maps (see
 
 Blender 5.3 draws Gaussian splats natively (a point cloud of the type **3D Gaussian Splat**) and imports them, but it
 can't save them. With the add-on, splats go the same way meshes do, both ways, with everything that makes a splat look
-right: positions, sizes, rotations, opacity and colour including the view-dependent colour (spherical
-harmonics, up to degree 3). It needs Blender 5.3 or newer; on older versions the splat buttons say so and the mesh
-bridge works as before. The file formats and what SculptForge does with a capture are in
-[Gaussian splats](splats.md).
+right: positions, sizes, rotations, opacity and colour including the view-dependent colour (spherical harmonics, up to
+degree 3).
+
+It needs Blender 5.3 or newer; on older versions the splat buttons say so and the mesh bridge works as before. The
+file formats and what SculptForge does with a capture are in [Gaussian splats](splats.md).
 
 **From Blender to SculptForge**
 

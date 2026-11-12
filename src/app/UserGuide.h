@@ -13,6 +13,7 @@
 #include <imgui.h>
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -105,6 +106,7 @@ private:
     ImFont* h1_ = nullptr, *h2_ = nullptr, *h3_ = nullptr;
     ImFont* body_ = nullptr, *bodyBold_ = nullptr;
     int linkCounter_ = 0;
+    std::set<int> openDetails_;             // this page's <details> blocks that are open
     whatsnew::Page whatsNew_;               // whats-new.md as versions and groups (built when the guide loads)
     std::map<std::string, bool> expanded_;  // What's New sections open (by anchor): the newest version at first
     bool demoteHeadings_ = false;           // "###" drawn in the reading font (What's New's folded versions)

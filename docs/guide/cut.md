@@ -1,5 +1,12 @@
 # Cut: line, lasso, rectangle and polyline
 
+![Cutting a sculpted head](images/quick-tour/07-cut.jpg)
+
+> **In short:**
+> - **Cut** cuts the active Part with a line, lasso, rectangle or polyline you draw.
+> - What you see inside the shape is cut, front and back.
+> - Every cut is one undo step, and a closed Part stays watertight.
+
 **Cut** cuts the active Part with a shape you draw on the screen. The shape is pushed straight into the view, so
 what you see inside it is what gets cut, front and back. Every cut is one undo step, and a closed Part stays
 closed (watertight), so you can keep sculpting, remeshing or 3D printing it.

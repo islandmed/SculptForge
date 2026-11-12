@@ -1,11 +1,16 @@
 # Masking
 
+![A mask painted on the lion's mane, with the Masking sub-palette](images/masking.jpg)
+
+> **In short:**
+> - A mask protects part of the model; brushes and paint leave it alone.
+> - Hold <kbd>Ctrl</kbd> to paint a mask, or pick a lasso or rectangle.
+> - **Tool > Masking** inverts, blurs, grows and builds masks from the surface.
+
 A mask protects part of the model from change. Masked areas are drawn darker (or in a colour you pick, see below), and every brush, the Paint
 brush and colour fills leave them alone. This chapter covers painting masks with <kbd>Ctrl</kbd>, masking
 with a lasso or rectangle, the background gestures, and the **Tool > Masking** panel for inverting, blurring, growing and building masks
 from cavities, peaks, face groups, vertex paint, the direction the surface faces or the mesh border.
-
-![A mask painted on the lion's mane, with the Masking sub-palette](images/masking.jpg)
 
 ## How masks work
 
@@ -16,10 +21,12 @@ from cavities, peaks, face groups, vertex paint, the direction the surface faces
 - Masking is not a layer and isn't affected by sculpt layers: a mask stroke always works on the model itself.
 - Mask strokes and mask commands are undoable like any other change.
 
-To see the mask, keep **Mask** on in the right shelf. The same toggle is **Show mask** in **Tool > Masking**, and **Show Mask** in the **Render**
-palette. Turning it off hides the darkening without clearing the mask: it still protects the surface, the status
-bar says so, and turning it on again shows the same mask. **Clear Mask** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>)
-is what removes it.
+To see the mask, keep **Mask** on in the right shelf. The same toggle is **Show mask** in **Tool > Masking**, and
+**Show Mask** in the **View** menu.
+
+Turning it off hides the darkening without clearing the mask: it still protects the surface, the status bar says so,
+and turning it on again shows the same mask. **Clear Mask** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>) is what
+removes it.
 
 **Mask colour**: **Edit > Preferences > Interface > Mask colour** picks the colour masked areas show (the default is the
 model's own colours, darkened); **Mask darkness** there sets how much of it shows, and **Reset** goes back to the default.
@@ -57,12 +64,12 @@ With **Lasso Mask** or **Rectangle Mask**:
    is drawn blue). You can press or release <kbd>Alt</kbd> while dragging; what counts is whether it is held when
    you let go.
 
-The selection works in screen space, like the visibility rectangle: a vertex counts as inside when it falls
-inside the shape as you see it, including vertices on the far side of the model. Hidden parts are left alone.
-With symmetry on (**X**, **Y**, **Z** on the top shelf), the mirror image of what's inside is masked too, as a
-mask stroke mirrors. A shape that covers none of the model clears the mask instead.
-**Mask Strength** sets how much a selection masks or unmasks, and each selection is one undo step. A lasso that
-crosses itself leaves out the areas it encloses twice.
+The selection works in screen space, like the visibility rectangle: a vertex counts as inside when it falls inside the
+shape as you see it, including vertices on the far side of the model. Hidden parts are left alone. With symmetry on
+(**X**, **Y**, **Z** on the top shelf), the mirror image of what's inside is masked too, as a mask stroke mirrors.
+
+A shape that covers none of the model clears the mask instead. **Mask Strength** sets how much a selection masks or
+unmasks, and each selection is one undo step. A lasso that crosses itself leaves out the areas it encloses twice.
 
 Turn on **Front faces only** (under the shape buttons, shown for Lasso Mask and Rectangle Mask) to mask only what
 faces you: the far side of the model and folds turned away from you are left as they are. It follows the mirror

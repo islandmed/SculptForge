@@ -1,11 +1,16 @@
 # Image and text to 3D
 
+![The Generate 3D window with a sketch loaded and the Hugging Face service selected](images/generate-3d.jpg)
+
+> **In short:**
+> - Turn a picture or a written description into a 3D model you can sculpt.
+> - Use free Hugging Face models, your own ComfyUI server, paid services or an offline blockout.
+> - Generate for form, then remesh for topology.
+
 SculptForge can turn a picture or a written description into a full 3D model that you can sculpt straight
 away. This chapter covers the **Generate 3D** window, the services it can use (free Hugging Face models, your
 own ComfyUI server, paid fal.ai or Meshy, your own command line, or an offline blockout) and the offline image
 tools: relief, inflate and stamp.
-
-![The Generate 3D window with a sketch loaded and the Hugging Face service selected](images/generate-3d.jpg)
 
 ## How it works
 
@@ -54,10 +59,12 @@ you haven't touched (the starting sphere) is replaced by it.
 
 ### Pick the strongest form
 
-With more than one candidate, **Pick the strongest form** shows each one as a shaded thumbnail over its
-silhouette, flat black on a light background. Judge the outline, not the detail: a strong silhouette sculpts
-well, and fine detail is what you add next. Click a picture or **Pick A** / **Pick B** / **Pick C**. If a service
-ignores the random seed and sends the same shape twice, the window says "Same shape as A".
+With more than one candidate, **Pick the strongest form** shows each one as a shaded thumbnail over its silhouette,
+flat black on a light background. Judge the outline, not the detail: a strong silhouette sculpts well, and fine detail
+is what you add next.
+
+Click a picture or **Pick A** / **Pick B** / **Pick C**. If a service ignores the random seed and sends the same shape
+twice, the window says "Same shape as A".
 
 The others are discarded, unless **Keep the others as hidden Parts** is on: then they stay in the Parts list,
 hidden ("Option A", "Option C"), in the same place as the pick, to compare or use later. **Discard all** drops every candidate. With one candidate there is nothing to
@@ -77,9 +84,11 @@ Generated meshes are uneven, often holey and full of overlapping pieces: good fo
   right below the base, named "Reference". Divide the base, then click **Project Detail from the
   high-detail copy** to bring the fine detail back onto it.
 
-Click **Use as sculpting base**. The status line reports the result, for example "Sculpting base ready: remeshed
-to 32768 quads (2 subdivision levels)". Quad Remesh takes about 10 to 25 seconds on a typical model; the
-progress bar shows it and the window stays usable. Undo goes back to the model as generated.
+Click **Use as sculpting base**. The status line reports the result, for example "Sculpting base ready: remeshed to
+32768 quads (2 subdivision levels)".
+
+Quad Remesh takes about 10 to 25 seconds on a typical model; the progress bar shows it and the window stays usable.
+Undo goes back to the model as generated.
 
 ### Pictures that work well
 
@@ -203,10 +212,11 @@ For error messages and their fixes, see [Troubleshooting](troubleshooting.md#com
 
 ### My generator command
 
-Runs any command line on your computer: a local open-source model, a studio service, or a script that calls a
-cloud API. Type the command into the box. It must contain `{input}` (replaced with the image path) and
-`{output}` (replaced with the path to write, ending in `.glb`). Both are quoted for you, so don't add quotes.
-The command must write a GLB file to `{output}` and exit with status 0.
+Runs any command line on your computer: a local open-source model, a studio service, or a script that calls a cloud
+API. Type the command into the box. It must contain `{input}` (replaced with the image path) and `{output}` (replaced
+with the path to write, ending in `.glb`).
+
+Both are quoted for you, so don't add quotes. The command must write a GLB file to `{output}` and exit with status 0.
 
 The box starts with a command that runs SculptForge's own silhouette inflation, which is a quick way to check
 that the pipeline works:

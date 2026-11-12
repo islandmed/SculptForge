@@ -1,5 +1,12 @@
 # Vertex Paint and materials
 
+![Vertex Paint on a sculpt with the Paint menu open](images/vertex-paint.jpg)
+
+> **In short:**
+> - Vertex Paint stores a colour on every vertex: no UVs or textures needed.
+> - Paint with the Paint brush, or turn on **Rgb** to paint while you sculpt.
+> - Lit Sphere materials change how the model is shaded in the viewport.
+
 Vertex Paint (experienced sculptors: Vertex Paint) stores a colour on every vertex of the mesh, so you can paint a sculpt
 without UVs or textures. This chapter covers the Paint brush, painting while you sculpt, fills and cavity paint, picking colours,
 paint layers with blend modes, and the Lit Sphere materials that change how the model is shaded in the viewport.
@@ -33,8 +40,6 @@ While the Paint brush is active:
 - The surface isn't changed.
 
 Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sculpting.
-
-![Vertex Paint on a sculpt with the Paint menu open](images/vertex-paint.jpg)
 
 ## Paint while sculpting
 
@@ -71,24 +76,29 @@ off in the viewport without deleting them.
 
 ## Line Gradient
 
-**Line Gradient** (under **Clear**) paints a straight colour ramp across the model as you see it: turn it on, then drag
-a line over the view. The paint colour at the start of the line runs into the **End** colour at its end; past the ends
-the two colours carry on. Tick **Clear** to fade the paint colour out instead, so the paint underneath shows through
-towards the end. The swap button swaps the two colours.
+**Line Gradient** (under **Clear**) paints a straight colour ramp across the model as you see it: turn it on, then
+drag a line over the view. The paint colour at the start of the line runs into the **End** colour at its end; past the
+ends the two colours carry on.
+
+Tick **Clear** to fade the paint colour out instead, so the paint underneath shows through towards the end. The swap
+button swaps the two colours.
 
 The line stays on screen with a handle at each end until you keep it: drag a handle, or change a colour, and the
 gradient is painted again in place of the last one. <kbd>Enter</kbd> keeps it (so does turning the view or any other
-edit), <kbd>Esc</kbd> takes it back. Each gradient is one undo step. It respects the mask like **Fill**, never paints
-hidden faces, and goes into the texture when the Part paints into one. With it on, <kbd>Ctrl</kbd> still masks and
+edit), <kbd>Esc</kbd> takes it back. Each gradient is one undo step.
+
+It respects the mask like **Fill**, never paints hidden faces, and goes into the texture when the Part paints into
+one. With it on, <kbd>Ctrl</kbd> still masks and
 <kbd>Shift</kbd> still smooths; turn it off with its button or <kbd>Esc</kbd>.
 
 ## Paint through a Stencil
 
 A [Stencil](sculpting.md#stencil) (**Sculpt > Alpha > Stencil**) paints too: load a photo or a pattern, place it over
 the model, and paint over it with the Paint brush. Where it covers the model the brush lays the image's colours (with
-your Colour intensity, falloff and mask); everywhere else it paints nothing. Turn off **Paint its colours** to paint
-the paint colour through the image's brightness instead (a grayscale pattern as a mask). Turn the model or move the
-stencil and paint again to cover a whole model.
+your Colour intensity, falloff and mask); everywhere else it paints nothing.
+
+Turn off **Paint its colours** to paint the paint colour through the image's brightness instead (a grayscale pattern
+as a mask). Turn the model or move the stencil and paint again to cover a whole model.
 
 ## Paint layers
 
@@ -157,9 +167,11 @@ Hold <kbd>Ctrl</kbd> over any control for its description. Every action is undoa
 
 ### Paint layers and sculpt layers
 
-They are separate stacks. **Tool > Layers** holds sculpt layers: shape changes exported as blend shapes. **Tool >
-Paint Layers** holds colour. Selecting a sculpt layer doesn't change the paint layer you paint on, and the other
-way round, so a stroke with **Rgb** on can sculpt into the "Smile" layer and paint into the "Blush" layer at once.
+They are separate stacks. **Tool > Layers** holds sculpt layers: shape changes exported as blend shapes.
+
+**Tool > Paint Layers** holds colour. Selecting a sculpt layer doesn't change the paint layer you paint on, and the
+other way round, so a stroke with **Rgb** on can sculpt into the "Smile" layer and paint into the "Blush" layer at
+once.
 
 ### Files, Parts and geometry
 
@@ -200,10 +212,11 @@ To choose one:
 Vertex Paint multiplies the material, and cavity shading stays on with every material (strongest with Sculpt). The
 material is saved with the project: projects saved with Studio open with Studio.
 
-**Colour tints the material** (in the **Paint** menu, on by default): on a Part with no vertex paint yet, the
-current colour tints its Lit Sphere material, so you can try a skin, stone or bronze tone without
-painting anything. The colour's hue and saturation tint it; grey (the starting colour) and black leave the material
-as it is, and the material keeps its own light and shade. Once a Part has vertex paint, the paint shows instead.
+**Colour tints the material** (in the **Paint** menu, on by default): on a Part with no vertex paint yet, the current
+colour tints its Lit Sphere material, so you can try a skin, stone or bronze tone without painting anything. The
+colour's hue and saturation tint it; grey (the starting colour) and black leave the material as it is, and the
+material keeps its own light and shade. Once a Part has vertex paint, the paint shows instead.
+
 PBR shading uses the material channels and is not tinted. Saved with the project.
 
 > **Tip:** **Sculpt** is the material to judge strokes with. The prettier ones (Skin, Red Wax) soften small
@@ -243,9 +256,11 @@ with the sphere filling it (a non-square image is cropped to its centre; big one
 ![Right-click a Lit Sphere for Rename... and Move to folder; the Metals folder is a heading in the list](images/lit-sphere-folders.jpg)
 
 Your Lit Spheres appear in the material picker (<kbd>M</kbd>), **Render > Materials** and the Library, after the
-built-in ones, those in folders under their folder's name. A project that uses one carries a copy of the image, so it opens with the same look on another
-computer (or after you delete the file). Loading an image with the same name again replaces it. EXR images are
-read as linear light, so very bright highlights clip to white.
+built-in ones, those in folders under their folder's name. A project that uses one carries a copy of the image, so it
+opens with the same look on another computer (or after you delete the file).
+
+Loading an image with the same name again replaces it. EXR images are read as linear light, so very bright highlights
+clip to white.
 
 ## Smooth and flat shading
 
@@ -262,10 +277,12 @@ most when blocking out forms on a low-poly base mesh.
 ![Smooth and Flat shading on the template head, with its eyes kept smooth](images/shading.jpg)
 
 Shading works with every material, vertex paint, textures and the mask. Like the material, it only changes the view:
-exports are unaffected. Projects save the scene's shading and each Part's own; projects from before open with
-your preferred shading. The scene's shading you choose is also the preference for the next session (it saves
-itself). Smooth and Flat have no default shortcut, so no
-classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch often.
+exports are unaffected. Projects save the scene's shading and each Part's own; projects from before open with your
+preferred shading.
+
+The scene's shading you choose is also the preference for the next session (it saves itself). Smooth and Flat have no
+default shortcut, so no classic key changes meaning; assign one under **Edit > Preferences > Hotkeys** if you switch
+often.
 
 ## Scripting
 

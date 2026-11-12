@@ -1,5 +1,12 @@
 # Troubleshooting: tablets, display, crashes and FAQ
 
+![Ctrl-hover help on a button](images/ctrl-help.jpg)
+
+> **In short:**
+> - Fixes for start-up, graphics, tablet and AI service problems.
+> - Starts with a quick-answers table for the common problems.
+> - Also covers settings locations, resetting the interface and reporting a bug.
+
 This chapter collects fixes for common problems: start-up and graphics errors, tablets, AI service messages,
 ComfyUI errors, the camera notch, first-launch warnings on macOS and Windows, where SculptForge keeps its
 settings, how to reset the interface, and how to report a bug.
@@ -143,10 +150,11 @@ If no pen is detected or pressure doesn't change:
 
 ### Brush Lab
 
-The default **Free** provider uses a hosted open model with no account. If it is unreachable and Ollama runs
-on your computer, SculptForge uses your local model instead. "Rate limited by the provider" means too many
-requests in a short time: wait a few seconds. For setup of local models, see
-[Brush Lab and sharing brushes](brush-lab.md).
+The default **Free** provider uses a hosted open model with no account. If it is unreachable and Ollama runs on your
+computer, SculptForge uses your local model instead.
+
+"Rate limited by the provider" means too many requests in a short time: wait a few seconds. For setup of local models,
+see [Brush Lab and sharing brushes](brush-lab.md).
 
 ### No connection at all
 
@@ -256,29 +264,31 @@ SculptForge writes what it does to `sculptforge.log` in its [settings folder](#w
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/sculptforge.log` |
 | Linux | `~/.local/share/SculptForge/SculptForge/sculptforge.log` |
 
-It holds the version, your system and GPU (the `OpenGL ... on ...` line), warnings and errors, and each command
-you ran. If SculptForge crashes, it ends with lines starting `CRASH:` that say what crashed and what was done
-last. Every start keeps the previous session's log as `sculptforge-previous.log` beside it, so after a crash
-**attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds
-no models and no keys, only command names and messages, which may include file names.
+It holds the version, your system and GPU (the `OpenGL ... on ...` line), warnings and errors, and each command you
+ran. If SculptForge crashes, it ends with lines starting `CRASH:` that say what crashed and what was done last.
+
+Every start keeps the previous session's log as `sculptforge-previous.log` beside it, so after a crash
+**attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds no
+models and no keys, only command names and messages, which may include file names.
 
 ### A performance trace
 
-When SculptForge gets slow, **Help > Record a performance trace** shows where the time goes. Turn it on, do what
-feels slow (the stroke, the orbit, the remesh), then choose it again to stop. `sculptforge-trace.log` beside the
-log then lists every frame that took longer than 33 ms with its parts (events, dabs, interface, GPU uploads,
-drawing, GPU time), each stroke's timings, commands that held up the frames, background jobs starting and
-ending, the mesh size and levels, and on its first line your GPU, driver and CPU. **Attach it to your report.**
-It is off by default and costs nothing when off; it stays small (2 MB, then the older lines move to
-`sculptforge-trace-previous.log`) and never leaves your computer.
+When SculptForge gets slow, **Help > Record a performance trace** shows where the time goes. Turn it on, do what feels
+slow (the stroke, the orbit, the remesh), then choose it again to stop.
+
+`sculptforge-trace.log` beside the log then lists every frame that took longer than 33 ms with its parts (events,
+dabs, interface, GPU uploads, drawing, GPU time), each stroke's timings, commands that held up the frames, background
+jobs starting and ending, the mesh size and levels, and on its first line your GPU, driver and CPU.
+**Attach it to your report.** It is off by default and costs nothing when off; it stays small (2 MB, then the older
+lines move to `sculptforge-trace-previous.log`) and never leaves your computer.
 
 ## Recovering work after a crash
 
 SculptForge autosaves unsaved work every 5 minutes by default (**Edit > Preferences > Autosave**, 0 turns it off).
-After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
-work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
-[Projects, autosave and snapshots](projects.md). The dialog also points to the crashed session's
-[log file](#the-log-file).
+After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved work?".
+
+**Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See [Projects, autosave and
+snapshots](projects.md). The dialog also points to the crashed session's [log file](#the-log-file).
 
 ## Frequently asked questions
 

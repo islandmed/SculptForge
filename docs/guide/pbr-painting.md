@@ -1,5 +1,12 @@
 # Material painting (PBR)
 
+![A painted lion bust](images/paint-layers.jpg)
+
+> **In short:**
+> - Material channels let one Paint stroke set roughness, metallic, bump and brightness.
+> - Channels share the colour's UVs and paint layers, and cost no memory until painted.
+> - Export them for Unreal, Unity, Godot, Blender, glTF and USD.
+
 A painted texture can carry more than colour. Turn on **material channels** and the Paint brush paints how rough,
 how metallic, how bumpy and how bright the surface is, all in one stroke, the way game engines and renderers
 describe materials (physically based rendering, PBR). Every channel lives on the same UVs and paint layers as the
@@ -98,10 +105,11 @@ to about 6 ms with Lit Sphere on an Apple M1 Pro. The settings are saved with th
 ## See one channel on its own
 
 **Tool > Texture Image > Normal view** opens a list: pick **Solo Roughness** (or any enabled channel) and the model
-shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with
-the height's normal in it) and in colour for emissive. Painting updates it live. Pick **Normal view** to go back.
-The viewport doesn't yet render the channels together as a lit PBR material; the solo view is how you check
-them for now.
+shows just that channel, in grey for roughness, metallic, height, AO and opacity, as colours for the normal (with the
+height's normal in it) and in colour for emissive. Painting updates it live.
+
+Pick **Normal view** to go back. The viewport doesn't yet render the channels together as a lit PBR material; the solo
+view is how you check them for now.
 
 ## Height and normals
 
