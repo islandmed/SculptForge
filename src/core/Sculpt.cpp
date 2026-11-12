@@ -997,6 +997,41 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     if (type != BrushType::Move) repairDab(mesh, bvh);
 }
 
+// Inflate along each vertex's own normal (#194). That swells a form, but where Crease or Pinch cut a groove the grid across
+// its line is packed to a tenth of its spacing, and the packed vertices' normals lean toward each other, noisily: the
+// steps close the gap within a dab or two, the triangles between them flip, and stacked strokes tear needles and stretched
+// streaks into the surface. So a dab that reaches a packed grid (at least 8 vertices, and 0.2% of the dab's, whose shortest
+// edge is under 2/3 of the dab's typical one; a lone odd vertex on a remeshed surface is not one) moves all its vertices
+// along the brush's one area normal instead, which carries the whole groove alike; every other dab, the usual Inflate, is
+// unchanged. One choice for the whole dab, not a per-vertex mix: neighbours on different rules were what tore.
+//
+// The typical edge length around the vertices of `verts` (an even sample of 64: the mean of each one's edges' mean).
+static float typicalEdge(const Mesh& mesh, std::span<const uint32_t> verts) {
+    const size_t stride = std::max<size_t>(1, verts.size() / 64);
+    double sum = 0.0;
+    size_t count = 0;
+    for (size_t i = 0; i < verts.size(); i += stride) {
+        float edges = 0.0f;
+        size_t n = 0;
+        for (uint32_t u : mesh.polygonNeighbors(verts[i])) {
+            edges += glm::distance(mesh.positions[u], mesh.positions[verts[i]]);
+            ++n;
+        }
+        if (n) {
+            sum += edges / float(n);
+            ++count;
+        }
+    }
+    return count ? float(sum / double(count)) : 0.0f;
+}
+// 1 where v's shortest edge is at least 90% of `typical`, 0 at 65%.
+static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
+    if (typical <= 0.0f) return 1.0f;
+    float shortest = std::numeric_limits<float>::max();
+    for (uint32_t u : mesh.polygonNeighbors(v)) shortest = std::min(shortest, glm::distance(mesh.positions[u], mesh.positions[v]));
+    return std::clamp((shortest / typical - 0.65f) / 0.25f, 0.0f, 1.0f);
+}
+
 void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p) {
     auto clock = std::chrono::steady_clock::now();
     // Alphas and the square Clay Block tip reach into the corners of their square.
@@ -1090,6 +1125,21 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
+    // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
+    bool inflateAlongNormals = true;
+    if (type == BrushType::Inflate) {
+        const float typical = typicalEdge(mesh, verts_);
+        // (an even sample of at most 4096 vertices: a packed cluster of 0.2% of a big dab still shows in it)
+        const size_t stride = std::max<size_t>(1, verts_.size() / 4096), sampled = (verts_.size() + stride - 1) / stride;
+        std::atomic<size_t> bad{0};
+        poolFor(sampled, [&](size_t b, size_t e) {
+            size_t n = 0;
+            for (size_t i = b; i < e; ++i)
+                if (unpackedShare(mesh, verts_[i * stride], typical) < 0.1f) ++n;
+            bad.fetch_add(n, std::memory_order_relaxed);
+        }, 512);
+        inflateAlongNormals = bad.load() * stride < std::max<size_t>(8, verts_.size() / 500);
+    }
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
     // offset of the i-th vertex v if it were at x (x = pos[v] for the dab itself; the adaptive normals ask for
@@ -1107,7 +1157,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = plane.offsetWith(x, f); // (core/SculptKernel.h)
             break;
         case BrushType::Inflate:
-            d = nrm[v] * (sign * s * r * 0.05f * f);
+            d = (inflateAlongNormals ? nrm[v] : areaNormal) * (sign * s * r * 0.05f * f);
             break;
         case BrushType::Smooth: case BrushType::SmoothPeaks: {
             if (p.groupBorders && type == BrushType::Smooth) { // along the border, on the tangent plane; junctions and inner vertices stay
