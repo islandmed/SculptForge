@@ -1036,6 +1036,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
+    if (name == "key_sequence_waiting") return app_.actions_.sequenceWaiting() ? 1.0 : 0.0; // a first key waiting for its second
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
     if (name == "custom_litspheres") {
         int n = 0;
@@ -2869,6 +2870,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     } else if (verb == "key_nav_speed") { // key_nav_speed X: Preferences > Input's pan and zoom key speed (0.1 to 5)
         if (!need(1)) return false;
         run([this, v = num(1, 1.0f)] { app_.uiPrefs_.keyNavSpeed = std::clamp(v, 0.1f, 5.0f); });
+    } else if (verb == "two_key_window") { // two_key_window X: Preferences > Input's two-key window (seconds)
+        if (!need(1)) return false;
+        run([this, v = num(1, 0.4f)] { app_.uiPrefs_.twoKeyWindow = v; });
     } else if (verb == "input_style") {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;

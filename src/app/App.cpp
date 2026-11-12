@@ -348,6 +348,13 @@ bool App::init(const AppOptions& options) {
     splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
+    actions_.setAloneHook([this](SDL_Keycode key, bool begin) { // a first key that waited: a pie menu on it holds open only while it is down
+        if (!begin) keyDown_ = aloneSavedKey_;
+        else {
+            aloneSavedKey_ = keyDown_;
+            keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
+        }
+    });
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
@@ -1862,9 +1869,10 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
-            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
+            onKey(e.key.key, e.key.mod, true); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
+        actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
         std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
@@ -2407,7 +2415,7 @@ void App::onMouseUp() {
     penNavButton_ = 0;
 }
 
-void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
@@ -2459,7 +2467,8 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
-    actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
     keyDown_ = SDLK_UNKNOWN;
 }
 

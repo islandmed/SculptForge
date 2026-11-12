@@ -22,10 +22,13 @@ the action's key, then press the first key and the second. The sequence is added
 sequence another action already uses asks first (Replace / Cancel), like any key. <kbd>Backspace</kbd> in that box
 removes the action's two-key shortcuts and leaves its single keys.
 
-- The second key must come within half a second of the first.
+- Press the two keys together (either one first) or one after the other. The second must come within the **Two-key
+  window** (**Edit > Preferences > Input**, 0.35 to 1 second, 0.4 by default) of the first; when both are down together
+  only the two-key shortcut runs, not the keys' own actions.
 - It has to be a different key: the same key twice is not a sequence.
-- If the first key is bound on its own, it still works: it waits that half second, and runs by itself when no second
-  key follows. A first key with no shortcut of its own does nothing alone.
+- A key that is part of a two-key shortcut and is also bound on its own still works: it waits that window and runs by
+  itself when its partner does not come. A key with no shortcut of its own does nothing alone. Keys that are in no
+  two-key shortcut run at once.
 - Either key can carry <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd>.
 
 On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
