@@ -425,6 +425,7 @@ TEST(tube_invariant_turn_twist_spin_together_on_a_curved_tube) {
         for (TubePoint& p : s.points) p.position.x += 1.0f;
         s.profile = profile;
         s.roll = 25.0f, s.twist = 90.0f, s.spin = 15.0f;
+        s.up = vec3(0.3f, 1.0f, 0.2f); // (a set first orientation: an automatic one is not the mirror of the mirror copy's)
         s.taperEnd = 0.3f;
         TubeShape one = s;
         s.mirrorX = true;
