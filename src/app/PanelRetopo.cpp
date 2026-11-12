@@ -217,34 +217,17 @@ const VoxelRemeshEstimate& App::voxelEstimate() {
     return c.estimate;
 }
 
-void App::drawVoxelResolution(bool compact) {
+void App::drawVoxelResolution() {
     voxelResolution_ = std::clamp(voxelResolution_, kVoxelResolutionMin, kVoxelResolutionMax);
     // Two thirds of the travel for 32-512 (the everyday range keeps its precision), a sixth each for 528-2048 and
     // 2112-4096. Ctrl+click types a number.
-    if (!compact) ImGui::SetNextItemWidth(-1);
-    // Customize Shelves, Ctrl+Alt: the slider is drawn inert and a button over it takes the press, so the slider can be
-    // dragged onto a shelf (widget.voxel_resolution) instead of moving its value or the palette under it.
-    const bool grab = !compact && layout_.customize && ui::CtrlHeld() && ui::AltHeld();
-    if (grab) ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::SetNextItemWidth(-1);
     float t = voxelSliderFromResolution(voxelResolution_);
     std::string label = tr("Resolution %d");
     if (const size_t at = label.find("%d"); at != std::string::npos) label.replace(at, 2, std::to_string(voxelResolution_));
     const int before = voxelResolution_;
     if (ui::SliderInside("##voxres", &t, 0.0f, 1.0f, label.c_str(), ImGuiSliderFlags_NoInput)) voxelResolution_ = voxelResolutionFromSlider(t);
-    if (grab) {
-        ImGui::PopItemFlag();
-        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-        ImGui::SetCursorScreenPos(lo);
-        ImGui::InvisibleButton("##voxresgrab", ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
-        // The press is taken by hand (as Shell.cpp's grab): over the inert slider it would otherwise fall through to the
-        // palette's window move, and the drag source (which needs an active item) never began.
-        ImGuiContext& g = *ImGui::GetCurrentContext();
-        if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
-            ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
-            g.ActiveIdMouseButton = 0;
-        }
-        ui::UiItemDragSource(*this, "widget.voxel_resolution", "Voxel Resolution");
-    } else if (ImGui::IsItemHovered() && ui::CtrlHeld() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (ImGui::IsItemHovered() && ui::CtrlHeld() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         voxelResolution_ = before; // (the click doesn't move it)
         ImGui::ClearActiveID();
         voxelResolutionTyped_ = before;
@@ -267,7 +250,7 @@ void App::drawVoxelResolution(bool compact) {
         ImGui::EndPopup();
     }
     if (voxelResolution_ <= kVoxelDenseMax) voxelHighResOk_ = false; // (asks again on the next trip above 512)
-    if (compact || doc_.mesh.triangleCount() == 0) return;
+    if (doc_.mesh.triangleCount() == 0) return;
     const VoxelRemeshEstimate& e = voxelEstimate();
     const std::string tris = formatTriangles(e.triangles);
     char line[256];
