@@ -16,7 +16,7 @@ chmod +x "$S/bin/herdr"
 export PATH=$S/bin:$PATH SF_LAUNCH_DIR=$S/launch V=9.9.9 BASE=9.9.9
 cd "$S/wt"
 # shellcheck disable=SC1090
-source <(sed -n '/^headline_check()/,/^}/p' "$ROOT/scripts/release.sh")
+eval "$(sed -n '/^headline_check()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
 printf '## Version 9.9.9\n\n```features\ndate: unreleased\ntagline: Reference images beside your sculpt.\nhighlight: x\n```\n\n## Version 9.9.8\n\ntagline: Older\n' > docs/guide/whats-new.md
 HIGHLIGHTS=$S/hl.txt
 printf 'Reference images: front and side drawings in the view\nsecond line\nthird line\n' > "$HIGHLIGHTS"
@@ -29,9 +29,9 @@ grep -q "^agent prompt cmo pick the 9.9.9 headline" "$S/herdr.log" || fail "the 
 # 2. every keyword present (case-insensitive) in both: silence, no prompt
 : > "$S/herdr.log"
 echo '{"line": "Reference images", "keywords": ["reference", "IMAGES"]}' > "$S/launch/9.9.9.json"
-start=$(date +%s%N)
+start=$(date +%s)
 out=$(headline_check) || fail "failed"
-[ $((($(date +%s%N) - start) / 1000000)) -lt 1000 ] || fail "headline_check took over 1 s"
+[ $(($(date +%s) - start)) -le 2 ] || fail "headline_check took over 2 s"
 [ -z "$out" ] || fail "a matching headline warned: $out"
 [ ! -s "$S/herdr.log" ] || fail "the CMO was prompted although the headline exists"
 

@@ -24,7 +24,7 @@ chmod +x "$S/bin/gh"
 export PATH=$S/bin:$PATH SF_LAUNCH_DIR=$S/launch V=9.9.9 BASE=9.9.9 T=v9.9.9 RELEASE_REPO=x/y GH_BODY=$S/body GH_FAIL=
 work=$S/work
 # shellcheck disable=SC1090
-source <(sed -n '/^release_body_headline()/,/^}/p' "$ROOT/scripts/release.sh")
+eval "$(sed -n '/^release_body_headline()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
 reset() { printf '## What changed\n\n- a thing\n' > "$S/body"; rm -f "$S/body.edits"; }
 
 # 1. no file: untouched
@@ -42,7 +42,7 @@ grep -q '^## What changed' "$S/body" || fail "old body lost"
 
 # 3. run again: idempotent (one edit only)
 release_body_headline || fail "failed"
-[ "$(wc -l < "$S/body.edits")" = 1 ] || fail "edited twice"
+[ "$(wc -l < "$S/body.edits" | tr -d " ")" = 1 ] || fail "edited twice"
 
 # 4. only a line: bold line alone; a link with a query gets &utm
 reset; echo '{"line": "Only a line"}' > "$S/launch/9.9.9.json"
