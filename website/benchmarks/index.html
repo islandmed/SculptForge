@@ -137,7 +137,7 @@ sculptforge --benchmark core-100m</code></pre></li>
   <h2 id="sizes">Dab time and view speed by mesh size</h2>
   <div class="scroll">
   <table>
-    <thead><tr><th>Mesh</th><th class="num">Dab, medium (ms)</th><th class="num">Dab, large (ms)</th><th class="num">View, 4x AA (fps)</th><th class="num">View, Fast Navigation (fps)</th></tr></thead>
+    <thead><tr><th>Mesh</th><th class="num">Dab, medium (ms)</th><th class="num">Dab, large (ms)</th><th class="num">View, 4% of triangles drawn, 4x AA (fps)</th><th class="num">View, 4% drawn, Fast Navigation (fps)</th></tr></thead>
     <tbody>
       <tr><td>4 million triangles</td><td class="num">2.9 (2.9 to 3.0)</td><td class="num">7.2</td><td class="num">1960 (1887 to 1980)</td><td class="num">5554 (5141 to 5584)</td></tr>
       <tr><td>16 million triangles</td><td class="num">5.2 (5.0 to 5.3)</td><td class="num">18.3</td><td class="num">1137 (1129 to 1143)</td><td class="num">2633 (2553 to 2691)</td></tr>
@@ -145,7 +145,7 @@ sculptforge --benchmark core-100m</code></pre></li>
     </tbody>
   </table>
   </div>
-  <p class="small muted">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="raw/bench-sizes-1.md">run 1</a>, <a href="raw/bench-sizes-2.md">run 2</a>, <a href="raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure.</p>
+  <p class="small muted">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="raw/bench-sizes-1.md">run 1</a>, <a href="raw/bench-sizes-2.md">run 2</a>, <a href="raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure. This is the laptop without the simulated entry-level limits, so it is not the entry-level tier; the simulated entry-level rows are on <a href="../fast/">How fast?</a>.</p>
 
   <h2 id="submit">Submit your result</h2>
   <div class="grid2">

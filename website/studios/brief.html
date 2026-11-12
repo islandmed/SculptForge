@@ -211,7 +211,7 @@
           <h3>Sculpting and turning the view, by mesh size</h3>
           <div class="tscroll" tabindex="0" role="region" aria-label="Dab time and view speed by mesh size, scrolls sideways">
           <table class="t">
-    <thead><tr><th>Mesh</th><th class="n">Dab, medium brush (ms)</th><th class="n">Dab, large brush (ms)</th><th class="n">View, 4x antialiasing (fps)</th><th class="n">View, Fast Navigation (fps)</th></tr></thead>
+    <thead><tr><th>Mesh</th><th class="n">Dab, medium brush (ms)</th><th class="n">Dab, large brush (ms)</th><th class="n">View, 4% of triangles drawn, 4x AA (fps)</th><th class="n">View, 4% drawn, Fast Navigation (fps)</th></tr></thead>
     <tbody>
       <tr><td>4 million triangles</td><td class="n">2.9 (2.9 to 3.0)</td><td class="n">7.2</td><td class="n">1960 (1887 to 1980)</td><td class="n">5554 (5141 to 5584)</td></tr>
       <tr><td>16 million triangles</td><td class="n">5.2 (5.0 to 5.3)</td><td class="n">18.3</td><td class="n">1137 (1129 to 1143)</td><td class="n">2633 (2553 to 2691)</td></tr>
@@ -219,7 +219,7 @@
     </tbody>
   </table>
           </div>
-          <p class="note">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="../benchmarks/raw/bench-sizes-1.md">run 1</a>, <a href="../benchmarks/raw/bench-sizes-2.md">run 2</a>, <a href="../benchmarks/raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure. The same table is on <a href="../benchmarks/#sizes">Benchmarks</a>.</p>
+          <p class="note">Median of 3 runs (range in brackets) of <code>sculptforge --bench --bench-sizes 4,16,33 --bench-no-project</code> on the development build (commit 308f83c, after 0.12.10), run on an Apple M1 Pro laptop (10 cores, integrated GPU, Linux, no limits), X symmetry on, one dab of the Standard brush at radius 0.12 (large: 0.4) of a unit sphere. The view figures are frames a second of the benchmark's orbit with only the part of the mesh in view drawn (4% of the triangles). Raw output: <a href="../benchmarks/raw/bench-sizes-1.md">run 1</a>, <a href="../benchmarks/raw/bench-sizes-2.md">run 2</a>, <a href="../benchmarks/raw/bench-sizes-3.md">run 3</a>. The 100-million-triangle size did not fit this laptop's test memory limit and has no figure. This is the laptop without the simulated entry-level limits, so it is not the entry-level tier; the simulated entry-level rows are on <a href="../fast/">How fast?</a>. The same table is on <a href="../benchmarks/#sizes">Benchmarks</a>.</p>
 
           <h3>Micro levels: hundreds of millions of polygons</h3>
           <ul class="facts">
