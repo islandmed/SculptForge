@@ -300,12 +300,14 @@ void App::drawSupportUi() {
         const float margin = 16.0f * uiScale_;
         CanvasRect room = c;
         if (c.w < 500.0f * uiScale_ + margin) room = {0.0f, topInset(), screen.x, std::max(screen.y - topInset(), 1.0f)};
-        const float fit = std::clamp((room.w - margin) / (500.0f * uiScale_), 0.4f, 1.0f);
+        const bool narrow = room.w - margin < 500.0f * uiScale_;
+        // (Paddings and spacing don't shrink with the text, so the rows need a tenth more room than the ratio.)
+        const float fit = narrow ? std::clamp((room.w - margin) / (500.0f * uiScale_) * 0.9f, 0.35f, 1.0f) : 1.0f;
         const float s = uiScale_ * fit; // (this window's own scale, below the outer one)
         ImGui::SetNextWindowPos(ImVec2(room.x + room.w * 0.5f, room.y + room.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         // Height 0 every frame: the window fits its content, so the featured creator card arriving after the first frame
         // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold.
-        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(narrow ? room.w - margin : 500.0f * s, 0.0f), ImGuiCond_Always);
         ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(room.h - margin, 100.0f)));
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         const bool welcomeOpen = ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags);
