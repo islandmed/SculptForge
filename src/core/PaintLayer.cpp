@@ -214,14 +214,20 @@ bool paintLayerEditable(const Mesh& m, int layer) {
 void paintVertex(Mesh& m, uint32_t v, const glm::vec3& color, float w, bool erase) {
     w = std::clamp(w, 0.0f, 1.0f);
     if (w <= 0.0f) return;
+    const glm::vec3 target = erase ? glm::vec3(1.0f) : color;
+    if (m.paintLayers.empty() || m.activePaintLayer < 0) {
+        Mesh::PaintTarget& pt = m.paintTarget;
+        if (pt.state == 0 || pt.settled) pt = {target, 1, false};
+        else if (pt.state == 1 && pt.color != target) pt.state = 2;
+    }
     if (m.paintLayers.empty()) {
-        m.colors[v] = glm::mix(m.colors[v], erase ? glm::vec3(1.0f) : color, w);
+        m.colors[v] = glm::mix(m.colors[v], target, w);
         m.markDirty(v);
         return;
     }
     const int active = m.activePaintLayer;
     if (active < 0) {
-        m.paintBase[v] = glm::mix(m.paintBase[v], erase ? glm::vec3(1.0f) : color, w);
+        m.paintBase[v] = glm::mix(m.paintBase[v], target, w);
     } else {
         if (!paintLayerEditable(m, active)) return;
         PaintLayer& l = m.paintLayers[size_t(active)];
