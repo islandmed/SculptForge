@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Tripo, direct: Generate 3D's "tripo" service (image or text to 3D on Tripo's own API, v3, billed to the user's Tripo
-// account). Written in house from Tripo's public developer documentation (developers.tripo3d.com). A shape only
+// account). Written in house from Tripo's public developer documentation (developers.tripo3d.ai, the global site; its China-region twin on tripo3d.com is a
+// different platform with its own keys and is not used). A shape only
 // (texture and PBR off): the model is what gets sculpted, and it is the cheapest tier (about $0.20 an image, $0.10 a text).
 //
 // Kept as narrow as the other direct providers (ai/Hyper3D.h):
@@ -31,10 +32,10 @@ struct GenerationProgress;
 
 namespace sf::ai::tripo {
 
-inline constexpr const char* kApiHost = "openapi.tripo3d.com";
-inline constexpr const char* kApiBase = "https://openapi.tripo3d.com/v3";
+inline constexpr const char* kApiHost = "openapi.tripo3d.ai";
+inline constexpr const char* kApiBase = "https://openapi.tripo3d.ai/v3";
 inline constexpr const char* kDefaultModel = "v3.1-20260211"; // H3.1
-inline constexpr const char* kKeyUrl = "https://platform.tripo3d.ai/api-keys";
+inline constexpr const char* kKeyUrl = "https://developers.tripo3d.ai/en/keys";
 
 struct Model {
     const char* id;
@@ -45,7 +46,7 @@ const std::vector<Model>& models();
 std::string resolvedModel(const std::string& model);
 
 // Pieces exposed for tests.
-// True for exactly https://openapi.tripo3d.com/v3/<path> (default port, no user info).
+// True for exactly https://openapi.tripo3d.ai/v3/<path> (default port, no user info).
 bool apiUrl(const std::string& url);
 // True for an https URL (default port, no user info) on tripo3d.com or tripo3d.ai or a subdomain.
 bool downloadUrlAllowed(const std::string& url);

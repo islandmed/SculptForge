@@ -36,7 +36,7 @@ expect_text Tripo (direct) - paid, your key
 click "Tripo (direct) - paid, your key"
 wait 0.2
 expect_text Off until you add your own key from your Tripo account
-expect_text Sends your image or description to Tripo (openapi.tripo3d.com)
+expect_text Sends your image or description to Tripo (openapi.tripo3d.ai)
 click "Generate 3D/Generate 3D model"
 wait 0.5
 expect_status Add your Tripo API key

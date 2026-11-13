@@ -191,14 +191,15 @@ TEST(tripo_without_key_sends_nothing) {
 }
 
 TEST(tripo_hosts_are_pinned) {
-    CHECK(tripo::apiUrl("https://openapi.tripo3d.com/v3/files"));
-    CHECK(tripo::apiUrl("https://openapi.tripo3d.com/v3/tasks/abc"));
-    CHECK(!tripo::apiUrl("http://openapi.tripo3d.com/v3/files"));
-    CHECK(!tripo::apiUrl("https://openapi.tripo3d.com:8443/v3/files"));
-    CHECK(!tripo::apiUrl("https://openapi.tripo3d.com.evil.example/v3/files"));
-    CHECK(!tripo::apiUrl("https://x@openapi.tripo3d.com/v3/files"));
-    CHECK(!tripo::apiUrl("https://openapi.tripo3d.com/v2/openapi/task"));
-    CHECK(!tripo::apiUrl("https://openapi.tripo3d.com/v3/../x"));
+    CHECK(tripo::apiUrl("https://openapi.tripo3d.ai/v3/files"));
+    CHECK(tripo::apiUrl("https://openapi.tripo3d.ai/v3/tasks/abc"));
+    CHECK(!tripo::apiUrl("https://openapi.tripo3d.com/v3/files")); // the China-region host: a global key is never sent there
+    CHECK(!tripo::apiUrl("http://openapi.tripo3d.ai/v3/files"));
+    CHECK(!tripo::apiUrl("https://openapi.tripo3d.ai:8443/v3/files"));
+    CHECK(!tripo::apiUrl("https://openapi.tripo3d.ai.evil.example/v3/files"));
+    CHECK(!tripo::apiUrl("https://x@openapi.tripo3d.ai/v3/files"));
+    CHECK(!tripo::apiUrl("https://openapi.tripo3d.ai/v2/openapi/task"));
+    CHECK(!tripo::apiUrl("https://openapi.tripo3d.ai/v3/../x"));
     CHECK(!tripo::apiUrl("https://evil.example/v3/files"));
     CHECK(tripo::downloadUrlAllowed("https://cdn.tripo3d.ai/output/model.glb"));
     CHECK(tripo::downloadUrlAllowed("https://tripo-data.rg1.data.tripo3d.com/x.glb"));
@@ -254,11 +255,11 @@ TEST(tripo_full_flow_image) {
     CHECK(httpRequestCount() == before); // (all through the fake)
     // upload, create, two running polls, success, the file
     CHECK(fake.calls.size() == 6);
-    CHECK(fake.calls[0].method == "POST" && fake.calls[0].url == "https://openapi.tripo3d.com/v3/files");
+    CHECK(fake.calls[0].method == "POST" && fake.calls[0].url == "https://openapi.tripo3d.ai/v3/files");
     CHECK(fake.calls[0].body.find("\x89PNG") != std::string::npos);
-    CHECK(fake.calls[1].url == "https://openapi.tripo3d.com/v3/generation/image-to-model");
+    CHECK(fake.calls[1].url == "https://openapi.tripo3d.ai/v3/generation/image-to-model");
     CHECK(fake.calls[1].body.find("file_abc") != std::string::npos && fake.calls[1].body.find("v3.1-20260211") != std::string::npos);
-    CHECK(fake.calls[2].method == "GET" && fake.calls[2].url == "https://openapi.tripo3d.com/v3/tasks/task-1");
+    CHECK(fake.calls[2].method == "GET" && fake.calls[2].url == "https://openapi.tripo3d.ai/v3/tasks/task-1");
     for (size_t i = 0; i + 1 < fake.calls.size(); ++i) CHECK(hasKeyHeader(fake.calls[i].headers, kKey));
     CHECK(fake.calls[5].url == fake.fileUrl && !hasKeyHeader(fake.calls[5].headers, kKey)); // the key never goes to the file host
     CHECK(st.waits.size() == 3 && st.waits[0] >= 2);
@@ -267,7 +268,7 @@ TEST(tripo_full_flow_image) {
     fs::remove_all(r.privateDir, ec);
     fs::remove(png, ec);
     const std::string log = st.audit();
-    CHECK(log.find("tripo") != std::string::npos && log.find("openapi.tripo3d.com") != std::string::npos);
+    CHECK(log.find("tripo") != std::string::npos && log.find("openapi.tripo3d.ai") != std::string::npos);
     CHECK(log.find(kKey) == std::string::npos && log.find("PNG") == std::string::npos);
 }
 
@@ -278,7 +279,7 @@ TEST(tripo_text_flow_and_cost_of_a_description) {
     AiSettings s = tripoSettings();
     GeneratorResult r = generate3DFromText(s, "a stylised dragon head", (fs::temp_directory_path() / "sf_tripo_text").string());
     CHECK(r.ok);
-    CHECK(fake.calls[0].url == "https://openapi.tripo3d.com/v3/generation/text-to-model"); // no upload for text
+    CHECK(fake.calls[0].url == "https://openapi.tripo3d.ai/v3/generation/text-to-model"); // no upload for text
     CHECK(fake.calls[0].body.find("a stylised dragon head") != std::string::npos);
     CHECK(st.audit().find("dragon") == std::string::npos && st.audit().find("promptChars") != std::string::npos);
     std::error_code ec;

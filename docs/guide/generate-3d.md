@@ -186,9 +186,9 @@ When a paid service can't be reached, the free models take over if you have allo
   Low and Low; the other tiers need Full access.
 
 - **Tripo (direct)**: Tripo v3.1 on Tripo's own service, from an image or a description, asked for the shape only
-  (the cheaper tier). Paste your key from platform.tripo3d.ai into **API key**, then **Save settings**: the key goes
+  (the cheaper tier). Paste your key from developers.tripo3d.ai into **API key**, then **Save settings**: the key goes
   into the system keychain. It stays off until you add a key, and your image or description goes to Tripo
-  (openapi.tripo3d.com) and nowhere else.
+  (openapi.tripo3d.ai) and nowhere else.
 
 Generations are billed to your account with that service. Errors such as "The API key was rejected", "Out of
 credits on this account" or "Rate limited" come from the service.

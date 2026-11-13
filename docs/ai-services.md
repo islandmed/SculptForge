@@ -111,9 +111,9 @@ One more direct provider, built the same way as Hyper3D above: off until you ent
 system keychain, never in `ai.json`, never in a log, never in a project; no environment variable, no shared or trial
 key), one fixed API address, https with certificates checked and no redirects followed, the key sent only there.
 
-- **Tripo** (`openapi.tripo3d.com`, provider id `tripo`): image or text to 3D with Tripo v3.1 (or v3.0), asked for the
+- **Tripo** (`openapi.tripo3d.ai`, provider id `tripo`): image or text to 3D with Tripo v3.1 (or v3.0), asked for the
   shape only (no texture, the cheaper tier: about $0.20 a picture, $0.10 a description, billed to your Tripo account;
-  prices are Tripo's list prices and can change). Get a key at platform.tripo3d.ai. The model file is accepted only over
+  prices are Tripo's list prices and can change). Get a key at developers.tripo3d.ai. The model file is accepted only over
   https from Tripo's own domains (`tripo3d.com`, `tripo3d.ai`), up to 200 MB, and only when it is a well-formed GLB; it
   is saved in a private temporary folder and deleted after import. If a file would come from anywhere else it is not
   downloaded, and the message gives the task id: the model stays in your Tripo account. Tripo's terms apply to your

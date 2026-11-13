@@ -4540,9 +4540,9 @@ void App::drawImageTo3D() {
         }
         ImGui::InputText(tr("API key##tripo"), tripoKey_, sizeof tripoKey_, ImGuiInputTextFlags_Password);
         if (!tripoKey_[0])
-            hint(aiSettings_.resolvedTripoKey().empty() ? tr("Off until you add your own key from your Tripo account (platform.tripo3d.ai).")
+            hint(aiSettings_.resolvedTripoKey().empty() ? tr("Off until you add your own key from your Tripo account (developers.tripo3d.ai).")
                                                         : tr("Using your key from the system keychain."));
-        hint(tr("Sends your image or description to Tripo (openapi.tripo3d.com), which builds the shape. About $0.20 a picture "
+        hint(tr("Sends your image or description to Tripo (openapi.tripo3d.ai), which builds the shape. About $0.20 a picture "
                 "and $0.10 a description, billed to your Tripo account."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();

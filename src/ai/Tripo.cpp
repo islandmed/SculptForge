@@ -230,7 +230,7 @@ GeneratorResult run(const AiSettings& s, const std::string& imagePath, const std
     if (!aiRequestAllowed("tripo", std::string(kApiBase) + "/generation/image-to-model", result.error)) return result;
     const std::string key = s.resolvedTripoKey();
     if (key.empty()) {
-        result.error = "Add your Tripo API key (platform.tripo3d.ai > API keys) in Generate 3D";
+        result.error = "Add your Tripo API key (developers.tripo3d.ai > API keys) in Generate 3D";
         return result;
     }
     if (std::string why; audit::required() && !audit::writable(&why)) {
@@ -322,7 +322,7 @@ GeneratorResult run(const AiSettings& s, const std::string& imagePath, const std
         for (char c : taskId.substr(0, 64))
             if (std::isalnum(static_cast<unsigned char>(c)) || c == '-') id += c;
         return fail("Refused the model file: it isn't on Tripo's servers (" + host +
-                    "). The model stays in your Tripo account (platform.tripo3d.ai), task " + id);
+                    "). The model stays in your Tripo account (developers.tripo3d.ai), task " + id);
     };
     if (!downloadUrlAllowed(task.modelUrl)) {
         net::UrlParts u;

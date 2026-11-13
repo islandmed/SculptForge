@@ -12,6 +12,6 @@ added: **Tripo in Generate 3D** (with your own key): Tripo v3.1 / v3.0 from an i
   another paid service).
 testers:
   - Any OS, no key: Generate 3D > Recommended models lists Tripo v3.1, TRELLIS.2, Hunyuan3D 3.1, Rodin 2.5 and the free models with a price each; clicking one picks the service and model; **Get a key** opens the provider's page.
-  - Any OS, if you have a Tripo key (platform.tripo3d.ai): one generation, Generate 3D > Tripo > From image; report the time it took, the result (does the shape import?) and the cost your Tripo account shows. A wrong key says "Tripo rejected the API key".
+  - Any OS, if you have a Tripo key (developers.tripo3d.ai): one generation, Generate 3D > Tripo > From image; report the time it took, the result (does the shape import?) and the cost your Tripo account shows. A wrong key says "Tripo rejected the API key".
 ---
 Reviewers: the feed's `ai3d` block is written by scripts/ai3d-health.py (a daily timer, not Claude); the app only reads it.

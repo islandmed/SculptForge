@@ -155,14 +155,14 @@ If no pen is detected or pressure doesn't change:
 
 | Message | What to do |
 |---|---|
-| *Add your Tripo API key* | It stays off until you add your own key (platform.tripo3d.ai) in the Generate 3D window |
+| *Add your Tripo API key* | It stays off until you add your own key (developers.tripo3d.ai) in the Generate 3D window |
 | *Tripo rejected the API key* | Check the key, or make a new one |
 | *Out of credits on your Tripo account* | Top up with that service; nothing was charged for the failed call |
 | *Tripo is rate limiting* / *Tripo is already running your other generations* | Wait a moment and try again, or make fewer candidates at once |
 | *Tripo retired this model version* | Update SculptForge, or choose another model |
 | *Tripo refused the content* | The picture or description was refused by the provider's content check; you were not charged |
 | *Tripo took longer than 10 minutes* | The task stays in your Tripo account; try again |
-| *Refused the model file* | The result came from somewhere other than Tripo's servers, so SculptForge didn't download it. The model stays in your Tripo account (platform.tripo3d.ai) under the task id in the message |
+| *Refused the model file* | The result came from somewhere other than Tripo's servers, so SculptForge didn't download it. The model stays in your Tripo account (developers.tripo3d.ai) under the task id in the message |
 | *The free models were not tried* | A paid service was unreachable and you haven't allowed the free Hugging Face models yet: choose one once and press **Allow** |
 | *Switched off* next to a free model | The Space's owner switched it off (the update check says so, once a day): choose another model; Generate already uses the first one that is up |
 
@@ -177,7 +177,7 @@ see [Brush Lab and sharing brushes](brush-lab.md).
 ### No connection at all
 
 AI features need internet access (except a local Ollama, LM Studio or ComfyUI). Behind a company proxy or
-firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), openapi.tripo3d.com (and `*.tripo3d.com`, `*.tripo3d.ai` for the model file), or the
+firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), openapi.tripo3d.ai (and `*.tripo3d.com`, `*.tripo3d.ai` for the model file), or the
 Pollinations.ai text endpoint for the free Brush Lab model.
 
 ## ComfyUI errors
