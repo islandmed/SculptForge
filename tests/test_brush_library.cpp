@@ -15,6 +15,11 @@
 #include <fstream>
 #include <map>
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 using namespace sf;
 namespace fs = std::filesystem;
 
@@ -717,6 +722,31 @@ TEST(file_replace_lands_or_names_the_file) {
     std::ifstream in2(dir / "a.json");
     CHECK(std::string((std::istreambuf_iterator<char>(in2)), std::istreambuf_iterator<char>()) == "after read-only");
     in2.close();
+    // The target held open by a reader that allows other readers and writers but not delete (what std::ifstream does on
+    // Windows: the cause of "Access is denied" at start-up when project.json was still open while it was saved).
+    {
+        writeText(dir / "held.json", "old");
+        std::ifstream holder(dir / "held.json", std::ios::binary);
+        CHECK(holder.is_open());
+        writeText(dir / "held.tmp", "after open");
+        CHECK(replaceFile(dir / "held.tmp", dir / "held.json", err));
+        holder.close();
+        std::ifstream check(dir / "held.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after open");
+    }
+#ifdef _WIN32
+    { // ... and by a second handle without FILE_SHARE_DELETE (a scanner, a sync client), opened the Win32 way.
+        writeText(dir / "held2.json", "old");
+        HANDLE h = CreateFileW((dir / "held2.json").c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, nullptr);
+        CHECK(h != INVALID_HANDLE_VALUE);
+        writeText(dir / "held2.tmp", "after handle");
+        CHECK(replaceFile(dir / "held2.tmp", dir / "held2.json", err));
+        CloseHandle(h);
+        std::ifstream check(dir / "held2.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after handle");
+    }
+#endif
     // A target that can't be replaced (a folder is in the way): false, the error names the file, the temp file is gone.
     fs::create_directories(dir / "blocked" / "inner");
     writeText(dir / "b.tmp", "x");
