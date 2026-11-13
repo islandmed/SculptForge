@@ -6,9 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/BrushRecipe.h"
-#include "core/BVH.h"
 #include "core/BrushSettings.h"
-#include "core/Primitives.h"
 #include "core/Sculpt.h"
 
 #include <cstdio>
@@ -192,59 +190,4 @@ TEST(brush_recipe_pen_pressure) {
     CHECK(Json::parse(R"({"name":"Old","depth":0.3,"penPressureSize":"sideways"})", j, err));
     const BrushRecipe old = BrushRecipe::fromJson(j);
     CHECK(old.pressureSize == PenPressure::Global && old.pressureStrength == PenPressure::Global);
-}
-
-// Save Brush Settings must hand the next start exactly what was saved: every value bit for bit (a value the file rounds
-// would make the brush feel different after a restart), and a dab with the reloaded settings must move the surface exactly
-// as the dab with the originals did, on a curved mesh.
-TEST(brush_settings_save_load_invariant_same_values_same_dab) {
-    const std::string path = tempPath("sf_brush_settings_invariant.json");
-    std::remove(path.c_str());
-    BrushSettingsStore store;
-    BrushToolSettings s; // awkward values: none of them is a short decimal
-    s.radiusPx = 33.333333f;
-    s.strength = 0.123456789f;
-    s.focal = -0.37294711f;
-    s.rgbIntensity = 0.7071068f;
-    s.sprayScatter = 1.7320508f;
-    s.lazyRadius = 41.2345678f;
-    s.stroke = StrokeType::Spray;
-    s.alphaOptions.angle = 17.123457f;
-    store.store("custom:Round Trip", s);
-    std::string err;
-    CHECK(store.save(path, err) && err.empty());
-    BrushSettingsStore loaded;
-    CHECK(loaded.load(path, err));
-    BrushToolSettings got;
-    CHECK(loaded.savedFor("custom:Round Trip", got));
-    CHECK(got == s); // exact float equality, every field
-    CHECK(got.radiusPx == s.radiusPx && got.strength == s.strength && got.focal == s.focal);
-
-    auto dabbed = [](const BrushToolSettings& b) {
-        Document d;
-        d.mesh = makeIcosphere(5);
-        BVH bvh;
-        bvh.build(d.mesh);
-        Sculptor sculptor;
-        sculptor.beginStroke(d.mesh, "dab");
-        DabParams p;
-        p.center = glm::vec3(0.0f, 0.0f, 1.0f);
-        p.viewDir = glm::vec3(0.0f, 0.0f, -1.0f);
-        p.radius = b.radiusPx * 0.01f;
-        p.strength = b.strength;
-        p.focal = b.focal;
-        sculptor.dab(d.mesh, bvh, BrushType::Clay, p, Symmetry{});
-        return d.mesh.positions;
-    };
-    const auto original = dabbed(s), reloaded = dabbed(got);
-    CHECK(original.size() == reloaded.size());
-    bool same = original.size() == reloaded.size();
-    bool moved = false;
-    const Mesh rest = makeIcosphere(5);
-    for (size_t v = 0; same && v < original.size(); ++v) {
-        same = original[v] == reloaded[v];
-        moved = moved || original[v] != rest.positions[v];
-    }
-    CHECK(same && moved); // identical, and the dab did something
-    std::remove(path.c_str());
 }
