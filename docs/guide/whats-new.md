@@ -5,6 +5,14 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.14
+
+```features
+date: unreleased
+tagline: The welcome window fits a phone held sideways.
+highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
+```
+
 ## Version 0.12.13
 
 ```features
