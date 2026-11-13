@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.15
+
+```features
+date: unreleased
+tagline: Image to 3D from an AI tool no longer freezes the window, and links on Linux open one browser window.
+highlight: Image to 3D and Text to 3D from an AI tool, the console or a script run in the background with live status instead of freezing the window
+highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
+highlight: On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle
+```
+
 ## Version 0.12.14
 
 ```features
