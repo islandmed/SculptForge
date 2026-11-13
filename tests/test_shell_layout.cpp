@@ -443,3 +443,23 @@ TEST(shell_phone_width_keeps_the_view) {
     const ShellGeometry t = computeShell(l, 2000.0f, 1200.0f, 2.0f);
     CHECK(t.leftTray.w > 0.0f);
 }
+
+// A shelf slot's brush id (custom brush slots find their brush by it) survives the layout file; hand-edited junk is dropped.
+TEST(shell_layout_keeps_brush_slot_ids) {
+    UiLayout l = standardLayout();
+    l.bottomShelf.push_back("brush.recipe.Finish - Classic");
+    l.brushIds["Finish - Classic"] = "00ff00ff00ff00ff";
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.brushIds.size() == 1 && back.brushIds["Finish - Classic"] == "00ff00ff00ff00ff");
+    CHECK(std::find(back.bottomShelf.begin(), back.bottomShelf.end(), "brush.recipe.Finish - Classic") != back.bottomShelf.end());
+    Json j = toJson(l);
+    Json ids = Json::object();
+    ids.set("A", 5.0);
+    ids.set("B", std::string());
+    ids.set("C", std::string(200, 'x'));
+    j.set("brushIds", ids);
+    CHECK(fromJson(j, back, err) && back.brushIds.empty());
+    CHECK(toJson(standardLayout()).has("brushIds") == false);
+}

@@ -95,6 +95,9 @@ struct BrushRecipe {
 
     // Library bookkeeping, not part of the recipe: never written by toJson().
     BrushOrigin origin;
+    // Stable identity of a brush file in the library (written to the .sfbrush by the library, not by toJson, so brush
+    // codes and projects never carry it): a shelf slot finds its brush by it after a rename or a move. Empty = none yet.
+    std::string id;
 
     void clamp();
     // Numeric parameter by key (see recipeParams()), or nullptr.

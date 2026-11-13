@@ -2959,19 +2959,33 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ui::HelpText("Add a brush", nullptr, "Put another brush (built-in or one of yours) on this shelf.", "Bottom shelf");
     } else if (item.rfind("brush.recipe.", 0) == 0 || item.rfind("recipe:", 0) == 0) {
         const std::string name = item.substr(item[0] == 'r' ? 7 : 13); // custom brush, by name
-        int found = -1;
-        for (int i = 0; i < int(doc_.brushes.size()); ++i)
+        // The slot's brush: by the stable id it learned (a renamed brush, a file moved to another folder), else by name.
+        const auto slotId = layout_.brushIds.find(name);
+        const std::string wantId = slotId != layout_.brushIds.end() ? slotId->second : std::string();
+        int found = findBrushById(doc_, wantId);
+        for (int i = 0; found < 0 && i < int(doc_.brushes.size()); ++i)
             if (doc_.brushes[size_t(i)].name == name) found = i;
-        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored or copied file returns it)
+        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored, moved or copied file returns it)
             double& tried = shelfBrushTried_[name];
             if (ImGui::GetTime() - tried > 3.0) {
                 tried = ImGui::GetTime();
                 std::string note;
-                found = recoverBrush(doc_, name, note);
+                found = relinkBrush(doc_, name, wantId, note);
                 if (found >= 0) status_ = note;
             }
         } else {
             shelfBrushTried_.erase(name);
+        }
+        if (found >= 0) {
+            const BrushRecipe& have = doc_.brushes[size_t(found)];
+            if (have.name != name) { // renamed or case-changed: the slot follows its brush (never cleared for a name it can't find)
+                for (auto* list : {&layout_.topShelf, &layout_.leftShelf, &layout_.rightShelf, &layout_.bottomShelf})
+                    for (std::string& other : *list)
+                        if (other == item) other = item.substr(0, item.size() - name.size()) + have.name;
+                layout_.brushIds.erase(name);
+                shelfBrushTried_.erase(name);
+            }
+            if (!have.id.empty()) layout_.brushIds[have.name] = have.id; // learn it (a slot from an older version gets its id here)
         }
         const ImVec2 size(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         const bool clicked = ImGui::InvisibleButton((name + "##" + item).c_str(), size);

@@ -81,6 +81,16 @@ bool saveBrushToLibrary(Document& doc, int index, std::string& error, bool galle
 int recoverBrush(Document& doc, const std::string& name, std::string& message,
                  const BrushLibraryPaths& paths = brushLibraryPaths());
 
+// The brush a shelf slot points at, by its stable id first (a renamed brush, a file moved to another folder, a changed
+// internal name), then by name (case-insensitive as a last resort: Windows and macOS files differ only in case), loaded or
+// not: unloaded ones are looked for in the user library (subfolders too), the studio folders and the backups, as
+// recoverBrush does. Returns its index or -1; the slot is never to be cleared for a -1. `message` says what was done.
+int relinkBrush(Document& doc, const std::string& name, const std::string& id, std::string& message,
+                const BrushLibraryPaths& paths = brushLibraryPaths());
+
+// Index of the loaded brush with this stable id, or -1 (an empty id is never found).
+int findBrushById(const Document& doc, const std::string& id);
+
 // Adds (or updates, by name) `recipe`, saves it to the user library and makes
 // it the active brush. Returns its index; on a save error the brush is still
 // usable this session and `error` says why it isn't saved.
