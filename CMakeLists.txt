@@ -1337,6 +1337,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
     # The welcome window on a 1080x2400 phone at 300 %: inside the view, its X and Close reachable (Hameron, Pixel).
     sculptforge_ui_test(welcome_phone hidpi/welcome_phone --size 1080x2400)
+    # The welcome with a finger only (touch taps, Android's Back, safe-area insets), both ways up, two phone densities, and a
+    # swipe that scrolls it in landscape: its X and Close whole and one tap closes (Hameron, Pixel, 11-13).
+    sculptforge_ui_test(welcome_touch_portrait hidpi/welcome_touch --size 1080x2400)
+    sculptforge_ui_test(welcome_touch_landscape hidpi/welcome_touch --size 2400x1080)
+    sculptforge_ui_test(welcome_touch_350_portrait hidpi/welcome_touch_350 --size 1440x3120)
+    sculptforge_ui_test(welcome_touch_350_landscape hidpi/welcome_touch_350 --size 3120x1440)
+    sculptforge_ui_test(welcome_touch_scroll hidpi/welcome_touch_scroll --size 2400x1080)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one

@@ -2100,6 +2100,20 @@ private:
 
     // ---- Shell (A): layout, shelves, palettes, trays, theme ----
     float topInset() const;  // window px kept clear at the top (camera notch)
+    // Window px the system covers (camera cut-out, bars, gesture area; SDL's safe area). UI tests: `safe_area` sets them.
+    struct SafeInsets {
+        float l = 0.0f, t = 0.0f, r = 0.0f, b = 0.0f;
+    };
+    SafeInsets safeInsets() const;
+    CanvasRect safeRect() const; // the window inside those insets
+    bool safeInsetsTest_ = false;
+    SafeInsets safeInsetsTestValue_;
+    // Android's Back (SDLK_AC_BACK): closes the topmost card or window and answers true; false: nothing open, the system's
+    // Back (leave the app) goes on. androidBackWanted() is the same question, for SDL's trap-the-button hint.
+    bool androidBack();
+    bool androidBackWanted() const;
+    ImVec4 welcomeCloseRect_{}, welcomeXRect_{}; // the welcome's Close button and title-bar X as last drawn (UI tests)
+    float welcomeScrollY_ = 0.0f, welcomeScrollMax_ = 0.0f, welcomeBodyH_ = 0.0f; // its scrolling part on a phone (PanelSupport.cpp)
     bool hideBrushCursor_ = false; // demos: camera moves while the cursor is off screen
     float fpsShown_ = -1.0f; // title-strip frame rate, refreshed twice a second
     double fpsShownAt_ = 0.0;

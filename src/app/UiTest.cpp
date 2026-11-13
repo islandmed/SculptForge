@@ -334,7 +334,16 @@
 //                            midpoint moves DX DY pixels. Touch screen (SDL's mouse events for the first finger too)
 //                            or trackpad; late: the first finger lands alone and drags 40 px first (a stroke starts)
 //   touch_stroke U0 V0 U1 V1 one finger on the touch screen from one point on the model to another (sculpts)
-//   expect_value touch_fingers (fingers down now)
+//   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
+//                            window that doesn't drag-scroll; fails when the item is not visible)
+//   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
+//   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
+//   touch_tap_welcome_x      a tap on the welcome window's title-bar X
+//   android_back             Android's Back button (SDLK_AC_BACK) down and up
+//   safe_area L T R B        window px the system covers (camera cut-out, bars, gesture area); `safe_area off` clears them
+//   expect_value touch_fingers (fingers down now), welcome_close_hidden_px / welcome_x_hidden_px (how far the welcome's
+//                            Close button / X sit outside the visible part of the window or the safe area, 0: whole),
+//                            welcome_scrolled_px (how far its body is scrolled), welcome_scroll_px (content below the fold: Close is only reachable by scrolling when > 0)
 //
 // Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
 // axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
@@ -1237,6 +1246,21 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "welcome_close_hidden_px" || name == "welcome_x_hidden_px" || name == "welcome_scroll_px" || name == "welcome_scrolled_px") {
+        const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
+        if (!w || !w->WasActive) return -1.0;
+        if (name == "welcome_scroll_px") return std::ceil(double(std::max(w->ScrollMax.y, app_.welcomeScrollMax_)) - 0.5);
+        if (name == "welcome_scrolled_px") return std::ceil(double(app_.welcomeScrollY_) - 0.5);
+        const bool close = name == "welcome_close_hidden_px";
+        const ImVec4 r = close ? app_.welcomeCloseRect_ : app_.welcomeXRect_;
+        const CanvasRect safe = app_.safeRect();
+        // (the Close button sits in the scrolling part: its visible part is the window's inner rect; the X is the title bar's)
+        const float x0 = std::max(safe.x, close ? w->InnerRect.Min.x : w->Pos.x), y0 = std::max(safe.y, close ? w->InnerRect.Min.y : w->Pos.y);
+        const float x1 = std::min(safe.x + safe.w, close ? w->InnerRect.Max.x : w->Pos.x + w->Size.x);
+        const float y1 = std::min(safe.y + safe.h, close ? w->InnerRect.Max.y : w->Pos.y + w->Size.y);
+        const double out = std::max({double(x0 - r.x), double(y0 - r.y), double(r.z - x1), double(r.w - y1), 0.0});
+        return std::ceil(out - 0.5);
+    }
     if (name == "welcome_outside_px" || name == "welcome_overflow_px") {
         const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
         if (!w || !w->WasActive) return -1.0;
@@ -1805,6 +1829,123 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         return stray;
     };
 
+    // Steps outside the else-if chain below (MSVC C1061: blocks nested too deeply once it grows past 120).
+    if (verb == "safe_area") {
+        if (!need(1)) return false;
+        const bool off = w[1] == "off";
+        if (!off && !need(4)) return false;
+        run([this, off, l = num(1, 0), t = num(2, 0), r = num(3, 0), b = num(4, 0)] {
+            app_.safeInsetsTest_ = !off;
+            app_.safeInsetsTestValue_ = off ? App::SafeInsets{} : App::SafeInsets{l, t, r, b};
+        });
+        wait(0.2f);
+        return true;
+    }
+    if (verb == "android_back") {
+        run([this] {
+            for (const bool down : {true, false}) {
+                SDL_Event e{};
+                e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                e.key.windowID = SDL_GetWindowID(app_.window_);
+                e.key.key = SDLK_AC_BACK;
+                e.key.scancode = SDL_SCANCODE_AC_BACK;
+                e.key.down = down;
+                app_.handleEvent(e);
+            }
+        });
+        wait(0.2f);
+        return true;
+    }
+    if (verb == "touch_drag_at") {
+        if (!need(4)) return false;
+        const ImVec2 a(num(1, 0.5f), num(2, 0.5f)), b(num(3, 0.5f), num(4, 0.5f));
+        steps_.push_back([this, a, b](float t) {
+            const ImVec2 screen = ImGui::GetIO().DisplaySize;
+            const float k = std::min(t / 0.4f, 1.0f);
+            const ImVec2 p((a.x + (b.x - a.x) * k) * screen.x, (a.y + (b.y - a.y) * k) * screen.y);
+            auto finger = [&](SDL_EventType type) {
+                SDL_Event e{};
+                e.type = type;
+                e.tfinger.touchID = App::kUiTestTouchScreen;
+                e.tfinger.fingerID = 1;
+                e.tfinger.x = p.x / screen.x;
+                e.tfinger.y = p.y / screen.y;
+                e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+                e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+                app_.handleEvent(e);
+            };
+            mouseMotion(p.x, p.y, SDL_TOUCH_MOUSEID);
+            if (t == 0.0f) {
+                mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                finger(SDL_EVENT_FINGER_DOWN);
+                return false;
+            }
+            finger(SDL_EVENT_FINGER_MOTION);
+            if (t < 0.4f) return false;
+            mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.2f);
+        return true;
+    }
+    if (verb == "touch_tap" || verb == "touch_tap_at" || verb == "touch_tap_welcome_x") {
+        // One finger taps: SDL's mouse events for it (motion, press), the finger event, a few frames, then the lift.
+        if (!need(verb == "touch_tap" ? 1 : verb == "touch_tap_at" ? 2 : 0)) return false;
+        const std::string label = verb == "touch_tap" ? w[1] : std::string();
+        const bool atFraction = verb == "touch_tap_at", onX = verb == "touch_tap_welcome_x";
+        const float fx = atFraction ? num(1, 0.5f) : 0.0f, fy = atFraction ? num(2, 0.5f) : 0.0f;
+        auto at = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, atFraction, onX, fx, fy, at](float t) {
+            ImVec2 to;
+            if (atFraction) {
+                to = ImVec2(fx * ImGui::GetIO().DisplaySize.x, fy * ImGui::GetIO().DisplaySize.y);
+            } else if (onX) {
+                const ImVec4 r = app_.welcomeXRect_;
+                if (r.z <= r.x) {
+                    if (t > 1.0f) fail(line, "touch_tap_welcome_x: no welcome window");
+                    return t > 1.0f;
+                }
+                to = ImVec2((r.x + r.z) * 0.5f, (r.y + r.w) * 0.5f);
+            } else {
+                bool visible = false;
+                if (!findItem(label, to, &visible)) {
+                    if (t > 3.0f) fail(line, notFound(label));
+                    return t > 3.0f;
+                }
+                if (!visible) {
+                    if (t > 0.5f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view): a finger can't reach it");
+                    return t > 0.5f;
+                }
+            }
+            *at = to;
+            mouseMotion(to.x, to.y, SDL_TOUCH_MOUSEID);
+            mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            return true;
+        });
+        auto finger = [this, at](SDL_EventType type) {
+            int ww = 1, wh = 1;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            SDL_Event e{};
+            e.type = type;
+            e.tfinger.touchID = App::kUiTestTouchScreen;
+            e.tfinger.fingerID = 1;
+            e.tfinger.x = at->x / float(ww);
+            e.tfinger.y = at->y / float(wh);
+            e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+            e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        };
+        run([finger] { finger(SDL_EVENT_FINGER_DOWN); });
+        wait(0.12f); // (a tap's few frames)
+        steps_.push_back([this, finger](float) {
+            mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.2f);
+        return true;
+    }
     if (verb == "click" || verb == "double_click" || verb == "right_click") {
         if (!need(1)) return false;
         testClick(line, w[1], verb == "right_click" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, verb == "double_click");
@@ -4221,7 +4362,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
-                "touch_stroke", "touch_pinch", "palm_guard", "classic_keys", "input_style"};
+                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";

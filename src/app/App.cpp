@@ -1794,6 +1794,10 @@ void App::handleEvent(const SDL_Event& event) {
 }
 
 void App::dispatchEvent(const SDL_Event& event) {
+    if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && event.key.key == SDLK_AC_BACK) { // Android's Back
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
+        return;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;

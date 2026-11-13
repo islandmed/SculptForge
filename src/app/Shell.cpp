@@ -905,7 +905,29 @@ void App::registerShellActions() {
 // Layout
 // ---------------------------------------------------------------------------
 
+App::SafeInsets App::safeInsets() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_;
+    SafeInsets in;
+    in.t = topInset();
+    SDL_Rect safe{};
+    int w = 0, h = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    if (SDL_GetWindowSafeArea(window_, &safe) && safe.w > 0 && safe.h > 0) {
+        in.l = float(std::max(safe.x, 0));
+        in.r = float(std::max(w - safe.x - safe.w, 0));
+        in.b = float(std::max(h - safe.y - safe.h, 0));
+    }
+    return in;
+}
+
+CanvasRect App::safeRect() const {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const SafeInsets in = safeInsets();
+    return {in.l, in.t, std::max(screen.x - in.l - in.r, 1.0f), std::max(screen.y - in.t - in.b, 1.0f)};
+}
+
 float App::topInset() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_.t;
     // Laptop camera notches cover the top of a window that fills the screen (MacBooks since 2021).
     if (uiPrefs_.cameraNotch == 2 || hideUi_ || !options_.uiTest.empty() || !options_.recordPath.empty()) return 0.0f;
     // macOS (and any platform that knows) reports the safe area itself.
