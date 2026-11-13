@@ -580,11 +580,13 @@ rez-env sculptforge -- sculptforge troll.usda \
         <p class="fine">The interface speaks English, Español, 繁體中文, 简体中文 and 日本語 (Edit &gt; Preferences &gt; Interface &gt; Language;
           it starts in your computer's language when SculptForge has it).
           <a href="getting-started-ja.html" hreflang="ja" lang="ja">日本語のはじめ方</a>.</p>
-        <p class="fine">Android is an early test build. Members get the .apk today from the members' releases (the invitation
-          to the member repository comes with <a href="support.html?utm_campaign=android-site">membership</a>); it is free for
-          everyone on 26 November. Sideload it (allow installs from your browser or file manager) and uninstall any earlier
-          test APK first, since it is signed with a different key. Test build: a later version will need one uninstall and
-          reinstall. Found a bug? Tell us on <a href="https://github.com/islandmed/SculptForge/issues">GitHub</a> or Discord.</p>
+        <p class="fine"><strong>Android is an early test build.</strong> Members get the .apk today; it is free for everyone on 26 November.</p>
+        <ul class="fine">
+          <li>Members: the .apk is in the members' releases (the invitation comes with <a href="support.html?utm_campaign=android-site">membership</a>)</li>
+          <li>Sideload it: allow installs from your browser or file manager</li>
+          <li>Uninstall any earlier test APK first (it was signed with a different key); a later version will need one more reinstall</li>
+          <li>Found a bug? Tell us on <a href="https://github.com/islandmed/SculptForge/issues">GitHub</a> or Discord</li>
+        </ul>
         <p class="fine">Package managers: Homebrew is live; winget and Omarchy are in review; the AUR package is ready
           but not published yet; apt and dnf repositories are being built. Status:
           <a href="guide/installing.html">Install guide</a>.</p>
@@ -610,11 +612,13 @@ rez-env sculptforge -- sculptforge troll.usda \
             the Python plugin and tick "Enable Remote Execution"; there's nothing to install in your project.
             You can always export an Unreal-ready FBX instead.</p></details>
         <details><summary>I already sculpt in another app. Will my habits carry over?</summary>
-          <p>Mostly, yes. Blocking out, sculpting forms and detail, blend shapes, LODs and getting assets into Unreal,
-            glTF or USD all work today, with familiar brushes and controls. Masking, face groups and hide/show, vertex
-            paint, lit spheres, project files, subdivision levels, dynamic topology, Quad Remesh retopology with guides,
-            UVs and vector displacement brushes are in too. Pick <strong>Classic sculpting keys</strong> at the first
-            start, and bring models over as OBJ, FBX, glTF or USD, or through the Bridge.</p></details>
+          <p><strong>Mostly, yes.</strong> Pick <strong>Classic sculpting keys</strong> at the first start and bring models over as OBJ, FBX, glTF or USD, or through the Bridge.</p>
+          <p>Already in, with familiar brushes and controls:</p>
+          <ul>
+            <li>Blocking out, sculpting forms and detail, blend shapes, LODs, and getting assets into Unreal, glTF or USD</li>
+            <li>Masking, face groups, hide/show, vertex paint, lit spheres and project files</li>
+            <li>Subdivision levels, dynamic topology, Quad Remesh with guides, UVs and vector displacement brushes</li>
+          </ul></details>
         <details><summary>Does it fit a VFX studio pipeline?</summary>
           <p>Yes. Every release includes VFX Reference Platform CY2026 and CY2027 builds (Rocky Linux 8 and 9, GCC
             14.2, Python 3.13), there's a Rez package, and everything the app does can be scripted from Python or the
