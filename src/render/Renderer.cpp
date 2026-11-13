@@ -50,6 +50,7 @@ uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec3 uGridOrigin;
 uniform float uGridStep;
+uniform float uPushBack; // > 0: the surface pushed back along the view ray by this much (the coarse underlay of edited clusters)
 #ifdef PRIM
 uniform usamplerBuffer uClusterPrims;
 uniform int uPrimBase; // >= 0: this cluster's first drawn triangle (clusters drawn one by one)
@@ -208,6 +209,7 @@ void main() {
     }
 #endif
     vec4 p = uView * vec4(world, 1.0);
+    if (uPushBack > 0.0) p.xyz += (uProj[3][3] == 1.0 ? vec3(0.0, 0.0, -1.0) : normalize(p.xyz)) * uPushBack; // (same pixel, further away)
     vNormalCurv = vec4(mat3(uView) * normal, curvature);
 #ifdef FLAT
     vViewPos = p.xyz;
@@ -1157,6 +1159,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.hasPaint = at("uHasPaint");
     p.normalFlipY = at("uNormalFlipY");
     p.twoSided = at("uTwoSided");
+    p.pushBack = at("uPushBack");
     p.checker = at("uChecker");
     p.checkerScale = at("uCheckerScale");
     p.ghostGroups = at("uGhostGroups");
@@ -1737,6 +1740,8 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     if (outside.load()) {
         // A vertex left the grid: a new grid, and everything sent again.
         s.grid = PositionGrid::around(meshBounds(mesh));
+        regridded_ = true;
+        regridRuns_ = dirtyRuns_; // (only these moved: the coarse levels hold exact positions, a new grid changes none)
         dirtyRuns_.assign(1, {0u, uint32_t(ns)});
         everything = true;
         uploadGathered(staging_, s.vertexBuffer, sizeof(PackedVertex), ns, false, dirtyRuns_, fill, &blockChanged_);
@@ -1770,7 +1775,16 @@ void Renderer::updateBounds(MeshSlot& s, const Mesh& mesh, bool all, bool comput
         }
     }
     s.proxyStale.resize(clusters.size(), 1);
-    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1, markCoarseDirty(s, c);
+    for (uint32_t c : cullScratch_) s.proxyStale[c] = 1;
+    if (s.follow) s.followStale = true; // (edits the follower didn't get as a stroke's uploads)
+    if (all || !regridded_) {
+        for (uint32_t c : cullScratch_) markCoarseDirty(s, c);
+    } else { // (a new position grid re-sent every vertex: the coarse levels follow only the clusters the edit touched)
+        for (const auto& [b, e] : regridRuns_) {
+            if (b >= e) continue;
+            for (uint32_t c = s.order.clusterOfSlot(b), c1 = s.order.clusterOfSlot(e - 1); c <= c1; ++c) markCoarseDirty(s, c);
+        }
+    }
     if (computed) cullScratch_.clear();
     poolFor(cullScratch_.size(), [&](size_t i0, size_t i1) {
         for (size_t i = i0; i < i1; ++i) {
@@ -2406,6 +2420,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Dynamic topology changes topology a little at a time: patches (notePatches) instead of a full upload,
     // until there are too many of them.
     const bool patched = !s.patches.empty() || !mesh.changedTriangles.empty();
+    regridRuns_.clear(), regridded_ = false;
     bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
@@ -2452,6 +2467,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
     } else if (s.regrid) { // a stroke's vertex left the grid (prepareStrokeUpload): a new one, everything sent
+        regridded_ = true;
+        s.order.dirtyRuns(mesh, regridRuns_); // (the coarse levels follow only these; a stroke upload marked its own)
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
         std::fill(s.blockHash.begin(), s.blockHash.end(), ~uint64_t(0) >> 1); // (no block keeps its hash)
@@ -2480,6 +2497,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (full) {
         s.proxyAllocated = false; // sized for the old mesh
+        if (s.follow) s.follow->reset();
         s.coarse.reset(), s.coarseTried = false, s.coarseDirty.clear(), s.coarsePending.clear();
         s.proxyCount.clear();
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
@@ -2519,8 +2537,10 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         const bool attributes = (nv > 0 && mesh.colors.size() == nv) || (nv > 0 && mesh.mask.size() == nv) ||
                                 !s.coarse->colors.empty() || !s.coarse->mask.empty();
         if (!coarseAttributesMatch(*s.coarse, mesh)) {
-            if (s.coarsePending.size() < s.coarseDirty.size()) // (once: then the next quiet sync updates them)
+            if (s.coarsePending.size() < s.coarseDirty.size()) { // (once: then the next quiet sync updates them)
                 for (uint32_t c = 0; c < s.coarseDirty.size(); ++c) markCoarseDirty(s, c);
+                s.coarseEditAt = -1.0e9; // (not a stroke's edits: nothing to wait out, the next frame updates them)
+            }
         } else if (attributes && ranged) {
             for (const auto& [b, e] : dirtyRuns_) {
                 if (b >= e) continue;
@@ -2530,7 +2550,16 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     }
     if (coarseLod_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
         buildCoarse(s, mesh);
-    if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateCoarse(s, mesh); // (the stroke is over)
+    // The edited clusters draw in full beside the coarse rest until their cells follow: after the stroke, once the
+    // edits have rested (quick strokes in a row keep the same look instead of flipping the edited area each time).
+    followEdits(s, mesh);
+    constexpr double kCoarseRest = 0.35; // seconds
+    if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_ &&
+        (clock_ <= 0.0 || clock_ - s.coarseEditAt >= kCoarseRest)) // (no frame clock: callers that never set one)
+        updateCoarse(s, mesh);
+    applyFollow(s); // (the tail of a stroke: what the follower worked out after the last commit)
+    syncFollow(s, mesh);
+    s.coarseFresh.clear();
     s.coarseEdited = false;
     if (syncLog) proxyMs = lapMs(lap);
     syncTexture(s, mesh, pbr);
@@ -3187,6 +3216,7 @@ void Renderer::drawReferences(bool behind, const glm::mat4& view, const glm::mat
 
 void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, const RenderSettings& settings,
                     const Viewport& viewport) {
+    clock_ = settings.frameClock;
     if (!settings.motionProxy) lodBudget_ = triangleBudget(settings); // (sync builds coarse levels of meshes over it)
     // SF_FRAME_LOG=ms (App.cpp): a draw slower than that says where its time went (lit spheres, environment, Parts).
     static const double drawLogMs = std::getenv("SF_FRAME_LOG") ? std::atof(std::getenv("SF_FRAME_LOG")) : -1.0;
@@ -3498,24 +3528,32 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
     cull(s, frame, false); // (the visible clusters, in full)
     coarseClusters_.clear();
     coarseLevel_.clear();
+    underlayClusters_.clear();
     size_t full = 0;
     for (uint32_t c : drawClusters_) full += size_t(s.drawCount[c]) / 3;
     if (full <= budget) return;
+    // (The edited clusters draw in full on top: they never move the level, so a stroke doesn't change it.)
     // (clusters facing away stay out: the coarse ones go to the GPU's culling as the full ones)
     const CoarseLevels& L = *s.coarse;
     int pick = int(L.levels.size()) - 1;
     for (int level = 0; level < int(L.levels.size()); ++level) {
         size_t total = 0;
         for (uint32_t c : drawClusters_)
-            total += s.coarseDirty[c] || L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
+            if (!s.coarseDirty[c]) total += L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
         if (total <= budget) {
             pick = level;
             break;
         }
     }
     size_t kept = 0;
+    float error = 0.0f;
+    underlayLevel_ = pick;
     for (uint32_t c : drawClusters_) {
         if (s.coarseDirty[c] || L.clusters[c].levels <= pick) {
+            if (s.coarseDirty[c] && L.clusters[c].levels > pick) { // (full, with its coarse level beneath)
+                underlayClusters_.push_back(c);
+                error = std::max(error, L.clusters[c].error[pick]);
+            }
             drawClusters_[kept++] = c;
         } else {
             coarseClusters_.push_back(c);
@@ -3523,6 +3561,8 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
         }
     }
     drawClusters_.resize(kept);
+    // Beneath the full clusters by what their vertices may be off their cells (an edit moves them within the cell too)
+    underlayPush_ = std::max(2.0f * error, 0.25f * L.cell * float(1 << pick));
 }
 
 // Draws `clusters` of `s` (the VAO for `part` bound): their triangles, the wireframe's edges, or their motion
@@ -3645,6 +3685,7 @@ void Renderer::buildCoarse(MeshSlot& s, const Mesh& mesh) {
         gl::GenBuffers(1, &s.coarseColors);
         gl::GenBuffers(1, &s.coarseMask);
     }
+    if (s.follow) s.follow->reset();
     s.coarse = std::move(levels);
     s.coarseDirty.assign(s.coarse->clusters.size(), 0);
     s.coarsePending.clear();
@@ -3767,6 +3808,8 @@ size_t Renderer::patchErrors(uint32_t id, const Mesh& mesh) {
 void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
     if (!s.coarse || c >= s.coarseDirty.size()) return;
     s.coarseEdited = true;
+    s.coarseEditAt = clock_;
+    s.coarseFresh.push_back(c);
     if (!s.coarseDirty[c]) s.coarseDirty[c] = 1, s.coarsePending.push_back(c);
 }
 
@@ -3774,6 +3817,12 @@ void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
 // (updateCoarseLevels), sent up whole (a few MB).
 void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     const auto start = std::chrono::steady_clock::now();
+    if (s.follow && s.follow->ready()) { // (what the follower has comes first: the exact cells below replace it)
+        do {
+            s.follow->drain();
+            applyFollow(s);
+        } while (!s.follow->idle());
+    }
     const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
     gl::BindVertexArray(s.coarseVao);
     if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
@@ -3784,6 +3833,50 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
         std::fprintf(stderr, "coarse lod: %zu clusters, %zu points updated in %.1f ms\n", s.coarsePending.size(), changed.size(),
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     s.coarsePending.clear();
+}
+
+// The follower's latest cells into the levels, and sent up.
+void Renderer::applyFollow(MeshSlot& s) {
+    CoarseFollower::Result r;
+    if (!s.coarse || !s.follow || !s.follow->take(r)) return;
+    CoarseLevels& L = *s.coarse;
+    for (size_t i = 0; i < r.cells.size(); ++i) L.positions[r.cells[i]] = r.positions[i];
+    gl::BindVertexArray(s.coarseVao);
+    if (r.runs.empty()) {
+        uploadCoarsePoints(s);
+    } else {
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.coarseVertices);
+        for (const CoarseFollower::Result::Run& run : r.runs)
+            gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(run.begin) * sizeof(PackedVertex)),
+                              GLsizeiptr(size_t(run.end - run.begin) * sizeof(PackedVertex)), r.packed.data() + run.offset);
+    }
+    gl::BindVertexArray(0);
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+// Once the levels are current (a rest, nothing pending): the follower starts from the mesh as it is, or again after edits it
+// didn't see. Only Parts drawn on their coarse levels have one.
+void Renderer::syncFollow(MeshSlot& s, const Mesh& mesh) {
+    if (!s.coarse || stroking_ || !s.coarsePending.empty()) return;
+    if (!s.follow) s.follow = std::make_unique<CoarseFollower>();
+    if (s.follow->ready() && !s.followStale) return;
+    s.follow->init(*s.coarse, mesh, s.order, s.grid);
+    s.followStale = false;
+}
+
+// While the Part is drawn on its coarse levels, the cells the latest edits moved follow at once (a few clusters a frame):
+// the coarse underlay of the edited clusters (cullCoarse) stays on the surface they edit.
+void Renderer::followEdits(MeshSlot& s, const Mesh& mesh) {
+    if (!s.coarse || !s.drewCoarse || s.coarseFresh.empty()) return;
+    std::sort(s.coarseFresh.begin(), s.coarseFresh.end());
+    s.coarseFresh.erase(std::unique(s.coarseFresh.begin(), s.coarseFresh.end()), s.coarseFresh.end());
+    const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarseFresh);
+    if (changed.empty()) return;
+    gl::BindVertexArray(s.coarseVao);
+    uploadCoarsePoints(s);
+    uploadCoarseAttributes(s);
+    gl::BindVertexArray(0);
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
@@ -3920,10 +4013,11 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const bool perTriangle = features & (kPrim | kTextured | kNormalMap); // (not kFlat: no per-triangle data)
     const bool coarseAllowed = !perTriangle && !(active && settings.wireframe);
     const size_t budget = coarseLod_ ? triangleBudget(settings) : 0;
-    // (While a stroke's edits wait for their levels, all of it in full: edited clusters in full beside coarse ones
-    // would leave seams, and squeeze the rest to the coarsest level.)
+    // (While a stroke's edits wait for their levels the Part keeps the look it had: on its coarse levels the edited
+    // clusters draw in full beside them (cullCoarse); in full detail, in full. Never the one and then the other.)
     bool coarse = coarseLod_ && coarseAllowed && s.coarse && s.coarse->clusters.size() == s.drawCount.size() &&
-                  s.coarsePending.empty() && !settings.fullDetail && (settings.motionProxy || s.drawnTriangles > budget);
+                  (s.coarsePending.empty() || s.drewCoarse) && !settings.fullDetail &&
+                  (settings.motionProxy || s.drawnTriangles > budget);
     // At rest the real detail, if one full frame fits the still-frame budget (a single slow frame is fine).
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
@@ -3943,13 +4037,22 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),
                      int(active && settings.wireframe), s.drawnTriangles, budget);
+    if (s.coarse && !s.coarsePending.empty()) stillWanted_ = true; // (frames until the levels follow the edits, drawn coarse or in full, stroking or not: the frame after a stroke must come)
+    s.drewCoarse = coarse;
     if (coarse) {
         cullCoarse(s, frameCull_, budget);
     } else {
         coarseClusters_.clear();
+        underlayClusters_.clear();
         cull(s, frameCull_, settings.motionProxy && coarseAllowed);
     }
     lastCoarseClusters_ += coarseClusters_.size();
+    if (active && !thumbnailPass_ && !settings.fullDetail) {
+        const int detail = coarseClusters_.empty() ? 0 : 1 + int(coarseLevel_.front());
+        if (detail != detailNow_ && (settings.stroking || detailWasStroking_)) ++strokeDetailSwitches_;
+        detailNow_ = detail;
+        detailWasStroking_ = settings.stroking;
+    }
     // The back faces left in clusters along the silhouette: the GPU skips them too when they can't show.
     if (cullBackfaces_ || xrayCull_) gl::Enable(GL_CULL_FACE);
     if (xrayCull_) gl::CullFace(xrayCull_);
@@ -4033,7 +4136,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
         gl::BindVertexArray(s.vao);
     }
-    if (coarse && !coarseClusters_.empty()) { // the spike's coarse levels: one multi-draw, 32-bit indices
+    if (coarse && (!coarseClusters_.empty() || !underlayClusters_.empty())) { // the coarse levels: one multi-draw, 32-bit indices
         gl::BindVertexArray(s.coarseVao);
         if (s.coarse->colors.empty()) gl::VertexAttrib4f(2, 1.0f, 1.0f, 1.0f, 1.0f);
         if (s.coarse->mask.empty()) gl::VertexAttrib1f(3, 0.0f);
@@ -4049,8 +4152,23 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         }
         lastDrawn_ += indices / 3;
         drawBases_.assign(drawCounts_.size(), 0);
-        gl::MultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts_.data(), GL_UNSIGNED_INT, drawOffsets_.data(), GLsizei(drawCounts_.size()),
-                                        drawBases_.data());
+        if (!drawCounts_.empty())
+            gl::MultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts_.data(), GL_UNSIGNED_INT, drawOffsets_.data(), GLsizei(drawCounts_.size()),
+                                            drawBases_.data());
+        if (!underlayClusters_.empty()) { // the edited clusters' coarse level, behind their full detail
+            drawCounts_.clear();
+            drawOffsets_.clear();
+            for (uint32_t c : underlayClusters_) {
+                const CoarseLevels::Lod& l = s.coarse->clusters[c];
+                drawCounts_.push_back(GLsizei(l.count[underlayLevel_]));
+                drawOffsets_.push_back(reinterpret_cast<const void*>(size_t(l.first[underlayLevel_]) * sizeof(uint32_t)));
+            }
+            drawBases_.assign(drawCounts_.size(), 0);
+            gl::Uniform1f(p->pushBack, underlayPush_);
+            gl::MultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts_.data(), GL_UNSIGNED_INT, drawOffsets_.data(), GLsizei(drawCounts_.size()),
+                                            drawBases_.data());
+            gl::Uniform1f(p->pushBack, 0.0f);
+        }
         gl::BindVertexArray(s.vao);
     }
     if (!proxyClusters_.empty()) {
@@ -4317,13 +4435,28 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
                               GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)), up.data.data() + r.offset);
         gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     }
+    if (up.regrid && s.follow) { // (its positions are on the old grid: it starts again at the next rest)
+        s.follow->reset();
+        s.followStale = true;
+    }
+    // The coarse follower gets the packed vertices (the GL thread has sent them): it works the cells out on its own thread.
+    const bool followed = s.follow && s.follow->ready() && !s.followStale && s.coarse && !up.regrid && !up.staged && !up.ranges.empty();
+    if (followed) {
+        CoarseFollower::Batch b;
+        for (const StrokeUpload::Range& r : up.ranges) b.ranges.push_back({r.begin, r.end, r.offset});
+        b.data = std::move(up.data);
+        s.follow->push(b);
+        up.data = std::move(b.data); // (the spare it handed back, with room)
+    }
     if (!up.movedClusters.empty()) {
         s.bounds.resize(s.order.clusters().size());
         s.proxyStale.resize(s.bounds.size(), 1);
+        const size_t freshBefore = s.coarseFresh.size();
         for (size_t i = 0; i < up.movedClusters.size(); ++i) {
             s.bounds[up.movedClusters[i]] = up.bounds[i];
             s.proxyStale[up.movedClusters[i]] = 1, markCoarseDirty(s, up.movedClusters[i]);
         }
+        if (followed) s.coarseFresh.resize(freshBefore); // (the follower has these clusters' cells: followEdits has nothing to redo)
         s.looseClusters.insert(s.looseClusters.end(), up.movedClusters.begin(), up.movedClusters.end());
         s.looseMark.resize(s.bounds.size(), 0);
         for (uint32_t c : up.movedClusters) s.looseMark[c] = 1;
@@ -4346,6 +4479,7 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
             }
         }
     }
+    applyFollow(s); // (what the follower has worked out by now)
 }
 
 void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }

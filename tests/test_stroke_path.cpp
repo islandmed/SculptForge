@@ -107,6 +107,36 @@ TEST(stroke_path_curve_stays_a_curve_when_samples_are_far_apart) {
     CHECK(curved < straight * 0.4f);
 }
 
+TEST(stroke_path_fast_stroke_lands_every_dab_of_the_slow_replay) {
+    // #help (0.12.10): "it doesn't pick up rapid strokes". The same arc (radius 300 px, 120 degrees) fed as the pointer
+    // gives it at a slow drag (every 2 degrees) and as a fast flick (every 20 and every 40 degrees, one sample a
+    // frame): the dab count and the length they cover match the slow replay within a spacing or two, and the last dab
+    // sits on the last sample. (Only the load shedding in App thins dabs, by design: strokeBacklogLimit.)
+    const float r = 300.0f, spacing = 12.0f, pi = 3.14159265f;
+    auto run = [&](float stepDeg) {
+        StrokePath path;
+        path.reset(r, 0.0f);
+        std::vector<PathDab> out;
+        for (float a = stepDeg; a <= 120.0f + 1e-3f; a += stepDeg)
+            path.addSample(r * std::cos(a * pi / 180.0f), r * std::sin(a * pi / 180.0f), 1.0f, 1.0f, spacing, true, out);
+        return out;
+    };
+    auto length = [](const std::vector<PathDab>& d) {
+        float l = 0.0f;
+        for (size_t i = 1; i < d.size(); ++i) l += std::hypot(d[i].x - d[i - 1].x, d[i].y - d[i - 1].y);
+        return l;
+    };
+    const std::vector<PathDab> slow = run(2.0f), mid = run(20.0f), fast = run(40.0f);
+    const float arc = r * 120.0f * pi / 180.0f;
+    CHECK(slow.size() > 40);
+    for (const std::vector<PathDab>* d : {&mid, &fast}) {
+        CHECK(std::abs(int(d->size()) - int(slow.size())) <= 3);
+        CHECK(std::abs(length(*d) - length(slow)) <= 3.0f * spacing);
+        CHECK(std::abs(length(*d) - arc) <= 0.05f * arc); // (dabs are chords: the slow replay itself is 2.6 % short)
+        CHECK(std::hypot(d->back().x - r * std::cos(2.0f * pi / 3.0f), d->back().y - r * std::sin(2.0f * pi / 3.0f)) <= spacing + 1e-3f);
+    }
+}
+
 TEST(stroke_path_curve_ends_on_the_sample_and_keeps_the_spacing) {
     StrokePath path;
     path.reset(0.0f, 0.0f);

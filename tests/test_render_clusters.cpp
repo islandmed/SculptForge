@@ -11,6 +11,7 @@
 #include "core/ThreadPool.h"
 #include "core/UploadOrder.h"
 #include "render/Clusters.h"
+#include "render/CoarseFollower.h"
 #include "render/Renderer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -464,6 +465,75 @@ TEST(coarse_levels_follow_edits) {
     const std::vector<glm::vec3> after(L.positions);
     updateCoarseLevels(L, m, order, dirty);
     CHECK(L.positions == after);
+}
+
+TEST(coarse_follower_matches_exact_update) {
+    // The follower (a thread of its own, fed the packed vertices a stroke uploads, never the mesh) gives the same cell points as
+    // updateCoarseLevels does from the mesh, to the position grid's step, over two pushes (the second moves some vertices again).
+    Mesh m = detailedSphere(300000);
+    UploadOrder order;
+    order.build(m);
+    CoarseLevels L = buildCoarseLevels(m, order);
+    AABB box;
+    for (const glm::vec3& p : m.positions) box.expand(p);
+    const PositionGrid grid = PositionGrid::around(box);
+    CoarseFollower follower;
+    follower.init(L, m, order, grid);
+    CHECK(follower.ready());
+    CoarseLevels exact = L, applied = L;
+    const float radius = glm::length(m.positions[0]) * 0.2f;
+    const glm::vec3 centre = glm::normalize(glm::vec3(0.3f, 0.8f, 0.5f)) * glm::length(m.positions[0]);
+    auto push = [&](float amount) {
+        std::vector<uint32_t> dirty;
+        std::vector<uint8_t> moved(m.vertexCount(), 0);
+        for (size_t v = 0; v < m.vertexCount(); ++v) {
+            const float d = glm::distance(m.positions[v], centre);
+            if (d >= radius) continue;
+            m.positions[v] += m.normals[v] * (radius * amount * (1.0f - d / radius));
+            moved[v] = 1;
+        }
+        for (uint32_t c = 0; c < order.clusters().size(); ++c) {
+            const auto& cl = order.clusters()[c];
+            for (uint32_t l = 0; l < cl.vertexCount; ++l)
+                if (moved[order.fromGpu()[cl.firstVertex + l]]) {
+                    dirty.push_back(c);
+                    break;
+                }
+        }
+        updateCoarseLevels(exact, m, order, dirty);
+        CoarseFollower::Batch b;
+        b.ranges.push_back({0u, uint32_t(order.size()), 0});
+        b.data.resize(order.size());
+        for (uint32_t i = 0; i < order.size(); ++i) {
+            const size_t v = std::min<size_t>(order.fromGpu()[i], m.vertexCount() - 1);
+            packVertex(grid, m.positions[v], m.normals[v], 0.0f, b.data[i]);
+        }
+        follower.push(b);
+        CoarseFollower::Result r;
+        do {
+            follower.drain();
+            if (follower.take(r)) {
+                for (size_t i = 0; i < r.cells.size(); ++i) applied.positions[r.cells[i]] = r.positions[i];
+                for (const auto& run : r.runs)
+                    for (uint32_t i = run.begin; i < run.end; ++i) { // (what the GPU would hold: within a step of the points)
+                        const glm::vec3 g = unpackPosition(grid, r.packed[run.offset + (i - run.begin)]);
+                        CHECK(glm::distance(g, applied.positions[i]) <= grid.step * 1.01f);
+                    }
+            }
+        } while (!follower.idle());
+    };
+    push(0.08f);
+    push(-0.03f);
+    float worst = 0.0f;
+    size_t movedCells = 0;
+    for (size_t k = 0; k < exact.positions.size(); ++k) {
+        worst = std::max(worst, glm::distance(exact.positions[k], applied.positions[k]));
+        movedCells += L.positions[k] != applied.positions[k];
+    }
+    std::printf("  coarse follower: %zu cells moved, worst point off the exact one by %g (grid step %g)\n", movedCells, double(worst),
+                double(grid.step));
+    CHECK(movedCells > 0);
+    CHECK(worst <= grid.step * 2.0f);
 }
 
 TEST(coarse_levels_carry_colour_and_mask) {

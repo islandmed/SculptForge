@@ -1568,6 +1568,10 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
     }
+    if (name == "edited_clusters") { // the 3D view drawn once more now: the clusters drawn in full beside the coarse level
+        app_.benchmarkDrawMs(0);
+        return double(app_.renderer_.underlayDrawnClusters());
+    }
     if (name == "timelapse_flicker") {
         // The timelapse's frames on a static camera (320x180, as renderTimelapseFrame draws them): through the
         // history, then a hold on the last step. Held frames show the same model from the same place, so they must
@@ -1605,6 +1609,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(app_.renderer_.patchErrors(app_.doc_.parts[size_t(app_.doc_.activePart)].id, app_.displayedMesh()));
     }
     if (name == "render_patches") return double(app_.renderer_.patchCount(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
+    if (name == "stroke_detail_switches") return double(app_.renderer_.strokeDetailSwitches()); // frames a stroke flipped full <-> coarse
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one
