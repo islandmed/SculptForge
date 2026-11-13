@@ -95,10 +95,16 @@ void App::initProject() {
     prefDir_ = userDataDir();
     setProjectAutosaveFolder(prefDir_); // (its autosave may name a streamed level's file by path: core/Project.h)
     if (prefDir_.empty()) return;
-    std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+    std::string prefsText;
+    bool readable = false;
+    { // (closed before anything is written: on Windows a file held open can't be replaced, "Access is denied")
+        std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+        readable = bool(f);
+        if (f) prefsText.assign(std::istreambuf_iterator<char>(f), {});
+    }
     Json prefs;
     std::string err;
-    const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
+    const bool hadPrefs = readable && Json::parse(prefsText, prefs, err);
     if (hadPrefs) {
         // An install from before SculptForge-style keys were the default, that never stored its key style: it had
         // the Classic sculpting keys, and keeps them (initActions applies the style).
@@ -297,7 +303,10 @@ void App::saveProjectPrefs() {
     for (const glm::vec3& c : recentColors_) colours.push(vec3Json(c));
     prefs.set("recent_colors", std::move(colours));
     std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
-    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) SDL_Log("%s", err.c_str());
+    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) {
+        SDL_Log("%s", err.c_str());
+        status_ = "Recent projects couldn't be saved. " + err;
+    }
 }
 
 void App::rememberPaintColor(const glm::vec3& linear) {

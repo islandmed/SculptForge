@@ -20,6 +20,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "app/UserData.h"
+#include "core/FileReplace.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
 #include "core/MaskColour.h"
@@ -1147,12 +1148,7 @@ bool App::writeJsonAtomic(const std::string& path, const Json& j, std::string& e
             return false;
         }
     }
-    std::filesystem::rename(fsPath(tmp), fsPath(path), ec);
-    if (ec) {
-        err = "Could not write " + path + ": " + ec.message();
-        return false;
-    }
-    return true;
+    return replaceFile(fsPath(tmp), fsPath(path), err);
 }
 
 std::string App::prefsKey() const {
@@ -1209,6 +1205,7 @@ void App::autosavePrefs(bool flush) {
     std::string err;
     if (!saveUiPrefs(err)) {
         SDL_Log("%s", err.c_str());
+        status_ = "Your settings and layout couldn't be saved. " + err; // never log-only: a save lands or the user is told
         prefsSavedKey_ = std::move(key); // (no retry every frame; the next change tries again)
         layoutSavedKey_ = std::move(lkey);
         prefsSaveAt_ = 0.0;
