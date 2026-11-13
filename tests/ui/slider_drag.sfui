@@ -1,0 +1,16 @@
+# Plain left-drags move every palette slider (Guide Strength and Target Quads in Remesh, Voxel Resolution); masterfull95 on
+# Discord asked about slider dragging after 0.12.12, and this pins that nothing swallows the press.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+click "Remesh##tool.remesh"
+remember guide_strength g0
+drag_item "##qcurves" -60 0
+expect_value guide_strength != $g0
+remember retopo_target t0
+drag_item "##qtarget" -60 0
+expect_value retopo_target != $t0
+remember voxel_resolution v0
+drag_item "##voxres" 60 0
+expect_value voxel_resolution != $v0
+wait_idle 30
+shot remesh_sliders

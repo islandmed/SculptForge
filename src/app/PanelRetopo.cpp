@@ -217,33 +217,56 @@ const VoxelRemeshEstimate& App::voxelEstimate() {
     return c.estimate;
 }
 
+// Customize Shelves, Ctrl+Alt: a slider is drawn inert (beginShelfGrab) and a button over it takes the press (endShelfGrab), so
+// it can be dragged onto a shelf as `item` instead of moving its value or the palette under it. The press is taken by hand
+// (as Shell.cpp's grab): over the inert slider it would otherwise fall through to the palette's window move, and the drag
+// source (which needs an active item) never began.
+bool App::beginShelfGrab() {
+    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld();
+    if (grab) ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    return grab;
+}
+
+void App::endShelfGrab(const char* buttonId, const char* item, const char* title) {
+    ImGui::PopItemFlag();
+    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+    ImGui::SetCursorScreenPos(lo);
+    ImGui::InvisibleButton(buttonId, ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
+    ImGuiContext& g = *ImGui::GetCurrentContext();
+    if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
+        ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+        g.ActiveIdMouseButton = 0;
+    }
+    ui::UiItemDragSource(*this, item, title);
+}
+
+void App::drawGuideStrength(bool compact) {
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    ui::SliderInside(compact ? "##qcurves.shelf" : "##qcurves", &curvesStrength_, 0.0f, 100.0f, "Guide Strength %.0f");
+    if (grab) endShelfGrab("##qcurvesgrab", "widget.guide_strength", "Guide Strength");
+}
+
+void App::drawTargetQuads(bool compact) {
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    tray::SliderInt(compact ? "##qtarget.shelf" : "##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    if (grab) endShelfGrab("##qtargetgrab", "widget.target_quads", "Target Quads");
+}
+
 void App::drawVoxelResolution(bool compact) {
     voxelResolution_ = std::clamp(voxelResolution_, kVoxelResolutionMin, kVoxelResolutionMax);
     // Two thirds of the travel for 32-512 (the everyday range keeps its precision), a sixth each for 528-2048 and
     // 2112-4096. Ctrl+click types a number.
     if (!compact) ImGui::SetNextItemWidth(-1);
-    // Customize Shelves, Ctrl+Alt: the slider is drawn inert and a button over it takes the press, so the slider can be
-    // dragged onto a shelf (widget.voxel_resolution) instead of moving its value or the palette under it.
-    const bool grab = !compact && layout_.customize && ui::CtrlHeld() && ui::AltHeld();
-    if (grab) ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    const bool grab = !compact && beginShelfGrab();
     float t = voxelSliderFromResolution(voxelResolution_);
     std::string label = tr("Resolution %d");
     if (const size_t at = label.find("%d"); at != std::string::npos) label.replace(at, 2, std::to_string(voxelResolution_));
     const int before = voxelResolution_;
     if (ui::SliderInside("##voxres", &t, 0.0f, 1.0f, label.c_str(), ImGuiSliderFlags_NoInput)) voxelResolution_ = voxelResolutionFromSlider(t);
     if (grab) {
-        ImGui::PopItemFlag();
-        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-        ImGui::SetCursorScreenPos(lo);
-        ImGui::InvisibleButton("##voxresgrab", ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
-        // The press is taken by hand (as Shell.cpp's grab): over the inert slider it would otherwise fall through to the
-        // palette's window move, and the drag source (which needs an active item) never began.
-        ImGuiContext& g = *ImGui::GetCurrentContext();
-        if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
-            ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
-            g.ActiveIdMouseButton = 0;
-        }
-        ui::UiItemDragSource(*this, "widget.voxel_resolution", "Voxel Resolution");
+        endShelfGrab("##voxresgrab", "widget.voxel_resolution", "Voxel Resolution");
     } else if (ImGui::IsItemHovered() && ui::CtrlHeld() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         voxelResolution_ = before; // (the click doesn't move it)
         ImGui::ClearActiveID();
@@ -623,8 +646,7 @@ void App::drawQRemeshContents() {
                      "become exact edge loops. Legacy: the method of SculptForge 0.9 (more poles, a split look).",
                      kQRemeshPath);
     }
-    ImGui::SetNextItemWidth(-1);
-    tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    drawTargetQuads();
     ui::HelpText("Target Quads", nullptr,
                  "About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from "
                  "the Part's current polygon count.",
@@ -732,7 +754,7 @@ void App::drawQRemeshGuideControls() {
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.qremesh_guides_clear", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##qcurves", &curvesStrength_, 0.0f, 100.0f, "Guide Strength %.0f");
+    drawGuideStrength();
     ui::HelpText("Guide Strength", nullptr,
                  "How far around each guide curve the edge flow follows it: 0 = only the edge loop on the curve, 100 = "
                  "about six quads to each side. The loop on the curve is always made.",

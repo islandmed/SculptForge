@@ -2833,6 +2833,13 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
         drawVoxelResolution(true);
         ImGui::PopStyleVar();
+    } else if (item == "widget.guide_strength" || item == "widget.target_quads" || item == "widget.level") {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
+        if (item == "widget.guide_strength") drawGuideStrength(true);
+        else if (item == "widget.target_quads") drawTargetQuads(true);
+        else drawLevelSlider(true);
+        ImGui::PopStyleVar();
     } else if (item == "widget.points") {
         size_t total = 0;
         uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ uint64_t(doc_.activePart) ^

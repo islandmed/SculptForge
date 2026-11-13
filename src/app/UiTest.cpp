@@ -195,7 +195,7 @@
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
-//                            voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
+//                            guide_strength (Guide Strength), retopo_target (Target Quads), guide_strength_on_shelves / target_quads_on_shelves / level_on_shelves, voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
 //                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
@@ -721,6 +721,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "voxel_remesh_running") return app_.voxelRemesh_ ? 1.0 : 0.0;
     if (name == "voxel_resolution") return double(app_.voxelResolution_);
+    if (name == "retopo_target") return double(app_.retopo_.target);
+    if (name == "guide_strength") return double(app_.curvesStrength_);
+    if (name == "sdiv_slider") return double(app_.sdivSlider_);
     if (name == "voxel_triangle_estimate") return double(app_.voxelEstimate().triangles);
     if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open ? 1.0 : 0.0;
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
@@ -988,6 +991,13 @@ double Demo::query(const std::string& name, bool& known) const {
         double n = 0;
         for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
             n += double(std::count(list->begin(), list->end(), "widget.voxel_resolution"));
+        return n;
+    }
+    for (const char* w : {"guide_strength", "target_quads", "level"}) { // slots holding that slider (Customize Shelves)
+        if (name != std::string(w) + "_on_shelves") continue;
+        double n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += double(std::count(list->begin(), list->end(), std::string("widget.") + w));
         return n;
     }
     if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
