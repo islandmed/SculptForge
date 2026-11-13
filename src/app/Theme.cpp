@@ -5,7 +5,10 @@
 #include "app/LookSchemes.h"
 #include "app/Ui.h"
 
+#include <IconsLucide.h>
+
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace sf::theme {
@@ -113,6 +116,37 @@ ImVec4 mixc(const ImVec4& a, const ImVec4& b, float t, float alpha = 1.0f) {
 
 ImVec4 g_gradCentre(0.217f, 0.217f, 0.217f, 1.0f), g_gradEdge(0.109f, 0.109f, 0.109f, 1.0f);
 
+float linear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
+float luminance(const ImVec4& c) { return 0.2126f * linear(c.x) + 0.7152f * linear(c.y) + 0.0722f * linear(c.z); }
+float contrast(const ImVec4& a, const ImVec4& b) {
+    const float la = luminance(a), lb = luminance(b);
+    return (std::max(la, lb) + 0.05f) / (std::min(la, lb) + 0.05f);
+}
+// `c`, moved towards `toward` (the text colour) only as far as it takes to reach `ratio` on `bg`.
+ImVec4 readable(const ImVec4& c, const ImVec4& bg, const ImVec4& toward, float ratio) {
+    for (int i = 0; i <= 20; ++i) {
+        const ImVec4 m = mixc(c, toward, float(i) / 20.0f);
+        if (contrast(m, bg) >= ratio) return m;
+    }
+    return toward;
+}
+
+// The pop-up roles in the current look (Theme.h Role): fixed hues, so a tip reads as a tip in every scheme, with the
+// scheme's own yellow and red for warnings and deletes; Phosphor and Blueprint keep their one-ink screens by mixing
+// the hues halfway into their accent. Then each is nudged until it reads on the lifted surface.
+void setRoles(const ImVec4& yellow, const ImVec4& red, bool mono) {
+    // The surface the roles are measured on: one step lighter than the panels (Ui.cpp PushRole lifts it and its buttons).
+    const bool light = luminance(panelBg) > 0.4f;
+    popupLift = light ? 0.5f : 0.05f;
+    popupBg = mixc(panelBg, ImVec4(1, 1, 1, 1), popupLift);
+    const ImVec4 hues[] = {rgb(0x4d9de0), rgb(0x2fb5a5), brand, yellow, red};
+    for (int r = 0; r < int(Role::Count); ++r) {
+        const ImVec4 hue = mono && r != int(Role::Danger) ? mixc(hues[r], accent, 0.5f) : hues[r];
+        roleEdge[r] = readable(hue, popupBg, textBright, 3.0f);
+        roleInk[r] = readable(mixc(hue, textBright, 0.25f), popupBg, textBright, 4.5f);
+    }
+}
+
 void syncUiColors() {
     ui::color::accent = u32(accent);
     ui::color::accentHover = u32(accentHover);
@@ -184,10 +218,12 @@ void applyLook(const LookSettings& settings, std::string* status) {
     // (The hover rings follow Outlines in every look: Classic has no panel borders, but a calm hover all the same.)
     look.outlines = std::clamp(settings.outlines, 0, 2);
     look.outlineOpacity = std::clamp(settings.outlineOpacity, 0.0f, 1.0f);
+    rolePopups = settings.rolePopups;
     if (id == looks::LookId::Classic) {
         for (size_t i = 0; i < std::size(kTokens); ++i) *kTokens[i] = classic[i];
         g_gradCentre = ImVec4(0.217f, 0.217f, 0.217f, 1.0f);
         g_gradEdge = ImVec4(0.109f, 0.109f, 0.109f, 1.0f);
+        setRoles(rgb(0xe0a830), danger, false);
         applyStyle();
         syncUiColors();
         return;
@@ -240,6 +276,7 @@ void applyLook(const LookSettings& settings, std::string* status) {
     const float opacity = std::clamp(settings.outlineOpacity, 0.0f, 1.0f);
     tileBorder = look.outlines == 0 ? panelBg : mixc(panelBg, strong, (look.outlines == 1 ? 0.4f : 1.0f) * opacity);
     focusBorder = look.outlines == 2 ? mixc(tileBorder, textDim, 0.35f * opacity) : tileBorder;
+    setRoles(rgb(palette.yellow), rgb(palette.red), id == looks::LookId::Phosphor || id == looks::LookId::Blueprint);
     applyStyle();
     ImGuiStyle& s = ImGui::GetStyle();
     s.WindowRounding = s.ChildRounding = s.PopupRounding = s.FrameRounding = s.GrabRounding = s.TabRounding = 0.0f;
@@ -265,6 +302,17 @@ void applyLook(const LookSettings& settings, std::string* status) {
     c[ImGuiCol_TableRowBgAlt] = ImVec4(text.x, text.y, text.z, 0.03f);
     c[ImGuiCol_TextSelectedBg] = ImVec4(accent.x, accent.y, accent.z, 0.30f);
     syncUiColors();
+}
+
+const char* roleIcon(Role r) {
+    switch (r) {
+    case Role::Info: return ICON_LC_LIGHTBULB;
+    case Role::Learn: return ICON_LC_GRADUATION_CAP;
+    case Role::New: return ICON_LC_SPARKLES;
+    case Role::Warning: return ICON_LC_TRIANGLE_ALERT;
+    case Role::Danger: return ICON_LC_OCTAGON_ALERT;
+    default: return "";
+    }
 }
 
 void lookViewportGradient(ImVec4& centre, ImVec4& edge) {

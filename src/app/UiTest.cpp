@@ -899,6 +899,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "look_popup_colors") return app_.uiPrefs_.look.rolePopups ? 1.0 : 0.0; // 1 by role, 0 plain
+    if (name == "style_popup_role_edge") return theme::rolePopups ? 1.0 : 0.0;           // what the theme draws
     if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours

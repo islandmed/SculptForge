@@ -4,6 +4,8 @@
 // Widgets every panel uses, so Ctrl-hover help and UI customization come for free.
 #pragma once
 
+#include "app/Theme.h"
+
 #include <imgui.h>
 
 #include <initializer_list>
@@ -152,6 +154,14 @@ void DrawHelp(App& app);
 const std::string& HelpShown();
 
 // Theme tokens shared by the help, palette and console (ui-spec section 10).
+// A pop-up in its role's colours (theme::Role; nothing when Preferences turns Pop-up colours off). PushRole right
+// before its ImGui::Begin / BeginPopupModal and PopRole right after, so menus and tooltips opened inside keep the plain
+// colours (Begin draws the surface, edge and title bar); then RoleStrip inside it, first thing: the strip across its
+// top and, in a title bar, the role's icon after the title. Nothing moves: only colours, the strip and the icon.
+void PushRole(theme::Role role);
+void PopRole();
+void RoleStrip(theme::Role role);
+
 namespace color {
 inline ImU32 accent = IM_COL32(0xf0, 0x88, 0x2e, 0xff);
 inline ImU32 accentHover = IM_COL32(0xff, 0x9a, 0x45, 0xff);

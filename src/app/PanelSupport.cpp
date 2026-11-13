@@ -10,6 +10,7 @@
 #include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
+#include "app/Ui.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
@@ -370,7 +371,10 @@ void App::drawSupportUi() {
         ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(room.h - margin, 100.0f)));
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
         if (sheet) flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+        ui::PushRole(theme::Role::Learn);
         const bool welcomeOpen = ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags);
+        ui::PopRole();
+        ui::RoleStrip(theme::Role::Learn);
         keepWindowInView(room); // (title bar and X inside the view, however the window was placed)
         {
             const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
@@ -528,7 +532,11 @@ void App::drawSupportUi() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;
-        if (ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags)) {
+        ui::PushRole(theme::Role::New);
+        const bool began = ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::New);
             ImGui::TextWrapped("%s", tr("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
                                "status bar and a one-row tool shelf. Your layout stays as it is unless you try it."));
             ImGui::Spacing();
@@ -548,7 +556,11 @@ void App::drawSupportUi() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
         bool open = true;
-        if (ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags)) {
+        ui::PushRole(theme::Role::Info);
+        const bool began = ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Info);
             ImGui::TextWrapped("%s", tr("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
                                "smoothly right after a stroke."));
             ImGui::Spacing();

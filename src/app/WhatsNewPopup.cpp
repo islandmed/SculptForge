@@ -161,7 +161,9 @@ void App::drawWhatsNew() {
     if (!ImGui::IsPopupOpen(kPopup)) ImGui::OpenPopup(kPopup);
     if (t < 1.0f || pop.closing) redrawIn(0.0); // animated while it opens and closes (then while a card's hover eases)
 
-    const ImVec4 bg = theme::shellBg, cardBg = theme::panelBg, raised = theme::header, accent = theme::accent;
+    // What's New is the New role (Theme.h): the SculptForge orange in every look (the look's accent with Pop-up colours off).
+    const ImVec4 bg = theme::shellBg, cardBg = theme::panelBg, raised = theme::header,
+                 accent = theme::rolePopups ? theme::edge(theme::Role::New) : theme::accent;
     const ImVec4 ink = theme::textBright, body = theme::text, dim = theme::textDim, line = theme::text;
 
     // Logical 920 x 660, fitted to the window and the UI scale; scaled from 96 % while opening.

@@ -835,6 +835,7 @@ void App::registerShellActions() {
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
                     {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
                     {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
+                    {"popup_colors", ParamSpec::Type::String, "Pop-up colours: role (the default) or plain.", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or classic (default: the look's, else unchanged).", false},
                     {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -862,6 +863,11 @@ void App::registerShellActions() {
                        }
                        if (a.contains("outline_opacity"))
                            l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
+                       if (a.contains("popup_colors")) {
+                           const std::string pc = argString(a, "popup_colors");
+                           if (pc != "role" && pc != "plain") return {false, "popup_colors must be role or plain"};
+                           l.rolePopups = pc == "role";
+                       }
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
                            if (k != "sculptforge" && k != "classic") return {false, "layout must be sculptforge or classic"};

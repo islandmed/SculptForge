@@ -61,6 +61,7 @@ void lookToJson(const UiPrefs& p, Json& j) {
     look.set("effects", p.look.effects);
     look.set("outlines", std::string(p.look.outlines == 0 ? "off" : p.look.outlines == 2 ? "on" : "subtle"));
     look.set("outlineOpacity", double(p.look.outlineOpacity));
+    look.set("popupColors", std::string(p.look.rolePopups ? "role" : "plain"));
     j.set("look", std::move(look));
     j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "classic"));
 }
@@ -78,6 +79,7 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
             p.look.outlines = o == "off" ? 0 : o == "on" ? 2 : 1;
         }
         p.look.outlineOpacity = std::clamp(float(look["outlineOpacity"].asNumber(p.look.outlineOpacity)), 0.0f, 1.0f);
+        if (look["popupColors"].isString()) p.look.rolePopups = look["popupColors"].asString() != "plain";
     }
     if (j["layout"].isString()) p.shellLayout = j["layout"].asString() == "sculptforge" ? 1 : 0;
     return j["look"].isObject() || j["layout"].isString();
@@ -2445,6 +2447,24 @@ void App::drawLookSection() {
                      "does, lower fades them into the panels (#98). Ctrl+click to type.",
                      "Preferences > Interface > Look");
     }
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Pop-up colours"));
+    ImGui::SameLine();
+    if (ImGui::RadioButton(tr("By role##look.popup_colors"), l.rolePopups)) {
+        l.rolePopups = true;
+        lookDirty_ = true;
+    }
+    ui::HelpText("Pop-up colours: by role", nullptr,
+                 "Pop-ups show what they are with a strip, an edge and an icon in one colour: tips and help blue, the "
+                 "welcome and the quick tour teal, What's New orange, warnings amber, deletes red. The default.",
+                 "Preferences > Interface > Look");
+    ImGui::SameLine();
+    if (ImGui::RadioButton(tr("Plain##look.popup_colors"), !l.rolePopups)) {
+        l.rolePopups = false;
+        lookDirty_ = true;
+    }
+    ui::HelpText("Pop-up colours: plain", nullptr, "Pop-ups in the panels' own colours, as before 0.12.15.",
+                 "Preferences > Interface > Look");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Layout"));
     ImGui::SameLine();

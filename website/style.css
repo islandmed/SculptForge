@@ -12,6 +12,14 @@
   --muted: #a3a3ad;
   --accent: #f28c3c;
   --accent-2: #ffb06a;
+  /* Roles (callouts, section accents): the edge colour, and -ink for text and icons (AA on the tinted panels). */
+  --role-info: #4d9de0;    --role-info-ink: #8cc4f2;
+  --role-learn: #2fb5a5;   --role-learn-ink: #6fdccd;
+  --role-new: #f28c3c;     --role-new-ink: #ffb06a;
+  --role-warn: #e0a830;    --role-warn-ink: #f3c95f;
+  --role-danger: #e5604a;  --role-danger-ink: #f39a89;
+  --role-violet: #9a7fe0;  --role-violet-ink: #c3b1f3;
+  --role-neutral: #8c8c9c; --role-neutral-ink: #c4c4d0;
   --radius: 14px;
   --wrap: 1180px;
 }
@@ -526,20 +534,37 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .guide-article th { background: #1d1d23; color: #fff; font-weight: 600; }
 .guide-article tr:last-child td { border-bottom: 0; }
 .guide-article tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.015); }
-.callout { margin: 0 0 1.3em; padding: 13px 18px; border-radius: 12px; background: #1b1b21; border: 1px solid var(--border);
-           border-left: 3px solid #8c8c96; }
+/* Callouts (> **Tip:** ...): one colour per kind, from the same role palette as the app's pop-ups (src/app/Theme.h
+   theme::Role): Tip teal, Note blue, Not yet and Warning amber, Important red, New orange, Experienced violet, and
+   In short in the page's section colour.
+   The label and an icon say the kind as well as the colour (colour-blind safe); labels are AA on the tinted panel. */
+.callout { --role: var(--role-neutral); --role-ink: var(--role-neutral-ink); --icon: none;
+           margin: 0 0 1.3em; padding: 13px 18px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--role) 28%, var(--border));
+           border-left: 4px solid var(--role); background: linear-gradient(90deg, color-mix(in srgb, var(--role) 17%, #1b1b21), color-mix(in srgb, var(--role) 8%, #1b1b21) 75%); }
 .callout p { margin: 0; }
-.callout-tip { border-left-color: #62c07e; } .callout-tip strong:first-child { color: #7fd497; }
-.callout-note { border-left-color: #6fa8e6; } .callout-note strong:first-child { color: #8dbcf0; }
-.callout-experienced { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(242, 140, 60, 0.07), #1b1b21 40%); }
-.callout-experienced strong:first-child { color: var(--accent-2); }
-.callout-not-yet { border-left-color: #a990dc; } .callout-not-yet strong:first-child { color: #c1aef0; }
-.callout-warning, .callout-important { border-left-color: #e5604a; } .callout-warning strong:first-child { color: #f08a78; }
+.callout > p:first-child > strong:first-child { color: var(--role-ink); }
+.callout > p:first-child > strong:first-child::before { content: ""; display: inline-block; width: 1.05em; height: 1.05em; margin: 0 0.4em 0 0;
+           vertical-align: -0.17em; background: var(--role-ink); -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 .callout ul { margin: 0.5em 0 0; padding-left: 1.2em; }
 .callout li { margin-bottom: 0.25em; }
-.callout-short { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(242, 140, 60, 0.09), #1b1b21 60%); }
-.callout-short > p > strong:first-child { color: var(--accent-2); }
-.callout-short li::marker { color: var(--accent); }
+.callout li::marker { color: var(--role); }
+.callout-tip { --role: var(--role-learn); --role-ink: var(--role-learn-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6M10 22h4'/%3E%3C/svg%3E"); }
+.callout-note { --role: var(--role-info); --role-ink: var(--role-info-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4M12 8h.01'/%3E%3C/svg%3E"); }
+.callout-experienced { --role: var(--role-violet); --role-ink: var(--role-violet-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 10 12 5 2 10l10 5 10-5zM6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"); }
+.callout-not-yet { --role: var(--role-warn); --role-ink: var(--role-warn-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E"); }
+.callout-warning { --role: var(--role-warn); --role-ink: var(--role-warn-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01'/%3E%3C/svg%3E"); }
+.callout-important { --role: var(--role-danger); --role-ink: var(--role-danger-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16h.01M12 8v4M15.3 2a2 2 0 0 1 1.4.6l4.7 4.7a2 2 0 0 1 .6 1.4v6.6a2 2 0 0 1-.6 1.4l-4.7 4.7a2 2 0 0 1-1.4.6H8.7a2 2 0 0 1-1.4-.6l-4.7-4.7A2 2 0 0 1 2 15.3V8.7a2 2 0 0 1 .6-1.4l4.7-4.7A2 2 0 0 1 8.7 2z'/%3E%3C/svg%3E"); }
+.callout-short { --role: var(--section, var(--role-new)); --role-ink: var(--section-ink, var(--role-new-ink)); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h.01M3 12h.01M3 18h.01M8 6h13M8 12h13M8 18h13'/%3E%3C/svg%3E"); }
+.callout-new { --role: var(--role-new); --role-ink: var(--role-new-ink); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.9 15.5a2 2 0 0 0-1.4-1.4l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.4-1.4l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0zM20 3v4M22 5h-4'/%3E%3C/svg%3E"); }
+/* Section accents: each part of the contents (build_site.py SECTIONS) colours its chapters' heading rules and the current entry. */
+[data-section="brand"] { --section: var(--role-new); --section-ink: var(--role-new-ink); } [data-section="start"] { --section: var(--role-learn); --section-ink: var(--role-learn-ink); } [data-section="sculpt"] { --section: var(--role-new); --section-ink: var(--role-new-ink); } [data-section="ai"] { --section: var(--role-violet); --section-ink: var(--role-violet-ink); } [data-section="files"] { --section: var(--role-info); --section-ink: var(--role-info-ink); } [data-section="ref"] { --section: var(--role-neutral); --section-ink: var(--role-neutral-ink); } [data-section="help"] { --section: var(--role-warn); --section-ink: var(--role-warn-ink); }
+.guide-article h2 { background: linear-gradient(var(--section, var(--accent)), var(--section, var(--accent))) left bottom / 56px 2px no-repeat;
+                    background-origin: border-box; }
+.guide-page .toc a.current { background: color-mix(in srgb, var(--section, var(--accent)) 15%, transparent); box-shadow: inset 2px 0 0 var(--section, var(--accent)); }
+.toc-group[data-section] { color: var(--section-ink); }
+.toc-group[data-section]::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 7px;
+                                  vertical-align: 0.1em; background: var(--section); }
+.guide-article h1::after { content: ""; display: block; width: 72px; height: 3px; margin-top: 0.35em; border-radius: 2px; background: var(--section, var(--accent)); }
 .path { white-space: normal; }
 .path > span { display: inline-block; padding: 0 0.6em; border: 1px solid #3a3a44; border-radius: 999px; background: #22222a;
                color: #fff; font-size: 0.88em; font-weight: 500; line-height: 1.55; white-space: nowrap; }
@@ -869,3 +894,13 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .hero-news a { color: var(--text); }
 .hero-news a:hover { text-decoration: none; color: #fff; }
 .hero-news strong { color: var(--accent-2); font-weight: 600; }
+/* Code blocks on a cool surface, so commands and scripts stand apart from the prose and the callouts. */
+.guide-article .code { background: #0e141c; border-color: color-mix(in srgb, var(--role-info) 28%, var(--border)); }
+/* "See also" and the previous / next cards carry the section's colour on their edge. */
+.guide-article h2#see-also + ul { list-style: none; padding: 12px 18px; border: 1px solid color-mix(in srgb, var(--section, var(--accent)) 30%, var(--border));
+                                  border-left: 4px solid var(--section, var(--accent)); border-radius: 12px; background: var(--panel); }
+.guide-article h2#see-also + ul li::before { content: "\2192"; margin-right: 0.5em; color: var(--section-ink, var(--accent-2)); }
+.guide-page .pager a { border-color: color-mix(in srgb, var(--section, var(--accent)) 35%, var(--border)); }
+.guide-page .pager .prev { box-shadow: inset 3px 0 0 var(--section, var(--accent)); }
+.guide-page .pager .next { box-shadow: inset -3px 0 0 var(--section, var(--accent)); }
+.guide-page .pager a span { color: var(--section-ink, var(--muted)); }
