@@ -58,6 +58,16 @@
      "shipped": ""
     },
     {
+     "slug": "smooth-peaks-brush",
+     "anchor": "vote-smooth-peaks-brush",
+     "title": "Smooth-peaks brush",
+     "line": "Smooths only the high points and leaves the valleys alone.",
+     "where": "Brush picker",
+     "votes": 1,
+     "status": "shipped",
+     "shipped": "0.12.7"
+    },
+    {
      "slug": "wood-detail-brush-pack",
      "anchor": "vote-wood-detail-brush-pack",
      "title": "Wood detail brush pack",
@@ -66,16 +76,6 @@
      "votes": 0,
      "status": "shipped",
      "shipped": "0.12.2"
-    },
-    {
-     "slug": "smooth-peaks-brush",
-     "anchor": "vote-smooth-peaks-brush",
-     "title": "Smooth-peaks brush",
-     "line": "Smooths only the high points and leaves the valleys alone.",
-     "where": "Brush picker",
-     "votes": 0,
-     "status": "shipped",
-     "shipped": "0.12.7"
     }
    ]
   },
@@ -149,6 +149,26 @@
      "shipped": ""
     },
     {
+     "slug": "retopology-draw-quads-over-a-sculpt",
+     "anchor": "vote-retopology-draw-quads-over-a-sculpt",
+     "title": "Retopology (draw quads over a sculpt)",
+     "line": "Draw quads, strips and loops on the surface to get a clean low-poly mesh that keeps the detail.",
+     "where": "New Retopo mode",
+     "votes": 1,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "make-symmetric-choose-the-side-to-keep",
+     "anchor": "vote-make-symmetric-choose-the-side-to-keep",
+     "title": "Make Symmetric: choose the side to keep",
+     "line": "Pick which half is kept and mirrored (now it keeps the +X side), so you can work on either side.",
+     "where": "Tool > Geometry > Symmetry",
+     "votes": 1,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "panel-tool",
      "anchor": "vote-panel-tool",
      "title": "Panel tool",
@@ -199,16 +219,6 @@
      "shipped": ""
     },
     {
-     "slug": "retopology-draw-quads-over-a-sculpt",
-     "anchor": "vote-retopology-draw-quads-over-a-sculpt",
-     "title": "Retopology (draw quads over a sculpt)",
-     "line": "Draw quads, strips and loops on the surface to get a clean low-poly mesh that keeps the detail.",
-     "where": "New Retopo mode",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "micro-levels-rebuild-and-merge",
      "anchor": "vote-micro-levels-rebuild-and-merge",
      "title": "Micro levels: rebuild and merge",
@@ -249,16 +259,6 @@
      "shipped": ""
     },
     {
-     "slug": "make-symmetric-choose-the-side-to-keep",
-     "anchor": "vote-make-symmetric-choose-the-side-to-keep",
-     "title": "Make Symmetric: choose the side to keep",
-     "line": "Pick which half is kept and mirrored (now it keeps the +X side), so you can work on either side.",
-     "where": "Tool > Geometry > Symmetry",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "confirm-before-destructive-remesh",
      "anchor": "vote-confirm-before-destructive-remesh",
      "title": "Confirm before destructive remesh",
@@ -285,6 +285,16 @@
    "emoji": "🧩",
    "slug": "parts-scene",
    "ideas": [
+    {
+     "slug": "mesh-array",
+     "anchor": "vote-mesh-array",
+     "title": "Mesh array",
+     "line": "Repeat and chain copies of a Part without merging: offset, scale, rotate and pivot per stage, mirror and align options, an on/off pattern, a live preview, then bake it to a mesh.",
+     "where": "Tool > Parts",
+     "votes": 1,
+     "status": "open",
+     "shipped": ""
+    },
     {
      "slug": "primitive-blockout-kit",
      "anchor": "vote-primitive-blockout-kit",
@@ -351,16 +361,6 @@
      "title": "Smooth blend for Booleans (SDF style)",
      "line": "A blend radius on Boolean Parts, so a union or subtract can merge softly like a simple SDF modeller, with control over how far the merge reaches.",
      "where": "Tool > Parts, Booleans",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "mesh-array",
-     "anchor": "vote-mesh-array",
-     "title": "Mesh array",
-     "line": "Repeat and chain copies of a Part without merging: offset, scale, rotate and pivot per stage, mirror and align options, an on/off pattern, a live preview, then bake it to a mesh.",
-     "where": "Tool > Parts",
      "votes": 0,
      "status": "open",
      "shipped": ""
@@ -718,6 +718,16 @@
      "shipped": "0.12.7"
     },
     {
+     "slug": "multi-key-shortcut-sequences",
+     "anchor": "vote-multi-key-shortcut-sequences",
+     "title": "Multi-key shortcut sequences",
+     "line": "Bind sequences like A then A for more keys.",
+     "where": "Preferences > Input",
+     "votes": 1,
+     "status": "shipped",
+     "shipped": "0.12.8"
+    },
+    {
      "slug": "startup-splash-screen",
      "anchor": "vote-startup-splash-screen",
      "title": "Startup splash screen",
@@ -736,16 +746,6 @@
      "votes": 0,
      "status": "shipped",
      "shipped": "0.12.4"
-    },
-    {
-     "slug": "multi-key-shortcut-sequences",
-     "anchor": "vote-multi-key-shortcut-sequences",
-     "title": "Multi-key shortcut sequences",
-     "line": "Bind sequences like A then A for more keys.",
-     "where": "Preferences > Input",
-     "votes": 0,
-     "status": "shipped",
-     "shipped": "0.12.8"
     },
     {
      "slug": "shortcut-conflict-warning",
@@ -864,5 +864,5 @@
    ]
   }
  ],
- "updated": "2026-11-13T03:39:21Z"
+ "updated": "2026-11-13T18:38:12Z"
 }
