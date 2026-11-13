@@ -582,33 +582,74 @@ def human_parts(body, j):
 # ---------------------------------------------------------------------------
 
 HUMAN_MALE_HEIGHT = 180.0
-HUMAN_MALE_SHIN_SLANT = 0.2  # cm each shin point slides in per cm below the knee: the lower leg upright, the feet under the hips
-HUMAN_MALE_ARM_DROP = math.radians(5.0)  # each arm lowered about its shoulder (about 51 degrees below horizontal)
+HUMAN_MALE_SHIN_SLANT = 0.207  # cm each shin point slides in per cm below the knee: the lower leg upright, the feet under the hips
+HUMAN_MALE_ARM_DROP = math.radians(5.58)  # each arm lowered about its shoulder (about 51 degrees below horizontal)
 HUMAN_MALE_THUMB_IN = math.radians(12.0)  # the thumb turned toward the index finger at its root, a relaxed hand
 HUMAN_MALE_PALM_TWIST = math.radians(90.0)
 HUMAN_MALE_FINGER_CURL = (math.radians(15.0), math.radians(20.0), math.radians(15.0))  # per knuckle, root to tip
 HUMAN_MALE_CURL_SIGN = 1.0  # +1 curls toward the palm with the base mesh's hand orientation  # forearm pronation, left arm (mirrored for the right)
 
-# MakeHuman target weights: its macro modifiers at gender 1, age young, the three ethnic shapes mixed evenly,
-# muscle 0.95 and weight 0.4 (the "maxmuscle" universal targets at 0.75 + 0.2), a touch of its "ideal
-# proportions"; then the shape targets of a lean athletic build: a gentle V, pectorals, toned stomach and pelvis,
-# slim waist and ribcage, shoulders a little narrower with a natural slope, a slimmer neck, narrower hips and
-# thighs, muscled limbs, the knees brought in (leg valgus), fingers together, slightly longer and wider feet. Everything is listed in tools/starter/makehuman-targets.sha256 (the
-# build downloads and checks them).
+# MakeHuman target weights. The macro part: gender 1, age young, the three ethnic shapes mixed evenly, the
+# "maxmuscle" universal targets for a lean athletic build, a touch of "ideal proportions". The rest were solved
+# (silhouette landmarks of the owner's front reference, 27 of them within 1% of height) over
+# MakeHuman's measure, torso, hip, neck, head and limb targets, with the pose constants below. Everything is listed
+# in tools/starter/makehuman-targets.sha256 (the build downloads and checks them).
 HUMAN_MALE_TARGETS = [
-    ("caucasian-male-young", 1 / 3), ("asian-male-young", 1 / 3), ("african-male-young", 1 / 3),
-    ("universal-male-young-maxmuscle-averageweight", 0.75), ("universal-male-young-maxmuscle-minweight", 0.2),
+    ("caucasian-male-young", 0.333),
+    ("asian-male-young", 0.333),
+    ("african-male-young", 0.333),
+    ("universal-male-young-maxmuscle-averageweight", 0.75),
+    ("universal-male-young-maxmuscle-minweight", 0.2),
     ("male-young-maxmuscle-averageweight-idealproportions", 0.2),
     ("male-young-averagemuscle-averageweight-idealproportions", 0.1),
-    ("torso-vshape-incr", 0.25), ("torso-muscle-pectoral-incr", 0.7), ("torso-muscle-dorsi-incr", 0.1),
-    ("stomach-tone-incr", 1.0), ("pelvis-tone-incr", 0.4), ("measure-waist-circ-decr", 0.3),
-    ("measure-underbust-circ-decr", 0.2), ("measure-shoulder-dist-decr", 0.15), ("neck-scale-horiz-decr", 0.2),
-    ("hip-scale-horiz-decr", 0.4), ("measure-hips-circ-decr", 0.3), ("measure-thigh-circ-decr", 0.3),
-    ("measure-calf-circ-incr", 0.2),
-] + [(f"{side}-{t}", w) for side in ("l", "r") for t, w in (
-    ("upperarm-muscle-incr", 0.5), ("lowerarm-muscle-incr", 0.4), ("upperarm-shoulder-muscle-incr", 0.35),
-    ("upperleg-muscle-incr", 0.5), ("lowerleg-muscle-incr", 0.5), ("leg-valgus-incr", 0.6),
-    ("hand-fingers-distance-decr", 0.9), ("foot-scale-depth-incr", 0.4), ("foot-scale-horiz-incr", 0.3))]
+    ("torso-muscle-dorsi-incr", 0.1),
+    ("stomach-tone-incr", 1.0),
+    ("pelvis-tone-incr", 0.4),
+    ("measure-underbust-circ-decr", 0.2),
+    ("l-upperarm-muscle-incr", 0.5),
+    ("l-lowerarm-muscle-incr", 0.4),
+    ("l-upperleg-muscle-incr", 0.5),
+    ("l-lowerleg-muscle-incr", 0.5),
+    ("l-leg-valgus-incr", 0.6),
+    ("l-hand-fingers-distance-decr", 0.9),
+    ("l-foot-scale-depth-incr", 0.4),
+    ("l-foot-scale-horiz-incr", 0.3),
+    ("r-upperarm-muscle-incr", 0.5),
+    ("r-lowerarm-muscle-incr", 0.4),
+    ("r-upperarm-shoulder-muscle-incr", 0.35),
+    ("r-upperleg-muscle-incr", 0.5),
+    ("r-lowerleg-muscle-incr", 0.5),
+    ("r-leg-valgus-incr", 0.6),
+    ("r-hand-fingers-distance-decr", 0.9),
+    ("r-foot-scale-depth-incr", 0.4),
+    ("r-foot-scale-horiz-incr", 0.3),
+    ("measure-shoulder-dist-decr", 0.414),
+    ("hip-scale-horiz-incr", 0.372),
+    ("measure-hips-circ-decr", 0.835),
+    ("measure-waist-circ-incr", 0.262),
+    ("torso-scale-horiz-incr", 0.288),
+    ("measure-thigh-circ-decr", 0.316),
+    ("measure-knee-circ-decr", 0.075),
+    ("measure-calf-circ-incr", 0.043),
+    ("measure-ankle-circ-incr", 0.478),
+    ("torso-scale-vert-decr", 0.017),
+    ("upperlegs-height-decr", 0.427),
+    ("lowerlegs-height-decr", 0.456),
+    ("neck-scale-vert-incr", 0.548),
+    ("neck-scale-horiz-incr", 0.063),
+    ("head-scale-vert-incr", 0.245),
+    ("head-scale-horiz-incr", 0.457),
+    ("measure-upperarm-length-decr", 0.924),
+    ("measure-lowerarm-length-decr", 0.99),
+    ("measure-upperarm-circ-decr", 0.125),
+    ("measure-waisttohip-dist-incr", 0.341),
+    ("measure-napetowaist-dist-incr", 0.258),
+    ("stomach-navel-up", 0.103),
+    ("hip-scale-vert-incr", 0.986),
+    ("l-upperarm-shoulder-muscle-incr", 0.574),
+    ("torso-vshape-incr", 0.125),
+    ("torso-muscle-pectoral-incr", 0.665),
+]
 
 
 def load_target(path):
