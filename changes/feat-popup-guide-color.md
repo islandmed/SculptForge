@@ -16,5 +16,4 @@ testers:
   - Preferences > Interface > Look > Pop-up colours > Plain: pop-ups look as before; By role brings the colours back after a restart too.
   - A light Omarchy theme (Match my Omarchy theme): the strips and icons stay clearly readable.
 ---
-Owner ask 11-13: the guide and the pop-ups "all look the same color" as the interface. Mock-ups (two options) and
-before/after shots: ~/Work/.sf/shots/popup-guide-color/.
+The owner's ask: the guide and the pop-ups looked the same colour as the interface.
