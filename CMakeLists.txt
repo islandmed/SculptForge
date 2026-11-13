@@ -1354,6 +1354,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(welcome_touch_350_landscape hidpi/welcome_touch_350 --size 3120x1440)
     sculptforge_ui_test(welcome_touch_scroll hidpi/welcome_touch_scroll --size 2400x1080)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    # Android tablets (Mali-G72): each tray opens and closes with one finger tap, wide, landscape and upright.
+    sculptforge_ui_test(android_trays_wide_1920 hidpi/android_trays_wide --size 1920x1200)
+    sculptforge_ui_test(android_trays_wide_2560 hidpi/android_trays_wide --size 2560x1600)
+    sculptforge_ui_test(android_trays_narrow_1920 hidpi/android_trays_narrow --size 1920x1200)
+    sculptforge_ui_test(android_trays_narrow_2000 hidpi/android_trays_narrow --size 2000x1200)
+    sculptforge_ui_test(android_trays_narrow_2560 hidpi/android_trays_narrow --size 2560x1600)
+    sculptforge_ui_test(android_trays_portrait_1200 hidpi/android_trays_portrait --size 1200x1920)
+    sculptforge_ui_test(android_trays_portrait_1600 hidpi/android_trays_portrait --size 1600x2560)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one
     # process, the longest test of every app T0, so it runs as four shards side by side (SF_MODE_MATRIX_SHARD), first.

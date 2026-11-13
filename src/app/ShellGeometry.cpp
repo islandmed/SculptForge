@@ -125,9 +125,12 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
 
     float left = 0.0f, right = W; // the span between the dividers
     if (g.shelves) {
-        const bool phone = logicalW < kPhoneWidth;
-        const float lw = l.leftTrayOpen && !phone ? trayWidth(l.leftTrayWidth, logicalW) * s : 0.0f;
-        const float rw = l.rightTrayOpen && !g.narrow ? trayWidth(l.rightTrayWidth, logicalW) * s : 0.0f;
+        // A narrow window (a tablet at 240-320 dpi is 760-1000 logical px; upright, 450-800) holds one tray at a time, at
+        // most 40 % of its width: the left one if both are open. The right one opens there only once asked for (rightTrayPeek).
+        const float cap = g.narrow ? std::max(kPhoneTrayMinW, logicalW * 0.4f) : kTrayMaxW;
+        const float lw = l.leftTrayOpen ? std::min(trayWidth(l.leftTrayWidth, logicalW), cap) * s : 0.0f;
+        const bool rightWanted = l.rightTrayOpen && (!g.narrow || (l.rightTrayPeek && !l.leftTrayOpen));
+        const float rw = rightWanted ? std::min(trayWidth(l.rightTrayWidth, logicalW), cap) * s : 0.0f;
         const float dw = m.dividerW * s;
         g.leftTray = {0, top, lw, H - top};
         g.leftDivider = {lw, top, dw, H - top};

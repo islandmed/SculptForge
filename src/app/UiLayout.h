@@ -27,6 +27,7 @@ struct UiLayout {
                      // popup; 5: the right shelf has Turntable, Ortho, Floor and Flat (older stored layouts get them on load)
     bool shelvesVisible = true, paletteBarVisible = true, leftHanded = false;
     bool leftTrayOpen = false, rightTrayOpen = true;
+    bool rightTrayPeek = false; // not saved: on a narrow window the right tray shows only after it was asked for (a tap)
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
     std::vector<std::string> openSubpalettes;         // "tool.part", ...

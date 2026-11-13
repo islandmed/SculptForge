@@ -784,18 +784,12 @@ void App::registerShellActions() {
          [this] { return layout_.paletteBarVisible; }, nullptr});
     add({"ui.tray.left", "Left tray", ICON_LC_PANEL_LEFT, "Open or close the left tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.leftTrayOpen = !layout_.leftTrayOpen;
-             noteLayoutChanged();
-         },
+         [this] { setTrayOpen(false, !trayShown(false)); },
          [this] { return layout_.leftTrayOpen; }, nullptr});
     add({"ui.tray.right", "Right tray", ICON_LC_PANEL_RIGHT, "Open or close the right tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.rightTrayOpen = !layout_.rightTrayOpen;
-             noteLayoutChanged();
-         },
-         [this] { return layout_.rightTrayOpen; }, nullptr});
+         [this] { setTrayOpen(true, !trayShown(true)); },
+         [this] { return layout_.rightTrayOpen && (!shell_.narrow || layout_.rightTrayPeek); }, nullptr});
     static const char* const kPresetHelp[] = {
         "Standard layout: Tool palette in the right tray, shelves around the canvas.",
         "Sculpt layout: both trays closed for the largest canvas.",
@@ -1108,7 +1102,34 @@ void App::applyPreset(int preset) {
 
 bool App::paletteInShownTray(const std::string& id) const {
     return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) ||
-           (!shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+           ((!shell_.narrow || (layout_.rightTrayPeek && !layout_.leftTrayOpen)) &&
+            std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+}
+
+// Open as the layout has it; on a narrow window, as drawn (the right tray is hidden there until asked for).
+bool App::trayShown(bool right) const {
+    if (!shell_.narrow) return right ? layout_.rightTrayOpen : layout_.leftTrayOpen;
+    return (right ? shell_.rightTray : shell_.leftTray).w > 0.0f;
+}
+
+// Opens or closes a tray: one tap on its divider, its action, or a palette's header icon. A narrow window (a tablet:
+// 760-1000 logical px, upright 450-800) holds one tray at a time and the right one only once asked for, so opening one
+// there closes the other, and what the tap changes is what is drawn, not the stored "open" the wide layout keeps.
+void App::setTrayOpen(bool right, bool open) {
+    if (shell_.narrow) {
+        if (right) {
+            layout_.rightTrayPeek = open;
+            if (open) layout_.rightTrayOpen = true, layout_.leftTrayOpen = false;
+            else layout_.rightTrayOpen = false;
+        } else {
+            layout_.leftTrayOpen = open;
+            if (open) layout_.rightTrayPeek = false;
+        }
+    } else {
+        (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = open;
+        layout_.rightTrayPeek = false;
+    }
+    noteLayoutChanged();
 }
 
 void App::removePaletteFromTrays(const std::string& id) {
@@ -1125,7 +1146,7 @@ void App::autoCollapseTray(bool right, const std::string& keep) {
 void App::movePaletteToTray(const std::string& id, bool right) {
     removePaletteFromTrays(id);
     (right ? layout_.rightTray : layout_.leftTray).push_back(id);
-    (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = true;
+    setTrayOpen(right, true);
     collapsedPalettes_.erase(std::remove(collapsedPalettes_.begin(), collapsedPalettes_.end(), id), collapsedPalettes_.end());
     autoCollapseTray(right, id);
     if (dropdown_ == id) {
@@ -1546,6 +1567,7 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.rightTray = from.rightTray;
     l.leftTrayOpen = from.leftTrayOpen;
     l.rightTrayOpen = from.rightTrayOpen;
+    l.rightTrayPeek = from.rightTrayPeek;
     l.leftTrayWidth = from.leftTrayWidth;
     l.rightTrayWidth = from.rightTrayWidth;
     l.openSubpalettes = from.openSubpalettes;
@@ -2565,7 +2587,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         ImGui::End();
         return;
     }
-    const bool open = right ? layout_.rightTrayOpen && !shell_.narrow : layout_.leftTrayOpen;
+    const bool open = trayShown(right);
     ImGui::InvisibleButton(right ? "##rightdivider" : "##leftdivider", ImVec2(r.w, r.h));
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     ImGuiIO& io = ImGui::GetIO();
@@ -2579,12 +2601,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         noteLayoutChanged();
     }
     if (ImGui::IsItemDeactivated() && io.MouseDragMaxDistanceSqr[0] < 9.0f * s * s) {
-        if (right && shell_.narrow) {
-            status_ = "The window is too narrow for the tray - palettes open as drop-downs";
-        } else {
-            (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = !open;
-            noteLayoutChanged();
-        }
+        setTrayOpen(right, !open);
     }
     ui::HelpText(right ? "Right tray" : "Left tray", nullptr,
                  "Click to open or close the tray, drag to resize it. Palettes go in trays from their header icon.",
