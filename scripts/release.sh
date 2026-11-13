@@ -546,8 +546,10 @@ step_bump() {
     preflight bump
     local out
     # A beta's #testers checklist comes from the fragments, so it is written before they go (step status names it).
+    # Outside the checkout: the bump runs in the batch checkout, the promote (status) in ~/Work/Zbrush.
     if [ -n "$PRE" ] && ls changes/*.md 2>/dev/null | grep -v '/README.md$' >/dev/null; then
-        python3 tools/release/assemble_notes.py "$BASE" --testers >"release-testers-$V.md"
+        mkdir -p "$(dirname "$(testers_file)")"
+        python3 tools/release/assemble_notes.py "$BASE" --testers >"$(testers_file)"
     fi
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
     out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
@@ -1172,14 +1174,17 @@ step_social() {
     python3 "$ls" "$V" website/latest.json || true
 }
 
+# A beta's #testers checklist (step bump writes it, step status names it): one place both checkouts see.
+testers_file() { echo "${SF_TESTERS_DIR:-$HOME/Work/.sf/state/release-testers}/release-testers-$V.md"; }
+
 step_status() {
     if [ -n "$PRE" ]; then
         echo "   Beta:     https://github.com/$INSIDERS_REPO/releases/tag/$T (members only; nothing public)"
         echo "   Discord:  release.yml posted it in #members (DISCORD_MEMBERS_WEBHOOK)"
         echo "   Members:  onboarding adds each paying member's confirmed GitHub username to team ${INSIDERS_REPO%%/*}/insiders"
         echo "             (read on $INSIDERS_REPO only; ~/Work/.sf/members/onboard.py status)"
-        if [ -f "release-testers-$V.md" ]; then
-            echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #members)"
+        if [ -f "$(testers_file)" ]; then
+            echo "   Testers:  $(testers_file) (read it, then post it in #members)"
         else
             echo "   Testers:  no checklist (the note fragments had no testers: lines)"
         fi
