@@ -5,10 +5,13 @@
 # Builds the starter meshes (Library > Tool > Starter meshes, File > New from starter mesh) as OBJ base cages.
 # Everything is either made here from scratch (the eye, the stylised and creature heads' extra Parts, the
 # bevelled primitives) or cut from the MakeHuman hm08 base mesh, which MakeHuman released under CC0 1.0
-# (docs/starter-meshes.md has the provenance). Deterministic: the same input gives the same bytes.
+# (docs/starter-meshes.md has the provenance). The Human (male) is that base mesh reshaped with MakeHuman's CC0
+# shape targets (a 180 cm athletic man, tools/starter/makehuman-targets.sha256) and our own forearm swing, with
+# its UVs. Deterministic: the same input gives the same bytes.
 #
-# Usage: build_starter_meshes.py <makehuman base.obj> <out dir>
-# tools/starter/build.sh runs this, then sculptforge-cli (OBJ -> .sfproj) and compresses the projects.
+# Usage: build_starter_meshes.py <makehuman base.obj> <out dir> [<targets dir>]
+# tools/starter/build.sh runs this, then sculptforge-cli (OBJ -> .sfproj) and compresses the projects. Without
+# the targets dir (the .target files, flat) the Human (male) is skipped.
 #
 # Units are centimetres, Y up, looking down +Z, the character's left is +X; every mesh is centred on X and Z
 # and stands on the ground (lowest point at Y = 0). All faces are quads.
@@ -39,14 +42,17 @@ def smoothstep(e0, e1, x):
 
 
 class Mesh:
-    """Quads only: verts [(x,y,z)], faces [(a,b,c,d)], CCW seen from outside."""
+    """Quads only: verts [(x,y,z)], faces [(a,b,c,d)], CCW seen from outside. Optional UVs: uvs [(u,v)] and
+    uv_faces [(a,b,c,d)] indexing them, one per face (the OBJ gets `vt` lines and v/vt corners)."""
 
-    def __init__(self, verts=None, faces=None):
+    def __init__(self, verts=None, faces=None, uvs=None, uv_faces=None):
         self.verts = list(verts or [])
         self.faces = list(faces or [])
+        self.uvs = list(uvs or [])
+        self.uv_faces = list(uv_faces or [])
 
     def transformed(self, fn):
-        return Mesh([fn(v) for v in self.verts], self.faces)
+        return Mesh([fn(v) for v in self.verts], self.faces, self.uvs, self.uv_faces)
 
 
 def bounds(meshes):
@@ -249,26 +255,46 @@ def orient_outward(m):
 # ---------------------------------------------------------------------------
 
 
-def load_makehuman(path):
-    verts, groups, g = [], {}, None
+def load_makehuman_raw(path):
+    """The whole base.obj in centimetres: verts, texture coordinates, and every group's faces as (vertex,
+    texcoord) corner pairs (texcoord -1 when a face has none)."""
+    verts, texcoords, groups, g = [], [], {}, None
     with open(path, encoding="utf-8") as fh:
         for line in fh:
             if line.startswith("v "):
                 verts.append(tuple(float(t) * 10.0 for t in line.split()[1:4]))
+            elif line.startswith("vt "):
+                texcoords.append(tuple(float(t) for t in line.split()[1:3]))
             elif line.startswith("g "):
                 g = line.split()[1]
                 groups.setdefault(g, [])
             elif line.startswith("f "):
-                groups[g].append(tuple(int(t.split("/")[0]) - 1 for t in line.split()[1:]))
-    body = groups["body"]
-    if any(len(f) != 4 for f in body):
-        sys.exit("expected an all-quad body group")
+                corners = []
+                for t in line.split()[1:]:
+                    parts = t.split("/")
+                    corners.append((int(parts[0]) - 1, int(parts[1]) - 1 if len(parts) > 1 and parts[1] else -1))
+                groups[g].append(tuple(corners))
+    return verts, texcoords, groups
+
+
+def joint_centres(verts, groups):
+    """Each joint-* helper group's centroid, by name without the prefix."""
     joints = {}
     for name, fs in groups.items():
         if name.startswith("joint-"):
-            ids = {i for f in fs for i in f}
+            ids = {i for f in fs for i, _ in f}
             joints[name[6:]] = mul(
                 tuple(sum(verts[i][k] for i in ids) for k in range(3)), 1.0 / len(ids))
+    return joints
+
+
+def load_makehuman(path):
+    verts, _, raw = load_makehuman_raw(path)
+    groups = {name: [tuple(i for i, _ in f) for f in fs] for name, fs in raw.items()}
+    body = groups["body"]
+    if any(len(f) != 4 for f in body):
+        sys.exit("expected an all-quad body group")
+    joints = joint_centres(verts, raw)
     ground = joints["ground"][1]
     verts = [(v[0], v[1] - ground, v[2]) for v in verts]
     joints = {k: (v[0], v[1] - ground, v[2]) for k, v in joints.items()}
@@ -551,6 +577,150 @@ def human_parts(body, j):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Human (male, A-pose): the MakeHuman base reshaped by its CC0 shape targets, plus our forearm swing
+# ---------------------------------------------------------------------------
+
+HUMAN_MALE_HEIGHT = 180.0
+HUMAN_MALE_SHIN_SLANT = 0.2  # cm each shin point slides in per cm below the knee: the lower leg upright, the feet under the hips
+HUMAN_MALE_PALM_TWIST = math.radians(90.0)  # forearm pronation, left arm (mirrored for the right)
+
+# MakeHuman target weights: its macro modifiers at gender 1, age young, the three ethnic shapes mixed evenly,
+# muscle 0.925 and weight 0.5 (the "maxmuscle" universal target at 0.85), a touch of its "ideal proportions"; then
+# the shape targets of a lean athletic build: V-shaped torso, pectorals and lats, toned stomach and pelvis, slim
+# waist, broader shoulders, a slimmer neck, narrower hips and thighs, muscled limbs, the knees brought in
+# (leg valgus), the fingers a little closer. Everything is listed in tools/starter/makehuman-targets.sha256 (the
+# build downloads and checks them).
+HUMAN_MALE_TARGETS = [
+    ("caucasian-male-young", 1 / 3), ("asian-male-young", 1 / 3), ("african-male-young", 1 / 3),
+    ("universal-male-young-maxmuscle-averageweight", 0.85),
+    ("male-young-maxmuscle-averageweight-idealproportions", 0.2),
+    ("male-young-averagemuscle-averageweight-idealproportions", 0.1),
+    ("torso-vshape-incr", 0.4), ("torso-muscle-pectoral-incr", 0.6), ("torso-muscle-dorsi-incr", 0.2),
+    ("stomach-tone-incr", 1.0), ("pelvis-tone-incr", 0.4), ("measure-waist-circ-decr", 0.3),
+    ("measure-shoulder-dist-incr", 0.3), ("neck-scale-horiz-decr", 0.2),
+    ("hip-scale-horiz-decr", 0.4), ("measure-hips-circ-decr", 0.3), ("measure-thigh-circ-decr", 0.3),
+    ("measure-calf-circ-incr", 0.2),
+] + [(f"{side}-{t}", w) for side in ("l", "r") for t, w in (
+    ("upperarm-muscle-incr", 0.5), ("lowerarm-muscle-incr", 0.4), ("upperarm-shoulder-muscle-incr", 0.5),
+    ("upperleg-muscle-incr", 0.5), ("lowerleg-muscle-incr", 0.5), ("leg-valgus-incr", 0.6),
+    ("hand-fingers-distance-decr", 0.3))]
+
+
+def load_target(path):
+    """A MakeHuman .target: (vertex index, offset) pairs, decimetres in the file, centimetres here."""
+    out = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            t = line.split()
+            out.append((int(t[0]), (float(t[1]) * 10.0, float(t[2]) * 10.0, float(t[3]) * 10.0)))
+    return out
+
+
+def rotate_about(p, centre, axis, angle):
+    """Rodrigues' rotation of p about the unit `axis` through `centre`."""
+    x = sub(p, centre)
+    c, s_ = math.cos(angle), math.sin(angle)
+    return add(centre, add(add(mul(x, c), mul(cross(axis, x), s_)), mul(axis, dot(axis, x) * (1.0 - c))))
+
+
+def human_male(base_path, targets_dir):
+    verts, texcoords, groups = load_makehuman_raw(base_path)
+    base_verts = list(verts)
+    verts = [list(v) for v in verts]
+    for name, w in HUMAN_MALE_TARGETS:
+        for i, d in load_target(os.path.join(targets_dir, name + ".target")):
+            verts[i][0] += w * d[0]
+            verts[i][1] += w * d[1]
+            verts[i][2] += w * d[2]
+    verts = [tuple(v) for v in verts]
+    body_ids = sorted({i for f in groups["body"] for i, _ in f})
+    all_ids = range(len(verts))  # the pose changes move the joint helpers too, so the next stage reads them moved
+
+    # Forearm swing: the base mesh's forearms point forward and down from the elbow; ours continue the upper
+    # arm in the frontal plane (the hands beside the thighs seen from the side, as a figure in A-pose stands),
+    # turned about the elbow and blended in over a few centimetres round it.
+    joints = joint_centres(verts, groups)
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        elbow, hand = joints[side + "-elbow"], joints[side + "-hand"]
+        fore = sub(hand, elbow)
+        flat = norm((fore[0], fore[1], 0.0))
+        axis = norm(cross(fore, flat))
+        angle = math.acos(max(-1.0, min(1.0, dot(norm(fore), flat))))
+        along = norm(fore)
+        tip = add(hand, mul(along, 20.0))
+        for i in all_ids:
+            p = verts[i]
+            if p[0] * sign < elbow[0] * sign - 10.0 or seg_dist(p, elbow, tip) > 14.0:
+                continue
+            w = smoothstep(-4.0, 6.0, dot(sub(p, elbow), along))
+            if w > 0.0:
+                verts[i] = rotate_about(p, elbow, axis, angle * w)
+    joints = joint_centres(verts, groups)
+
+    # Feet under the hips: the base mesh stands with the feet apart, each lower leg slanting out from the knee
+    # (its centre line 16 cm off the midline at the knee, 21 at the ankle). With the knees brought in by MakeHuman's
+    # leg-valgus target, each shin is sheared upright: a point slides in by HUMAN_MALE_SHIN_SLANT cm per cm below the
+    # knee (eased in over the first 6 cm), and the foot by the ankle's full amount, so the soles stay flat.
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        knee, ankle, toe = joints[side + "-knee"], joints[side + "-ankle"], joints[side + "-toe-1-1"]
+        shin = knee[1] - ankle[1]
+        for i in all_ids:
+            p = verts[i]
+            if p[0] * sign < 0.0 or p[1] > knee[1] + 6.0:
+                continue
+            if min(seg_dist(p, knee, ankle), seg_dist(p, ankle, toe)) > 16.0:
+                continue
+            below = min(max(knee[1] - p[1], 0.0), shin)
+            shift = HUMAN_MALE_SHIN_SLANT * below * smoothstep(0.0, 6.0, below)
+            verts[i] = (p[0] - sign * shift, p[1], p[2])
+    joints = joint_centres(verts, groups)
+
+    # Palms to the thighs: the base mesh's palms face back; the forearm twists about its own axis from the elbow
+    # (none) to the wrist (the full turn), the hand turning with it.
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        elbow, hand = joints[side + "-elbow"], joints[side + "-hand"]
+        along = norm(sub(hand, elbow))
+        reach = length(sub(hand, elbow))
+        tip = add(hand, mul(along, 22.0))
+        for i in all_ids:
+            p = verts[i]
+            if p[0] * sign < elbow[0] * sign - 10.0 or seg_dist(p, elbow, tip) > 14.0:
+                continue
+            w = smoothstep(0.0, reach, dot(sub(p, elbow), along))
+            if w > 0.0:
+                verts[i] = rotate_about(p, elbow, along, sign * HUMAN_MALE_PALM_TWIST * w)
+
+    # The body, to 180 cm, made exactly mirror-symmetric: MakeHuman's base is, its targets only nearly, so the
+    # character's left side (base x > 0) is kept and the right is its exact mirror (pairs by the base positions).
+    remap = {old: new for new, old in enumerate(body_ids)}
+    lo, hi = bounds([Mesh([verts[i] for i in body_ids])])
+    scale = HUMAN_MALE_HEIGHT / (hi[1] - lo[1])
+    scaled = [mul(verts[i], scale) for i in body_ids]
+    key = lambda p: (round(p[0], 2), round(p[1], 2), round(p[2], 2))
+    by_key = {key(base_verts[i]): n for n, i in enumerate(body_ids)}
+    out = []
+    for n, i in enumerate(body_ids):
+        m = by_key.get(key(mirror_x(base_verts[i])))
+        if m is None:
+            sys.exit(f"human-male: no mirror partner for vertex {i}")
+        if m == n:
+            out.append((0.0, scaled[n][1], scaled[n][2]))
+        elif base_verts[i][0] > 0.0:
+            out.append(scaled[n])
+        else:
+            out.append(mirror_x(scaled[m]))
+    faces = [tuple(remap[i] for i, _ in f) for f in groups["body"]]
+    uv_ids = sorted({t for f in groups["body"] for _, t in f})
+    if uv_ids[0] < 0:
+        sys.exit("human-male: a body face has no texture coordinates")
+    uv_remap = {old: new for new, old in enumerate(uv_ids)}
+    uv_faces = [tuple(uv_remap[t] for _, t in f) for f in groups["body"]]
+    return Mesh(out, faces, [texcoords[t] for t in uv_ids], uv_faces)
+
+
 def stylised_head(head, j):
     """The human head pushed toward a cartoon: bigger cranium and eyes, smaller nose, mouth and jaw."""
     eyes = [j["l-eye"], mirror_x(j["l-eye"])]
@@ -682,6 +852,7 @@ SET = [
     ("human-head", "Human Head", ["Head"], True, False, 2),
     ("bust", "Bust", ["Bust"], True, False, 2),
     ("full-body", "Full Body (A-pose)", ["Body"], True, True, 1),
+    ("human-male", "Human (male, A-pose)", ["Body"], True, True, 2),
     ("hand", "Hand", ["Hand"], False, False, 2),
     ("foot", "Foot", ["Foot"], False, False, 2),
     ("ear", "Ear", ["Ear"], False, False, 2),
@@ -722,28 +893,41 @@ def check(mid, parts, closed):
 def write_obj(path, names, parts):
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("# SculptForge starter mesh (tools/starter/build_starter_meshes.py); docs/starter-meshes.md\n")
-        base = 1
+        base, uv_base = 1, 1
         for name, m in zip(names, parts):
             fh.write(f"o {name}\n")
             for v in m.verts:
                 fh.write("v %.4f %.4f %.4f\n" % tuple(0.0 if abs(c) < 5e-5 else c for c in v))
-            for f in m.faces:
-                fh.write("f " + " ".join(str(i + base) for i in f) + "\n")
+            for uv in m.uvs:
+                fh.write("vt %.5f %.5f\n" % uv)
+            if m.uvs:
+                for f, t in zip(m.faces, m.uv_faces):
+                    fh.write("f " + " ".join(f"{i + base}/{k + uv_base}" for i, k in zip(f, t)) + "\n")
+            else:
+                for f in m.faces:
+                    fh.write("f " + " ".join(str(i + base) for i in f) + "\n")
             base += len(m.verts)
+            uv_base += len(m.uvs)
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.exit(__doc__ if __doc__ else "usage: build_starter_meshes.py <makehuman base.obj> <out dir>")
+    if len(sys.argv) not in (3, 4):
+        sys.exit("usage: build_starter_meshes.py <makehuman base.obj> <out dir> [<targets dir>]")
     body, joints = load_makehuman(sys.argv[1])
     out_dir = sys.argv[2]
     os.makedirs(out_dir, exist_ok=True)
     meshes = human_parts(body, joints)
+    if len(sys.argv) == 4:
+        meshes["human-male"] = [human_male(sys.argv[1], sys.argv[3])]
+    else:
+        print("human-male skipped (no targets dir)")
     meshes["stylised-head"] = [stylised_head(meshes["human-head"][0], joints)]
     meshes["eye"] = [eye()]
     meshes["creature-head"] = creature_head()
     meshes.update(primitives())
     for (mid, name, part_names, symmetric, closed, levels) in SET:
+        if mid not in meshes:
+            continue
         parts = place_on_ground(meshes[mid])
         check(mid, parts, closed)
         write_obj(os.path.join(out_dir, mid + ".obj"), part_names, parts)

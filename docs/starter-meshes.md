@@ -2,7 +2,7 @@
 
 The starter meshes (File > New from Starter Mesh, Library > Tool > Starter meshes, `new_starter_mesh`;
 src/core/StarterMeshes.h) are the base cages in `assets/starter/*.sfproj.z`: SculptForge projects, zlib-compressed,
-embedded in the program. They open with subdivision levels added (Divide), so the files stay small (0.8 MB for the
+embedded in the program. They open with subdivision levels added (Divide), so the files stay small (1.4 MB for the
 set; the budget is 15 MB, checked by `starter_meshes_set_and_budget`).
 
 **Licensing rule:** only meshes made by our own scripts, or CC0 / public-domain sources recorded here with URL,
@@ -15,6 +15,7 @@ licence and date. Never another app's assets or output, nothing scraped.
 | Human Head | MakeHuman hm08 base mesh | CC0 1.0 | The body above the neck |
 | Bust | MakeHuman hm08 base mesh | CC0 1.0 | Above the mid chest; arms cut a third of the way down the upper arm |
 | Full Body | MakeHuman hm08 base mesh | CC0 1.0 | The whole "body" group (helpers and joints dropped), A-pose |
+| Human (male, A-pose) | Base mesh derived from MakeHuman (CC0): hm08 base mesh + its shape targets | CC0 1.0 | The "body" group with UVs, reshaped by 32 MakeHuman targets (male young macro mix, max muscle 0.85, a touch of ideal proportions, V-shape, pectorals, lats, toned stomach, slim waist, broader shoulders, slimmer neck, narrower hips and thighs, muscled limbs, knees in: `HUMAN_MALE_TARGETS`), then our own pose fixes (forearms swung into the frontal plane about the elbow, shins sheared upright so the feet sit under the hips, forearms turned so the palms face the thighs), scaled to 180 cm, made exactly mirror-symmetric |
 | Hand | MakeHuman hm08 base mesh | CC0 1.0 | The left hand past the wrist, stood up (fingers +Y, palm +Z) |
 | Foot | MakeHuman hm08 base mesh | CC0 1.0 | The left foot below 9 cm over the ankle |
 | Ear | MakeHuman hm08 base mesh | CC0 1.0 | The left ear and the skin round it (its rim relaxed into an even curve), turned to face +Z |
@@ -29,7 +30,9 @@ SHA-256 `8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c`, down
 verified that day: the file's header says "This asset was explicitly released as CC0 in september 2020", and the
 repository's [LICENSE.md](https://github.com/makehumancommunity/makehuman/blob/master/LICENSE.md) (section C:
 "The base mesh and proxies ... have been released under CC0 1.0 Universal", full text in LICENSE.ASSETS.md). Only
-the mesh is used; MakeHuman's AGPL code is not. Credited in THIRD_PARTY_NOTICES.md.
+the mesh and its shape targets (`tools/starter/makehuman-targets.sha256`: 32 `.target` files under
+`makehuman/data/targets` at the same commit, each pinned by SHA-256; section C of the licence names "targets and
+modifiers" as CC0 too) are used; MakeHuman's AGPL code is not. Credited in THIRD_PARTY_NOTICES.md.
 
 ## Conventions
 
@@ -45,7 +48,7 @@ and `tests/ui/starter_meshes.sfui` opens one from the Library.
 
     tools/starter/build.sh build/sculptforge-cli
 
-downloads base.obj at the pinned commit, checks its SHA-256, runs `tools/starter/build_starter_meshes.py`
-(deterministic), saves each OBJ as a project with sculptforge-cli and compresses it into assets/starter. A new mesh
+downloads base.obj and the Human (male)'s target files at the pinned commit, checks their SHA-256, runs
+`tools/starter/build_starter_meshes.py` (deterministic), saves each OBJ as a project with sculptforge-cli and compresses it into assets/starter. A new mesh
 also needs its line in `starterMeshes()` (src/core/StarterMeshes.cpp) and in the `embed_files` list in
 CMakeLists.txt.
