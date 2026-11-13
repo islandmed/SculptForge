@@ -9,8 +9,9 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: The welcome window fits a phone held sideways.
+tagline: The welcome window fits a phone held sideways, and the model draws on more Android devices.
 highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
+highlight: On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu
 ```
 
 - **Welcome on a phone**: held sideways, the welcome window fits the screen, keeps **Close** at its bottom and scrolls
