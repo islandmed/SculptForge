@@ -546,7 +546,7 @@ step_bump() {
     preflight bump
     local out
     # A beta's #testers checklist comes from the fragments, so it is written before they go (step status names it).
-    # Outside the checkout: the bump runs in the batch checkout, the promote (status) in ~/Work/Zbrush.
+    # Outside the checkout: the bump runs in the batch checkout, the promote (status) in the main checkout.
     if [ -n "$PRE" ] && ls changes/*.md 2>/dev/null | grep -v '/README.md$' >/dev/null; then
         mkdir -p "$(dirname "$(testers_file)")"
         python3 tools/release/assemble_notes.py "$BASE" --testers >"$(testers_file)"
