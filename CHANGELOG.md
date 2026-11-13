@@ -12,6 +12,16 @@ All notable changes to SculptForge are listed here. The format follows
   (Hameron on Discord). It is now a sheet inside the screen's safe area (camera cut-out, bars, gesture area) with a
   finger-sized **Close** pinned at the bottom, content that scrolls with a swipe (a swipe that starts on a button
   scrolls, it doesn't press it), and Back closes it, the membership card, What's New and the quick tour.
+- **Help > Copy log to clipboard** was only in the command search (F3); it is now in the Help menu too, where an
+  Android tester who can't open the app's folder looks for it.
+
+### Changed
+- **Android**: a mesh is drawn through the extension's multi-draw only when the driver lists the extensions that
+  define it (otherwise one core draw call per range, and never a missing entry point), and the log records the first
+  GL error a view draw raises and the first frames' triangle counts, for the empty 3D view some Mali tablets show (not
+  confirmed fixed: testers).
+- **Android**: the welcome's phone sheet needs a touch screen (a short desktop window with a mouse keeps its movable
+  window).
 
 ## [0.12.13] - 2026-11-12
 

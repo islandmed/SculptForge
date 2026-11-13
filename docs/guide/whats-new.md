@@ -16,6 +16,8 @@ highlight: On Android the model draws on phones and tablets whose driver lacks t
 
 - **Welcome on a phone**: held sideways, the welcome window fits the screen, keeps **Close** at its bottom and scrolls
   with a swipe. Android's Back button closes it (and the other cards that open by themselves).
+- **Help > Copy log to clipboard** is in the Help menu now (it was only in the command search), for reports from a
+  phone where the app's folder can't be opened.
 
 ## Version 0.12.13
 
