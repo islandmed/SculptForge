@@ -1,0 +1,55 @@
+# Customize Shelves: Guide Strength and Target Quads (Remesh palette) and Level (Geometry palette) drag onto a shelf like
+# Voxel Resolution does (masterfull95 on Discord), keep their value on the way, and work from the shelf.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+click "Remesh##tool.remesh"
+expect_value guide_strength_on_shelves == 0
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+
+remember guide_strength g0
+hold ctrl+alt
+drag_item_to "##qcurvesgrab" "Clay##brush.clay" keep
+release
+hold none
+wait 0.3
+expect_value guide_strength == $g0
+expect_value guide_strength_on_shelves == 1
+
+remember retopo_target t0
+hold ctrl+alt
+drag_item_to "##qtargetgrab" "Clay##brush.clay" keep
+release
+hold none
+wait 0.3
+expect_value retopo_target == $t0
+expect_value target_quads_on_shelves == 1
+
+# Level, from the Geometry palette (a one-level Part's slider is dimmed but can still be picked up).
+click "Geometry##tool.geometry"
+hold ctrl+alt
+drag_item_to "##levelgrab" "Clay##brush.clay" keep
+release
+hold none
+wait 0.3
+expect_value level_on_shelves == 1
+wait_idle 30
+shot dropped
+
+# Out of Customize, the shelf copies work with the palettes closed.
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 0
+drag_item "##qcurves.shelf" -60 0
+expect_value guide_strength != $g0
+drag_item "##qtarget.shelf" -60 0
+expect_value retopo_target != $t0
+
+# Kept at the next start.
+restart
+expect_value guide_strength_on_shelves == 1
+expect_value target_quads_on_shelves == 1
+expect_value level_on_shelves == 1

@@ -1565,6 +1565,13 @@ private:
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
+    // Customize Shelves, Ctrl+Alt: sliders that can be picked up and dropped on a shelf (PanelRetopo.cpp); compact: the shelf's copy,
+    // the slider alone at the width set before. The Guide Strength, Target Quads and Level sliders draw through these.
+    bool beginShelfGrab();
+    void endShelfGrab(const char* buttonId, const char* item, const char* title);
+    void drawGuideStrength(bool compact = false);
+    void drawTargetQuads(bool compact = false);
+    void drawLevelSlider(bool compact = false); // PanelGeometry.cpp
     void drawVoxelResolution(bool compact = false); // the slider (2/3 of its travel for 32-512) and the estimate line; compact: the shelf's, the slider alone at the width set before
     void drawVoxelHighResConfirm();
     struct VoxelEstimateCache {

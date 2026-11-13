@@ -1135,6 +1135,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
     sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
     sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
+    # Guide Strength, Target Quads and Level dropped on a shelf (tests/ui/shelf_slider_drop.sfui), and plain slider drags (slider_drag).
+    sculptforge_ui_test(shelf_slider_drop_1440 shelf_slider_drop --size 1440x900)
+    sculptforge_ui_test(shelf_slider_drop_2880 shelf_slider_drop --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
