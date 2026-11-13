@@ -78,15 +78,17 @@ def main():
     stroke(path([(3.0, ny - 7.8), (6.0, ny - 8.0), (9.0, ny - 7.5), (13.0, ny - 6.0), (16.5, ny - 3.0), (18.5, ny + 1.5)]),
            "Crease", 2.4, 0.8)
     stroke(path([(4.0, ny - 2.0), (9.0, ny - 1.0), (14.0, ny + 1.0)]), "Inflate", 5.5, 0.35)
-    # Sternum groove and linea alba, the sternal notch to the navel (lighter below the chest).
-    stroke(path([(0.0, notch[1] - 3.0), (0.0, ny + 2.0), (0.0, ny - 8.0)]), "Crease", 1.6, 0.6)
-    stroke(path([(0.0, ny - 9.0), (0.0, (ny - 9.0 + vy) / 2), (0.0, vy + 1.5)]), "Crease", 1.3, 0.5)
+    # Sternum: a soft, shallow valley between the pecs only (a wide Inflate carved in, fading above the abs); the
+    # linea alba is not one cut but a gentle groove between each pair of ab rows (below, with the tendinous creases).
+    stroke(path([(0.0, ny + 3.0), (0.0, ny - 2.0), (0.0, ny - 7.0)]), "Inflate", 2.6, 0.22, invert=True)
     # Abs: three rows above the navel line, each a mound with a tendinous crease between rows.
     for row, yo in enumerate((14.0, 7.5, 1.5)):
         stroke(pt(4.3, vy + yo), "Inflate", 4.3, 0.7)
         stroke(pt(4.3, vy + yo), "Inflate", 3.0, 0.5)
     for yo in (11.0, 4.5, -2.5):
         stroke(path([(2.0, vy + yo), (4.8, vy + yo - 0.3), (7.8, vy + yo + 0.3)]), "Crease", 1.4, 0.6)
+    for y0, y1 in ((vy + 12.5, vy + 9.5), (vy + 6.0, vy + 3.0), (vy - 0.5, vy - 4.0)):
+        stroke(path([(0.0, y0), (0.0, y1)]), "Inflate", 1.4, 0.2, invert=True, curve=False)
     # Below the navel: the lower abs' outer edge (the linea semilunaris) and the inguinal line to the pubis.
     stroke(path([(8.0, vy + 15.0), (8.6, vy + 6.0), (8.0, vy - 3.0), (6.0, vy - 10.0)]), "Crease", 1.5, 0.45)
     stroke(path([(13.0, hip[1] + 4.0), (9.0, hip[1] - 2.0), (4.5, hip[1] - 8.0), (2.2, hip[1] - 11.5)]), "Crease", 1.6, 0.5)
