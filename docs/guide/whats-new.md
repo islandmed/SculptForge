@@ -9,10 +9,10 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-13
-tagline: Image to 3D from an AI tool no longer freezes the window, and links on Linux open one browser window.
-highlight: Image to 3D and Text to 3D from an AI tool, the console or a script run in the background with live status instead of freezing the window
-highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
+tagline: Android tablet trays open again, and links on Linux open one browser window.
 highlight: On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle
+highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
+highlight: Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes
 ```
 
 - **Trays on tablets**: the Right Tray and the Left Tray open with one tap on their edge handle on tablets, held
