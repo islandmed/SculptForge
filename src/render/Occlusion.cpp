@@ -114,7 +114,8 @@ void main() {
             float dq = depthAt(q);
             if (dq >= 1.0) continue;
             float dz = posAt(q, dq).z - Q.z; // > 0: the drawn surface there is in front of the ray
-            if (dz > pixelSize(Q.z) * 2.0 && dz < uThick) {
+            // (the bias grows along the ray: a grazing ray over a faceted surface doesn't shadow itself)
+            if (dz > pixelSize(Q.z) * 2.0 + 0.04 * distance(Q, P) && dz < uThick) {
                 shadow = 1.0 - smoothstep(0.75, 1.0, t);
                 break;
             }

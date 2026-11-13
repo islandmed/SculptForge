@@ -3006,7 +3006,7 @@ void Renderer::prepareOcclusion(const RenderSettings& settings, bool pbr, const 
         const glm::vec3 dirEnv(glm::dot(envSh_.c[3], lum), glm::dot(envSh_.c[1], lum), glm::dot(envSh_.c[2], lum));
         const float l0 = 0.282095f * glm::dot(envSh_.c[0], lum), l1 = 0.488603f * glm::length(dirEnv);
         o.light = l1 > 1e-6f ? glm::transpose(frameViewToEnv_) * (dirEnv / glm::length(dirEnv)) : glm::vec3(0.0f, 1.0f, 0.0f);
-        o.shadowDarkness = std::clamp(1.8f * l1 / std::max(l0 + l1, 1e-6f), 0.35f, 0.7f);
+        o.shadowDarkness = std::clamp(l1 / std::max(l0 + l1, 1e-6f), 0.3f, 0.55f);
         } else {
         o.light = lightRotation(settings.lightYaw, settings.lightPitch) * glm::normalize(glm::vec3(0.45f, 0.65f, 0.6f));
         o.shadowDarkness = 0.6f; // (the studio key's share of the light)
