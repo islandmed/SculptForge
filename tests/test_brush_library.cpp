@@ -664,3 +664,30 @@ TEST(brush_files_get_their_own_identity) {
     CHECK(one && two && one->id != two->id && !one->id.empty() && !two->id.empty());
     CHECK(one->id == disk.id || two->id == disk.id); // one keeps the original identity
 }
+
+// The id is bookkeeping: a brush with an id and the same brush without one are the same recipe (the JSON the sculpting
+// engine, projects and brush codes read), and the library's id writes never change a brush's parameters.
+TEST(brush_identity_invariant_recipe_is_unchanged) {
+    for (const BrushRecipe& builtin : builtinBrushRecipes()) {
+        BrushRecipe with = builtin;
+        with.id = "0123456789abcdef";
+        CHECK(with.toJson().dump() == builtin.toJson().dump());
+        CHECK(encodeBrushCode(with) == encodeBrushCode(builtin));
+    }
+    LibraryFixture lib("idinvariant");
+    BrushRecipe r = builtinBrushRecipes()[2];
+    r.name = "Keeps Its Look";
+    r.jitter = 0.37f;
+    r.frontFacesOnly = true;
+    r.alpha = "";
+    writeText(lib.user / "Keeps Its Look.sfbrush", r.toJson().dump(true)); // an older file: no id
+    Document doc;
+    CHECK(loadBrushLibrary(doc, lib.paths()).empty()); // gives it an id, writes it back
+    const BrushRecipe* got = find(doc, "Keeps Its Look");
+    CHECK(got && !got->id.empty());
+    BrushRecipe disk;
+    std::string err;
+    CHECK(readBrushFile((lib.user / "Keeps Its Look.sfbrush").string(), disk, err));
+    CHECK(disk.toJson().dump() == got->toJson().dump());
+    CHECK(got->toJson().dump() == BrushRecipe::fromJson(r.toJson()).toJson().dump());
+}
