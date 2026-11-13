@@ -1027,6 +1027,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME native_dialogs COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py
                                          ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME native_dialogs_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py --self-test)
+    # MSVC stops at about 128 nested blocks (C1061) and every `else if` nests one: a chain of 100 under src/ fails on Linux
+    # first (0.12.13: UiTest.cpp's step dispatch broke the Windows stage twice). Use a table or a switch.
+    add_test(NAME else_if_chains COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py
+                                         ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME else_if_chains_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py --self-test)
   endif()
 
   # The phone link's relay (services/link-worker, a Cloudflare Worker) under plain Node, when Node 20+ is installed.

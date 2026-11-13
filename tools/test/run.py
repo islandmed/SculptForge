@@ -54,6 +54,7 @@ READS = {
     "blender_exchange": ["addons/blender", "tests/blender"], "blender_addon_package": ["addons/blender"],
     "maya_shelf_script": ["integrations/maya", "tests/maya"], "link_worker": ["services/link-worker"],
     "release_smoke": ["tests/release_smoke.py", "tests/ui/release_smoke.sfui"],
+    "else_if_chains": ["src"],
 }
 APP_READS = ["assets", "tests/ui/data", "docs/guide"]  # the app loads these at run time (docs/guide: Help)
 UNIT_READS = ["tests/data"]
