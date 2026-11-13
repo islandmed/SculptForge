@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.12.14"
-expect_text "The welcome window fits a phone held sideways, and the model draws on more Android devices."
+expect_text "Shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways."
 expect_text "Version 0.12.13"
 expect_text "SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail."
 expect_text "Version 0.12.12"
