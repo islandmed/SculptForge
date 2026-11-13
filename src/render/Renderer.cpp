@@ -2950,9 +2950,10 @@ bool Renderer::viewTarget(int width, int height, int samples) {
 static void logViewFrame(const char* what, int width, int height, int samples, float scale, size_t triangles, bool fbo) {
     static int frames = 0;
     static unsigned seen = 0;
-    if (frames >= 300) { // (the first seconds only: the draw's errors are cleared as before, unlogged)
-        for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-        }
+    if (frames >= 300) { // (the first seconds only: after that the target's draws clear their errors unlogged, as before)
+        if (fbo)
+            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+            }
         return;
     }
     for (int i = 0; i < 16; ++i) {
