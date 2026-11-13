@@ -588,22 +588,22 @@
    "slug": "interface",
    "ideas": [
     {
+     "slug": "rooms",
+     "anchor": "vote-rooms",
+     "title": "Rooms",
+     "line": "Separate workspaces for Sculpt, Model, Paint and UV, each with its own tools, panels and keys, and a clean hand-off of the model; also the backbone of the coming tablet and phone app.",
+     "where": "a workspace switcher at the top of the window",
+     "votes": 1,
+     "status": "open",
+     "shipped": ""
+    },
+    {
      "slug": "tab-hides-one-shelf",
      "anchor": "vote-tab-hides-one-shelf",
      "title": "Tab hides one shelf",
      "line": "Tab over a shelf hides only that shelf.",
      "where": "Shelves",
      "votes": 1,
-     "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "rooms",
-     "anchor": "vote-rooms",
-     "title": "Rooms",
-     "line": "Separate workspaces for Sculpt, Model, Paint and UV, each with its own tools, panels and keys, and a clean hand-off of the model; also the backbone of the coming tablet and phone app.",
-     "where": "a workspace switcher at the top of the window",
-     "votes": 0,
      "status": "open",
      "shipped": ""
     },
@@ -864,5 +864,5 @@
    ]
   }
  ],
- "updated": "2026-11-12T23:37:59Z"
+ "updated": "2026-11-13T03:39:21Z"
 }
