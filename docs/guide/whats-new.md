@@ -9,7 +9,8 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: The welcome window fits a phone held sideways, and the model draws on more Android devices.
+tagline: Shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways.
+highlight: A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name
 highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
 highlight: On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu
 ```
