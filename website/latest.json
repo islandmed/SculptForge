@@ -1,13 +1,13 @@
 {
-  "version": "0.12.12",
+  "version": "0.12.13",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips",
-    "25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded",
-    "The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)",
-    "Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)",
-    "Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times"
+    "SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome",
+    "A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh",
+    "AI agents connected over MCP reach fine detail such as pores and wrinkles",
+    "Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone",
+    "Windows laptops with two graphics chips start on the faster one, and the Clay live preview matches the final stroke"
   ],
   "support": {
     "founding": {
