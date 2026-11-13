@@ -1156,6 +1156,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
+    # A shelf slot follows its brush through a rename (tests/ui/shelf_slot_rename.sfui).
+    sculptforge_ui_test(shelf_slot_rename_1440 shelf_slot_rename --size 1440x900)
     # Revert to Saved Layout / Reset Layout from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
     # at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)

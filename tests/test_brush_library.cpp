@@ -494,3 +494,173 @@ TEST(brush_library_reload_keeps_session_brushes) {
     loadBrushLibrary(doc, lib.paths());
     CHECK(find(doc, "Unsaved") != nullptr);
 }
+
+// A shelf slot keeps pointing at its brush (relinkBrush: the stable id in the .sfbrush first, the name as a hint). The
+// bottom shelf stores "brush.recipe.<name>" and the id it learned (UiLayout::brushIds); these are the moves that broke
+// it for @rand_gogh's slot 8: the brush's file still on disk, the slot marked missing.
+namespace {
+int indexOf(const Document& doc, const std::string& name) {
+    for (size_t i = 0; i < doc.brushes.size(); ++i)
+        if (doc.brushes[i].name == name) return int(i);
+    return -1;
+}
+
+// A .sfbrush file with the given name and id, as the library writes it.
+void writeIdBrush(const fs::path& path, const std::string& name, const std::string& id) {
+    BrushRecipe r;
+    r.name = name;
+    Json j = r.toJson();
+    j.set("format", "sfbrush");
+    j.set("version", 1);
+    j.set("id", id);
+    writeText(path, j.dump(true) + "\n");
+}
+
+BrushRecipe installed(Document& doc, const LibraryFixture& lib, const std::string& name) {
+    BrushRecipe r;
+    r.name = name;
+    std::string err;
+    const int i = installBrush(doc, r, err, false, lib.paths());
+    CHECK(err.empty());
+    return doc.brushes[size_t(i)];
+}
+} // namespace
+
+TEST(brush_slot_identity_is_stored_and_survives_restart) {
+    LibraryFixture lib("slotid");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Finish - Classic");
+    CHECK(!made.id.empty());
+    Document restarted;
+    CHECK(loadBrushLibrary(restarted, lib.paths()).empty());
+    const BrushRecipe* back = find(restarted, "Finish - Classic");
+    CHECK(back && back->id == made.id);
+    std::string note;
+    const int i = relinkBrush(restarted, "Finish - Classic", made.id, note, lib.paths());
+    CHECK(i >= 0 && restarted.brushes[size_t(i)].id == made.id);
+    // A brush code (chat, forum) never carries the id: two installs of one code are two brushes.
+    std::string err;
+    BrushRecipe fromCode;
+    CHECK(decodeBrushCode(encodeBrushCode(restarted.brushes[size_t(i)]), fromCode, err));
+    CHECK(fromCode.id.empty());
+}
+
+TEST(brush_slot_follows_a_rename) {
+    LibraryFixture lib("slotrename");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Old Name");
+    std::string err, note;
+    const int renamed = renameBrush(doc, indexOf(doc, "Old Name"), "New Name", err, lib.paths());
+    CHECK(renamed >= 0 && err.empty());
+    CHECK(doc.brushes[size_t(renamed)].id == made.id);
+    // The slot still says "Old Name": the id finds the brush, loaded or after a restart.
+    CHECK(relinkBrush(doc, "Old Name", made.id, note, lib.paths()) == renamed);
+    Document restarted;
+    loadBrushLibrary(restarted, lib.paths());
+    const int i = relinkBrush(restarted, "Old Name", made.id, note, lib.paths());
+    CHECK(i >= 0 && restarted.brushes[size_t(i)].name == "New Name");
+    // An older slot with no id has nothing to follow, but is still never dropped: it is reported missing (-1).
+    CHECK(relinkBrush(restarted, "Old Name", "", note, lib.paths()) < 0);
+}
+
+TEST(brush_slot_follows_a_file_moved_or_renamed_by_hand) {
+    LibraryFixture lib("slotmove");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Mover");
+    const fs::path file = lib.user / "Mover.sfbrush";
+    std::string note;
+
+    // The file renamed by hand: the brush inside is the same.
+    fs::rename(file, lib.user / "mover copy.sfbrush");
+    Document a;
+    loadBrushLibrary(a, lib.paths());
+    CHECK(relinkBrush(a, "Mover", made.id, note, lib.paths()) >= 0);
+
+    // Moved into a folder of the user library (the library sorted into folders): the library doesn't list it, the slot finds it.
+    fs::create_directories(lib.user / "Polish");
+    fs::rename(lib.user / "mover copy.sfbrush", lib.user / "Polish" / "Mover.sfbrush");
+    Document b;
+    loadBrushLibrary(b, lib.paths());
+    CHECK(find(b, "Mover") == nullptr);
+    const int ib = relinkBrush(b, "Mover", made.id, note, lib.paths());
+    CHECK(ib >= 0 && b.brushes[size_t(ib)].origin.path == (lib.user / "Polish" / "Mover.sfbrush").string());
+    CHECK(b.brushes[size_t(ib)].origin.source == BrushSource::User);
+    CHECK(fs::exists(lib.user / "Polish" / "Mover.sfbrush")); // looked at, never moved or changed
+
+    // Moved to a studio folder: loaded from there, the slot finds it by id and name.
+    fs::rename(lib.user / "Polish" / "Mover.sfbrush", lib.studioA / "Mover.sfbrush");
+    Document c;
+    loadBrushLibrary(c, lib.paths());
+    const int ic = relinkBrush(c, "Mover", made.id, note, lib.paths());
+    CHECK(ic >= 0 && c.brushes[size_t(ic)].origin.source == BrushSource::Studio);
+}
+
+TEST(brush_slot_follows_the_internal_name_and_its_case) {
+    LibraryFixture lib("slotname");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Finish - Classic");
+    std::string note;
+    // The name inside the file changed (edited by hand, a sync tool): same id, the slot follows it.
+    writeIdBrush(lib.user / "Finish - Classic.sfbrush", "Finish - Classic v2", made.id);
+    Document a;
+    loadBrushLibrary(a, lib.paths());
+    CHECK(find(a, "Finish - Classic") == nullptr);
+    const int ia = relinkBrush(a, "Finish - Classic", made.id, note, lib.paths());
+    CHECK(ia >= 0 && a.brushes[size_t(ia)].name == "Finish - Classic v2");
+
+    // Case-only change (Windows and macOS don't tell the files apart), with and without an id on the slot.
+    writeIdBrush(lib.user / "Finish - Classic.sfbrush", "finish - classic", made.id);
+    for (const std::string& id : {made.id, std::string()}) {
+        Document c;
+        loadBrushLibrary(c, lib.paths());
+        const int ic = relinkBrush(c, "Finish - Classic", id, note, lib.paths());
+        CHECK(ic >= 0 && c.brushes[size_t(ic)].name == "finish - classic");
+    }
+    // Same, with the file in a subfolder and not loaded.
+    fs::create_directories(lib.user / "sub");
+    fs::rename(lib.user / "Finish - Classic.sfbrush", lib.user / "sub" / "x.sfbrush");
+    Document d;
+    loadBrushLibrary(d, lib.paths());
+    CHECK(relinkBrush(d, "Finish - Classic", "", note, lib.paths()) >= 0);
+}
+
+TEST(brush_slot_of_a_deleted_brush_stays_missing) {
+    LibraryFixture lib("slotdeleted");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Gone");
+    std::string err, note;
+    CHECK(deleteBrush(doc, indexOf(doc, "Gone"), err, lib.paths()));
+    CHECK(relinkBrush(doc, "Gone", made.id, note, lib.paths()) < 0); // missing: the slot is kept, the UI says so
+    CHECK(relinkBrush(doc, "Gone", "", note, lib.paths()) < 0);
+    CHECK(fs::exists(lib.user / "backups" / "deleted" / "Gone.sfbrush"));
+    // Another brush with a different id and name never answers for it.
+    installed(doc, lib, "Other");
+    CHECK(relinkBrush(doc, "Gone", made.id, note, lib.paths()) < 0);
+}
+
+TEST(brush_files_get_their_own_identity) {
+    LibraryFixture lib("slotcopy");
+    // A file from an older version (no id) gets one on load, written back, and it reads back as the same brush.
+    writeBrush(lib.user / "Old.sfbrush", "Old", 0.3f);
+    Document a;
+    CHECK(loadBrushLibrary(a, lib.paths()).empty());
+    const BrushRecipe* old = find(a, "Old");
+    CHECK(old && !old->id.empty());
+    BrushRecipe disk;
+    std::string err;
+    CHECK(readBrushFile((lib.user / "Old.sfbrush").string(), disk, err) && disk.id == old->id && disk.depth == 0.3f);
+    // The same file copied (a duplicate in the folder): the copy gets an identity of its own.
+    fs::copy_file(lib.user / "Old.sfbrush", lib.user / "Old (copy).sfbrush");
+    writeIdBrush(lib.user / "Old (copy).sfbrush", "Old (copy)", disk.id);
+    Document b;
+    loadBrushLibrary(b, lib.paths());
+    const BrushRecipe* one = find(b, "Old");
+    const BrushRecipe* two = find(b, "Old (copy)");
+    CHECK(one && two && one->id != two->id && !one->id.empty() && !two->id.empty());
+    CHECK(one->id == disk.id || two->id == disk.id); // one keeps the original identity
+}
