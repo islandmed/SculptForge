@@ -6,6 +6,33 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Pop-up colours** (Preferences > Interface > Look): pop-ups get a colour by role (a strip across the top, an edge,
+  a tinted title bar and an icon after the title, on a surface one step lighter than the panels): tips and help blue,
+  the welcome and the quick tour teal, What's New, the new-look card and the membership cards the SculptForge orange
+  in every look, licence and merge confirmations amber, deletes and discards red. The colours follow every look and
+  scheme (Classic, Forge Terminal, Phosphor, Blueprint, Match my Omarchy theme, light themes too), and each one is
+  checked for AA contrast on its pop-up. **Plain** draws pop-ups as before; nothing moves either way. The User Guide
+  (in the app and on the website) colours its callouts the same way, each with an icon and its label (Tip teal, Note
+  blue, Not yet and Warning amber, Important red), and gives each part of the guide its own accent: the contents, the
+  headings, See also and the previous / next cards.
+
+### Changed
+- **Subdivide** writes a line to the log (triangles before and after, and how long it took), so a report that ends in
+  a refused Subdivide shows what the presses before it made.
+
+### Fixed
+- On Windows, saving could fail with "Access is denied" and your settings, shelf layout, brush edits or recent
+  projects were silently lost on the next start (reports from noved_ and rand_gogh on Discord). Start-up no longer
+  keeps the settings file open while it saves it, and every save that replaces a file now waits and retries for about
+  a second when the file is busy (a virus scanner, a sync client) or marked read-only, and finally writes over it
+  directly. If a save still can't land, the status bar says which file.
+- **A thin shell no longer shows dark specks while you orbit.** Make Shell on a dense model and a thin Thickness:
+  while the view moved (Fast Navigation) or the model drew its lighter preview, the two faces of the shell were
+  treated as one surface, so the inner face's dark side showed through as specks, or the shell collapsed to a single
+  sheet; they cleared up at rest. A thin shell now keeps its faces apart in the moving preview and draws in full where
+  the lighter preview would merge them. A user report.
+
 ## [0.12.15] - 2026-11-13
 
 ### Changed

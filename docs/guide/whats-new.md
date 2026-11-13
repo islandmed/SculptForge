@@ -5,6 +5,20 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.16
+
+```features
+date: unreleased
+highlight: Pop-ups and the guide in colour by role
+```
+
+- **Pop-up colours**: pop-ups now stand out from the panels, each kind in its own colour with an icon: tips blue, the
+  welcome and the quick tour teal, What's New orange, warnings amber, deletes red. **Preferences > Interface > Look >
+  Pop-up colours > Plain** keeps the old look. The User Guide's tips, notes and warnings get the same colours and
+  icons, and each part of the guide has its own accent.
+- **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
+  names the file instead of staying quiet.
+
 ## Version 0.12.15
 
 ```features
