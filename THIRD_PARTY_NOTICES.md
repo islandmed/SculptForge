@@ -24,7 +24,7 @@ licenses require.
 | [Noto Sans CJK TC and SC](https://github.com/notofonts/noto-cjk) | 2.004 | SIL Open Font License 1.1 | The Chinese glyphs of the Traditional and Simplified Chinese interfaces: one subset per script with only the characters the translation uses (tools/i18n/subset_cjk_font.py), embedded in the desktop app. Vendored in assets/fonts (NotoSansTC-UI.otf, NotoSansSC-UI.otf, license NotoSansCJK-OFL.txt). |
 | Colour schemes of the Forge Terminal look: [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme), [Catppuccin](https://github.com/catppuccin/catppuccin) (Mocha), [Gruvbox](https://github.com/morhetz/gruvbox) (dark), [Nord](https://github.com/nordtheme/nord), [Rosé Pine](https://github.com/rose-pine/rose-pine-theme), [Kanagawa](https://github.com/rebelot/kanagawa.nvim), [Everforest](https://github.com/sainnhe/everforest) (dark) | colour values only | MIT License (each) | The published colour values of each scheme, as data in src/app/LookSchemes.cpp. No code from these projects is included. Credited with thanks below. |
 | [Poly Haven](https://polyhaven.com) HDRIs: Brown Photostudio 02, Studio Small 09 (Sergej Majboroda), Kloofendal 48d Partly Cloudy (Pure Sky) (Greg Zaal, sky edits by Jarod Guest) | 1K files, downsampled to 512 x 256 | CC0 1.0 (public domain) | Image-based lighting of the PBR viewport (Material > Viewport Shading). Vendored in assets/hdri and embedded. |
-| [MakeHuman](https://github.com/makehumancommunity/makehuman) base mesh hm08 and shape targets | commit a8bc2d5 (makehuman/data/3dobjs/base.obj, SHA-256 8e761e66...; 23 makehuman/data/targets/*.target files, tools/starter/makehuman-targets.sha256; licence text third_party/makehuman/LICENSE.ASSETS.md) | CC0 1.0 (public domain) | The human starter meshes (head, bust, full body, Human (male), hand, foot, ear, stylised head, torso), cut and reshaped by tools/starter/build_starter_meshes.py into assets/starter (embedded). Only the CC0 mesh asset is used, no MakeHuman code (AGPL). See docs/starter-meshes.md. |
+| [MakeHuman](https://github.com/makehumancommunity/makehuman) base mesh hm08 and shape targets | commit a8bc2d5 (makehuman/data/3dobjs/base.obj, SHA-256 8e761e66...; 32 makehuman/data/targets/*.target files, tools/starter/makehuman-targets.sha256; licence text third_party/makehuman/LICENSE.ASSETS.md) | CC0 1.0 (public domain) | The human starter meshes (head, bust, full body, Human (male), hand, foot, ear, stylised head, torso), cut and reshaped by tools/starter/build_starter_meshes.py into assets/starter (embedded). Only the CC0 mesh asset is used, no MakeHuman code (AGPL). See docs/starter-meshes.md. |
 | [ICT-FaceKit](https://github.com/ICT-VGL/ICT-FaceKit) (ICT Face Model Light) | commit on master, 2020 | MIT License | The template head of Generate Facial Shapes (Tool > Facial Shapes): its neutral skin, mouth and eye sockets and its 53 ARKit-style expression shapes, converted by tools/face/build_ict_template.py into assets/face/ict-arkit.sfface (embedded). Not the separately licensed full ICT Face Model. |
 | [libcurl](https://curl.se) | system library | curl License (MIT/X derivate) | HTTPS for optional AI features on Linux and macOS. Linked dynamically from the operating system; Windows uses the built-in WinHTTP instead. |
 | [QR Code generator](https://github.com/nayuki/QR-Code-generator) | 1.8.0 | MIT License | The phone link's pairing QR code (File > Capture from phone). Vendored in third_party/qrcodegen. |
@@ -811,32 +811,41 @@ LICENSE.ASSETS.md (https://creativecommons.org/publicdomain/zero/1.0/legalcode).
 given here as thanks. The CC0 text as the repository ships it (LICENSE.ASSETS.md at that commit) is in
 third_party/makehuman/LICENSE.ASSETS.md.
 
-The **Human (male, A-pose)** starter mesh is built from the same base mesh and 23 of MakeHuman's shape targets, downloaded
+**Base mesh derived from MakeHuman (CC0).** The **Human (male, A-pose)** starter mesh is built from the same base mesh and 32 of MakeHuman's shape targets, downloaded
 2026-11-12 from the official repository at the same commit, `makehuman/data/targets/` + (SHA-256 of each in
 tools/starter/makehuman-targets.sha256):
 `macrodetails/caucasian-male-young.target`,
 `macrodetails/asian-male-young.target`,
 `macrodetails/african-male-young.target`,
 `macrodetails/universal-male-young-maxmuscle-averageweight.target`,
+`macrodetails/proportions/male-young-maxmuscle-averageweight-idealproportions.target`,
+`macrodetails/proportions/male-young-averagemuscle-averageweight-idealproportions.target`,
 `torso/torso-vshape-incr.target`,
 `torso/torso-muscle-pectoral-incr.target`,
 `torso/torso-muscle-dorsi-incr.target`,
 `stomach/stomach-tone-incr.target`,
 `pelvis/pelvis-tone-incr.target`,
+`measure/measure-waist-circ-decr.target`,
 `measure/measure-shoulder-dist-incr.target`,
-`measure/measure-neck-circ-incr.target`,
-`measure/measure-thigh-circ-incr.target`,
+`neck/neck-scale-horiz-decr.target`,
+`hip/hip-scale-horiz-decr.target`,
+`measure/measure-hips-circ-decr.target`,
+`measure/measure-thigh-circ-decr.target`,
 `measure/measure-calf-circ-incr.target`,
 `armslegs/l-upperarm-muscle-incr.target`,
 `armslegs/l-lowerarm-muscle-incr.target`,
 `armslegs/l-upperarm-shoulder-muscle-incr.target`,
 `armslegs/l-upperleg-muscle-incr.target`,
 `armslegs/l-lowerleg-muscle-incr.target`,
+`armslegs/l-leg-valgus-incr.target`,
+`armslegs/l-hand-fingers-distance-decr.target`,
 `armslegs/r-upperarm-muscle-incr.target`,
 `armslegs/r-lowerarm-muscle-incr.target`,
 `armslegs/r-upperarm-shoulder-muscle-incr.target`,
 `armslegs/r-upperleg-muscle-incr.target`,
 `armslegs/r-lowerleg-muscle-incr.target`,
+`armslegs/r-leg-valgus-incr.target`,
+`armslegs/r-hand-fingers-distance-decr.target`,
 Section C of LICENSE.md names "targets and modifiers" among the assets released under CC0 1.0 Universal. Thanks to the
 MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier and contributors) for them. The MakeHuman program code
 (AGPL) is not used. The starter meshes in assets/starter made from it are released under CC0 too.

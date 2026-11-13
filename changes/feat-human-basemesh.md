@@ -10,4 +10,3 @@ testers:
   - Geometry > Divide twice more: the forms hold (no pinching at the armpits, crotch, fingers), still smooth.
   - Side view (Numpad 3): the arms hang in the body's plane, not reaching forward; Paint > Texture: UVs are there (no "no UVs" prompt).
 ---
-Reference image stays private (forgebot only). Shape = 23 CC0 MakeHuman targets + our forearm swing; no rival assets.
