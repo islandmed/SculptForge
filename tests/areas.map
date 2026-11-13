@@ -33,6 +33,7 @@ ui_e2e_export_*             io
 ui_e2e_prefs_*              io
 ui_e2e_quit_*               ai
 e2e_quit_*                  ai
+e2e_record_clip            io
 ui_e2e_*                    sculpt
 ui_cloth*                   cloth
 ui_garment*                 cloth
