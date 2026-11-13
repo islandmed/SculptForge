@@ -969,6 +969,14 @@ release_card() {
         printf '   WARNING: no release card for %s (%s missing): the Discord post goes out without it; launch.py card %s builds it\n' "$V" "$src" "$V"
         return 0
     fi
+    # owner 11-12 16:45: every announcement image is NEW; the CMO's used-images log refuses a picture that went out for another release
+    # (only an explicit REFUSED stops the card; a missing or crashing checker never blocks a release)
+    if [ -f "$HOME/Work/.sf/social/usedimg.py" ] && ! out=$(python3 "$HOME/Work/.sf/social/usedimg.py" check "$src" --ctx "release:$V" 2>&1); then
+        case $out in REFUSED*)
+            printf '   WARNING: the release card is a picture already used (the Discord post goes out without it):\n      %s\n' "$out"
+            return 0 ;;
+        esac
+    fi
     mkdir -p "${dst%/*}" && cp "$src" "$dst" && lockretry git add "$dst" || { printf '   WARNING: could not stage the release card %s\n' "$dst"; return 0; }
     if out=$(python3 tools/check_marks_media.py 2>&1); then
         for f in tools/marks_media_cache.json tools/marks_media_flagged.txt; do [ ! -f "$f" ] || lockretry git add "$f"; done
