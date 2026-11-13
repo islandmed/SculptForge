@@ -16,7 +16,31 @@ highlight: AI agents connected over MCP reach fine detail such as pores and wrin
 highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
 highlight: Windows laptops with two graphics chips start SculptForge on the faster one
 highlight: The Clay live preview matches the final stroke, and Help > Copy log to clipboard helps with problem reports
+highlight: A sculpt-ready human base mesh
+highlight: Japanese interface
+highlight: AI agents sculpt down to pores and wrinkles
 ```
+
+- **Human (male, A-pose)** starter mesh: an athletic adult man, 180 cm, clean quads with edge loops at the eyes, mouth
+  and joints, UVs, ready to sculpt (**File > New from Starter Mesh**). Built from the CC0 MakeHuman base mesh and
+  shape targets.
+- **Japanese**: the whole interface in Japanese, from **Edit > Preferences > Interface > Language**; computers set to
+  Japanese start in it. A first translation: **native review wanted**, tell us what reads wrong in #testers or an
+  issue.
+- **AI agents reach fine detail**: an AI tool connected over MCP now gets a step-by-step route to finished detail (how
+  dense the mesh must be at each stage, brush sizes), **detail_pass** for pores, skin, wrinkles, scales and scars over
+  a region in one undo step, detail presets for strokes (Detail Crease, Detail Wrinkle, Detail Pores...) and
+  **view_closeup** to look at one spot up close.
+- **Clay:** the live stroke preview now matches the final result (it was drawn too strong).
+- **Masks on Micro levels** now hold: Move no longer pushes masked areas, and the Kelvin brushes and Detail Clone
+  leave a masked Micro level alone where the mask is.
+- **Paint across subdivision levels**: a paint stroke on a lower level blends into the finer detail above it at the
+  stroke's strength. Fine dots and edges the stroke did not touch keep their exact colour (no more black dots or pale
+  halos).
+- **A brush on your shelf stays on your shelf**: rename the brush, sort its file into a folder, or change its name in
+  the file, and the shelf slot still finds it.
+- **Customize Shelves**: Guide Strength, Target Quads (Remesh) and Level (Geometry) can be dragged onto a shelf with
+  Ctrl+Alt+drag, like Voxel Resolution.
 
 ## Version 0.12.12
 

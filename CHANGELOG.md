@@ -6,6 +6,78 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Help > Copy log to clipboard**: copies the last 60 lines of the log as text, to paste into a problem report where
+  the file can't be found or attached (Android hides its app folder from the Files app).
+- **Human (male, A-pose)** starter mesh (File > New from Starter Mesh, Library > Tool > Starter meshes,
+  `new_starter_mesh name=human-male`): an athletic adult man in A-pose, 180 cm, all quads (13 378 at the base cage)
+  with edge loops round the eyes, mouth, shoulders, elbows, knees, fingers and toes, UVs, exactly symmetric, opened
+  with two subdivision levels; the muscle definition (pec shelf, abs, obliques, deltoids, quads, calves) is a sculpt
+  layer called Definition you can turn down. Built from the CC0 MakeHuman base mesh and its shape targets by
+  tools/starter, the definition sculpted with our own brushes (not sculpted from scratch); docs/starter-meshes.md has
+  the recipe and provenance.
+- **Japanese interface** (日本語): menus, palettes, shelves, tooltips, Preferences, first-run and messages (3,200 texts),
+  with the kana and kanji drawn from a bundled Noto Sans CJK JP subset (+170 KB). Brush, tool and product names stay
+  in English. Computers whose language is Japanese start in it (OS-locale pick on the first start). Machine-translated
+  and cross-checked; native review wanted.
+- Japanese and Chinese text wraps at line ends without a closing mark (、。」) starting a line, an opening mark (「（)
+  ending one, or a Latin name such as "Forge Spheres" cut in the middle.
+- **Fine detail for AI agents (MCP)**: the server's instructions and the creature-head recipe walk an agent through
+  block-out, secondary forms at about 1M triangles and detail at 3-6M, with brush sizes for each stage.
+  **detail_pass** (pores, skin, wrinkles, scales, scars over a region or the whole Part; seeded, one undo step)
+  refuses a mesh too coarse for the detail and says how far to subdivide. Detail presets (Detail Crease, Detail
+  Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar) work as brush names in stroke and stroke_screen
+  without changing the user's alpha. **view_closeup** renders one spot up close along the surface, lit low, and
+  reports the triangles there and the finest detail the mesh holds (read-only; in live mode the user's view doesn't
+  move). Both servers, local only.
+- **`--ui-test x.sfui --record out.mp4`**: a UI test script also writes every frame to a small mp4 (crf 23, `--fps`
+  and `--size` honoured; needs ffmpeg), for before and after clips of a bug. `--ui-record` keeps the real-time
+  launch-clip mode.
+- Windows laptops with two graphics chips (Intel and NVIDIA or AMD) now start SculptForge on the faster one without a
+  setting; **Preferences > Performance > Graphics card** and Windows' own graphics settings still decide if you pick
+  one.
+- **Shelf sliders** (masterfull95 on Discord): in Customize Shelves, Ctrl+Alt+drag on Guide Strength and Target Quads
+  (Tool > Remesh) or Level (Tool > Geometry) drops the slider onto a shelf; it works there and is kept across
+  restarts.
+
+### Changed
+- **Tool > Geometry > Micro Detail**: before Add Micro, the slider reads **New Micro 2 (83M)**: what Add Micro would
+  make, not a level the mesh already has.
+- A Japanese Get started page (sculptforge.app/getting-started-ja.html: download, switching the interface to 日本語, the
+  first sculpt, basic keys, community) and a languages line under the download buttons.
+
+### Fixed
+- **Android**: a mesh shader variant the graphics driver refuses to build no longer leaves the model undrawn without a
+  word: the app logs it once and draws with the next simpler variant, and the log now lists the GL vendor, shader
+  language and limits (reports of a missing 3D model on two phones had no log to go on).
+- **Android**: the welcome window fits a phone screen (its X and Close button were off the screen on a Pixel), no side
+  panel opens on a screen as narrow as a phone held upright (one opened by dragging an edge took the whole screen and
+  could not be closed again), the starting model is framed into the 3D view on a phone held upright (it filled the
+  narrow view edge to edge) and again when the phone is turned, the launcher icon is the same cube on its dark tile,
+  shaped by the launcher (it sat inside a white circle), and a touch whose lift was lost (switching apps, rotating,
+  split screen) no longer leaves later touches ignored.
+- **The Clay preview drew too much while you sculpted** (below the default Intensity, up to 1.4x the final pull): the
+  stroke changed when the result caught up. The live preview now uses the same pull and plane as the final result.
+  Clay Block's preview now follows its square tip and pull too, so it changes less when the result catches up.
+- **Masks on Micro levels**: Move, the elastic Kelvin brushes and Detail Clone deformed the base mesh under a Micro
+  level, which did not see the mask painted on the Micro level, so masked areas (a sphere's eyes) still moved. Masked
+  areas now stay exactly where they are, with the soft edge of the painted mask, and a partial mask scales the move. A
+  Move that reaches a mask moves the surface along its normals for that stroke (as Move along normals does); the
+  Kelvin brushes and Detail Clone do nothing near a mask on a Micro level (a hint in the status line says so; they
+  work as before elsewhere). A mask set on the Part itself (not painted on the Micro level) also protects the Micro
+  detail. Reported by a user.
+- **Vertex paint across subdivision levels**: a low-opacity stroke at a low level darkened the fine detail painted on
+  a higher level to black and left a pale halo around it, because the low level's colour difference was added on top
+  of detail that was not that colour. The stroke now goes up as the same blend (old colour toward the stroke colour at
+  the stroke's amount), so detail it does not reach is unchanged and no channel ends outside the old and stroke
+  colours.
+- A bottom-shelf slot for one of your brushes no longer shows "missing" while the brush file is still on disk
+  (rand_gogh on Discord). Each brush file now carries a hidden id, and the slot follows that id, so renaming the
+  brush, moving its file into a folder inside the brush library, or a change of upper/lower case in its name no longer
+  breaks the slot. Brush files from older versions get their id the first time the library loads (the file is saved
+  again, with a copy in backups/). A brush you really deleted still shows "missing" and the slot stays until you
+  remove it.
+
 ## [0.12.12] - 2026-11-12
 
 ### Added

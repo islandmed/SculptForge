@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.12 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.13 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "")
+set(SCULPTFORGE_PRERELEASE "beta.1")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
