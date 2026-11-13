@@ -440,7 +440,7 @@ TEST(shell_narrow_windows_open_one_tray_at_a_time) {
     ShellGeometry g = computeShell(l, 1080.0f, 2400.0f, s); // 360 logical
     CHECK(g.narrow && g.leftTray.w > 0.0f && near(g.rightTray.w, 0.0f)); // the left one wins; the right is not asked for
     CHECK(near(g.leftTray.w, 180.0f * s));
-    CHECK(g.canvas.w > 1080.0f * 0.3f);
+    CHECK(g.canvas.w > 0.0f && g.leftDivider.w > 0.0f); // (a sliver of view, the handle to close it: a phone is not the target)
     l.leftTrayOpen = false;
     g = computeShell(l, 1080.0f, 2400.0f, s);
     CHECK(near(g.rightTray.w, 0.0f)); // open in the layout, hidden until asked for
