@@ -354,6 +354,81 @@ TEST(motion_proxy_is_closed_and_light) {
     CHECK(clusterProxy(h, order, 0, order.clusterTriangles(0), proxy, b) && proxy.empty());
 }
 
+TEST(motion_proxy_keeps_thin_shell_faces_apart) {
+    // A thin shell (Make Shell: an outer and an inner face a fraction of an edge apart): the motion proxy snaps vertices to the
+    // cells of a grid a few edges wide, and a cell holding both faces took one vertex for both, so proxy triangles mixed the faces
+    // (specks while the view moved, Discord 11-12). No proxy triangle may touch both faces, and the shell's proxy folds over no
+    // more than the single surface's does.
+    Mesh base = makeBenchSphere(120000);
+    const size_t nv = base.vertexCount();
+    double edge = 0.0;
+    for (const glm::uvec3& tri : base.triangles) edge += glm::distance(base.positions[tri.x], base.positions[tri.y]);
+    edge /= double(base.triangleCount());
+    const float thickness = float(edge) * 0.15f; // (a tenth of the grid cell and less)
+    Mesh m;
+    m.positions = base.positions;
+    m.triangles = base.triangles;
+    for (size_t v = 0; v < nv; ++v) {
+        const glm::vec3 p = base.positions[v];
+        m.positions.push_back(p - glm::normalize(p) * thickness);
+    }
+    for (const glm::uvec3& tri : base.triangles) m.triangles.push_back(glm::uvec3(tri.x, tri.z, tri.y) + glm::uvec3(uint32_t(nv)));
+    m.recomputeAllNormals();
+    base.recomputeAllNormals();
+    // (Triangles of `mesh`'s proxies that mix the faces of a shell whose outer face is the vertices below `outerCount`, and those
+    // facing against the radial direction a closed sphere's or a shell's faces have.)
+    auto count = [](const Mesh& mesh, size_t outerCount, size_t& mixed, size_t& flipped, size_t& total) {
+        UploadOrder order;
+        order.build(mesh);
+        std::vector<uint16_t> proxy;
+        for (uint32_t c = 0; c < order.clusters().size(); ++c) {
+            ClusterBounds b = clusterBounds(mesh, order, c);
+            if (!clusterProxy(mesh, order, c, order.clusterTriangles(c) / 4, proxy, b)) continue;
+            const auto& cl = order.clusters()[c];
+            for (size_t i = 0; i < proxy.size(); i += 3) {
+                uint32_t v[3];
+                for (int k = 0; k < 3; ++k) v[k] = order.fromGpu()[cl.firstVertex + proxy[i + size_t(k)]];
+                ++total;
+                const bool outer = v[0] < outerCount;
+                mixed += (v[1] < outerCount) != outer || (v[2] < outerCount) != outer;
+                const glm::vec3 n = glm::cross(mesh.positions[v[1]] - mesh.positions[v[0]], mesh.positions[v[2]] - mesh.positions[v[0]]);
+                const glm::vec3 centre = (mesh.positions[v[0]] + mesh.positions[v[1]] + mesh.positions[v[2]]) / 3.0f;
+                flipped += (glm::dot(n, centre) > 0.0f) != outer;
+            }
+        }
+    };
+    size_t mixed = 0, flipped = 0, total = 0, bm = 0, bf = 0, bt = 0;
+    count(m, nv, mixed, flipped, total);
+    count(base, base.vertexCount(), bm, bf, bt);
+    std::printf("  thin shell proxy: %zu triangles, %zu mixing the faces, %zu facing the wrong way (a single sphere's: %zu of %zu)\n",
+                total, mixed, flipped, bf, bt);
+    CHECK(total > 0);
+    CHECK(mixed == 0);
+    {
+        UploadOrder order;
+        order.build(m);
+        const CoarseLevels L = buildCoarseLevels(m, order);
+        size_t cellsMixing = 0, cells = L.levels[0].keys.size();
+        for (uint32_t k = 0; k < cells; ++k) {
+            bool outer = false, inner = false;
+            for (uint32_t i = L.memberFirst[k]; i < L.memberFirst[k + 1]; ++i) (L.members[i] < nv ? outer : inner) = true;
+            cellsMixing += outer && inner;
+        }
+        std::printf("  thin shell coarse level 0: %zu of %zu cells hold both faces\n", cellsMixing, cells);
+        // No level a cluster keeps may have a triangle on a cell that holds both faces (at any level: through the parents).
+        std::vector<uint8_t> faces(L.positions.size(), 0);
+        for (size_t v = 0; v < m.vertexCount(); ++v)
+            for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) faces[k] |= v < nv ? 1 : 2;
+        size_t bad = 0, kept = 0;
+        for (const CoarseLevels::Lod& lod : L.clusters)
+            for (int level = 0; level < lod.levels; ++level, ++kept)
+                for (uint32_t i = lod.first[level]; i < lod.first[level] + lod.count[level]; ++i) bad += faces[L.indices[i]] == 3;
+        std::printf("  thin shell coarse levels kept: %zu, indices on a cell with both faces: %zu\n", kept, bad);
+        CHECK(bad == 0);
+    }
+    CHECK(double(flipped) / double(total) <= 1.5 * double(bf) / double(bt) + 0.002);
+}
+
 namespace {
 
 // Every cell point the mean of its vertices where they are now (the build's membership: a vertex's level-0 cell,

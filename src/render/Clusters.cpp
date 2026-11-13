@@ -176,6 +176,7 @@ struct CellTable {
     std::vector<uint32_t> stamps = std::vector<uint32_t>(kSize, 0);
     std::vector<uint16_t> reps = std::vector<uint16_t>(kSize);
     std::vector<float> dists = std::vector<float>(kSize);
+    std::vector<glm::vec3> normals = std::vector<glm::vec3>(kSize); // of the vertex that opened the cell
     uint32_t stamp = 0;
     void clear() {
         if (++stamp == 0) {
@@ -231,6 +232,7 @@ bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t
     if (!(cell > 0.0f)) return false;
     thread_local CellTable cells;
     thread_local std::vector<uint32_t> cellOfVertex;
+    const bool haveNormals = mesh.normals.size() == mesh.vertexCount();
     cellOfVertex.resize(nl);
     rep.resize(nl);
     for (int attempt = 0; attempt < 4; ++attempt, cell *= 1.6f) {
@@ -241,15 +243,20 @@ bool clusterProxy(const Mesh& mesh, const UploadOrder& order, uint32_t c, size_t
             const glm::vec3 p = pos(l);
             const glm::vec3 q = glm::floor((p - box.min) * inv);
             const glm::vec3 centre = box.min + (q + 0.5f) * cell;
-            const uint64_t key = uint64_t(uint32_t(q.x)) | (uint64_t(uint32_t(q.y)) << 21) | (uint64_t(uint32_t(q.z)) << 42);
+            uint64_t key = uint64_t(uint32_t(q.x)) | (uint64_t(uint32_t(q.y)) << 21) | (uint64_t(uint32_t(q.z)) << 42);
             const float d = glm::distance(p, centre);
+            const glm::vec3 nrm = haveNormals ? mesh.normals[fromGpu[cl.firstVertex + l]] : glm::vec3(0.0f);
             bool found = false;
-            const uint32_t h = cells.slot(key, found);
+            uint32_t h = cells.slot(key, found);
+            // The other face of a thin shell (its normal turned away from the one that opened the cell) is a cell of its own:
+            // one vertex for both faces would mix them (specks while the view moves).
+            if (found && glm::dot(nrm, cells.normals[h]) < 0.0f) h = cells.slot(key ^ (uint64_t(1) << 63), found), key ^= uint64_t(1) << 63;
             if (!found) {
                 cells.stamps[h] = cells.stamp;
                 cells.keys[h] = key;
                 cells.reps[h] = uint16_t(l);
                 cells.dists[h] = d;
+                cells.normals[h] = nrm;
             } else if (d < cells.dists[h]) {
                 cells.reps[h] = uint16_t(l);
                 cells.dists[h] = d;
@@ -388,6 +395,7 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
     // Room on the grid for the mesh to move a little (as PositionGrid's margin).
     L.origin = box.min - (box.max - box.min) * 0.125f - glm::vec3(L.cell);
     const bool hasNormals = mesh.normals.size() == nv;
+    std::vector<uint8_t> mixedCell; // per cell (as positions): its vertices' normals cancel (the two faces of a thin shell)
     // The cells of each level: the sorted keys of the vertices' cells, each once.
     std::vector<uint32_t> cellOfVertex(nv);
     for (int level = 0; level < CoarseLevels::kMaxLevels; ++level) {
@@ -425,6 +433,8 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
         for (size_t k = 0; k < cells; ++k) {
             L.positions.push_back(glm::vec3(sum[k] / double(std::max(weight[k], 1u))));
             const float l = glm::length(nsum[k]);
+            // A cell the two faces of a shell share would be one point for both: its normals cancel (a sharp corner's don't).
+            mixedCell.push_back(hasNormals && weight[k] > 1 && l < 0.25f * float(weight[k]));
             L.normals.push_back(l > 1e-12f ? nsum[k] / l : glm::vec3(0.0f, 0.0f, 1.0f));
         }
         if (cells < 64) break;
@@ -482,6 +492,9 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
             for (int level = 0; level < int(L.levels.size()); ++level) {
                 float error = 0.0f;
                 if (!clusterOnCells(L, mesh, order, uint32_t(c), level, tris, error)) break; // (every level: one is drawn for all)
+                // Thin shell: this level would put both faces on one point (specks, a collapsed sheet). The cluster has no
+                // level from here, so it draws in full whatever level the frame picks.
+                if (std::any_of(tris.begin(), tris.end(), [&](const std::array<uint32_t, 3>& m) { return mixedCell[m[0]] || mixedCell[m[1]] || mixedCell[m[2]]; })) break;
                 lod.first[lod.levels] = uint32_t(lists[c].size());
                 lod.count[lod.levels] = uint32_t(tris.size() * 3);
                 lod.error[lod.levels] = std::max(error, lod.levels > 0 ? lod.error[lod.levels - 1] : 0.0f);
