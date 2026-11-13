@@ -16,6 +16,7 @@
 # Units are centimetres, Y up, looking down +Z, the character's left is +X; every mesh is centred on X and Z
 # and stands on the ground (lowest point at Y = 0). All faces are quads.
 
+import json
 import math
 import os
 import sys
@@ -582,8 +583,10 @@ def human_parts(body, j):
 # ---------------------------------------------------------------------------
 
 HUMAN_MALE_HEIGHT = 180.0
+HUMAN_MALE_LANDMARKS = {}  # filled by human_male(): joints in the mesh's space, for the sculpt pass
 HUMAN_MALE_LEG_SHEAR = 0.076  # cm each leg point slides toward the midline per cm below the hip joint: legs straight, under the hips
 HUMAN_MALE_ARM_ANGLE = math.radians(52.92)  # the arm's line, shoulder to wrist, below horizontal (the reference's)
+HUMAN_MALE_FINGER_CLOSE = (math.radians(5.0), math.radians(5.0), math.radians(9.0))  # index, ring, little finger toward the middle
 HUMAN_MALE_THUMB_IN = math.radians(12.0)  # the thumb turned toward the index finger at its root, a relaxed hand
 HUMAN_MALE_PALM_TWIST = math.radians(90.0)
 HUMAN_MALE_FINGER_CURL = (math.radians(18.0), math.radians(12.0), math.radians(6.0))  # per knuckle, root to tip: a relaxed hand
@@ -792,6 +795,24 @@ def human_male(base_path, targets_dir):
                         verts[i] = rotate_about(verts[i], chain[k], axis, angle * w)
                 for m in range(k + 1, 5):
                     chain[m] = rotate_about(chain[m], chain[k], axis, angle)
+        # Fingers together: the index, ring and little finger turn toward the middle finger about their root, in the
+        # palm's plane (the turn direction is whichever brings the fingertip nearer the middle fingertip).
+        mid_tip = fingers[3][3]
+        for f, ang in ((2, HUMAN_MALE_FINGER_CLOSE[0]), (4, HUMAN_MALE_FINGER_CLOSE[1]), (5, HUMAN_MALE_FINGER_CLOSE[2])):
+            chain = fingers[f]
+            fdir = norm(sub(chain[3], chain[0]))
+            n_axis = norm(cross(fdir, row))  # the palm's normal
+            best = None
+            for sgn in (1.0, -1.0):
+                tip = rotate_about(chain[3], chain[0], n_axis, sgn * ang)
+                d = length(sub(tip, mid_tip))
+                if best is None or d < best[0]:
+                    best = (d, sgn)
+            along = norm(sub(chain[1], chain[0]))
+            for i in members[f]:
+                w = smoothstep(-0.8, 0.8, dot(sub(verts[i], chain[0]), along))
+                if w > 0.0:
+                    verts[i] = rotate_about(verts[i], chain[0], n_axis, best[1] * ang * w)
         # The thumb turns in toward the index finger about its root joint.
         thumb = [joints[f"{side}-finger-1-{k}"] for k in (1, 2, 3, 4)]
         thumb.append(add(thumb[3], mul(norm(sub(thumb[3], thumb[2])), 4.0)))
@@ -857,6 +878,11 @@ def human_male(base_path, targets_dir):
         else:
             out.append(mirror_x(scaled[m]))
     faces = [tuple(remap[i] for i, _ in f) for f in groups["body"]]
+    # Landmarks for the sculpt pass (tools/starter/human_male_sculpt.py): the left side's joints, scaled like the
+    # mesh (main() shifts them with place_on_ground's offset and writes human-male.landmarks.json).
+    global HUMAN_MALE_LANDMARKS
+    HUMAN_MALE_LANDMARKS = {k: mul(v, scale) for k, v in joints.items()
+                            if k.startswith("l-") or k in ("neck", "head", "jaw", "pelvis", "spine-1", "spine-2", "spine-3", "spine-4")}
     uv_ids = sorted({t for f in groups["body"] for _, t in f})
     if uv_ids[0] < 0:
         sys.exit("human-male: a body face has no texture coordinates")
@@ -996,7 +1022,7 @@ SET = [
     ("human-head", "Human Head", ["Head"], True, False, 2),
     ("bust", "Bust", ["Bust"], True, False, 2),
     ("full-body", "Full Body (A-pose)", ["Body"], True, True, 1),
-    ("human-male", "Human (male, A-pose)", ["Body"], True, True, 2),
+    ("human-male", "Human (male, A-pose)", ["Body"], True, True, 1),  # + the sculpt layer's level in the project
     ("hand", "Hand", ["Hand"], False, False, 2),
     ("foot", "Foot", ["Foot"], False, False, 2),
     ("ear", "Ear", ["Ear"], False, False, 2),
@@ -1075,6 +1101,12 @@ def main():
         parts = place_on_ground(meshes[mid])
         check(mid, parts, closed)
         write_obj(os.path.join(out_dir, mid + ".obj"), part_names, parts)
+        if mid == "human-male":
+            lo, hi = bounds(meshes[mid])
+            off = (-(lo[0] + hi[0]) / 2, -lo[1], -(lo[2] + hi[2]) / 2)
+            lm = {k: [round(c, 3) for c in add(v, off)] for k, v in sorted(HUMAN_MALE_LANDMARKS.items())}
+            with open(os.path.join(out_dir, "human-male.landmarks.json"), "w", encoding="utf-8", newline="\n") as fh:
+                json.dump(lm, fh, indent=1, sort_keys=True)
 
 
 if __name__ == "__main__":

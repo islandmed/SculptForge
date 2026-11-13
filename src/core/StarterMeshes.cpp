@@ -81,8 +81,9 @@ const std::vector<StarterMesh>& starterMeshes() {
         {"bust", "Bust", "Head, neck, shoulders and upper chest.", 2, true, false, SF_DATA(starterBust)},
         {"full-body", "Full Body", "A full human figure in A-pose, 167 cm tall.", 1, true, true, SF_DATA(starterFullBody)},
         {"human-male", "Human (male, A-pose)",
-         "An athletic adult man in A-pose, 180 cm, with UVs: loops round the eyes, mouth and joints, ready to sculpt.", 2,
-         true, true, SF_DATA(starterHumanMale)},
+         "An athletic adult man in A-pose, 180 cm, with UVs: loops round the eyes, mouth and joints; the muscle "
+         "definition is a sculpt layer you can turn down. Ready to sculpt.",
+         1, true, true, SF_DATA(starterHumanMale)}, // the project carries level 1 + the layer; one more on open
         {"hand", "Hand", "A left hand, raised with the palm to the front.", 2, false, false, SF_DATA(starterHand)},
         {"foot", "Foot", "A left foot and ankle.", 2, false, false, SF_DATA(starterFoot)},
         {"ear", "Ear", "A left ear with a little of the head round it, facing the front.", 2, false, false,
