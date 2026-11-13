@@ -1,13 +1,11 @@
 {
-  "version": "0.12.13",
+  "version": "0.12.14",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome",
-    "A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh",
-    "AI agents connected over MCP reach fine detail such as pores and wrinkles",
-    "Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone",
-    "Windows laptops with two graphics chips start on the faster one, and the Clay live preview matches the final stroke"
+    "A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name",
+    "On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back",
+    "On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu"
   ],
   "support": {
     "founding": {
