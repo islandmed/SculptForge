@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.13] - 2026-11-12
+
 ### Added
 - **Help > Copy log to clipboard**: copies the last 60 lines of the log as text, to paste into a problem report where
   the file can't be found or attached (Android hides its app folder from the Files app).

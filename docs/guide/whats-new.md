@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.13
 
 ```features
-date: unreleased
+date: 2026-11-12
 tagline: SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail.
 highlight: SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome
 highlight: A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh
