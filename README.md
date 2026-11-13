@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.12.14:</strong> shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways (<a href="https://sculptforge.app/guide/whats-new.html#version-01214">how it works</a>)
+  <strong>New in 0.12.15:</strong> image to 3D from an AI tool no longer freezes the window, and links on Linux open one browser window (<a href="https://sculptforge.app/guide/whats-new.html#version-01215">how it works</a>)
 </p>
 
 <p align="center">

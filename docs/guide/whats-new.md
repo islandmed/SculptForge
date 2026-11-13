@@ -8,12 +8,17 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.15
 
 ```features
-date: unreleased
+date: 2026-11-13
 tagline: Image to 3D from an AI tool no longer freezes the window, and links on Linux open one browser window.
 highlight: Image to 3D and Text to 3D from an AI tool, the console or a script run in the background with live status instead of freezing the window
 highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
 highlight: On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle
 ```
+
+- **Trays on tablets**: the Right Tray and the Left Tray open with one tap on their edge handle on tablets, held
+  either way up.
+- **Image to 3D no longer freezes the window** when an AI tool (or the console or a script) runs it: it works in the
+  background, shows its progress in the status line, and the model replaces the scene when it arrives.
 
 ## Version 0.12.14
 

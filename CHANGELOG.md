@@ -6,6 +6,30 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.15] - 2026-11-13
+
+### Changed
+- The crash log now notes a session that was ended from outside (Force Quit, the out-of-memory killer, a closed
+  session) and records the terminal, quit and CPU-limit signals; a closed pipe can no longer end the app.
+
+### Fixed
+- **Android tablets** (reported on 0.12.14-beta.2): the Right Tray never opened on a tablet window under 1280 logical
+  px (a 2000x1200 screen at UI scale 2.62 is 763), and neither tray opened upright. A narrow window now holds one tray
+  at a time (at most 40 % of its width); a tap on a tray's handle opens it (closing the other) and a second tap closes
+  it. A timeline track narrower than its margins no longer loops forever. Wider windows and the mouse behave as
+  before.
+- **Image to 3D / Text to 3D from an AI tool, the console or a script** no longer froze the whole window for the 30
+  seconds to several minutes a hosted model takes, with no sign of progress (it looked like a crash, and
+  force-quitting left no trace). The call now runs in the background with live status; the result opens when it
+  arrives, and if the scene changed meanwhile nothing is replaced.
+- **Free Hugging Face models** that are down, asleep or not answering no longer wait up to 15 minutes: after 4 minutes
+  queued (or 7 minutes running) it says which model isn't answering and the next free Hunyuan3D model runs instead,
+  with a note.
+- Support, the website and other links opened from SculptForge on Linux (the AppImage on Omarchy) no longer start a
+  pile of crashing Chromium windows. The browser now starts in the environment SculptForge was launched with, without
+  the AppImage's own library paths, once per click (the same link twice within 2 seconds opens once), and also for the
+  folders the app opens in your file manager.
+
 ## [0.12.14] - 2026-11-13
 
 ### Fixed
