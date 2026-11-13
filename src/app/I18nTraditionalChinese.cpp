@@ -5317,7 +5317,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"AO softness", "AO 柔和度"},
     {"AO strength", "AO 強度"},
     {"Ambient occlusion", "環境遮蔽"},
-    {"Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has room for it (Standard tier and up).", "模型周圍光線照不到的摺痕與凹陷會變暗。自動：顯示卡有餘裕時開啟（Standard 級以上）。"},
+    {"Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has room for it (Standard tier and up).", "模型周圍光線照不到的摺痕與凹陷會變暗。自動：顯示卡效能足夠時開啟（Standard 級以上）。"},
     {"How dark the occlusion gets.", "遮蔽變暗的程度。"},
     {"How soft and wide the occlusion looks.", "遮蔽看起來多柔和、多寬。"},
     {"How soft the shadows' edges are.", "陰影邊緣有多柔和。"},
@@ -5325,7 +5325,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Shadows", "陰影"},
     {"Shadows & AO", "陰影與 AO"},
     {"Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", "陰影與環境遮蔽也用於 Lit Sphere 與攝影棚著色，不只在 PBR 檢視。"},
-    {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "主光投下的陰影：鼻子落在臉頰、眉骨落在眼睛上。自動：顯示卡有餘裕時開啟（Standard 級以上）。若影格需要，環繞或雕刻時會暫時讓出。"},
+    {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "主光投下的陰影：鼻子落在臉頰、眉骨落在眼睛上。自動：顯示卡效能足夠時開啟（Standard 級以上）。若影格需要，環繞或雕刻時會暫時讓出。"},
     {"With Lit Sphere shading", "搭配 Lit Sphere 著色"},
 };
 
