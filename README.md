@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.12.13:</strong> SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail (<a href="https://sculptforge.app/guide/whats-new.html#version-01213">how it works</a>)
+  <strong>New in 0.12.14:</strong> shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways (<a href="https://sculptforge.app/guide/whats-new.html#version-01214">how it works</a>)
 </p>
 
 <p align="center">

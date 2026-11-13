@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.14] - 2026-11-13
+
 ### Fixed
 - **Android**: the welcome window on a phone held sideways ran off the bottom of the screen with **Close** below the
   fold, and a finger could only drag the window, not scroll it, so only the small X in its title bar closed it
@@ -14,6 +16,11 @@ All notable changes to SculptForge are listed here. The format follows
   scrolls, it doesn't press it), and Back closes it, the membership card, What's New and the quick tour.
 - **Help > Copy log to clipboard** was only in the command search (F3); it is now in the Help menu too, where an
   Android tester who can't open the app's folder looks for it.
+- A bottom-shelf slot for one of your brushes still showed "missing" after a restart when the brush's name held one of
+  the old words SculptForge renamed in 2026 (rand_gogh on Discord; the 0.12.13 fix covered renames and moves, not
+  this). The shelf, the brush's key and its saved id now keep a brush's name exactly as you typed it, and a slot that
+  an earlier version already changed finds its brush again by itself. If a slot still finds nothing, the log now says
+  which name and id it looked for and the closest brush names.
 
 ### Changed
 - **Android**: a mesh is drawn through the extension's multi-draw only when the driver lists the extensions that
@@ -22,6 +29,13 @@ All notable changes to SculptForge are listed here. The format follows
   confirmed fixed: testers).
 - **Android**: the welcome's phone sheet needs a touch screen (a short desktop window with a mouse keeps its movable
   window).
+- The view-draw GL error log (0.12.14 beta 2) stops after the first 300 frames on every draw path; the direct window
+  draw makes no GL error query after that.
+
+### Added
+- **Tooling**: the UI test runner's step dispatch is a verb table and a switch (a 121-link `else if` chain hit MSVC's
+  block-nesting limit, C1061, on the Windows build), and `scripts/check_else_if_chains.py` fails any `else if` chain
+  of 100 or more under src/.
 
 ## [0.12.13] - 2026-11-12
 

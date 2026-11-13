@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.14
 
 ```features
-date: unreleased
+date: 2026-11-13
 tagline: Shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways.
 highlight: A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name
 highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
