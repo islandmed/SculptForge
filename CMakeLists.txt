@@ -1119,9 +1119,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
     # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
     # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    if(TEST ui_micro_levels)
-      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
-    endif()
+    # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage).
+    foreach(t ui_micro_levels ui_micro_mask_kelvin)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
+      endif()
+    endforeach()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
