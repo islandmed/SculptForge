@@ -7,12 +7,18 @@
 
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
+#include "core/FileReplace.h"
 #include "core/Project.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace sf;
 namespace fs = std::filesystem;
@@ -690,4 +696,76 @@ TEST(brush_identity_invariant_recipe_is_unchanged) {
     CHECK(readBrushFile((lib.user / "Keeps Its Look.sfbrush").string(), disk, err));
     CHECK(disk.toJson().dump() == got->toJson().dump());
     CHECK(got->toJson().dump() == BrushRecipe::fromJson(r.toJson()).toJson().dump());
+}
+
+// Every save writes next to the target and replaces it (core/FileReplace.h). On Windows a read-only target, or one something
+// else holds for a moment, made the rename fail with "Access is denied" and the save was lost (a failed write must either
+// land or tell the user which file).
+TEST(file_replace_lands_or_names_the_file) {
+    const fs::path dir = fs::temp_directory_path() / "sculptforge_filereplace";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    std::string err;
+    // A new target, and an existing one: the temp file is gone, the target holds the new bytes.
+    writeText(dir / "a.tmp", "new");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err) && err.empty());
+    writeText(dir / "a.tmp", "newer");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err));
+    std::ifstream in(dir / "a.json");
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(text == "newer" && !fs::exists(dir / "a.tmp"));
+    in.close();
+    // A read-only target (the flag a copied or synced file can carry): replaced all the same.
+    fs::permissions(dir / "a.json", fs::perms::owner_read, fs::perm_options::replace);
+    writeText(dir / "a.tmp", "after read-only");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err));
+    std::ifstream in2(dir / "a.json");
+    CHECK(std::string((std::istreambuf_iterator<char>(in2)), std::istreambuf_iterator<char>()) == "after read-only");
+    in2.close();
+    // The target held open by a reader that allows other readers and writers but not delete (what std::ifstream does on
+    // Windows: the cause of "Access is denied" at start-up when project.json was still open while it was saved).
+    {
+        writeText(dir / "held.json", "old");
+        std::ifstream holder(dir / "held.json", std::ios::binary);
+        CHECK(holder.is_open());
+        writeText(dir / "held.tmp", "after open");
+        CHECK(replaceFile(dir / "held.tmp", dir / "held.json", err));
+        holder.close();
+        std::ifstream check(dir / "held.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after open");
+    }
+#ifdef _WIN32
+    { // ... and by a second handle without FILE_SHARE_DELETE (a scanner, a sync client), opened the Win32 way.
+        writeText(dir / "held2.json", "old");
+        HANDLE h = CreateFileW((dir / "held2.json").c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, nullptr);
+        CHECK(h != INVALID_HANDLE_VALUE);
+        writeText(dir / "held2.tmp", "after handle");
+        CHECK(replaceFile(dir / "held2.tmp", dir / "held2.json", err));
+        CloseHandle(h);
+        std::ifstream check(dir / "held2.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after handle");
+    }
+#endif
+    // A target that can't be replaced (a folder is in the way): false, the error names the file, the temp file is gone.
+    fs::create_directories(dir / "blocked" / "inner");
+    writeText(dir / "b.tmp", "x");
+    CHECK(!replaceFile(dir / "b.tmp", dir / "blocked", err));
+    CHECK(err.find("blocked") != std::string::npos && !fs::exists(dir / "b.tmp"));
+    // The brush library goes through it: a read-only brush file still takes its edit.
+    LibraryFixture lib("replacero");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    BrushRecipe r;
+    r.name = "Locked";
+    std::string e2;
+    const int i = installBrush(doc, r, e2, false, lib.paths());
+    CHECK(e2.empty());
+    fs::permissions(lib.user / "Locked.sfbrush", fs::perms::owner_read, fs::perm_options::replace);
+    doc.brushes[size_t(i)].depth = 0.31f;
+    CHECK(saveBrushToLibrary(doc, i, e2, false, lib.paths()) && e2.empty());
+    BrushRecipe back;
+    CHECK(readBrushFile((lib.user / "Locked.sfbrush").string(), back, e2) && std::abs(back.depth - 0.31f) < 1e-4f);
+    fs::permissions(dir / "a.json", fs::perms::owner_all, fs::perm_options::replace);
+    fs::remove_all(dir);
 }
