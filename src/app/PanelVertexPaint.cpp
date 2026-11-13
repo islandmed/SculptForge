@@ -666,6 +666,8 @@ void App::drawViewportShadingControls() {
            "Metallic of Parts without a material texture.");
     slider("##Cavity", "cavity", &v.pbrCavity, 0.0f, 1.0f, tr("Cavity %.2f"),
            "How much the sculpt's creases darken, so detail reads under even light. 0 is plain PBR.");
+    ImGui::Spacing();
+    drawViewEffectsControls("pbr");
 }
 
 void App::drawShadingControls() {
