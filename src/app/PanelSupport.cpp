@@ -324,12 +324,27 @@ void App::drawSupportUi() {
         // Never wider or taller than the room: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the
         // screen, its X and Close with it. Between a phone's two shelves the 3D view is too narrow, so there it takes the
         // whole screen below the status bar, and the text and rows shrink to fit (`fit`); a window taller than that scrolls.
-        // A phone (short side under 600 dp, either way up) gets a sheet: it never moves, its Close row stays at the bottom and
+        // A phone (a touch screen, short side under 600 dp, either way up) gets a sheet: it never moves, its Close row stays at the bottom and
         // its content scrolls with a drag (a finger can't scroll a window that is only dragged to move: landscape at 300 %,
         // 594 px of it, Close with it, were below the screen). It stays inside the safe area (cut-out, bars, gesture area).
         const CanvasRect safe = safeRect();
         const float margin = 16.0f * uiScale_;
-        const bool sheet = std::min(safe.w, safe.h) < 600.0f * uiScale_;
+        // (Only where a finger can be the pointer: Android, a touch screen, a UI test. A short desktop window with a mouse
+        // keeps its movable window.)
+        bool touchScreen = !options_.uiTest.empty();
+#ifdef __ANDROID__
+        touchScreen = true;
+#else
+        if (!touchScreen) {
+            int touchDevices = 0;
+            if (SDL_TouchID* ids = SDL_GetTouchDevices(&touchDevices)) {
+                for (int i = 0; i < touchDevices; ++i)
+                    touchScreen |= SDL_GetTouchDeviceType(ids[i]) == SDL_TOUCH_DEVICE_DIRECT;
+                SDL_free(ids);
+            }
+        }
+#endif
+        const bool sheet = touchScreen && std::min(safe.w, safe.h) < 600.0f * uiScale_;
         CanvasRect room = safe;
         if (!sheet && c.w >= 500.0f * uiScale_ + margin) { // (the 3D view between the shelves, inside the safe area)
             const float x0 = std::max(c.x, safe.x), y0 = std::max(c.y, safe.y);

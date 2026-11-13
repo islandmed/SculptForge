@@ -2943,6 +2943,33 @@ bool Renderer::viewTarget(int width, int height, int samples) {
     return true;
 }
 
+
+// What a report needs when the view stays empty on a phone (Mali-G72 tablet, 81.9k triangles in the bar and nothing drawn,
+// 11-13): the first GL error a view draw raised (each code once; the draw's errors are otherwise cleared unlogged), and a line
+// for each of the first frames: the target, the triangles asked for, the draw calls' count.
+static void logViewFrame(const char* what, int width, int height, int samples, float scale, size_t triangles, bool fbo) {
+    static int frames = 0;
+    static unsigned seen = 0;
+    if (frames >= 300) { // (the first seconds only: the draw's errors are cleared as before, unlogged)
+        for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+        }
+        return;
+    }
+    for (int i = 0; i < 16; ++i) {
+        const GLenum e = gl::GetError();
+        if (e == GL_NO_ERROR) break;
+        const unsigned bit = 1u << (e & 15u);
+        if (!(seen & bit)) {
+            seen |= bit;
+            SDL_Log("GL error 0x%04x after drawing the view (%s; logged once per code)", unsigned(e), what);
+        }
+    }
+    if (frames < 4 || frames == 60) // (a few at the start, one a second later)
+        SDL_Log("View frame %d: %dx%d, %d samples, scale %.2f, %zu triangles drawn%s", frames, width, height, samples, double(scale), triangles,
+                fbo ? " (through the view target)" : "");
+    ++frames;
+}
+
 int Renderer::drawView(const Camera& camera, int width, int height, const RenderSettings& settings, const Viewport& viewport,
                        int samples) {
     GLint maxSamples = 1;
@@ -2966,8 +2993,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
         if (s > 1 || viewTarget(sw, sh, 1)) {
             gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
             draw(camera, sw, sh, settings, small);
-            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-            }
+            logViewFrame("scaled view", sw, sh, s, scale, lastDrawn_, true);
             gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
             gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
             gl::BlitFramebuffer(0, 0, sw, sh, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -2998,12 +3024,12 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
+        logViewFrame("window", width, height, 1, 1.0f, lastDrawn_, false);
         return 1;
     }
     gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
     draw(camera, width, height, settings, viewport);
-    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-    }
+    logViewFrame("view target", width, height, samples, 1.0f, lastDrawn_, true);
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);

@@ -3,6 +3,8 @@
 #include "render/GL.h"
 
 #ifdef SF_GLES
+#include <SDL3/SDL_log.h>
+
 #include <cstring>
 #include <string>
 #endif
@@ -52,6 +54,12 @@ void SF_GLAPI disableES(GLenum cap) { if (cap != kMultisample) esDisable(cap); }
 void SF_GLAPI polygonModeES(GLenum, GLenum) {}
 void SF_GLAPI multiDrawElementsBaseVertexES(GLenum mode, const GLsizei* counts, GLenum type, const void* const* offsets,
                                             GLsizei drawCount, const GLint* baseVertex) {
+    if (!esDrawElementsBaseVertex) { // (ES before 3.2 without the extension: never call a null entry point; say so once)
+        static bool said = false;
+        if (!said) SDL_Log("GL ES: no DrawElementsBaseVertex in this driver, the mesh is not drawn");
+        said = true;
+        return;
+    }
     for (GLsizei i = 0; i < drawCount; ++i)
         if (counts[i] > 0) esDrawElementsBaseVertex(mode, counts[i], type, offsets[i], baseVertex[i]);
 }
@@ -63,15 +71,41 @@ void SF_GLAPI getBufferSubDataES(GLenum target, GLintptr offset, GLsizeiptr size
         unmap(target);
     }
 }
+// Whether the driver lists an extension (the loader is the context's, so this runs once the context is current).
+bool hasExtensionES(const char* name) {
+    using PFN_GetIntegervES = void(SF_GLAPI*)(GLenum, GLint*);
+    using PFN_GetStringiES = const GLubyte*(SF_GLAPI*)(GLenum, GLuint);
+    const auto getIntegerv = reinterpret_cast<PFN_GetIntegervES>(esLoader("glGetIntegerv"));
+    const auto getStringi = reinterpret_cast<PFN_GetStringiES>(esLoader("glGetStringi"));
+    if (!getIntegerv || !getStringi) return false;
+    GLint n = 0;
+    getIntegerv(0x821D /* GL_NUM_EXTENSIONS */, &n);
+    for (GLint i = 0; i < n; ++i) {
+        const char* e = reinterpret_cast<const char*>(getStringi(0x1F03 /* GL_EXTENSIONS */, GLuint(i)));
+        if (e && std::strcmp(e, name) == 0) return true;
+    }
+    return false;
+}
+
 GenericProc loadES(const char* name) {
     const std::string n = name;
     if (n == "glPolygonMode") return reinterpret_cast<GenericProc>(&polygonModeES);
     if (n == "glGetBufferSubData") return reinterpret_cast<GenericProc>(&getBufferSubDataES);
     if (n == "glMultiDrawElementsBaseVertex") {
         esDrawElementsBaseVertex = reinterpret_cast<PFN_DrawElementsBaseVertex>(esLoader("glDrawElementsBaseVertex"));
+        if (!esDrawElementsBaseVertex) // (the core call is ES 3.2; before that the extension's)
+            esDrawElementsBaseVertex = reinterpret_cast<PFN_DrawElementsBaseVertex>(esLoader("glDrawElementsBaseVertexEXT"));
+        if (!esDrawElementsBaseVertex)
+            esDrawElementsBaseVertex = reinterpret_cast<PFN_DrawElementsBaseVertex>(esLoader("glDrawElementsBaseVertexOES"));
         esMultiDrawExt = reinterpret_cast<PFN_MultiDrawElementsBaseVertex>(esLoader("glMultiDrawElementsBaseVertexEXT"));
-        return esMultiDrawExt ? reinterpret_cast<GenericProc>(esMultiDrawExt)
-                              : reinterpret_cast<GenericProc>(&multiDrawElementsBaseVertexES);
+        // Android's EGL hands out an entry point for an extension function the driver doesn't have (it does nothing, and no
+        // error is raised: the mesh is "drawn" and never appears). So the extension version is used only when the driver
+        // lists the extensions that define it; otherwise one DrawElementsBaseVertex (core in ES 3.2) per range.
+        const bool listed = esMultiDrawExt && hasExtensionES("GL_EXT_multi_draw_arrays") &&
+                            (hasExtensionES("GL_EXT_draw_elements_base_vertex") || hasExtensionES("GL_OES_draw_elements_base_vertex"));
+        SDL_Log("GL ES: multi-draw %s (entry point %s)", listed ? "from the extension" : "as one draw call per range",
+                esMultiDrawExt ? "present" : "absent");
+        return listed ? reinterpret_cast<GenericProc>(esMultiDrawExt) : reinterpret_cast<GenericProc>(&multiDrawElementsBaseVertexES);
     }
     if (n == "glShaderSource") {
         esShaderSource = reinterpret_cast<PFN_ShaderSource>(esLoader(name));
