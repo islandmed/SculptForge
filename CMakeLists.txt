@@ -1231,6 +1231,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A free Space that returns no model / switched Text to 3D off (tests/ui/generate_space_refused.sfui).
     sculptforge_ui_test(generate_space_refused_1440 generate_space_refused --size 1440x900)
     sculptforge_ui_test(generate_space_refused_2880 generate_space_refused --size 2880x1800)
+    # image_to_3d / text_to_3d from a command run on a worker (tests/ui/generate_command_background.sfui).
+    sculptforge_ui_test(generate_command_background_1440 generate_command_background --size 1440x900)
+    sculptforge_ui_test(generate_command_background_2880 generate_command_background --size 2880x1800)
     sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
