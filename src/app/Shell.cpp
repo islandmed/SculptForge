@@ -2991,16 +2991,16 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         // The slot's brush: by the stable id it learned (a renamed brush, a file moved to another folder), else by name.
         const auto slotId = layout_.brushIds.find(name);
         const std::string wantId = slotId != layout_.brushIds.end() ? slotId->second : std::string();
-        int found = findBrushById(doc_, wantId);
-        for (int i = 0; found < 0 && i < int(doc_.brushes.size()); ++i)
-            if (doc_.brushes[size_t(i)].name == name) found = i;
+        int found = findBrushForSlot(doc_, name, wantId);
         if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored, moved or copied file returns it)
             double& tried = shelfBrushTried_[name];
             if (ImGui::GetTime() - tried > 3.0) {
+                const bool first = tried == 0.0;
                 tried = ImGui::GetTime();
                 std::string note;
                 found = relinkBrush(doc_, name, wantId, note);
                 if (found >= 0) status_ = note;
+                else if (first) SDL_Log("%s", describeMissingSlot(doc_, name, wantId).c_str());
             }
         } else {
             shelfBrushTried_.erase(name);

@@ -4,6 +4,7 @@
 
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/LegacyNames.h"
 #include "core/Pack.h"
 #include "core/Vdm.h"
 
@@ -280,6 +281,15 @@ std::vector<std::string> brushFilesDeep(const std::string& dir) {
     }
     std::sort(out.begin(), out.end());
     return out;
+}
+
+// A slot's name for a brush: exactly, ASCII case aside, or as an older version's layout loader spelled it (a slot saved
+// by a version that rewrote retired words inside the names of custom brushes holds today's spelling of the brush's name).
+bool sameBrushName(const std::string& brushName, const std::string& slotName) {
+    if (slotName.empty()) return false;
+    if (brushName == slotName) return true;
+    const std::string lower = lowerAscii(slotName);
+    return lowerAscii(brushName) == lower || lowerAscii(legacy::modernize(brushName)) == lower;
 }
 
 int findBrush(const Document& doc, const std::string& name) {
@@ -572,13 +582,38 @@ int findBrushById(const Document& doc, const std::string& id) {
     return -1;
 }
 
-int relinkBrush(Document& doc, const std::string& name, const std::string& id, std::string& message, const BrushLibraryPaths& paths) {
-    message.clear();
+int findBrushForSlot(const Document& doc, const std::string& name, const std::string& id) {
     if (const int i = findBrushById(doc, id); i >= 0) return i;
     if (const int i = findBrush(doc, name); i >= 0) return i;
-    const std::string lowerName = lowerAscii(name);
     for (size_t i = 0; i < doc.brushes.size(); ++i)
-        if (!lowerName.empty() && lowerAscii(doc.brushes[i].name) == lowerName) return int(i);
+        if (sameBrushName(doc.brushes[i].name, name)) return int(i);
+    return -1;
+}
+
+std::string describeMissingSlot(const Document& doc, const std::string& name, const std::string& id) {
+    auto squashed = [](const std::string& s) {
+        std::string r;
+        for (unsigned char c : s)
+            if (std::isalnum(c) || c >= 0x80) r += char(std::tolower(c));
+        return r;
+    };
+    const std::string want = squashed(name);
+    std::string close;
+    int shown = 0;
+    for (const BrushRecipe& b : doc.brushes) {
+        if (!isUserLibraryBrush(b) || shown >= 3) continue;
+        const std::string have = squashed(b.name);
+        if (have == want || (want.size() >= 4 && have.compare(0, 4, want, 0, 4) == 0)) {
+            close += (shown++ ? ", '" : " '") + b.name + "'";
+        }
+    }
+    return "Shelf slot '" + name + "' (id " + (id.empty() ? "none" : id) + ") finds no brush in the library; closest:" +
+           (shown ? close : " none");
+}
+
+int relinkBrush(Document& doc, const std::string& name, const std::string& id, std::string& message, const BrushLibraryPaths& paths) {
+    message.clear();
+    if (const int i = findBrushForSlot(doc, name, id); i >= 0) return i;
     if (paths.userDir.empty() || (name.empty() && id.empty())) return -1;
     // Not loaded: its file, wherever it lives now (user library with its folders, studio folders), then the last good copy.
     struct Source {
@@ -595,7 +630,7 @@ int relinkBrush(Document& doc, const std::string& name, const std::string& id, s
                 BrushRecipe r;
                 std::string err;
                 if (!readBrushFile(file, r, err)) continue;
-                if (byId ? r.id != id : (r.name != name && lowerAscii(r.name) != lowerName)) continue;
+                if (byId ? r.id != id : !sameBrushName(r.name, name)) continue;
                 if (findBrush(doc, r.name) >= 0) continue; // another brush has that name now: never replaces it
                 const bool user = src.backup || insideDir(file, paths.userDir);
                 r.origin.source = !user ? BrushSource::Studio : r.origin.source == BrushSource::Gallery ? BrushSource::Gallery : BrushSource::User;

@@ -98,10 +98,24 @@ inline std::string modernize(std::string_view s) {
     return out;
 }
 
+// An id or shelf item an older version saved. Like modernize, except that the name of a custom brush or a file in it
+// ("brush.recipe.<name>", "recipe:<name>", "brush.file.<path>", "file:<path>") is the user's own text and is kept as typed:
+// a brush called after an old word keeps its slot and its key (only a whole renamed built-in, kNames, is mapped).
+inline std::string modernizeId(std::string_view s) {
+    for (std::string_view prefix : {"brush.recipe.", "recipe:", "brush.file.", "file:"})
+        if (s.substr(0, prefix.size()) == prefix) {
+            for (const Name& n : kNames)
+                if (s.size() == n.length && hash(s) == n.hash) return std::string(n.now);
+            return std::string(s);
+        }
+    return modernize(s);
+}
+
 // Whether `s` holds an old word (modernize would change it).
 inline bool isOld(std::string_view s) { return modernize(s) != s; }
 
 // `j` with every object key modernized (values as they are), for a file an older version wrote.
+// Keys that are the user's own text (the shelf's brush ids, by brush name) and ids of custom brushes stay as they are.
 inline Json modernizeKeys(const Json& j) {
     if (j.isArray()) {
         Json out = Json::array();
@@ -110,7 +124,7 @@ inline Json modernizeKeys(const Json& j) {
     }
     if (!j.isObject()) return j;
     Json out = Json::object();
-    for (const auto& [k, v] : j.members()) out.set(modernize(k), modernizeKeys(v));
+    for (const auto& [k, v] : j.members()) out.set(modernizeId(k), k == "brushIds" ? v : modernizeKeys(v));
     return out;
 }
 
