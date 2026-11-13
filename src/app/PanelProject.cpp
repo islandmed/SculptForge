@@ -827,7 +827,11 @@ void App::drawProjectPopups() {
         openUnsavedPopup_ = false;
     }
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Danger);
+    const bool unsavedOpen = ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (unsavedOpen) {
+        ui::RoleStrip(theme::Role::Danger);
         const std::string name = doc_.path.empty() ? std::string("Untitled") : utf8(fsPath(doc_.path).filename());
         ImGui::Text(tr("Save changes to %s before continuing?"), name.c_str());
         ImGui::TextDisabled("%s", tr("Your changes will be lost if you don't save them."));
@@ -870,7 +874,11 @@ void App::drawProjectPopups() {
     }
     drawUpdateBanner();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool restoreOpen = ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (restoreOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextUnformatted(tr("SculptForge did not close normally last time."));
         ImGui::TextUnformatted(tr("Restore the autosaved work?"));
         if (crashlog::previousCrashed()) {
@@ -1009,7 +1017,11 @@ void App::drawUpdateBanner() {
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-    if (ImGui::Begin("##update_banner", nullptr, flags)) {
+    ui::PushRole(theme::Role::New);
+    const bool began = ImGui::Begin("##update_banner", nullptr, flags);
+    ui::PopRole();
+    if (began) {
+        ui::RoleStrip(theme::Role::New);
         // Above the floating panels (a Preferences window open over the canvas's top would hide its buttons), but
         // never over a modal dialog.
         if (!ImGui::GetTopMostPopupModal()) ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());

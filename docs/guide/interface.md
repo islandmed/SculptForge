@@ -81,6 +81,12 @@ borders, and nothing lights up under the pointer), **Off** (no borders; the gaps
 100%) fades the borders further into the panels. Hovering a control only gives that control a faint fill, never a
 bright border.
 
+**Pop-up colours** sets how pop-ups stand out from the panels. **By role** (the default) gives each kind its own
+colour, as a strip across the top, an edge and an icon beside the title, with the surface a step lighter than the
+panels: tips and help in blue, the welcome and the quick tour in teal, What's New and the membership cards in the
+SculptForge orange, warnings in amber and deletes in red. The title and the icon say the same thing, so the colour is
+never the only cue. **Plain** draws pop-ups in the panels' own colours, as before. Nothing moves either way.
+
 **The first start** shows three looks to pick from in the welcome: **Neutral**, **Forge Terminal** (Tokyo Night)
 and **Classic layout** (Classic with the palette bar). **Coming from** sets the keys and the layout together:
 Classic sculpting keys (the keys and the Classic layout), Blender, Maya or New to sculpting (their keys, the SculptForge layout).
@@ -622,7 +628,7 @@ layout saves itself.
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
+| **Look**, **Outlines**, **Pop-up colours** and **Layout** | Forge Terminal, Neutral, Subtle, By role, SculptForge | See [Looks and layouts](#looks-and-layouts) |
 | **Language** | English | The interface language: **English**, **Español**, Traditional Chinese, Simplified Chinese or **Japanese** (see below) |
 | **Show startup splash** | On | The SculptForge logo and version at every start, for half a second or more while SculptForge loads, then it fades into the main window. Turn it off for an instant start. Applies at the next start |
 | **Ctrl+hover help** | On | Ctrl-hover help boxes |

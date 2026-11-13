@@ -342,15 +342,17 @@ private:
     std::vector<Word> words_;
 };
 
+// The callouts' colours: the pop-up roles of the current look (Theme.h theme::Role, readable on it), the same
+// kinds as the website's (website/style.css): Tip teal, Note blue, Not yet and Warning amber, Important red, In short
+// orange; Experienced sculptor? violet. The label says the kind as well.
 struct CalloutLook {
     const char* label;
-    ImU32 color;
+    int role; // theme::Role, or -1: violet
 };
 constexpr CalloutLook kCallouts[] = {
-    {"Tip", IM_COL32(0x62, 0xc0, 0x7e, 0xff)},     {"Note", IM_COL32(0x6f, 0xa8, 0xe6, 0xff)},
-    {"Experienced sculptor?", IM_COL32(0xf0, 0x88, 0x2e, 0xff)},  {"Not yet", IM_COL32(0xa9, 0x90, 0xdc, 0xff)},
-    {"Warning", IM_COL32(0xe5, 0x60, 0x4a, 0xff)}, {"Important", IM_COL32(0xe5, 0x60, 0x4a, 0xff)},
-    {"In short", IM_COL32(0xf0, 0x88, 0x2e, 0xff)},
+    {"Tip", int(theme::Role::Learn)},     {"Note", int(theme::Role::Info)},        {"Experienced sculptor?", -1},
+    {"Not yet", int(theme::Role::Warning)}, {"Warning", int(theme::Role::Warning)}, {"Important", int(theme::Role::Danger)},
+    {"In short", int(theme::Role::New)},  {"New", int(theme::Role::New)},
 };
 
 Spans parseTitle(const std::string& title) {
@@ -359,12 +361,15 @@ Spans parseTitle(const std::string& title) {
     return {sp};
 }
 
-ImU32 calloutColor(const Block& b) {
+// The bar's colour, or with `ink` the label's (AA on the page).
+ImU32 calloutColor(const Block& b, bool ink = false) {
     if (b.spans.empty() || !b.spans[0].bold) return kRule();
     std::string label = b.spans[0].text;
     while (!label.empty() && (label.back() == ':' || label.back() == ' ')) label.pop_back();
     for (const auto& c : kCallouts)
-        if (label == c.label) return c.color;
+        if (label == c.label)
+            return c.role < 0 ? (ink ? IM_COL32(0xc3, 0xb1, 0xf3, 0xff) : IM_COL32(0x9a, 0x7f, 0xe0, 0xff))
+                              : theme::u32(ink ? theme::ink(theme::Role(c.role)) : theme::edge(theme::Role(c.role)));
     return kDim();
 }
 
@@ -907,7 +912,7 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
         const float pad = 10.0f * s, bar = 3.0f * s;
         const ImU32 col = calloutColor(b);
         FlowStyle cs = st;
-        cs.labelColor = col;
+        cs.labelColor = calloutColor(b, true);
         const Span* label = !b.spans.empty() && b.spans[0].bold ? &b.spans[0] : nullptr;
         const float textW = width - pad * 2.0f - bar;
         const float th = Flow(cs, s).run(b.spans, o, textW, nullptr, nullptr, nullptr, linkCounter_);
@@ -921,7 +926,7 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
         }
         h = th + (b.items.empty() ? 0.0f : 4.0f * s + ih) + pad * 1.6f;
         if (dl) {
-            const ImU32 bg = b.items.empty() ? kBox() : theme::u32(mix(theme::panelBg, ImGui::ColorConvertU32ToFloat4(col), 0.07f));
+            const ImU32 bg = theme::u32(mix(theme::panelBg, ImGui::ColorConvertU32ToFloat4(col), b.items.empty() ? 0.08f : 0.10f));
             dl->AddRectFilled(o, ImVec2(o.x + width, o.y + h), bg, 6.0f * s);
             dl->AddRectFilled(o, ImVec2(o.x + bar, o.y + h), col, 6.0f * s, ImDrawFlags_RoundCornersLeft);
             float y = o.y + pad * 0.8f;

@@ -4589,7 +4589,11 @@ void App::drawImageTo3D() {
         openHunyuanNotice_ = false;
     }
     ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
-    if (ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool licenceOpen = ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (licenceOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextWrapped("%s", tr(ai::kHunyuanLicenceNote));
         ImGui::TextDisabled("%s", tr("This stays in the Model tooltip."));
         if (ImGui::Button(tr("OK"), ImVec2(-1, 0))) ImGui::CloseCurrentPopup();
