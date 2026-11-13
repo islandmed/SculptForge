@@ -387,7 +387,7 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 # App code the tests also run (layout, looks, translations, Library, brush previews, camera, clusters): one static
 # library both link, so an edit to one of these files compiles once, not once per program.
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
-  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
+  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/OpenUrl.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
     src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/I18nJapanese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)

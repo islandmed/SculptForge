@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/NativeDialog.h"
 
+#include "app/OpenUrl.h"
+
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -237,6 +240,21 @@ bool openUrl(const char* url) {
         SDL_Log("  (url: %s)", url ? url : "");
         return false;
     }
+    if (!url) return SDL_OpenURL(url);
+    { // the same URL at most once per 2 s (a double click, a key repeat, two handlers for one button)
+        static sf::opener::Debounce debounce;
+        static std::mutex mutex;
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        std::lock_guard lock(mutex);
+        if (!debounce.allow(url, now)) {
+            SDL_Log("open url: %s again within 2 s, once is enough", url);
+            return true;
+        }
+    }
+#if defined(__linux__) && !defined(__ANDROID__)
+    // The browser gets the environment the app was started with (no AppImage paths, no test-run XDG folders), detached.
+    if (sf::opener::launch(url)) return true;
+#endif
     return SDL_OpenURL(url);
 }
 
