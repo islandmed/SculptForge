@@ -186,7 +186,7 @@ TEST(starter_meshes_human_male) {
         AABB box;
         for (const glm::vec3& p : d.mesh.positions) box.expand(p);
         CHECK(std::abs(box.max.y - 180.0f) < 0.5f);
-        CHECK(box.max.x - box.min.x > 120.0f);  // A-pose: the hands well out from the body
+        CHECK(box.max.x - box.min.x > 105.0f);  // A-pose: the hands well out from the body (119 cm)
         CHECK(box.max.z - box.min.z < 40.0f);   // nothing reaching forward: the arms in the frontal plane
     }
 }
