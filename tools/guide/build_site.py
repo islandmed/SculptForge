@@ -874,7 +874,10 @@ def readme_news(page: "WhatsNewPage") -> str:
     text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
     card = next((c for c in v["cards"] if c.get("link") or c["action"].startswith("guide:")), None)
     target = (card.get("link") or card["action"][len("guide:"):]) if card else f"whats-new.html#{v['anchor']}"
-    return (f'  <strong>New in {html.escape(v["version"])}:</strong> {text[:1].lower() + text[1:]} '
+    first = text.split(" ", 1)[0]
+    if not any(ch.isupper() for ch in first[1:]):  # "The user guide" -> "the user guide"; a name like SculptForge stays
+        text = text[:1].lower() + text[1:]
+    return (f'  <strong>New in {html.escape(v["version"])}:</strong> {text} '
             f'(<a href="https://sculptforge.app/guide/{target}">how it works</a>)')
 
 

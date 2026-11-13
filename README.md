@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.12.13:</strong> sculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail (<a href="https://sculptforge.app/guide/whats-new.html#version-01213">how it works</a>)
+  <strong>New in 0.12.13:</strong> SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail (<a href="https://sculptforge.app/guide/whats-new.html#version-01213">how it works</a>)
 </p>
 
 <p align="center">
