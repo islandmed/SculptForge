@@ -28,7 +28,15 @@ done
 python3 -I "$ROOT/tools/starter/build_starter_meshes.py" "$BASE" "$WORK/obj" "$WORK/makehuman/targets"
 for obj in "$WORK"/obj/*.obj; do
   id=$(basename "$obj" .obj)
-  "$CLI" -q -c "open_obj path=$obj; save_project path=$WORK/obj/$id.sfproj"
+  if [ "$id" = human-male ]; then
+    # The Human (male)'s definition pass: our brushes on subdivision level 1, in a sculpt layer (human_male_sculpt.py).
+    python3 -I "$ROOT/tools/starter/human_male_sculpt.py" "$obj" "$WORK/obj/human-male.landmarks.json" "$WORK/obj/human-male.strokes"
+    { echo "open_obj path=$obj"; echo "subdiv_divide"; echo "layer_add name=Definition"; cat "$WORK/obj/human-male.strokes"
+      echo "subdiv_level level=1"; echo "save_project path=$WORK/obj/$id.sfproj"; } > "$WORK/obj/human-male.cmds"
+    "$CLI" -q -f "$WORK/obj/human-male.cmds"
+  else
+    "$CLI" -q -c "open_obj path=$obj; save_project path=$WORK/obj/$id.sfproj"
+  fi
   python3 -I -c 'import sys, zlib; open(sys.argv[2], "wb").write(zlib.compress(open(sys.argv[1], "rb").read(), 9))' \
     "$WORK/obj/$id.sfproj" "$ROOT/assets/starter/$id.sfproj.z"
 done

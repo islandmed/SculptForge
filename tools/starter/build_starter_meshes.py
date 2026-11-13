@@ -16,6 +16,7 @@
 # Units are centimetres, Y up, looking down +Z, the character's left is +X; every mesh is centred on X and Z
 # and stands on the ground (lowest point at Y = 0). All faces are quads.
 
+import json
 import math
 import os
 import sys
@@ -582,29 +583,76 @@ def human_parts(body, j):
 # ---------------------------------------------------------------------------
 
 HUMAN_MALE_HEIGHT = 180.0
-HUMAN_MALE_SHIN_SLANT = 0.2  # cm each shin point slides in per cm below the knee: the lower leg upright, the feet under the hips
-HUMAN_MALE_PALM_TWIST = math.radians(90.0)  # forearm pronation, left arm (mirrored for the right)
+HUMAN_MALE_LANDMARKS = {}  # filled by human_male(): joints in the mesh's space, for the sculpt pass
+HUMAN_MALE_LEG_SHEAR = 0.076  # cm each leg point slides toward the midline per cm below the hip joint: legs straight, under the hips
+HUMAN_MALE_ARM_ANGLE = math.radians(52.92)  # the arm's line, shoulder to wrist, below horizontal (the reference's)
+HUMAN_MALE_FINGER_CLOSE = (math.radians(11.0), math.radians(10.0), math.radians(19.0))  # index, ring, little finger toward the middle: one paddle
+HUMAN_MALE_THUMB_IN = math.radians(12.0)  # the thumb turned toward the index finger at its root, a relaxed hand
+HUMAN_MALE_PALM_TWIST = math.radians(90.0)
+HUMAN_MALE_FINGER_CURL = (math.radians(18.0), math.radians(12.0), math.radians(6.0))  # per knuckle, root to tip: a relaxed hand
+HUMAN_MALE_CURL_SIGN = 1.0  # +1 curls toward the palm with the base mesh's hand orientation  # forearm pronation, left arm (mirrored for the right)
 
-# MakeHuman target weights: its macro modifiers at gender 1, age young, the three ethnic shapes mixed evenly,
-# muscle 0.925 and weight 0.5 (the "maxmuscle" universal target at 0.85), a touch of its "ideal proportions"; then
-# the shape targets of a lean athletic build: V-shaped torso, pectorals and lats, toned stomach and pelvis, slim
-# waist, broader shoulders, a slimmer neck, narrower hips and thighs, muscled limbs, the knees brought in
-# (leg valgus), the fingers a little closer. Everything is listed in tools/starter/makehuman-targets.sha256 (the
-# build downloads and checks them).
+# MakeHuman target weights. The macro part: gender 1, age young, the three ethnic shapes mixed evenly, the
+# "maxmuscle" universal targets for a lean athletic build, a touch of "ideal proportions". The rest were solved
+# (silhouette landmarks of the owner's front reference: 27 of them, every weight capped at 0.5 so the surface
+# stays smooth, 22 within 1% of height and none over 1.7%) over
+# MakeHuman's measure, torso, hip, neck, head and limb targets, with the pose constants below. Everything is listed
+# in tools/starter/makehuman-targets.sha256 (the build downloads and checks them).
 HUMAN_MALE_TARGETS = [
-    ("caucasian-male-young", 1 / 3), ("asian-male-young", 1 / 3), ("african-male-young", 1 / 3),
-    ("universal-male-young-maxmuscle-averageweight", 0.85),
+    ("caucasian-male-young", 0.333),
+    ("asian-male-young", 0.333),
+    ("african-male-young", 0.333),
+    ("universal-male-young-maxmuscle-averageweight", 0.75),
+    ("universal-male-young-maxmuscle-minweight", 0.2),
     ("male-young-maxmuscle-averageweight-idealproportions", 0.2),
     ("male-young-averagemuscle-averageweight-idealproportions", 0.1),
-    ("torso-vshape-incr", 0.4), ("torso-muscle-pectoral-incr", 0.6), ("torso-muscle-dorsi-incr", 0.2),
-    ("stomach-tone-incr", 1.0), ("pelvis-tone-incr", 0.4), ("measure-waist-circ-decr", 0.3),
-    ("measure-shoulder-dist-incr", 0.3), ("neck-scale-horiz-decr", 0.2),
-    ("hip-scale-horiz-decr", 0.4), ("measure-hips-circ-decr", 0.3), ("measure-thigh-circ-decr", 0.3),
-    ("measure-calf-circ-incr", 0.2),
-] + [(f"{side}-{t}", w) for side in ("l", "r") for t, w in (
-    ("upperarm-muscle-incr", 0.5), ("lowerarm-muscle-incr", 0.4), ("upperarm-shoulder-muscle-incr", 0.5),
-    ("upperleg-muscle-incr", 0.5), ("lowerleg-muscle-incr", 0.5), ("leg-valgus-incr", 0.6),
-    ("hand-fingers-distance-decr", 0.3))]
+    ("torso-muscle-dorsi-incr", 0.1),
+    ("stomach-tone-incr", 1.0),
+    ("pelvis-tone-incr", 0.4),
+    ("measure-underbust-circ-decr", 0.2),
+    ("l-upperarm-muscle-incr", 0.5),
+    ("l-lowerarm-muscle-incr", 0.4),
+    ("l-upperleg-muscle-incr", 0.5),
+    ("l-lowerleg-muscle-incr", 0.5),
+    ("l-hand-fingers-distance-decr", 1.0),
+    ("l-foot-scale-depth-incr", 0.4),
+    ("l-foot-scale-horiz-incr", 0.3),
+    ("r-upperarm-muscle-incr", 0.5),
+    ("r-lowerarm-muscle-incr", 0.4),
+    ("r-upperleg-muscle-incr", 0.5),
+    ("r-lowerleg-muscle-incr", 0.5),
+    ("r-hand-fingers-distance-decr", 1.0),
+    ("r-foot-scale-depth-incr", 0.4),
+    ("r-foot-scale-horiz-incr", 0.3),
+    ("torso-muscle-pectoral-incr", 0.6),
+    ("torso-vshape-incr", 0.25),
+    ("l-upperarm-shoulder-muscle-incr", 0.35),
+    ("r-upperarm-shoulder-muscle-incr", 0.35),
+    ("measure-shoulder-dist-decr", 0.235),
+    ("hip-scale-horiz-incr", 0.33),
+    ("measure-hips-circ-incr", 0.105),
+    ("measure-waist-circ-incr", 0.084),
+    ("torso-scale-horiz-decr", 0.074),
+    ("measure-thigh-circ-incr", 0.078),
+    ("measure-knee-circ-incr", 0.044),
+    ("measure-calf-circ-incr", 0.048),
+    ("measure-ankle-circ-incr", 0.084),
+    ("torso-scale-vert-incr", 0.292),
+    ("upperlegs-height-decr", 0.209),
+    ("lowerlegs-height-decr", 0.051),
+    ("neck-scale-vert-incr", 0.485),
+    ("neck-scale-horiz-incr", 0.035),
+    ("head-scale-vert-incr", 0.334),
+    ("head-scale-horiz-incr", 0.234),
+    ("measure-upperarm-length-decr", 0.399),
+    ("measure-lowerarm-length-decr", 0.548),
+    ("measure-upperarm-circ-incr", 0.031),
+    ("measure-waisttohip-dist-incr", 0.455),
+    ("measure-napetowaist-dist-incr", 0.368),
+    ("stomach-navel-up", 0.081),
+    ("hip-scale-vert-incr", 0.309),
+    ("breast-trans-down", 0.133),
+]
 
 
 def load_target(path):
@@ -639,6 +687,26 @@ def human_male(base_path, targets_dir):
     body_ids = sorted({i for f in groups["body"] for i, _ in f})
     all_ids = range(len(verts))  # the pose changes move the joint helpers too, so the next stage reads them moved
 
+    # Arm angle: the whole arm turns about its shoulder joint in the frontal plane to HUMAN_MALE_ARM_ANGLE below
+    # horizontal (shoulder to wrist, a straight line once the forearm swing below has put the forearm in line),
+    # blended in over the deltoid; the relax pass further down smooths what that does to the armpit.
+    joints = joint_centres(verts, groups)
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        shoulder, elbow, hand = joints[side + "-shoulder"], joints[side + "-elbow"], joints[side + "-hand"]
+        up = norm(sub(elbow, shoulder))
+        have = math.atan2(-(elbow[1] - shoulder[1]), abs(elbow[0] - shoulder[0]))  # upper arm, below horizontal
+        turn = HUMAN_MALE_ARM_ANGLE - have  # positive = lower the arm
+        tip = add(hand, mul(norm(sub(hand, elbow)), 22.0))
+        for i in all_ids:
+            p = verts[i]
+            if p[0] * sign < shoulder[0] * sign - 6.0:
+                continue
+            if min(seg_dist(p, shoulder, elbow), seg_dist(p, elbow, hand), seg_dist(p, hand, tip)) > 16.0:
+                continue
+            w = smoothstep(-2.0, 9.0, dot(sub(p, shoulder), up))
+            if w > 0.0:
+                verts[i] = rotate_about(p, shoulder, (0.0, 0.0, 1.0), -sign * turn * w)
+
     # Forearm swing: the base mesh's forearms point forward and down from the elbow; ours continue the upper
     # arm in the frontal plane (the hands beside the thighs seen from the side, as a figure in A-pose stands),
     # turned about the elbow and blended in over a few centimetres round it.
@@ -660,21 +728,20 @@ def human_male(base_path, targets_dir):
                 verts[i] = rotate_about(p, elbow, axis, angle * w)
     joints = joint_centres(verts, groups)
 
-    # Feet under the hips: the base mesh stands with the feet apart, each lower leg slanting out from the knee
-    # (its centre line 16 cm off the midline at the knee, 21 at the ankle). With the knees brought in by MakeHuman's
-    # leg-valgus target, each shin is sheared upright: a point slides in by HUMAN_MALE_SHIN_SLANT cm per cm below the
-    # knee (eased in over the first 6 cm), and the foot by the ankle's full amount, so the soles stay flat.
+    # Legs under the hips: the base mesh's legs splay out in a straight line from the hip joint (its centre line
+    # 8.5 cm off the midline at the hip, 16 at the knee, 21 at the ankle). Each leg is sheared toward the midline by
+    # HUMAN_MALE_LEG_SHEAR cm per cm below the hip joint, eased in over the first 16 cm so the crotch keeps its
+    # gap; the knee and foot ride along, so the leg stays straight and the soles flat.
     for side, sign in (("l", 1.0), ("r", -1.0)):
-        knee, ankle, toe = joints[side + "-knee"], joints[side + "-ankle"], joints[side + "-toe-1-1"]
-        shin = knee[1] - ankle[1]
+        hip, knee, ankle, toe = (joints[side + k] for k in ("-upper-leg", "-knee", "-ankle", "-toe-1-1"))
         for i in all_ids:
             p = verts[i]
-            if p[0] * sign < 0.0 or p[1] > knee[1] + 6.0:
+            if p[0] * sign < 0.0 or p[1] > hip[1] + 4.0:
                 continue
-            if min(seg_dist(p, knee, ankle), seg_dist(p, ankle, toe)) > 16.0:
+            if min(seg_dist(p, hip, knee), seg_dist(p, knee, ankle), seg_dist(p, ankle, toe)) > 17.0:
                 continue
-            below = min(max(knee[1] - p[1], 0.0), shin)
-            shift = HUMAN_MALE_SHIN_SLANT * below * smoothstep(0.0, 6.0, below)
+            below = hip[1] - p[1]
+            shift = HUMAN_MALE_LEG_SHEAR * below * smoothstep(0.0, 16.0, below)
             verts[i] = (p[0] - sign * shift, p[1], p[2])
     joints = joint_centres(verts, groups)
 
@@ -692,6 +759,104 @@ def human_male(base_path, targets_dir):
             w = smoothstep(0.0, reach, dot(sub(p, elbow), along))
             if w > 0.0:
                 verts[i] = rotate_about(p, elbow, along, sign * HUMAN_MALE_PALM_TWIST * w)
+
+    # Relaxed hands: each finger (not the thumb) curls gently toward the palm, knuckle by knuckle, about the axis
+    # across its knuckles; a vertex curls with the finger whose bone line it is nearest, so the webbing splits cleanly.
+    joints = joint_centres(verts, groups)
+    for side in ("l", "r"):
+        fingers = {}
+        for f in (2, 3, 4, 5):
+            chain = [joints[f"{side}-finger-{f}-{k}"] for k in (1, 2, 3, 4)]
+            chain.append(add(chain[3], mul(norm(sub(chain[3], chain[2])), 4.0)))  # the last joint to past the fingertip
+            fingers[f] = chain
+        row = norm(sub(joints[f"{side}-finger-5-1"], joints[f"{side}-finger-2-1"]))
+        members = {f: [] for f in fingers}
+        wrist = joints[side + "-hand"]
+        for i in all_ids:
+            p = verts[i]
+            if length(sub(p, wrist)) > 28.0:
+                continue
+            best, best_d = None, 2.0
+            for f, chain in fingers.items():
+                d = min(seg_dist(p, chain[k], chain[k + 1]) for k in range(4))
+                if d < best_d:
+                    best, best_d = f, d
+            if best is not None:
+                members[best].append(i)
+        for f, chain in fingers.items():
+            fdir = norm(sub(chain[3], chain[0]))
+            axis = norm(sub(row, mul(fdir, dot(row, fdir))))  # across the knuckles, in the palm's plane
+            for k in range(3):
+                angle = HUMAN_MALE_FINGER_CURL[k] * HUMAN_MALE_CURL_SIGN * (1.0 if side == "l" else -1.0)
+                along = norm(sub(chain[k + 1], chain[k]))
+                for i in members[f]:
+                    w = smoothstep(-0.5, 0.7, dot(sub(verts[i], chain[k]), along))
+                    if w > 0.0:
+                        verts[i] = rotate_about(verts[i], chain[k], axis, angle * w)
+                for m in range(k + 1, 5):
+                    chain[m] = rotate_about(chain[m], chain[k], axis, angle)
+        # Fingers together: the index, ring and little finger turn toward the middle finger about their root, in the
+        # palm's plane (the turn direction is whichever brings the fingertip nearer the middle fingertip).
+        mid_tip = fingers[3][3]
+        for f, ang in ((2, HUMAN_MALE_FINGER_CLOSE[0]), (4, HUMAN_MALE_FINGER_CLOSE[1]), (5, HUMAN_MALE_FINGER_CLOSE[2])):
+            chain = fingers[f]
+            fdir = norm(sub(chain[3], chain[0]))
+            n_axis = norm(cross(fdir, row))  # the palm's normal
+            best = None
+            for sgn in (1.0, -1.0):
+                tip = rotate_about(chain[3], chain[0], n_axis, sgn * ang)
+                d = length(sub(tip, mid_tip))
+                if best is None or d < best[0]:
+                    best = (d, sgn)
+            along = norm(sub(chain[1], chain[0]))
+            for i in members[f]:
+                w = smoothstep(-0.8, 0.8, dot(sub(verts[i], chain[0]), along))
+                if w > 0.0:
+                    verts[i] = rotate_about(verts[i], chain[0], n_axis, best[1] * ang * w)
+        # The thumb turns in toward the index finger about its root joint.
+        thumb = [joints[f"{side}-finger-1-{k}"] for k in (1, 2, 3, 4)]
+        thumb.append(add(thumb[3], mul(norm(sub(thumb[3], thumb[2])), 4.0)))
+        t_dir = norm(sub(thumb[3], thumb[0]))
+        i_dir = norm(sub(fingers[2][3], thumb[0]))
+        t_axis = norm(cross(t_dir, i_dir))  # a positive turn about it takes the thumb toward the index finger
+        t_along = norm(sub(thumb[1], thumb[0]))
+        for i in all_ids:
+            p = verts[i]
+            if length(sub(p, wrist)) > 28.0 or min(seg_dist(p, thumb[k], thumb[k + 1]) for k in range(4)) > 2.4:
+                continue
+            w = smoothstep(-0.5, 1.5, dot(sub(p, thumb[0]), t_along))
+            if w > 0.0:
+                verts[i] = rotate_about(p, thumb[0], t_axis, HUMAN_MALE_THUMB_IN * w)
+
+    # Relax pass (a smoothing brush, in the build): where the targets and the pose turns pile up, the surface
+    # is smoothed toward the mean of its neighbours, strongest at each region's centre and fading to nothing at
+    # its radius. Regions (left side; the right is the mirror): the armpit, the hip and outer thigh, the inner thigh.
+    nbrs = defaultdict(set)
+    for f in groups["body"]:
+        ids = [i for i, _ in f]
+        for a, b_ in zip(ids, ids[1:] + ids[:1]):
+            nbrs[a].add(b_); nbrs[b_].add(a)
+    sh, hip, knee = joints["l-shoulder"], joints["l-upper-leg"], joints["l-knee"]
+    regions = [  # (centre, radius, iterations, strength)
+        ((sh[0] + 1.0, sh[1] - 13.0, sh[2] - 1.0), 13.0, 14, 0.6),                 # armpit
+        ((hip[0] + 7.0, hip[1] - 10.0, hip[2]), 18.0, 6, 0.4),                     # hip and outer thigh
+        (((hip[0] + knee[0]) / 2 - 6.0, (hip[1] + knee[1]) / 2, hip[2]), 14.0, 6, 0.4),  # inner thigh
+    ]
+    for centre, radius, iterations, strength in regions:
+        weights = {}
+        for i in body_ids:
+            if verts[i][0] < -1.0:
+                continue
+            d = length(sub(verts[i], centre))
+            if d < radius:
+                weights[i] = strength * (1.0 - smoothstep(radius * 0.4, radius, d))
+        for _ in range(iterations):
+            moved = {}
+            for i, w in weights.items():
+                ns = nbrs[i]
+                mean = mul(tuple(sum(verts[n][k] for n in ns) for k in range(3)), 1.0 / len(ns))
+                moved[i] = tuple(lerp(verts[i][k], mean[k], w) for k in range(3))
+            verts = [moved.get(i, v) for i, v in enumerate(verts)]
 
     # The body, to 180 cm, made exactly mirror-symmetric: MakeHuman's base is, its targets only nearly, so the
     # character's left side (base x > 0) is kept and the right is its exact mirror (pairs by the base positions).
@@ -713,6 +878,11 @@ def human_male(base_path, targets_dir):
         else:
             out.append(mirror_x(scaled[m]))
     faces = [tuple(remap[i] for i, _ in f) for f in groups["body"]]
+    # Landmarks for the sculpt pass (tools/starter/human_male_sculpt.py): the left side's joints, scaled like the
+    # mesh (main() shifts them with place_on_ground's offset and writes human-male.landmarks.json).
+    global HUMAN_MALE_LANDMARKS
+    HUMAN_MALE_LANDMARKS = {k: mul(v, scale) for k, v in joints.items()
+                            if k.startswith("l-") or k in ("neck", "head", "jaw", "pelvis", "spine-1", "spine-2", "spine-3", "spine-4")}
     uv_ids = sorted({t for f in groups["body"] for _, t in f})
     if uv_ids[0] < 0:
         sys.exit("human-male: a body face has no texture coordinates")
@@ -852,7 +1022,7 @@ SET = [
     ("human-head", "Human Head", ["Head"], True, False, 2),
     ("bust", "Bust", ["Bust"], True, False, 2),
     ("full-body", "Full Body (A-pose)", ["Body"], True, True, 1),
-    ("human-male", "Human (male, A-pose)", ["Body"], True, True, 2),
+    ("human-male", "Human (male, A-pose)", ["Body"], True, True, 1),  # + the sculpt layer's level in the project
     ("hand", "Hand", ["Hand"], False, False, 2),
     ("foot", "Foot", ["Foot"], False, False, 2),
     ("ear", "Ear", ["Ear"], False, False, 2),
@@ -931,6 +1101,12 @@ def main():
         parts = place_on_ground(meshes[mid])
         check(mid, parts, closed)
         write_obj(os.path.join(out_dir, mid + ".obj"), part_names, parts)
+        if mid == "human-male":
+            lo, hi = bounds(meshes[mid])
+            off = (-(lo[0] + hi[0]) / 2, -lo[1], -(lo[2] + hi[2]) / 2)
+            lm = {k: [round(c, 3) for c in add(v, off)] for k, v in sorted(HUMAN_MALE_LANDMARKS.items())}
+            with open(os.path.join(out_dir, "human-male.landmarks.json"), "w", encoding="utf-8", newline="\n") as fh:
+                json.dump(lm, fh, indent=1, sort_keys=True)
 
 
 if __name__ == "__main__":
