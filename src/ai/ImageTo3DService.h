@@ -70,7 +70,7 @@ struct RecommendedModel {
 };
 const std::vector<RecommendedModel>& recommendedModels();
 // When those prices were read from the providers' public pricing pages (Tripo: 20 credits an image, 10 a text, at about
-// $0.01 a credit; fal: the model pages). The panel shows it: "List prices as of 2026-11-13".
+// $0.01 a credit; Stability: 4 credits; fal: the model pages). The panel shows it: "List prices as of 2026-11-13".
 inline constexpr const char* kPricesChecked = "2026-11-13";
 
 // Free models on Hugging Face Spaces (shared GPUs; a free HF token raises the daily quota).

@@ -27,11 +27,11 @@ struct AiSettings {
     std::string preset;   // the provider preset (ai/Providers.h: "ollama", "litellm", ...); "" = from provider/endpoint
     std::string endpoint;
     std::string model;
-    // Keys (apiKey, hfToken, falKey, meshyKey, hyper3dKey, tripoKey) are kept in the OS keychain (ai/Secrets.h), never in ai.json: these
+    // Keys (apiKey, hfToken, falKey, meshyKey, hyper3dKey, tripoKey, stabilityKey) are kept in the OS keychain (ai/Secrets.h), never in ai.json: these
     // fields hold one typed in this session, or read from an older ai.json (moved to the keychain at start-up).
     std::string apiKey; // Free: unused; empty = the keychain, then ANTHROPIC_API_KEY / OPENAI_API_KEY / the preset's
     std::string effort = "low";
-    // Image to 3D. service: "huggingface" (free Spaces), "fal", "meshy", "hyper3d" (Rodin direct), "tripo",
+    // Image to 3D. service: "huggingface" (free Spaces), "fal", "meshy", "hyper3d" (Rodin direct), "tripo", "stability" (SPAR3D),
     // "comfyui" (your ComfyUI server), "command" (generatorCommand with
     // {input}/{output}) or "inflate" (offline).
     std::string generatorService = "huggingface";
@@ -51,6 +51,7 @@ struct AiSettings {
     std::string hyper3dTier = "Gen-2.5-Low";
     std::string tripoKey;     // Tripo direct (ai/Tripo.h): the keychain only - no environment variable
     std::string tripoModel = "v3.1-20260211";
+    std::string stabilityKey; // Stability AI SPAR3D direct (ai/Stability.h): the keychain only
     std::string comfyUrl = "http://127.0.0.1:8188";
     std::string comfyImageWorkflow; // API-format workflow files; empty = the bundled default
     std::string comfyTextWorkflow;
@@ -59,6 +60,7 @@ struct AiSettings {
     std::string resolvedMeshyKey() const;
     std::string resolvedHyper3dKey() const; // typed in this session, else the keychain; never the environment
     std::string resolvedTripoKey() const;     // as resolvedHyper3dKey
+    std::string resolvedStabilityKey() const; // as resolvedHyper3dKey
 
     static AiSettings defaults(Provider provider);
     static Provider providerFromName(const std::string& name); // "free", "anthropic", "openai-compatible"

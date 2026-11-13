@@ -9,6 +9,7 @@
 #include "ai/GradioClient.h"
 #include "ai/Hyper3D.h"
 #include "ai/SpaceHealth.h"
+#include "ai/Stability.h"
 #include "ai/Tripo.h"
 #include "ai/Http.h"
 #include "core/Image.h"
@@ -407,6 +408,8 @@ const std::vector<RecommendedModel>& recommendedModels() {
     static const std::vector<RecommendedModel> list = {
         {"tripo", tripo::kDefaultModel, "Tripo v3.1", "~$0.20", "Fast and good all-round: the best price for the quality. Text costs $0.10.",
          tripo::kKeyUrl, true},
+        {"stability", "", "Stability SPAR3D", "$0.04", "A quick look: a rough shape in seconds, to sculpt over. Picture only.",
+         stability::kKeyUrl, false},
         {"fal", "fal-ai/trellis-2", "TRELLIS.2 (fal.ai)", "$0.25-0.35", "Sharp, clean shapes with fine detail.",
          "https://fal.ai/dashboard/keys", true},
         {"fal", "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", "Hunyuan3D 3.1 (fal.ai)", "from $0.375",
@@ -634,6 +637,7 @@ bool serviceAllowed(const AiSettings& s, std::string& error) {
     if (svc == "inflate") return true;
     if (svc == "hyper3d") return aiRequestAllowed(svc, std::string(hyper3d::kApiBase) + "/rodin", error); // (pinned)
     if (svc == "tripo") return aiRequestAllowed(svc, std::string(tripo::kApiBase) + "/generation/image-to-model", error); // (pinned)
+    if (svc == "stability") return aiRequestAllowed(svc, stability::kApiUrl, error); // (pinned)
     const std::string url = svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
                             : svc == "command" ? std::string() : std::string("https://huggingface.co/");
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
@@ -664,7 +668,7 @@ void setGeneratorStubForTests(GeneratorStub s) {
 namespace {
 
 bool paidService(const std::string& svc) {
-    return svc == "fal" || svc == "meshy" || svc == "hyper3d" || svc == "tripo";
+    return svc == "fal" || svc == "meshy" || svc == "hyper3d" || svc == "tripo" || svc == "stability";
 }
 
 // Worth another provider: the service was unreachable, timed out or was busy (not a bad key, no credits or a refusal,
@@ -731,6 +735,7 @@ GeneratorResult generate3DOnce(const AiSettings& s, const std::string& imagePath
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
     if (s.generatorService == "tripo") return tripo::run(s, imagePath, {}, progress);
+    if (s.generatorService == "stability") return stability::run(s, imagePath, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
         return runGenerator(s.generatorCommand, imagePath, outputStem + ".glb");
@@ -779,6 +784,7 @@ GeneratorResult generate3DFromTextOnce(const AiSettings& s, const std::string& p
     if (stubbed(outputStem, progress, result)) return result;
     if (s.generatorService == "hyper3d") return hyper3d::run(s, {}, prompt, progress);
     if (s.generatorService == "tripo") return tripo::run(s, {}, prompt, progress);
+    if (s.generatorService == "stability") return stability::run(s, {}, progress); // (says it needs a picture)
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
         return runFalRequest(s, falTextModel(s.falModel), falTextBody(prompt, s.falModel), outputStem, progress);

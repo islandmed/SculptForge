@@ -1,5 +1,5 @@
 # Generate 3D > Recommended models: each row shows what a generation costs and a line on its quality, a paid one a
-# "Get a key" button; Tripo (direct, your key) is a service of its own that stays off until a key is
+# "Get a key" button; Tripo and Stability SPAR3D (direct, your key) are services of their own that stay off until a key is
 # added; a free Space the update feed reports switched off (ui_space_health stands in for the feed here) says so, is greyed out in
 # the Model list and Generate still runs the first Space that is up. Nothing is generated (no key, no network).
 # CMake runs it at 1440x900 and 2880x1800 (the review sizes).
@@ -11,6 +11,8 @@ click "Generate 3D/Recommended models"
 wait 0.2
 expect_text Tripo v3.1
 expect_text $0.20
+expect_text Stability SPAR3D
+expect_text $0.04
 expect_text Get a key
 shot generate-recommended
 click "Generate 3D/Recommended models"   # closed again: the list is tall and pushes the service list down
@@ -33,6 +35,7 @@ expect_text Hunyuan3D 2 mini Turbo (Tencent) - free, fastest
 
 click "Generate 3D/##service"
 expect_text Tripo (direct) - paid, your key
+expect_text Stability SPAR3D (direct) - paid, your key
 click "Tripo (direct) - paid, your key"
 wait 0.2
 expect_text Off until you add your own key from your Tripo account
@@ -40,3 +43,12 @@ expect_text Sends your image or description to Tripo (openapi.tripo3d.ai)
 click "Generate 3D/Generate 3D model"
 wait 0.5
 expect_status Add your Tripo API key
+
+click "Generate 3D/##service"
+click "Stability SPAR3D (direct) - paid, your key"
+wait 0.2
+expect_text Off until you add your own key from your Stability AI account
+click "Generate 3D/Generate 3D model"
+wait 0.5
+expect_status Add your Stability AI API key
+

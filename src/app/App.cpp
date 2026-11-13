@@ -33,6 +33,7 @@
 #include "core/ManagedPolicy.h"
 #include "ai/Hyper3D.h"
 #include "ai/SpaceHealth.h"
+#include "ai/Stability.h"
 #include "ai/Tripo.h"
 #include "ai/Providers.h"
 #include "app/Demo.h"
@@ -4437,9 +4438,9 @@ void App::drawImageTo3D() {
     drawRecommendedModels(); // PanelGenerate3D.cpp
     const char* services[] = {tr("Hugging Face - free models"), tr("fal.ai - paid, your key"), tr("Meshy - paid, your key"),
                               tr("Hyper3D Rodin (direct) - paid, your key"), tr("Tripo (direct) - paid, your key"),
-                              tr("ComfyUI - your server"),
+                              tr("Stability SPAR3D (direct) - paid, your key"), tr("ComfyUI - your server"),
                               tr("My generator command"), tr("Offline blockout (inflate silhouette)")};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "tripo", "comfyui", "command", "inflate"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "tripo", "stability", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -4544,6 +4545,15 @@ void App::drawImageTo3D() {
                                                         : tr("Using your key from the system keychain."));
         hint(tr("Sends your image or description to Tripo (openapi.tripo3d.ai), which builds the shape. About $0.20 a picture "
                 "and $0.10 a description, billed to your Tripo account."));
+    } else if (serviceId == "stability") {
+        ImGui::InputText(tr("API key##stability"), stabilityKey_, sizeof stabilityKey_, ImGuiInputTextFlags_Password);
+        if (!stabilityKey_[0])
+            hint(aiSettings_.resolvedStabilityKey().empty()
+                     ? tr("Off until you add your own key from your Stability AI account (platform.stability.ai).")
+                     : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image to Stability AI (api.stability.ai), which builds a rough shape in seconds with SPAR3D: a quick "
+                "look to sculpt over. About $0.04 a picture, billed to your Stability AI account. Pictures only. Powered by "
+                "Stability AI."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -4557,7 +4567,7 @@ void App::drawImageTo3D() {
     if (serviceId != "inflate") {
         // Candidates: several shapes side by side to pick from. Billed services start at one (each is a generation
         // on the user's key); the free and local ones at three.
-        const bool paid = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" || serviceId == "tripo";
+        const bool paid = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" || serviceId == "tripo" || serviceId == "stability";
         int& count = paid ? paidCandidateCount_ : candidateCount_;
         ImGui::SliderInt(tr("Candidates"), &count, 1, 3);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -4640,6 +4650,7 @@ void App::drawImageTo3D() {
         aiSettings_.meshyKey = meshyKey_;
         aiSettings_.hyper3dKey = hyper3dKey_;
         aiSettings_.tripoKey = tripoKey_;
+        aiSettings_.stabilityKey = stabilityKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;

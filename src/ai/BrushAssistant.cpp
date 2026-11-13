@@ -145,6 +145,11 @@ std::string AiSettings::resolvedTripoKey() const {
     return secrets::cached(secrets::kTripo);
 }
 
+std::string AiSettings::resolvedStabilityKey() const {
+    if (!stabilityKey.empty()) return stabilityKey;
+    return secrets::cached(secrets::kStability);
+}
+
 Json AiSettings::toJson() const {
     Json j = Json::object();
     // (no keys: they are in the keychain, ai/Secrets.h)

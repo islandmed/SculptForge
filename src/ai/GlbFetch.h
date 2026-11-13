@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// What the paid direct providers (Tripo) share after the model is made: fetching the file from the
+// What the paid direct providers (Tripo, Stability) share after the model is made: fetching the file from the
 // provider's own hosts only (every redirect hop too, https, no key sent, capped), checking it is a well-formed GLB
 // (ai/Hyper3D.h checkGlb) and writing it into a private temporary folder the caller deletes after import
 // (GeneratorResult::privateDir). The same rules as Hyper3D's, in one place for the providers added after it.

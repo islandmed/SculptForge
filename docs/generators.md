@@ -9,6 +9,7 @@
 | **Meshy** | Meshy's own API (`meshy-7.1` by default) | Key from meshy.ai, or `MESHY_API_KEY` |
 | **Hyper3D Rodin (direct)** | Hyper3D's own API: Rodin Gen-2.5, image or text, in five tiers (Extreme Low to Extreme High), billed to your Hyper3D account | Your key from hyper3d.ai (API dashboard), saved in the system keychain; no environment variable. See [ai-services.md](ai-services.md#paid-services) |
 | **Tripo (direct)** | Tripo's own API: v3.1 / v3.0, image or text, the shape only (about $0.20 a picture, $0.10 a text), billed to your Tripo account | Your key from developers.tripo3d.ai, saved in the system keychain; no environment variable. See [ai-services.md](ai-services.md#tripo-and-stability-ai-direct) |
+| **Stability SPAR3D (direct)** | Stability AI's own API: Stable Point Aware 3D from a picture, a rough shape in seconds (about $0.04), billed to your Stability AI account | Your key from platform.stability.ai, saved in the system keychain; no environment variable |
 | **ComfyUI** | Any workflow on your own ComfyUI, on this computer or a studio GPU server: Hunyuan3D, TRELLIS, your own graph. See [comfyui.md](comfyui.md) | The server address and an API-format workflow (bundled ones included) |
 | **My generator command** | Anything you run locally (see below) | A command line |
 | **Offline blockout** | Inflates the outline into a rounded blob. Fine for simple shapes, not characters | Nothing |

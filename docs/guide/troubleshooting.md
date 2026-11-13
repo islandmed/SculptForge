@@ -151,16 +151,16 @@ If no pen is detected or pressure doesn't change:
 | *Out of credits on your Hyper3D account* | Top up on hyper3d.ai |
 | *Refused the model file* | The result came from somewhere other than Hyper3D's servers, so SculptForge didn't download it. The model isn't lost: it stays in your Hyper3D account (hyper3d.ai dashboard) under the task id in the message. If it keeps happening, [report it](https://github.com/islandmed/SculptForge/issues) |
 
-### Tripo (direct)
+### Tripo and Stability AI (direct)
 
 | Message | What to do |
 |---|---|
-| *Add your Tripo API key* | It stays off until you add your own key (developers.tripo3d.ai) in the Generate 3D window |
-| *Tripo rejected the API key* | Check the key, or make a new one |
-| *Out of credits on your Tripo account* | Top up with that service; nothing was charged for the failed call |
+| *Add your Tripo API key* / *Add your Stability AI API key* | Each stays off until you add your own key in the Generate 3D window (developers.tripo3d.ai, platform.stability.ai > Account > API keys) |
+| *Tripo rejected the API key* / *Stability AI rejected the API key* | Check the key, or make a new one |
+| *Out of credits on your Tripo account* / *...your Stability AI account* | Top up with that service; nothing was charged for the failed call |
 | *Tripo is rate limiting* / *Tripo is already running your other generations* | Wait a moment and try again, or make fewer candidates at once |
 | *Tripo retired this model version* | Update SculptForge, or choose another model |
-| *Tripo refused the content* | The picture or description was refused by the provider's content check; you were not charged |
+| *Tripo refused the content* / *Stability AI refused the content* | The picture or description was refused by the provider's content check; you were not charged |
 | *Tripo took longer than 10 minutes* | The task stays in your Tripo account; try again |
 | *Refused the model file* | The result came from somewhere other than Tripo's servers, so SculptForge didn't download it. The model stays in your Tripo account (developers.tripo3d.ai) under the task id in the message |
 | *The free models were not tried* | A paid service was unreachable and you haven't allowed the free Hugging Face models yet: choose one once and press **Allow** |
@@ -177,7 +177,7 @@ see [Brush Lab and sharing brushes](brush-lab.md).
 ### No connection at all
 
 AI features need internet access (except a local Ollama, LM Studio or ComfyUI). Behind a company proxy or
-firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), openapi.tripo3d.ai (and `*.tripo3d.com`, `*.tripo3d.ai` for the model file), or the
+firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), openapi.tripo3d.ai (and `*.tripo3d.com`, `*.tripo3d.ai` for the model file), api.stability.ai, or the
 Pollinations.ai text endpoint for the free Brush Lab model.
 
 ## ComfyUI errors
