@@ -6,6 +6,13 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Android**: the welcome window on a phone held sideways ran off the bottom of the screen with **Close** below the
+  fold, and a finger could only drag the window, not scroll it, so only the small X in its title bar closed it
+  (Hameron on Discord). It is now a sheet inside the screen's safe area (camera cut-out, bars, gesture area) with a
+  finger-sized **Close** pinned at the bottom, content that scrolls with a swipe (a swipe that starts on a button
+  scrolls, it doesn't press it), and Back closes it, the membership card, What's New and the quick tour.
+
 ## [0.12.13] - 2026-11-12
 
 ### Added

@@ -13,6 +13,9 @@ tagline: The welcome window fits a phone held sideways.
 highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
 ```
 
+- **Welcome on a phone**: held sideways, the welcome window fits the screen, keeps **Close** at its bottom and scrolls
+  with a swipe. Android's Back button closes it (and the other cards that open by themselves).
+
 ## Version 0.12.13
 
 ```features

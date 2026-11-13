@@ -2,10 +2,10 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.12.0's five cards (SF_WHATS_NEW_VERSION; the chapter starts at 0.11.0), so this stays valid
-# after each release; the guide chapter below is pinned to 0.12.13 (SF_GUIDE_VERSION), so it checks 0.12.13's section
+# after each release; the guide chapter below is pinned to 0.12.14 (SF_GUIDE_VERSION), so it checks 0.12.14's section
 # before and after the release.
 env SF_WHATS_NEW_VERSION 0.12.0
-env SF_GUIDE_VERSION 0.12.13
+env SF_GUIDE_VERSION 0.12.14
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -55,12 +55,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.12.14"
+expect_text "The welcome window fits a phone held sideways."
 expect_text "Version 0.12.13"
 expect_text "SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail."
 expect_text "Version 0.12.12"
 expect_text "The user guide is redesigned, with new pictures, and big Clay strokes no longer ring."
-expect_text "Version 0.12.11"
-expect_text "Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less."
 expect_value whats_new_contents == 5   # 3 versions in full, then 0.12.0 to 0.12.2 and 0.11.x (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide
