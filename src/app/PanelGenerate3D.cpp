@@ -11,6 +11,7 @@
 #include "app/I18n.h"
 #include "app/Ui.h"
 
+#include "core/AuditLog.h"
 #include "core/MeshPreview.h"
 #include "render/GL.h"
 
@@ -159,7 +160,70 @@ void App::startGenerator() {
     }).detach();
 }
 
+CommandResult App::startGenerateCommand(const std::string& name, const Args& args) {
+    if (generateCommand_ || pendingGenerator_.valid()) return {false, "A 3D model is already being generated"};
+    if (std::string why; audit::required() && !audit::writable(&why)) return {false, why}; // (as every AI command)
+    auto g = std::make_unique<GenerateCommandJob>();
+    CommandResult refused;
+    if (!ai::prepareGenerateJob(name, args, aiSettings_, g->job, refused)) return refused;
+    g->name = name;
+    g->args = args;
+    g->start = std::chrono::steady_clock::now();
+    g->revision = doc_.undo.revision();
+    g->progress = std::make_shared<ai::GenerationProgress>();
+    g->progress->setStatus("Starting...");
+    std::promise<ai::GeneratorResult> promise;
+    g->done = promise.get_future();
+    std::thread([promise = std::move(promise), work = g->job.work, progress = g->progress]() mutable {
+        try {
+            promise.set_value(work(progress.get()));
+        } catch (const std::exception& e) { // (a worker's uncaught exception would end the whole app)
+            promise.set_value({false, {}, std::string("Generating failed: ") + e.what()});
+        }
+    }).detach();
+    generateCommand_ = std::move(g);
+    commandResult_.reset();
+    const std::string what = name == "text_to_3d" ? "Text to 3D" : "Image to 3D";
+    return {true, what + ": generating in the background (the window stays usable; the result replaces the scene when it arrives)"};
+}
+
+void App::pollGenerateCommand() {
+    if (!generateCommand_) return;
+    GenerateCommandJob& g = *generateCommand_;
+    if (g.done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        const int secs = int(std::chrono::duration<double>(std::chrono::steady_clock::now() - g.start).count());
+        status_ = std::string(g.name == "text_to_3d" ? "Text to 3D" : "Image to 3D") + ": " + g.progress->status() + " (" +
+                  std::to_string(secs) + " s)";
+        return;
+    }
+    if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
+    const std::unique_ptr<GenerateCommandJob> job = std::move(generateCommand_);
+    ai::GeneratorResult generated = job->done.get();
+    CommandResult r;
+    if (generated.ok && doc_.undo.revision() != job->revision) {
+        removeDownload(generated); // (open would clear the history: the work done since stays)
+        r = {false, "The scene changed while the model was generating, so it was not opened: run it again"};
+    } else {
+        r = job->job.finish(doc_, generated);
+    }
+    ai::recordGenerateRun(job->name, job->args, r,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - job->start).count());
+    status_ = r.message;
+    commandResult_ = r;
+    console_.print(r.ok ? Console::Kind::Result : Console::Kind::Error, r.message);
+    console_.seenStatus(status_);
+    if (!r.ok) {
+        SDL_Log("%s failed: %s", job->name.c_str(), r.message.c_str());
+        return;
+    }
+    clearLods();
+    playingLayer_ = -1;
+    frameView(sceneBounds());
+    updateTitle();
+}
+
 void App::pollGenerator() {
+    pollGenerateCommand();
     if (!pendingGenerator_.valid() || pendingGenerator_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return;
     candidates_ = pendingGenerator_.get();

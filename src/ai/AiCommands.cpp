@@ -74,6 +74,74 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
 
 } // namespace
 
+bool prepareGenerateJob(const std::string& name, const Args& a, const AiSettings& settings, GenerateJob& job,
+                        CommandResult& refused) {
+    const bool text = name == "text_to_3d";
+    AiSettings s = settings;
+    if (a.contains("service")) s.generatorService = argString(a, "service");
+    if (a.contains("url")) s.comfyUrl = argString(a, "url");
+    if (text && (s.generatorService == "command" || s.generatorService == "inflate")) {
+        refused = {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
+                          "service=huggingface, fal, meshy, hyper3d or comfyui"};
+        return false;
+    }
+    if (a.contains("model")) {
+        if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
+        else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
+        else if (s.generatorService == "fal") s.falModel = argString(a, "model");
+        else s.hfModel = argString(a, "model");
+    }
+    const auto stem = std::filesystem::temp_directory_path() /
+                      ((text ? "sculptforge_text_" : "sculptforge_generated_") +
+                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto stemU8 = stem.u8string();
+    const std::string out(stemU8.begin(), stemU8.end());
+    GeneratedRemesh mode;
+    std::string err;
+    if (!remeshArg(a, mode, err)) {
+        refused = {false, err};
+        return false;
+    }
+    if (text && s.generatorService == "comfyui" && argString(a, "prompt").find_first_not_of(" \t\r\n") == std::string::npos) {
+        refused = {false, "Describe the model you want"};
+        return false;
+    }
+    job.work = [s, a, out, text](GenerationProgress* progress) -> GeneratorResult {
+        const std::string input = argString(a, text ? "prompt" : "path");
+        if (s.generatorService == "comfyui")
+            return text ? comfy::run(s, argString(a, "workflow"), {}, input, out, progress, comfySeed(a))
+                        : comfy::run(s, argString(a, "workflow"), input, {}, out, progress, comfySeed(a));
+        return text ? generate3DFromText(s, input, out, progress) : generate3D(s, input, out, progress);
+    };
+    job.finish = [a, mode, text](Document& doc, GeneratorResult& r) -> CommandResult {
+        if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
+        return importGenerated(doc, a, r, mode, text ? " from text" : "");
+    };
+    return true;
+}
+
+void recordGenerateRun(const std::string& name, const Args& a, const CommandResult& r, int64_t ms) {
+    audit::Entry e;
+    e.tool = "ai";
+    e.command = name;
+    e.args = audit::summarizeArgs(a);
+    e.ok = r.ok;
+    e.message = r.message;
+    e.ms = ms;
+    audit::record(e);
+}
+
+namespace {
+CommandResult runGenerateJob(const std::string& name, Document& doc, const Args& a, const AiSettings& settings) {
+    GenerateJob job;
+    CommandResult refused;
+    if (!prepareGenerateJob(name, a, settings, job, refused)) return refused;
+    GeneratorResult r = job.work(nullptr);
+    return job.finish(doc, r);
+}
+
+} // namespace
+
 void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
     // Every run goes into the audit log (core/AuditLog.h), from the app, a script, the CLI or an AI tool; with the
     // policy's audit.required, a run whose line can't be written is refused before anything is sent.
@@ -142,28 +210,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                    {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
-                      AiSettings s = settings();
-                      if (a.contains("service")) s.generatorService = argString(a, "service");
-                      if (a.contains("url")) s.comfyUrl = argString(a, "url");
-                      if (a.contains("model")) {
-                          if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
-                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
-                          else if (s.generatorService == "fal") s.falModel = argString(a, "model");
-                          else s.hfModel = argString(a, "model");
-                      }
-                      const auto stem = std::filesystem::temp_directory_path() /
-                                        ("sculptforge_generated_" +
-                                         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-                      const auto stemU8 = stem.u8string();
-                      const std::string out(stemU8.begin(), stemU8.end());
-                      GeneratedRemesh mode;
-                      std::string err;
-                      if (!remeshArg(a, mode, err)) return {false, err};
-                      GeneratorResult r = s.generatorService == "comfyui"
-                                              ? comfy::run(s, argString(a, "workflow"), argString(a, "path"), {}, out, nullptr, comfySeed(a))
-                                              : generate3D(s, argString(a, "path"), out);
-                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
-                      return importGenerated(doc, a, r, mode, "");
+                      return runGenerateJob("image_to_3d", doc, a, settings());
                   }});
 
     add({"text_to_3d",
@@ -187,35 +234,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                    {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
-                      AiSettings s = settings();
-                      if (a.contains("service")) s.generatorService = argString(a, "service");
-                      if (a.contains("url")) s.comfyUrl = argString(a, "url");
-                      if (s.generatorService == "command" || s.generatorService == "inflate")
-                          return {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
-                                         "service=huggingface, fal, meshy, hyper3d or comfyui"};
-                      if (a.contains("model")) {
-                          if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
-                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
-                          else if (s.generatorService == "fal") s.falModel = argString(a, "model");
-                          else s.hfModel = argString(a, "model");
-                      }
-                      const auto stem = std::filesystem::temp_directory_path() /
-                                        ("sculptforge_text_" +
-                                         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-                      const auto stemU8 = stem.u8string();
-                      const std::string out(stemU8.begin(), stemU8.end());
-                      GeneratedRemesh mode;
-                      std::string err;
-                      if (!remeshArg(a, mode, err)) return {false, err};
-                      GeneratorResult r;
-                      if (s.generatorService == "comfyui") {
-                          if (argString(a, "prompt").find_first_not_of(" \t\r\n") == std::string::npos) return {false, "Describe the model you want"};
-                          r = comfy::run(s, argString(a, "workflow"), {}, argString(a, "prompt"), out, nullptr, comfySeed(a));
-                      } else {
-                          r = generate3DFromText(s, argString(a, "prompt"), out);
-                      }
-                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
-                      return importGenerated(doc, a, r, mode, " from text");
+                      return runGenerateJob("text_to_3d", doc, a, settings());
                   }});
 
     add({"comfyui_check",

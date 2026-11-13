@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <optional>
 #include <random>
 
 namespace sf::ai {
@@ -116,6 +117,13 @@ std::string friendlyGradioError(const std::string& raw) {
         return "The Hugging Face Space is asleep or restarting - try again in a minute, or pick another model. (" +
                raw.substr(0, 160) + ")";
     return raw;
+}
+
+bool gradioSpaceUnavailable(const std::string& e) {
+    for (const char* k : {"Cannot reach", "Space is unavailable", "asleep or restarting", "isn't answering", "closed the connection",
+                          "Connection lost", "Could not join the queue", "(it may have changed)"})
+        if (e.find(k) != std::string::npos) return true;
+    return false;
 }
 
 bool gradioBuildInputs(const Json& config, const std::string& apiName, const std::vector<Json>& userArgs,
@@ -244,7 +252,7 @@ std::string GradioClient::fileUrl(const Json& value) const {
 
 bool GradioClient::call(const std::string& apiName, const std::vector<Json>& userArgs, std::vector<Json>& outputs,
                         std::string& error, const std::function<void(const std::string&)>& onStatus,
-                        const std::vector<GradioSlot>& slots) {
+                        const std::vector<GradioSlot>& slots, const std::function<bool()>& cancelled) {
     Json data;
     int fnIndex = -1;
     if (!gradioBuildInputs(config_, apiName, userArgs, slots, data, fnIndex, error)) return false;
@@ -266,12 +274,18 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
 
     // Read server-sent events until our event completes.
     std::string buffer;
-    bool done = false, ok = false;
+    bool done = false, ok = false, gaveUp = false, stopped = false;
+    const auto joinedAt = std::chrono::steady_clock::now();
+    std::optional<std::chrono::steady_clock::time_point> started;
     auto h = headers(false);
     h.push_back("Accept: text/event-stream");
     HttpResponse s = httpRequestStream(
         "GET", root_ + prefix_ + "/queue/data?session_hash=" + sessionHash_, h, {}, 900, [&](const char* d, size_t n) {
             buffer.append(d, n);
+            // (the Space's heartbeat arrives every 15 s, so the connection never looks stalled: the clock is ours)
+            if (cancelled && cancelled()) return stopped = true, false;
+            if (std::chrono::steady_clock::now() - (started ? *started : joinedAt) > std::chrono::seconds(started ? kRunSeconds : kStartSeconds))
+                return gaveUp = true, false;
             size_t eol;
             while ((eol = buffer.find('\n')) != std::string::npos) {
                 std::string line = buffer.substr(0, eol);
@@ -284,8 +298,9 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
                 if (msg == "estimation" && onStatus) {
                     const int rank = int(m["rank"].asNumber(0));
                     onStatus(rank > 0 ? "In the free queue: " + std::to_string(rank) + " ahead of you" : "Starting...");
-                } else if (msg == "process_starts" && onStatus) {
-                    onStatus("Generating on " + root_.substr(root_.find("//") + 2) + "...");
+                } else if (msg == "process_starts") {
+                    started = std::chrono::steady_clock::now();
+                    if (onStatus) onStatus("Generating on " + root_.substr(root_.find("//") + 2) + "...");
                 } else if (msg == "progress" && onStatus) {
                     const Json& p = m["progress_data"][0];
                     if (p.isObject()) {
@@ -304,6 +319,15 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
             }
             return true;
         });
+    if (stopped) {
+        error = "Cancelled";
+        return false;
+    }
+    if (gaveUp) {
+        error = root_.substr(root_.find("//") + 2) + " isn't answering (" + (started ? "no result" : "still queued") + " after " +
+                std::to_string((started ? kRunSeconds : kStartSeconds) / 60) + " minutes)";
+        return false;
+    }
     if (!done) {
         error = friendlyGradioError(s.error.empty() ? "The Space closed the connection without a result" : "Connection lost: " + s.error);
         return false;

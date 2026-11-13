@@ -271,11 +271,14 @@ GeneratorResult runMeshyRequest(const AiSettings& s, const std::string& taskPath
 
 // `imagePath` or `prompt` (text to 3D) - exactly one is used.
 GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
-                               const std::string& outputStem, GenerationProgress* p) {
+                               const std::string& outputStem, GenerationProgress* p, const HfPreset* chosen = nullptr) {
     GeneratorResult result;
     const bool text = !prompt.empty();
-    const HfPreset* preset = &resolveHfPreset(s, text, &result.note);
-    if (!result.note.empty()) status(p, result.note);
+    const HfPreset* preset = chosen;
+    if (!preset) {
+        preset = &resolveHfPreset(s, text, &result.note);
+        if (!result.note.empty()) status(p, result.note);
+    }
     status(p, "Connecting to " + std::string(preset->label) + "...");
     GradioClient client;
     if (!client.connect(preset->space, s.resolvedHfToken(), result.error)) return result;
@@ -309,7 +312,8 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
         std::vector<GradioSlot> slots;
         for (const auto& sl : step.slots) slots.push_back({sl.label, sl.type, resolve(sl.arg), sl.optional});
         std::vector<Json> outputs;
-        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }, slots)) {
+        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }, slots,
+                         [p] { return p && p->cancel.load(); })) {
             std::fprintf(stderr, "Generate 3D: %s (%s) '%s' failed: %s\n", preset->label, preset->space, step.api, result.error.c_str());
             result.error = std::string(preset->label) + ": " + result.error;
             return result;
@@ -340,6 +344,30 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
     result.ok = true;
     result.outputPath = path;
     return result;
+}
+
+// The free Hunyuan3D Spaces take turns: when the chosen one is down or not answering, the next answers instead (a quota,
+// a missing token or a Cancel doesn't move on: the others would say the same). Said in the result's note.
+GeneratorResult runHuggingFaceWithFallback(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
+                                           const std::string& outputStem, GenerationProgress* p) {
+    std::string note;
+    const HfPreset& first = resolveHfPreset(s, !prompt.empty(), &note);
+    GeneratorResult r = runHuggingFace(s, imagePath, prompt, outputStem, p, &first);
+    r.note = note;
+    if (r.ok || !hunyuanModel(first.id) || !gradioSpaceUnavailable(r.error)) return r;
+    const auto& presets = prompt.empty() ? hfPresets() : hfTextPresets();
+    for (const HfPreset& next : presets) {
+        if (&next == &first || !hunyuanModel(next.id) || (p && p->cancel)) continue;
+        status(p, std::string(first.label) + " isn't answering: trying " + next.label + "...");
+        GeneratorResult again = runHuggingFace(s, imagePath, prompt, outputStem, p, &next);
+        if (again.ok) {
+            again.note = (note.empty() ? "" : note + " ") + std::string(first.label) + " wasn't answering; " + next.label + " ran instead.";
+            return again;
+        }
+        if (!gradioSpaceUnavailable(again.error)) return again;
+        r.error += "; " + again.error;
+    }
+    return r;
 }
 
 GeneratorResult runInflate(const std::string& imagePath, const std::string& outputStem, GenerationProgress* p) {
@@ -615,7 +643,7 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
     if (s.generatorService == "inflate") return runInflate(imagePath, outputStem, progress);
     if (s.generatorService == "fal") return runFal(s, imagePath, outputStem, progress);
     if (s.generatorService == "comfyui") return comfy::run(s, {}, imagePath, {}, outputStem, progress);
-    return runHuggingFace(s, imagePath, {}, outputStem, progress);
+    return runHuggingFaceWithFallback(s, imagePath, {}, outputStem, progress);
 }
 
 std::string meshyTextBody(const std::string& model, const std::string& prompt) {
@@ -659,7 +687,7 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
         result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy, Hyper3D or ComfyUI - pick one of those services";
         return result;
     }
-    return runHuggingFace(s, {}, prompt, outputStem, progress);
+    return runHuggingFaceWithFallback(s, {}, prompt, outputStem, progress);
 }
 
 } // namespace sf::ai

@@ -1021,7 +1021,7 @@ void wakeMainLoop() {
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
     return running(pendingBrush_) || running(localProbe_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
-           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
+           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ || generateCommand_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
 }
@@ -3126,8 +3126,11 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
     // synchronous command, as its next steps read the UVs at once.
+    // Image / text to 3D waits on a hosted model (seconds to minutes): the same, the window never freezes.
+    const bool generates = (name == "image_to_3d" || name == "text_to_3d") && macros_.runDepth == 0 && commands_.find(name);
     CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args)
-                                                                 : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
+                      : generates                               ? startGenerateCommand(name, args)
+                                                                : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
     if (perftrace::on()) { // a command that held up the frames (remesh, Add Level, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
