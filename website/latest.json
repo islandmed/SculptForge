@@ -1,11 +1,11 @@
 {
-  "version": "0.12.14",
+  "version": "0.12.15",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name",
-    "On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back",
-    "On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu"
+    "On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle",
+    "On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage",
+    "Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes"
   ],
   "support": {
     "founding": {
