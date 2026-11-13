@@ -630,6 +630,7 @@ void App::drawPalette_File() {
     drawBlenderMenu(); // the Blender bridge (PanelBlender.cpp)
     drawMayaMenu(); // the Maya bridge (PanelMaya.cpp)
     menuAction(*this, "file.capture_phone"); // the phone link (PanelPhone.cpp)
+    if (uiPrefs_.forgeDeck) menuAction(*this, "file.forge_deck"); // Forge Deck prototype (PanelDeck.cpp): Preferences > Experimental
     ImGui::Separator();
     menuAction(*this, "file.quit");
 }
@@ -727,6 +728,10 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.hints", "Hints")) {
         tray::Section section;
         drawHintsSection();
+    }
+    if (subpalette("preferences.experimental", "Experimental")) {
+        tray::Section section;
+        drawExperimentalSection();
     }
     if (subpalette("preferences.hotkeys", "Hotkeys")) {
         tray::Section section;

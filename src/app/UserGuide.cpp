@@ -516,6 +516,7 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("File > Blender")) return "blender.md";
     if (starts("File > Maya")) return "maya.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
+    if (starts("File > Forge Deck") || actionId == "file.forge_deck") return "forge-deck.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||
         starts("File > Bridge") || starts("File > Bridge files"))
         return "exporting.md";

@@ -1,0 +1,51 @@
+# Forge Deck prototype: a short sculpting session driven from a scripted phone (the same six
+# commands the page sends over its data channel): pick a brush, set Size and Intensity, stroke, undo, redo, mirror. Used as the demo clip
+# (the numbered shots are stitched into deck-session.mp4 with ffmpeg).
+run ui_look look=classic layout=classic
+env SCULPTFORGE_LINK_PORT 0
+run new_sphere subdivisions=5
+click "Preferences##palette.preferences"
+click "Experimental##preferences.experimental"
+expect "Forge Deck (prototype)##experimental.forge_deck"
+click "Forge Deck (prototype)##experimental.forge_deck"
+click "Preferences##palette.preferences"
+click "File##palette.file"
+wait 0.2
+click "Forge Deck (prototype)##file.forge_deck"
+wait 0.4
+shot s01
+expect_value deck_on == 1
+deck_message ok {"type":"hello","ua":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"}
+wait 0.5
+shot s02
+
+deck_message ok {"cmd":"brush_use","name":"Clay"}
+deck_message ok {"cmd":"size_set","value":0.55}
+deck_message ok {"cmd":"intensity_set","value":0.8}
+wait 0.6
+shot s03
+stroke 0.2 0.45 0.8 0.45
+wait 0.4
+shot s04
+deck_message ok {"cmd":"brush_use","name":"Smooth"}
+deck_message ok {"cmd":"size_set","value":0.7}
+wait 0.6
+shot s05
+stroke 0.2 0.45 0.8 0.45
+wait 0.4
+shot s06
+deck_message ok {"cmd":"undo"}
+wait 0.6
+shot s07
+deck_message ok {"cmd":"redo"}
+wait 0.6
+shot s08
+deck_message ok {"cmd":"brush_use","name":"Crease"}
+deck_message ok {"cmd":"size_set","value":0.3}
+deck_message ok {"cmd":"symmetry_toggle","axis":"x"}
+wait 0.6
+shot s09
+stroke 0.3 0.3 0.7 0.65
+wait 0.6
+shot s10
+deck_message ok {"type":"hello","ua":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"}

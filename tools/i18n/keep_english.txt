@@ -42,3 +42,21 @@ Tube
 CPU
 GPU
 Turbo
+# Forge Deck prototype (PanelDeck.cpp): translated when it leaves the prototype stage
+A phone
+Connected through the internet
+Connected over Wi-Fi
+Disconnect and close##deck
+Forge Deck (prototype)
+Scan with your phone's camera. The Deck is off again when this window closes.
+Preparing a secure link...
+No link
+Try again##deck
+Starting...
+The phone can only pick one of the brush tiles, set Size and Intensity, Undo, Redo and Mirror.
+Use your phone as a control pad for this session: big brush tiles, Size and Intensity strips, Undo, Redo and Mirror. Off until you turn it on here; scan the QR code with your phone. The phone can only press those controls.
+is driving this session
+request(s) refused and logged
+Experimental
+Forge Deck (prototype)##experimental.forge_deck
+Adds File > Forge Deck: your phone becomes a control pad for the session (brush tiles, Size, Intensity, Undo, Redo, Mirror) after you scan a QR code. The phone page loads over HTTPS and talks to this computer over an encrypted link: directly on the same Wi-Fi, or through an encrypted relay when the phone can't reach it. Off by default; even when on, the Deck is off every time the app starts.

@@ -1882,6 +1882,26 @@ private:
     // exported on a worker; face frames drive face_weights.
     void initPhoneActions();
     void drawPhoneWindow();
+    // Forge Deck prototype (PanelDeck.cpp): the phone as a control pad. Off at every start; File > Forge Deck turns it
+    // on for the session and shows its QR code. A phone message is one allowlisted action (link/DeckCommands.h).
+    void initDeckActions();
+    void drawExperimentalSection(); // Preferences > Experimental
+    void drawDeckWindow();  // the pairing window, and the banner while a phone is driving
+    void pollDeck();        // every frame while the link runs: run the phone's actions, publish the state and tiles
+    void runDeckAction(const link::DeckAction& action);
+    void killDeck();        // the kill switch: Deck off, token changed, link closed
+    std::string deckStateJson() const;
+    bool showDeck_ = false;           // never saved: off at every app start
+    bool deckApplied_ = false;        // what the link was last told
+    uint64_t deckRev_ = 0;
+    std::string deckLastState_;
+    std::string deckQrText_;
+    link::QrCode deckQr_;
+    std::vector<int> deckImagesSent_; // BrushType indexes whose tile image the phone has
+    double deckLastImageTry_ = -1e9;
+    std::future<std::pair<bool, std::string>> deckLinkJob_; // the pairing link being made (ok, url or error)
+    std::string deckLinkError_;
+    double deckLinkMade_ = -1e9;
     void pollPhone(); // every frame: events, face frames, AR re-exports
     void setPhoneLinkOpen(bool open);
     void handlePhoneCapture(const link::PhoneEvent& e);

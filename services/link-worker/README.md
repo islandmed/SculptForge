@@ -48,3 +48,24 @@ proved itself, remove it from that constant. `SCULPTFORGE_LINK_RELAY` (space-sep
 overrides the list.
 
 If the face page moves to another domain, add it to `ALLOWED_ORIGINS` in `wrangler.toml` and deploy again.
+
+## Forge Deck mailbox (`/deck/<topic>/up|down`)
+
+For a phone whose browser can't reach the computer on the home network, the Forge Deck page's commands go up through
+here and the computer's state comes down. Same topic names and the same rule as above: the relay carries ciphertext
+only. Every message is an AES-256-GCM envelope `{"d":"p2d"|"d2p","s":sequence,"m":message}` under the Deck link's
+key (only in the link's `#fragment`); the computer drops one with the wrong key or direction or a sequence number
+that is not higher than the last, and everything it accepts goes through the same six-command allowlist as the
+direct link.
+
+| Request | |
+|---|---|
+| `POST /deck/<topic>/up` | the page (needs an `Origin` from `ALLOWED_ORIGINS`) posts one command; base64url, at most 1,400 bytes; 429 when 64 are waiting or more than 40 a second |
+| `GET /deck/<topic>/up?after=<n>` | SculptForge (no `Origin`) collects commands numbered above `n`, oldest first; those up to `n` are deleted; a command nobody collects is dropped after 20 seconds |
+| `POST /deck/<topic>/down` | SculptForge posts the state (at most 16 KB); the newest replaces the older |
+| `GET /deck/<topic>/down?after=<n>` | the page reads the state if it is newer than `n` (`{"n":..,"message":..}`, else `{"n":..}`) |
+
+The Deck's data is deleted 5 minutes after the last message. The `Origin` rules are hygiene, not security: anyone who
+knows the (96-bit, random) topic can post, and what protects the computer is that nothing without the key decrypts.
+**Cost:** a phone on the relay polls twice or three times a second while the Deck is in use (free plan: 100,000
+requests a day, so a few hours of relay use a day); the computer polls only while the direct link is down.
