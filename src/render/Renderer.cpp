@@ -436,6 +436,9 @@ uniform int uDim;             // 1: an inactive Part, shown a little darker and 
 uniform mat3 uLightRot;       // turns the light (Lit Sphere and studio) in view space (RenderSettings::lightYaw / Pitch)
 uniform vec2 uLightLevels;    // light intensity, ambient
 uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
+uniform int uOccAlpha;        // 1: alpha carries the shading normal's facing to the shadow light (render/Occlusion.h)
+uniform vec3 uOccLight;       // that light, view space
+vec3 gShadeN = vec3(0.0, 0.0, 1.0); // (main sets it: the normal the pixel is shaded with)
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
 out vec4 fragColor;
@@ -452,6 +455,9 @@ vec4 finish(vec3 c) {
 #ifdef MICRO
     g = mix(g, vec3(0.05, 0.05, 0.08), 0.5775 * gWire); // (the wireframe program's colour and opacity)
 #endif
+    // Opaque Parts under view shadows: alpha = the smooth normal's facing to the light (0.5 + 0.5 N.L), which the
+    // shadow pass reads instead of the faceted normal it would rebuild from the depth, then sets back to 1.
+    if (uOccAlpha == 1 && uAlpha >= 1.0) return vec4(g, 0.5 + 0.5 * dot(gShadeN, uOccLight));
     return vec4(g, uAlpha);
 }
 )" // (two literals: MSVC stops at ~16K characters a literal, C2026; tools/dev/check_literals.py)
@@ -594,6 +600,7 @@ void main() {
 #ifndef FLAT
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
 #endif
+    gShadeN = n;
     if (uUnlit == 1) { // the base colour alone: vertex paint, texture or face groups, plus the mask tint
         vec3 c = albedo;
         if (uShowMask == 1) c = maskTint(c, V_MASK);
@@ -1152,6 +1159,8 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.lightRot = at("uLightRot");
     p.lightLevels = at("uLightLevels");
     p.alpha = at("uAlpha");
+    p.occAlpha = at("uOccAlpha");
+    p.occLight = at("uOccLight");
     p.microWire = at("uMicroWire");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
@@ -3016,7 +3025,17 @@ void Renderer::prepareOcclusion(const RenderSettings& settings, bool pbr, const 
 
 void Renderer::applyOcclusion(GLuint drawFbo, GLuint resolveFbo, int width, int height) {
     if (!frameOcclusionWanted_) return;
-    if (occlusion_.apply(frameOcclusion_, drawFbo, resolveFbo, width, height, frameProj_, frameViewport_)) occlusionDrawn_ = true;
+    if (occlusion_.apply(frameOcclusion_, drawFbo, resolveFbo, width, height, frameProj_, frameViewport_)) {
+        occlusionDrawn_ = true;
+    } else if (frameOcclusion_.shadows) { // (the pass couldn't run: the meshes' facing in the alpha back to opaque)
+        gl::BindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+        gl::Disable(GL_SCISSOR_TEST);
+        gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+        gl::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        gl::Clear(GL_COLOR_BUFFER_BIT);
+        gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
     gl::Viewport(int(frameViewport_.x), int(frameViewport_.y), int(frameViewport_.z), int(frameViewport_.w)); // (as draw() left it)
 }
 
@@ -3898,6 +3917,9 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     gl::UniformMatrix3fv(p.lightRot, 1, GL_FALSE, glm::value_ptr(r));
     gl::Uniform2f(p.lightLevels, std::max(settings.lightIntensity, 0.0f), std::max(settings.lightAmbient, 0.0f));
     gl::Uniform1f(p.alpha, drawAlpha_);
+    const bool occ = frameOcclusionWanted_ && frameOcclusion_.shadows;
+    gl::Uniform1i(p.occAlpha, occ ? 1 : 0);
+    if (occ) gl::Uniform3fv(p.occLight, 1, glm::value_ptr(glm::normalize(frameOcclusion_.light)));
 }
 
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {

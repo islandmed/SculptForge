@@ -46,7 +46,7 @@ public:
 private:
     bool ensure(int width, int height);
     GLuint occProg_ = 0, blurProg_ = 0, compProg_ = 0, vao_ = 0;
-    GLuint depthFbo_ = 0, depth_ = 0;
+    GLuint depthFbo_ = 0, depth_ = 0, colorFbo_ = 0, color_ = 0;
     GLuint halfFbo_[2] = {}, half_[2] = {};
     int w_ = 0, h_ = 0;
     bool failed_ = false;

@@ -48,6 +48,7 @@ uniform int uOrtho;
 uniform int uAo, uShadows;
 uniform float uRadius, uShadowLen, uShadowSoft, uThick;
 uniform vec3 uLight;
+uniform sampler2D uColor; // the drawn view: alpha = the shading normal's facing to uLight (0.5 + 0.5 N.L)
 out vec4 fragColor;
 // World units a full-res pixel spans at view depth z (z < 0 in front of the eye).
 float pixelSize(float z) { return (uOrtho == 1 ? 2.0 : 2.0 * max(-z, 1e-6)) / (uProj[1][1] * uViewport.w); }
@@ -95,29 +96,35 @@ void main() {
         ao = clamp(ao * 3.2 / float(N), 0.0, 1.0);
     }
     float shadow = 0.0;
-    float facing = dot(n, uLight);
+    // (the mesh's own smooth normal, not the faceted one from the depth: a low-poly mesh shades smooth, and its facets
+    // would otherwise stripe the shadow's edge along a grazing light)
+    float facing = texelFetch(uColor, p, 0).a * 2.0 - 1.0;
     if (uShadows == 1 && facing > -0.25) {
-        // A cone around the light, wider with Softness: the penumbra (each pixel one ray, the blur averages them).
+        // A cone around the light, wider with Softness: the penumbra. Three rays a pixel, a third of a turn apart in the
+        // cone (each pixel's set turned by its noise), so the edge is a smooth gradient after the blur, not grain.
         vec3 t1 = normalize(abs(uLight.z) < 0.9 ? cross(uLight, vec3(0.0, 0.0, 1.0)) : cross(uLight, vec3(1.0, 0.0, 0.0)));
         vec3 t2 = cross(uLight, t1);
-        float noise2 = fract(noise * 7.13 + 0.37);
-        float ang = noise2 * 6.2831853, spread = uShadowSoft * 0.16 * sqrt(fract(noise * 3.7 + 0.11));
-        vec3 L = normalize(uLight + (t1 * cos(ang) + t2 * sin(ang)) * spread);
-        vec3 start = P + n * (px * 2.0) + L * px;
-        const int S = 20;
-        for (int i = 0; i < S; ++i) {
-            float t = (float(i) + noise) / float(S);
-            vec3 Q = start + L * (t * t * uShadowLen + px * float(i)); // denser near the point: contact shadows
-            vec2 sp = toPixel(Q);
-            if (any(lessThan(sp, uViewport.xy)) || any(greaterThanEqual(sp, uViewport.xy + uViewport.zw))) break;
-            ivec2 q = ivec2(sp);
-            float dq = depthAt(q);
-            if (dq >= 1.0) continue;
-            float dz = posAt(q, dq).z - Q.z; // > 0: the drawn surface there is in front of the ray
-            // (the bias grows along the ray: a grazing ray over a faceted surface doesn't shadow itself)
-            if (dz > pixelSize(Q.z) * 2.0 + 0.04 * distance(Q, P) && dz < uThick) {
-                shadow = 1.0 - smoothstep(0.75, 1.0, t);
-                break;
+        const int R = 3, S = 16;
+        for (int r = 0; r < R; ++r) {
+            float u = fract(noise + float(r) / float(R));
+            float ang = u * 6.2831853, spread = uShadowSoft * 0.16 * sqrt((float(r) + 0.5) / float(R));
+            vec3 L = normalize(uLight + (t1 * cos(ang) + t2 * sin(ang)) * spread);
+            vec3 start = P + n * (px * 2.0) + L * px;
+            float jitter = fract(noise * 7.13 + float(r) * 0.618);
+            for (int i = 0; i < S; ++i) {
+                float t = (float(i) + jitter) / float(S);
+                vec3 Q = start + L * (t * t * uShadowLen + px * float(i)); // denser near the point: contact shadows
+                vec2 sp = toPixel(Q);
+                if (any(lessThan(sp, uViewport.xy)) || any(greaterThanEqual(sp, uViewport.xy + uViewport.zw))) break;
+                ivec2 q = ivec2(sp);
+                float dq = depthAt(q);
+                if (dq >= 1.0) continue;
+                float dz = posAt(q, dq).z - Q.z; // > 0: the drawn surface there is in front of the ray
+                // (the bias grows along the ray: a grazing ray over a faceted surface doesn't shadow itself)
+                if (dz > pixelSize(Q.z) * 2.0 + 0.04 * distance(Q, P) && dz < uThick) {
+                    shadow += (1.0 - smoothstep(0.75, 1.0, t)) / float(R);
+                    break;
+                }
             }
         }
         shadow *= smoothstep(-0.25, 0.3, facing); // (turned away it is dark already: no double darkening)
@@ -132,6 +139,7 @@ uniform sampler2D uSrc;
 uniform ivec2 uDir;
 uniform vec2 uSigma; // AO, shadow (texels)
 uniform int uTaps;
+uniform int uStride; // texels between taps (wide blurs keep their tap count)
 out vec4 fragColor;
 float unpackDepth(vec2 v) { return (v.x * 255.0 + v.y) / 255.0; }
 void main() {
@@ -146,10 +154,10 @@ void main() {
     vec2 sum = c.rg, w = vec2(1.0);
     for (int k = -uTaps; k <= uTaps; ++k) {
         if (k == 0) continue;
-        vec4 s = texelFetch(uSrc, clamp(p + uDir * k, ivec2(0), size - 1), 0);
+        vec4 s = texelFetch(uSrc, clamp(p + uDir * (k * uStride), ivec2(0), size - 1), 0);
         float z = unpackDepth(s.ba);
         float wz = max(0.0, 1.0 - abs(z - zc) / (zc * 0.03 + 1e-4));
-        float fk = float(k * k);
+        float fk = float(k * k * uStride * uStride);
         vec2 wk = exp(-fk / (2.0 * uSigma * uSigma)) * wz;
         sum += s.rg * wk;
         w += wk;
@@ -239,9 +247,11 @@ void OcclusionPass::release() {
     if (vao_) gl::DeleteVertexArrays(1, &vao_);
     if (depthFbo_) gl::DeleteFramebuffers(1, &depthFbo_);
     if (depth_) gl::DeleteTextures(1, &depth_);
+    if (colorFbo_) gl::DeleteFramebuffers(1, &colorFbo_);
+    if (color_) gl::DeleteTextures(1, &color_);
     if (halfFbo_[0]) gl::DeleteFramebuffers(2, halfFbo_);
     if (half_[0]) gl::DeleteTextures(2, half_);
-    vao_ = depthFbo_ = depth_ = 0;
+    vao_ = depthFbo_ = depth_ = colorFbo_ = color_ = 0;
     halfFbo_[0] = halfFbo_[1] = half_[0] = half_[1] = 0;
     w_ = h_ = 0;
 }
@@ -263,6 +273,8 @@ bool OcclusionPass::ensure(int width, int height) {
     if (depthFbo_) {
         gl::DeleteFramebuffers(1, &depthFbo_);
         gl::DeleteTextures(1, &depth_);
+        gl::DeleteFramebuffers(1, &colorFbo_);
+        gl::DeleteTextures(1, &color_);
         gl::DeleteFramebuffers(2, halfFbo_);
         gl::DeleteTextures(2, half_);
     }
@@ -276,6 +288,11 @@ bool OcclusionPass::ensure(int width, int height) {
     gl::FramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_, 0);
     gl::DrawBuffers(1, &kNone);
     bool ok = gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    texture2D(color_, GL_RGBA8, width, height, GL_RGBA, GL_UNSIGNED_BYTE);
+    gl::GenFramebuffers(1, &colorFbo_);
+    gl::BindFramebuffer(GL_FRAMEBUFFER, colorFbo_);
+    gl::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_, 0);
+    ok = ok && gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     const int hw = (width + 1) / 2, hh = (height + 1) / 2;
     gl::GenFramebuffers(2, halfFbo_);
     for (int i = 0; i < 2; ++i) {
@@ -304,6 +321,11 @@ bool OcclusionPass::apply(const OcclusionParams& p, GLuint drawFbo, GLuint resol
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, drawFbo);
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, depthFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, kDepthBit, GL_NEAREST);
+    if (p.shadows) { // ... and its colour, for the facing in its alpha
+        gl::BindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+        gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, colorFbo_);
+        gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
     if (gl::GetError() != GL_NO_ERROR) {
         SDL_Log("View shadows and AO: the view's depth can't be read here, left off");
         failed_ = true;
@@ -328,6 +350,8 @@ bool OcclusionPass::apply(const OcclusionParams& p, GLuint drawFbo, GLuint resol
         gl::Uniform1f(at("uRange"), std::max(p.depthRange, 1e-4f));
         return at;
     };
+    gl::ActiveTexture(GL_TEXTURE0 + 2);
+    gl::BindTexture(GL_TEXTURE_2D, color_);
     gl::ActiveTexture(GL_TEXTURE0 + 1);
     gl::BindTexture(GL_TEXTURE_2D, depth_);
     gl::ActiveTexture(GL_TEXTURE0);
@@ -339,6 +363,7 @@ bool OcclusionPass::apply(const OcclusionParams& p, GLuint drawFbo, GLuint resol
         auto at = common(occProg_);
         gl::UniformMatrix4fv(at("uProj"), 1, GL_FALSE, glm::value_ptr(proj));
         gl::Uniform1i(at("uOrtho"), ortho ? 1 : 0);
+        gl::Uniform1i(at("uColor"), 2);
         gl::Uniform1i(at("uAo"), p.ao ? 1 : 0);
         gl::Uniform1i(at("uShadows"), p.shadows ? 1 : 0);
         gl::Uniform1f(at("uRadius"), p.aoRadius);
@@ -350,12 +375,16 @@ bool OcclusionPass::apply(const OcclusionParams& p, GLuint drawFbo, GLuint resol
         gl::DrawArrays(GL_TRIANGLES, 0, 3);
     }
     // 2. The blur: across, then down (back into the first target).
-    const float sigmaAo = 0.8f + 4.2f * std::clamp(p.aoSoftness, 0.0f, 1.0f);
-    const float sigmaSh = 1.0f + 3.5f * std::clamp(p.shadowSoftness, 0.0f, 1.0f);
+    // (in half-res texels, for a view 900 pixels high: the same softness on a bigger or HiDPI view)
+    const float scale = std::clamp(viewport.w / 900.0f, 0.5f, 3.0f);
+    const float sigmaAo = (0.8f + 4.2f * std::clamp(p.aoSoftness, 0.0f, 1.0f)) * scale;
+    const float sigmaSh = (1.0f + 3.5f * std::clamp(p.shadowSoftness, 0.0f, 1.0f)) * scale;
     gl::UseProgram(blurProg_);
     gl::Uniform1i(gl::GetUniformLocation(blurProg_, "uSrc"), 0);
     gl::Uniform2f(gl::GetUniformLocation(blurProg_, "uSigma"), sigmaAo, sigmaSh);
-    gl::Uniform1i(gl::GetUniformLocation(blurProg_, "uTaps"), int(std::ceil(2.0f * std::max(sigmaAo, sigmaSh))));
+    const int reach = int(std::ceil(2.0f * std::max(sigmaAo, sigmaSh))), stride = (reach + 11) / 12;
+    gl::Uniform1i(gl::GetUniformLocation(blurProg_, "uTaps"), (reach + stride - 1) / stride);
+    gl::Uniform1i(gl::GetUniformLocation(blurProg_, "uStride"), stride);
     for (int pass = 0; pass < 2; ++pass) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, halfFbo_[1 - pass]);
         gl::BindTexture(GL_TEXTURE_2D, half_[pass]);
@@ -379,13 +408,19 @@ bool OcclusionPass::apply(const OcclusionParams& p, GLuint drawFbo, GLuint resol
     }
     gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     gl::Disable(GL_BLEND);
+    if (p.shadows) { // the facing in the alpha back to opaque (the window and saved images read it)
+        gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+        gl::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        gl::Clear(GL_COLOR_BUFFER_BIT);
+        gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    }
     gl::Disable(GL_SCISSOR_TEST);
     gl::DepthMask(GL_TRUE);
     gl::Enable(GL_DEPTH_TEST);
-    gl::ActiveTexture(GL_TEXTURE0 + 1);
-    gl::BindTexture(GL_TEXTURE_2D, 0);
-    gl::ActiveTexture(GL_TEXTURE0);
-    gl::BindTexture(GL_TEXTURE_2D, 0);
+    for (int unit : {2, 1, 0}) {
+        gl::ActiveTexture(GL_TEXTURE0 + GLenum(unit));
+        gl::BindTexture(GL_TEXTURE_2D, 0);
+    }
     gl::BindVertexArray(0);
     gl::UseProgram(0);
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
