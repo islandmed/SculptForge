@@ -5,6 +5,7 @@ changed: **Android**: a mesh is drawn through the extension's multi-draw only wh
 changed: **Android**: the welcome's phone sheet needs a touch screen (a short desktop window with a mouse keeps its movable window).
 testers:
   - Android Mali tablet (the Mali-G72 that showed an empty 3D view): the sphere shows; if it is still empty, Help > Copy log to clipboard and send the "GL ES: multi-draw", "GL error" and "View frame" lines.
+  - Android phone on Adreno or another Mali (Pixel, Galaxy): a new sphere draws in the 3D view and its thumbnail shows; Help > Copy log has a "GL ES: multi-draw" line.
   - Any Android phone or tablet: Help > Copy log to clipboard is listed under Help.
 ---
 Follow-up to fix-android-welcome (0.12.14-beta.1). The multi-draw gate is a hypothesis from ebarranco's log (no shader failure, no GL error line,
