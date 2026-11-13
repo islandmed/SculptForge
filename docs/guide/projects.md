@@ -68,6 +68,7 @@ the Library's **Tool** tab has a **Starter meshes** folder with a thumbnail of e
 | Human Head | A neutral head and neck with loops round the eyes and mouth, for portraits |
 | Bust | Head, neck, shoulders and upper chest |
 | Full Body | A human figure in A-pose, 167 cm tall |
+| Human (male, A-pose) | An athletic adult man, 180 cm, with UVs: edge loops round the eyes, mouth, shoulders, elbows, knees, fingers and toes, ready to sculpt |
 | Hand, Foot, Ear | A left hand (raised, palm to the front), a left foot and ankle, a left ear |
 | Eye | An eyeball 24 mm across, with the cornea and rings of quads round the pupil |
 | Stylised Head | A cartoon head: big cranium and eyes, small nose and jaw |
@@ -79,13 +80,14 @@ Every starter mesh is life size in centimetres, centred, standing on the ground 
 symmetric ones are exactly symmetric, so [X symmetry](sculpting.md) works from the first stroke. The Hand, Foot,
 Ear, Head, Bust and Torso are cut from a body, so they have open edges where they were cut.
 
-A starter mesh opens with subdivision levels (two, or one for the Full Body): block out the big forms at
+A starter mesh opens with subdivision levels (two, or one for the Full Body; the Human opens at about 430 000
+triangles and takes a third and fourth level for pores and fine detail): block out the big forms at
 **Level 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
 scene: **Save** asks for a name. Double-click a tile to open it; <kbd>Shift</kbd>+double-click appends its base
 cage as a Part, for example an Eye next to a head.
 
-The human meshes come from the MakeHuman base mesh, which MakeHuman released into the public domain (CC0); the
-others are made by SculptForge's own build script. You may use them for anything, including commercial work.
+The human meshes come from the MakeHuman base mesh and, for the Human (male), its shape targets, which MakeHuman
+released into the public domain (CC0); the others are made by SculptForge's own build script. You may use them for anything, including commercial work.
 
 ## The unsaved-changes prompt
 

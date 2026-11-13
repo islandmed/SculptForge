@@ -239,6 +239,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedStarterMeshes.cpp sf::assets
   starterHumanHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-head.sfproj.z
   starterBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/bust.sfproj.z
   starterFullBody ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/full-body.sfproj.z
+  starterHumanMale ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-male.sfproj.z
   starterHand ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/hand.sfproj.z
   starterFoot ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/foot.sfproj.z
   starterEar ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/ear.sfproj.z
