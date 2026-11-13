@@ -83,4 +83,16 @@ echo "$out" | grep -q 'WARNING.*upload' || fail "no warning for a failed upload:
 reset; echo 'SculptForge-9.9.9-android-arm64-v8a-debug.apk' >> "$work/assets"
 release_apk >/dev/null || fail "failed when already uploaded"
 [ ! -s "$S/gh.log" ] || fail "looked again though the APKs are on the release"
+
+# 8. release_ready (just before release_apk): a beta's files carry the base version's names, which the desktop install
+#    scripts' check would refuse; a beta skips that check (0.12.13-beta.1 stopped there), a stable release still runs it.
+die() { echo "DIE: $*"; return 1; }
+eval "$(sed -n '/^release_ready()/,/^}/p' "$ROOT/scripts/release.sh")"
+cat > "$S/bin/gh" <<'SH'
+#!/bin/sh
+case "$1 $2" in "release view") printf 'SHA256SUMS.txt\nSculptForge-9.9.9-x86_64.AppImage\n' ;; esac
+SH
+out=$(cd "$ROOT" && release_ready 2>&1) || fail "a beta stopped in release_ready: $out"
+out=$(cd "$ROOT" && PRE= V=9.9.9 release_ready 2>&1) && fail "a stable release with missing install assets passed: $out"
+echo "$out" | grep -q 'DIE: install/install.sh' || fail "stable: not the install-asset check: $out"
 echo "release_apk: ok"

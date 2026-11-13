@@ -160,6 +160,9 @@ release_ready() {
         grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     fi
     # install/install.sh and install.ps1 (served from raw main) fetch from releases/latest: every name must be here (#159).
+    # Not for a beta: it is never releases/latest of the public repository, and its files carry the base version's names
+    # (0.12.13-beta.1 stopped here, so its APKs had to go on by hand).
+    [ -z "$PRE" ] || return 0
     local out
     out=$(python3 tools/release/check_install_assets.py --version "$V" --assets "$work/assets" 2>&1) ||
         die "$out" "fix the asset names in install/ (site lane, merges at once) or re-run the Release workflow if an upload is missing"
