@@ -3113,6 +3113,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
+    const size_t trisBefore = name == "subdivide" ? doc_.mesh.triangleCount() : 0;
     // OBJ and PLY have no units: read them in the Preferences > Interface > OBJ/PLY in unit unless the call says.
     Args withUnit;
     if ((name == "open" || name == "open_obj" || name == "part_append") && !args.contains("unit")) {
@@ -3159,6 +3160,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name == "save_obj" && !doc_.mesh.layers.empty())
         status_ += " (OBJ stores the current blend; export GLB to keep layers as blend shapes)";
     if (!r.ok) SDL_Log("%s failed: %s", name.c_str(), r.message.c_str());
+    if (r.ok && name == "subdivide") // (a log that ends in a refusal shows what the presses before it made, and what they took)
+        SDL_Log("subdivide: %zu -> %zu triangles, %.0f ms", trisBefore, doc_.mesh.triangleCount(),
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count());
     if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "new_starter_mesh" ||
                  name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
