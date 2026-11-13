@@ -2946,13 +2946,6 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.palm_.afterPen = hold;
             app_.palm_.silent = silent;
         });
-    } else if (verb == "start_view") { // start_view: the camera as a fresh start has it, then the first frame's fit (App::fitStartView)
-        run([this] {
-            app_.camera_ = Camera();
-            app_.autoFramed_ = false;
-            app_.updateCameraAspect();
-            app_.fitStartView(false);
-        });
     } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });
     } else if (verb == "quick_tour_offers") {
