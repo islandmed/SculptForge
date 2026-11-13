@@ -5,6 +5,7 @@
 // prompt (Save / Don't Save / Cancel) before new, open and quit, File > Open
 // Recent and autosave with crash recovery. Prompts only appear in interactive
 // sessions; --render, --record and demos run straight through.
+#include "ai/SpaceHealth.h"
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "app/Support.h"
@@ -965,6 +966,7 @@ void App::pollUpdateCheck() {
         return;
     }
     const UpdateInfo& u = job->info;
+    ai::health::set(u.spaceHealth); // the free Spaces' health (ai/SpaceHealth.h): from the feed already fetched, no new request
     // The feed's "support" block (the card's honest line): kept until the next check, gone when the feed drops it.
     if (u.support.present || supportCardPrefs_.feed.present) {
         supportCardPrefs_.feed = u.support;
