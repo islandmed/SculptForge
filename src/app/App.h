@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ai/AiCommands.h"
 #include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
 #include "ai/Consent.h"
@@ -1360,13 +1361,27 @@ private:
     void pollAutoUv();
     // A command that runs on a worker (uv_auto): it returned at once and its result comes later. The console, the AI
     // link and UI tests wait for it before their next statement, then take its result (once).
-    bool commandRunning() const { return autoUv_ && autoUv_->command; }
+    bool commandRunning() const { return (autoUv_ && autoUv_->command) || generateCommand_; }
     bool takeCommandResult(CommandResult& out) {
         if (!commandResult_) return false;
         out = *std::exchange(commandResult_, std::nullopt);
         return true;
     }
     std::optional<CommandResult> commandResult_;
+    // image_to_3d / text_to_3d from a command (console, script, AI tool): the service call waits on a worker (minutes at
+    // worst, the window stays alive and shows its status), the result lands in pollGenerateCommand (PanelGenerate3D.cpp).
+    struct GenerateCommandJob {
+        std::string name;
+        Args args;
+        ai::GenerateJob job;
+        std::shared_ptr<ai::GenerationProgress> progress;
+        std::future<ai::GeneratorResult> done;
+        std::chrono::steady_clock::time_point start;
+        uint64_t revision = 0; // the scene it will replace: if it changed meanwhile, nothing is replaced
+    };
+    std::unique_ptr<GenerateCommandJob> generateCommand_;
+    CommandResult startGenerateCommand(const std::string& name, const Args& args);
+    void pollGenerateCommand();
     struct AutoUvJob {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;

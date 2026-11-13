@@ -50,6 +50,7 @@ FILE* g_file = nullptr;
 int g_fd = -1; // the same file, for the crash handlers (which can't take locks or allocate)
 std::string g_path, g_previous;
 bool g_previousCrashed = false;
+bool g_previousNoNote = false; // ... and it left no crash note: ended from outside
 size_t g_bytes = 0;
 SDL_LogOutputFunction g_sdlDefault = nullptr;
 void* g_sdlDefaultData = nullptr;
@@ -129,6 +130,10 @@ void onSignal(int sig) {
                            : sig == SIGFPE  ? "arithmetic error (SIGFPE)"
                            : sig == SIGILL  ? "illegal instruction (SIGILL)"
                            : sig == SIGBUS  ? "bus error (SIGBUS)"
+                           : sig == SIGHUP  ? "ended by the terminal or session closing (SIGHUP)"
+                           : sig == SIGQUIT ? "ended by SIGQUIT"
+                           : sig == SIGSYS  ? "blocked system call (SIGSYS)"
+                           : sig == SIGXCPU ? "ran past its CPU limit (SIGXCPU)"
                                             : "signal";
         crashHeader(name);
 #if defined(SF_HAVE_BACKTRACE)
@@ -230,6 +235,7 @@ void start(const std::string& folder) {
         std::string text((std::istreambuf_iterator<char>(in)), {});
         in.close();
         g_previousCrashed = text.find(kClosed) == std::string::npos;
+        g_previousNoNote = g_previousCrashed && text.find("CRASH:") == std::string::npos;
         std::filesystem::remove(fsPath(g_previous), ec);
         std::filesystem::rename(fsPath(g_path), fsPath(g_previous), ec);
     }
@@ -251,7 +257,10 @@ void start(const std::string& folder) {
                 "." + std::to_string(SDL_VERSIONNUM_MINOR(SDL_GetVersion())) + "." +
                 std::to_string(SDL_VERSIONNUM_MICRO(SDL_GetVersion())) + ")");
     if (g_previousCrashed)
-        writeLocked("The last session did not close normally: its log, with the last command it ran, is " + g_previous);
+        writeLocked("The last session did not close normally: its log, with the last command it ran, is " + g_previous +
+                    (g_previousNoNote ? " (it left no crash note: something ended it from outside, such as Force Quit, the system's"
+                                        " out-of-memory killer, a window that did not answer being closed, or a power loss)"
+                                      : std::string()));
 
     SDL_GetLogOutputFunction(&g_sdlDefault, &g_sdlDefaultData);
     SDL_SetLogOutputFunction(onSdlLog, nullptr);
@@ -275,7 +284,9 @@ void start(const std::string& folder) {
     sa.sa_handler = onSignal;
     sa.sa_flags = SA_ONSTACK;
     sigemptyset(&sa.sa_mask);
-    for (int sig : {SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS}) sigaction(sig, &sa, nullptr);
+    // The signals that end a process without a core dump, the way the app once vanished (11-13: no note at all).
+    for (int sig : {SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS, SIGHUP, SIGQUIT, SIGSYS, SIGXCPU}) sigaction(sig, &sa, nullptr);
+    std::signal(SIGPIPE, SIG_IGN); // a closed socket or pipe is a failed write (every writer checks), never the app's death
 #if defined(SF_HAVE_BACKTRACE)
     void* warm[1];
     backtrace(warm, 1); // loads the unwinder now: the first call allocates, which a crash handler must not
