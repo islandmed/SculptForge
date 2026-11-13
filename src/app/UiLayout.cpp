@@ -21,7 +21,7 @@ void readStrings(const Json& j, std::vector<std::string>& out) {
     out.clear();
     for (size_t i = 0; i < j.size(); ++i)
         if (j[i].isString() && !j[i].asString().empty()) {
-            out.push_back(legacy::modernize(j[i].asString()));
+            out.push_back(legacy::modernizeId(j[i].asString())); // (a custom brush's name is the user's text)
         }
 }
 

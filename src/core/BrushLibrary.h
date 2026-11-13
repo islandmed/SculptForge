@@ -91,6 +91,14 @@ int relinkBrush(Document& doc, const std::string& name, const std::string& id, s
 // Index of the loaded brush with this stable id, or -1 (an empty id is never found).
 int findBrushById(const Document& doc, const std::string& id);
 
+// The loaded brush a shelf slot means: its id, else its name exactly, else the name with its case changed or spelled the
+// way an older version's layout loader rewrote it. -1 when none is loaded (relinkBrush then looks on disk).
+int findBrushForSlot(const Document& doc, const std::string& name, const std::string& id);
+
+// One log line for a slot that finds no brush: the name and id it looked for and the closest loaded brush names (the same
+// letters when case, spaces and punctuation are ignored, else sharing a start), so a report says why.
+std::string describeMissingSlot(const Document& doc, const std::string& name, const std::string& id);
+
 // Adds (or updates, by name) `recipe`, saves it to the user library and makes
 // it the active brush. Returns its index; on a save error the brush is still
 // usable this session and `error` says why it isn't saved.
