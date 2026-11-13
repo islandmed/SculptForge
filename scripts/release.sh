@@ -151,6 +151,9 @@ on_main() {
 push_main() {
     gitp push -q origin HEAD:main || die "push to main refused" "git pull --rebase origin main, check the result, run again"
 }
+# min_assets: the fewest assets a finished release has. A stable release has about 46; a beta 28 (no store or package
+# extras; 0.12.14-beta.1 stopped at the stable floor of 30, so its APKs went on by hand).
+min_assets() { if [ -n "$PRE" ]; then echo 26; else echo 30; fi; }
 release_ready() {
     gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: $(resume tag)"
@@ -865,7 +868,7 @@ step_release() {
     release_ready
     local n
     n=$(wc -l < "$work/assets")
-    [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
+    [ "$n" -ge "$(min_assets)" ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
     release_body_headline
     release_apk

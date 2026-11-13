@@ -95,4 +95,9 @@ SH
 out=$(cd "$ROOT" && release_ready 2>&1) || fail "a beta stopped in release_ready: $out"
 out=$(cd "$ROOT" && PRE= V=9.9.9 release_ready 2>&1) && fail "a stable release with missing install assets passed: $out"
 echo "$out" | grep -q 'DIE: install/install.sh' || fail "stable: not the install-asset check: $out"
+
+# 9. the asset floor: a beta's 28 assets are a finished beta, a stable release still needs 30 (0.12.14-beta.1 stopped at 30)
+eval "$(sed -n '/^min_assets()/p' "$ROOT/scripts/release.sh")"
+[ "$(PRE=beta.1 min_assets)" -le 28 ] || fail "a beta's 28 assets are below its floor: $(PRE=beta.1 min_assets)"
+[ "$(PRE= min_assets)" -eq 30 ] || fail "stable floor is not 30: $(PRE= min_assets)"
 echo "release_apk: ok"
