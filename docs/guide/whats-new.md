@@ -14,8 +14,7 @@ highlight: SculptForge now speaks Japanese, a machine translation of the whole i
 highlight: A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh
 highlight: AI agents connected over MCP reach fine detail such as pores and wrinkles
 highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
-highlight: Windows laptops with two graphics chips start SculptForge on the faster one
-highlight: The Clay live preview matches the final stroke, and Help > Copy log to clipboard helps with problem reports
+highlight: Windows laptops with two graphics chips start on the faster one, and the Clay live preview matches the final stroke
 highlight: A sculpt-ready human base mesh
 highlight: Japanese interface
 highlight: AI agents sculpt down to pores and wrinkles
