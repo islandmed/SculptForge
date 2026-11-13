@@ -9,8 +9,9 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: SculptForge now speaks Japanese, AI agents reach fine detail, and masks hold on Micro levels.
+tagline: SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail.
 highlight: SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome
+highlight: A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh
 highlight: AI agents connected over MCP reach fine detail such as pores and wrinkles
 highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
 highlight: Windows laptops with two graphics chips start SculptForge on the faster one
