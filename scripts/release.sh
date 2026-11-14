@@ -1016,6 +1016,7 @@ step_site() {
     else
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
         card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
+        python3 -I scripts/ai3d-health.py --write >/dev/null 2>&1 || true # (the free Spaces' health note rides the feed: no block = all up)
         python3 - "$V" "$HIGHLIGHTS" <<'PY'
 import json, sys
 v, notes = sys.argv[1], sys.argv[2]

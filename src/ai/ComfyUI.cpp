@@ -602,7 +602,7 @@ GeneratorResult run(const AiSettings& s, const std::string& workflowPath, const 
     in.seed = seed ? seed : std::optional<uint64_t>(randomSeed());
     if (!text) {
         std::string png;
-        if (!prepareImagePng(imagePath, png, result.error)) return result;
+        if (!prepareImagePng(imagePath, png, result.error, s.cutImageBackground)) return result;
         status(p, "Uploading the image...");
         std::string contentType;
         const std::string body = multipartBody({{"image", png, "sculptforge_" + randomId() + ".png", "image/png"},

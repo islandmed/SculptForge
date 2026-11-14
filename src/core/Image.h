@@ -19,6 +19,8 @@ struct Image {
     float luminance(float u, float v) const;
     float alpha(float u, float v) const;
     bool hasTransparency() const;
+    // The share (0..1) of pixels that are mostly transparent (alpha < 128).
+    float transparentFraction() const;
 
     static bool load(const std::string& path, Image& out, std::string& error);
     static bool decode(const unsigned char* bytes, size_t size, Image& out, std::string& error);
@@ -33,6 +35,14 @@ struct Image {
     // Crops to the opaque subject plus `margin` (fraction of its size) and centres
     // it on a transparent square canvas. Unchanged if there is no transparency.
     Image framedSubject(float margin) const;
+    // A picture with no transparency whose background is plain (a flat colour, a vignette, or a plate with rounded
+    // corners behind one object): the same picture with that background made transparent, so the subject can be framed
+    // and a reconstruction model doesn't build the backdrop too. Flooded from a ring just inside the border with a
+    // small step tolerance (it follows a vignette, it stops at an edge), thin leftovers (a rim line) dropped, checked
+    // to leave a sensible subject. Transparent pixels (the corners outside an icon's rounded plate) count as backdrop; a
+    // picture that is mostly transparent (10% or more) is cut already. `removed` says whether it cut (false: cut already,
+    // the border isn't plain, or the cut would leave nothing sensible: the picture is returned unchanged).
+    Image withoutPlainBackground(bool* removed = nullptr) const;
     static bool isImagePath(const std::string& path);
 
 private:

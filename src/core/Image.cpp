@@ -5,10 +5,12 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <utility>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_STDIO
@@ -53,6 +55,13 @@ bool Image::hasTransparency() const {
     for (size_t i = 3; i < rgba.size(); i += 4)
         if (rgba[i] < 128) return true;
     return false;
+}
+
+float Image::transparentFraction() const {
+    if (empty()) return 0.0f;
+    size_t n = 0;
+    for (size_t i = 3; i < rgba.size(); i += 4) n += rgba[i] < 128;
+    return float(n) / float(rgba.size() / 4);
 }
 
 bool Image::encodePng(std::vector<uint8_t>& out) const {
@@ -157,6 +166,152 @@ Image Image::framedSubject(float margin) const {
     for (int y = 0; y < h; ++y)
         std::copy_n(&rgba[(size_t(y0 + y) * size_t(width) + size_t(x0)) * 4], size_t(w) * 4,
                     &out.rgba[(size_t(oy + y) * size_t(side) + size_t(ox)) * 4]);
+    return out;
+}
+
+Image Image::withoutPlainBackground(bool* removed) const {
+    if (removed) *removed = false;
+    if (empty() || transparentFraction() >= 0.10f || std::min(width, height) < 32) return *this; // (cut already)
+    // Analysed on a copy of at most 512 px (the mask is scaled back up): fast on any size, and the 8 px of a thin rim
+    // line at 4000 px is still a thin line.
+    const Image a = downscaled(512);
+    const int w = a.width, h = a.height;
+    const size_t n = size_t(w) * size_t(h);
+    auto at = [&](int x, int y) { return &a.rgba[(size_t(y) * size_t(w) + size_t(x)) * 4]; };
+    auto lum = [&](const uint8_t* p) { return int(p[0]) + int(p[1]) + int(p[2]); };
+    auto clear = [&](int x, int y) { return at(x, y)[3] < 128; }; // (the corners outside a rounded plate)
+    auto dist = [](const uint8_t* p, const uint8_t* q) {
+        return std::max({std::abs(int(p[0]) - int(q[0])), std::abs(int(p[1]) - int(q[1])), std::abs(int(p[2]) - int(q[2]))});
+    };
+    // The ring just inside the border: past a rim line or a rounded plate's corner margin, on the backdrop itself.
+    const int r = std::max(3, int(float(std::min(w, h)) * 0.035f));
+    std::vector<std::pair<int, int>> ring;
+    for (int x = r; x < w - r; ++x) {
+        ring.push_back({x, r});
+        ring.push_back({x, h - 1 - r});
+    }
+    for (int y = r; y < h - r; ++y) {
+        ring.push_back({r, y});
+        ring.push_back({w - 1 - r, y});
+    }
+    if (ring.size() < 16) return *this;
+    std::erase_if(ring, [&](const std::pair<int, int>& q) { return clear(q.first, q.second); });
+    if (ring.size() < 16) return *this;
+    std::vector<int> lums;
+    for (auto [x, y] : ring) lums.push_back(lum(at(x, y)));
+    std::vector<int> sorted = lums;
+    std::nth_element(sorted.begin(), sorted.begin() + std::ptrdiff_t(sorted.size() / 2), sorted.end());
+    const int medLum = sorted[sorted.size() / 2];
+    std::vector<std::pair<int, int>> seeds;
+    for (size_t i = 0; i < ring.size(); ++i)
+        if (std::abs(lums[i] - medLum) <= 45) seeds.push_back(ring[i]);
+    if (seeds.size() * 10 < ring.size() * 6) return *this; // the border isn't plain: a busy photo, a scene
+    uint8_t med[4] = {0, 0, 0, 255};
+    for (int c = 0; c < 3; ++c) {
+        std::vector<int> v;
+        for (auto [x, y] : seeds) v.push_back(at(x, y)[c]);
+        std::nth_element(v.begin(), v.begin() + std::ptrdiff_t(v.size() / 2), v.end());
+        med[c] = uint8_t(v[v.size() / 2]);
+    }
+    constexpr int kStep = 6; // neighbour to neighbour: follows a vignette, stops at an edge
+    constexpr int kCap = 40; // and never far from the backdrop's own colour
+    std::vector<uint8_t> bg(n, 0);
+    std::vector<int> queue;
+    auto push = [&](int x, int y) {
+        const size_t i = size_t(y) * size_t(w) + size_t(x);
+        if (!bg[i]) {
+            bg[i] = 1;
+            queue.push_back(int(i));
+        }
+    };
+    for (auto [x, y] : seeds) push(x, y);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            if (clear(x, y)) push(x, y);
+    for (int x = 0; x < w; ++x)
+        for (int y : {0, h - 1})
+            if (dist(at(x, y), med) <= kCap) push(x, y);
+    for (int y = 0; y < h; ++y)
+        for (int x : {0, w - 1})
+            if (dist(at(x, y), med) <= kCap) push(x, y);
+    for (size_t head = 0; head < queue.size(); ++head) {
+        const int x = queue[head] % w, y = queue[head] / w;
+        const uint8_t* c = at(x, y);
+        const int nx[4] = {x + 1, x - 1, x, x}, ny[4] = {y, y, y + 1, y - 1};
+        for (int k = 0; k < 4; ++k) {
+            if (nx[k] < 0 || ny[k] < 0 || nx[k] >= w || ny[k] >= h || bg[size_t(ny[k]) * size_t(w) + size_t(nx[k])]) continue;
+            const uint8_t* d = at(nx[k], ny[k]);
+            if ((dist(c, d) <= kStep && dist(d, med) <= kCap) || clear(nx[k], ny[k])) push(nx[k], ny[k]);
+        }
+    }
+    // The subject is what is left, minus thin leftovers (a rim line, a halo): opened by a few pixels, small bits dropped.
+    std::vector<uint8_t> fg(n), tmp(n);
+    for (size_t i = 0; i < n; ++i) fg[i] = bg[i] ? 0 : 1;
+    const int open = std::max(2, int(float(std::min(w, h)) * 0.006f));
+    auto pass = [&](std::vector<uint8_t>& m, bool grow) {
+        std::fill(tmp.begin(), tmp.end(), uint8_t(0));
+        for (int y = 1; y < h - 1; ++y)
+            for (int x = 1; x < w - 1; ++x) {
+                const size_t i = size_t(y) * size_t(w) + size_t(x);
+                const bool any = m[i - 1] || m[i + 1] || m[i - size_t(w)] || m[i + size_t(w)] || m[i];
+                const bool all = m[i - 1] && m[i + 1] && m[i - size_t(w)] && m[i + size_t(w)] && m[i];
+                tmp[i] = grow ? any : all;
+            }
+        m.swap(tmp);
+    };
+    for (int k = 0; k < open; ++k) pass(fg, false);
+    std::vector<int> label(n, 0), sizes{0};
+    for (size_t i = 0; i < n; ++i) {
+        if (!fg[i] || label[i]) continue;
+        const int id = int(sizes.size());
+        sizes.push_back(0);
+        std::vector<int> stack{int(i)};
+        label[i] = id;
+        while (!stack.empty()) {
+            const int j = stack.back();
+            stack.pop_back();
+            ++sizes[size_t(id)];
+            const int x = j % w, y = j / w;
+            const int nx[4] = {x + 1, x - 1, x, x}, ny[4] = {y, y, y + 1, y - 1};
+            for (int k = 0; k < 4; ++k) {
+                if (nx[k] < 0 || ny[k] < 0 || nx[k] >= w || ny[k] >= h) continue;
+                const size_t q = size_t(ny[k]) * size_t(w) + size_t(nx[k]);
+                if (fg[q] && !label[q]) {
+                    label[q] = id;
+                    stack.push_back(int(q));
+                }
+            }
+        }
+    }
+    const int biggest = *std::max_element(sizes.begin(), sizes.end());
+    if (biggest <= 0) return *this;
+    for (size_t i = 0; i < n; ++i) fg[i] = label[i] > 0 && sizes[size_t(label[i])] * 10 >= biggest ? 1 : 0;
+    for (int k = 0; k < open + 1; ++k) pass(fg, true);
+    size_t subject = 0, backdrop = 0;
+    for (size_t i = 0; i < n; ++i) {
+        subject += fg[i];
+        backdrop += bg[i];
+    }
+    const float subjectFrac = float(subject) / float(n), backdropFrac = float(backdrop) / float(n);
+    // Sensible: a real backdrop went, and a subject of a fair size is left (not the whole picture, not a speck).
+    if (backdropFrac < 0.25f || subjectFrac < 0.02f || subjectFrac > 0.85f) return *this;
+    // Back to full size: bilinear, then a soft threshold, so the edge isn't blocky.
+    Image out = *this;
+    for (int y = 0; y < height; ++y) {
+        const float v = (float(y) + 0.5f) * float(h) / float(height) - 0.5f;
+        const int y0 = std::clamp(int(std::floor(v)), 0, h - 1), y1 = std::min(y0 + 1, h - 1);
+        const float fy = std::clamp(v - float(y0), 0.0f, 1.0f);
+        for (int x = 0; x < width; ++x) {
+            const float u = (float(x) + 0.5f) * float(w) / float(width) - 0.5f;
+            const int x0 = std::clamp(int(std::floor(u)), 0, w - 1), x1 = std::min(x0 + 1, w - 1);
+            const float fx = std::clamp(u - float(x0), 0.0f, 1.0f);
+            auto m = [&](int xx, int yy) { return float(fg[size_t(yy) * size_t(w) + size_t(xx)]); };
+            const float val = (m(x0, y0) * (1 - fx) + m(x1, y0) * fx) * (1 - fy) + (m(x0, y1) * (1 - fx) + m(x1, y1) * fx) * fy;
+            const float alpha = std::clamp((val - 0.5f) * 3.0f + 0.5f, 0.0f, 1.0f);
+            out.rgba[(size_t(y) * size_t(width) + size_t(x)) * 4 + 3] = uint8_t(alpha * 255.0f + 0.5f);
+        }
+    }
+    if (removed) *removed = true;
     return out;
 }
 
