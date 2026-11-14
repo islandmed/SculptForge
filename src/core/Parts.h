@@ -45,6 +45,19 @@ using PartRayFn = std::function<void(float x, float y, glm::vec3& origin, glm::v
 int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float tolerance = 0.0f, int active = -1,
                RayHit* hit = nullptr);
 
+// What the colour pick (C) finds under a screen point: the nearest hit across every visible Part, never only the active
+// one. The colour is that Part's texture or vertex paint under the point; a Part with neither gives `base` (the colour
+// the view shows it in). `hit` is in the Part's own space (what sampleColor and sampleTextureAt want). When nothing can
+// be picked `part` is -1 and `message` says why (shown to the user).
+struct PartColorPick {
+    int part = -1;
+    RayHit hit;
+    glm::vec3 colour{1.0f}; // linear
+    enum class From { None, Texture, VertexPaint, Base } from = From::None;
+    std::string message;
+};
+PartColorPick pickPartColor(Document& doc, const PartRayFn& rayAt, float x, float y, const glm::vec3& base);
+
 // The visible Parts merged into one mesh (for exporters that write a single
 // mesh), where they are in the scene. With one Part this is a copy of it, whether shown or not.
 Mesh mergedVisibleMesh(const Document& doc);

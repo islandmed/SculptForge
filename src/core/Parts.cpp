@@ -11,7 +11,9 @@
 #include "core/FaceGroups.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
+#include "core/Texture.h"
 #include "core/TextureTransfer.h"
+#include "core/VertexPaint.h"
 #include "io/GltfIO.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
@@ -128,12 +130,13 @@ const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch) {
 
 namespace {
 
-// The nearest visible Part along one ray (index, -1 for none), `skip` left out; its hit in scene space.
-int nearestPartOnRay(Document& doc, const glm::vec3& origin, const glm::vec3& dir, int skip, RayHit& nearest) {
+// The nearest visible Part along one ray (index, -1 for none), `skip` left out; its hit in scene space. With
+// `hidden` the Parts that are hidden count instead (to tell "nothing there" from "that Part is hidden").
+int nearestPartOnRay(Document& doc, const glm::vec3& origin, const glm::vec3& dir, int skip, RayHit& nearest, bool hidden = false) {
     int best = -1;
     for (int i = 0; i < doc.partCount(); ++i) {
         Part& s = doc.parts[size_t(i)];
-        if (!s.visible || i == skip) continue;
+        if (s.visible == hidden || i == skip) continue;
         // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
         const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
         const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
@@ -189,6 +192,40 @@ int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float to
     }
     if (out && under >= 0) *out = exact;
     return under;
+}
+
+PartColorPick pickPartColor(Document& doc, const PartRayFn& rayAt, float x, float y, const glm::vec3& base) {
+    PartColorPick r;
+    glm::vec3 origin, dir;
+    rayAt(x, y, origin, dir);
+    RayHit hit;
+    const int part = nearestPartOnRay(doc, origin, dir, -1, hit);
+    if (part < 0) {
+        RayHit behind;
+        r.message = nearestPartOnRay(doc, origin, dir, -1, behind, true) >= 0
+                        ? "Nothing to pick: the Part under the pointer is hidden"
+                        : "Nothing to pick: point at a visible Part, then press C";
+        return r;
+    }
+    const Part& p = doc.parts[size_t(part)];
+    if (p.moved()) { // the Part's own space: its triangles and colours live there
+        hit.position = glm::vec3(glm::inverse(p.transform) * glm::vec4(hit.position, 1.0f));
+        hit.normal = glm::normalize(glm::mat3(glm::transpose(p.transform)) * hit.normal);
+    }
+    const Mesh& m = doc.partMesh(part);
+    r.part = part;
+    r.hit = hit;
+    if (paintsTexture(m)) {
+        r.from = PartColorPick::From::Texture;
+        r.colour = sampleTextureAt(m, hit.triangle, hit.position);
+    } else if (m.hasColors()) {
+        r.from = PartColorPick::From::VertexPaint;
+        r.colour = sampleColor(m, hit.triangle, hit.position);
+    } else {
+        r.from = PartColorPick::From::Base;
+        r.colour = base;
+    }
+    return r;
 }
 
 Mesh mergedVisibleMesh(const Document& doc) {

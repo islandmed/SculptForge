@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/VertexPaint.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
 #include "render/Camera.h"
@@ -454,4 +455,52 @@ TEST(part_pick_near_thin_part) {
     CHECK(!partClickIsDrag(5.0f, 0.0f));
     CHECK(partClickIsDrag(6.0f, 0.0f));
     CHECK(partClickIsDrag(4.5f, 4.5f));
+}
+
+// C (pick colour) picks from the nearest visible Part under the pointer, not only the active one (Discord, macOS 0.13.1:
+// "it used to pick from everything"), and every miss says why.
+TEST(part_pick_colour_any_visible_part) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 4.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.activePart == 1); // the cube is the active Part, and unpainted
+    const glm::vec3 red(1.0f, 0.0f, 0.0f), base(0.62f, 0.58f, 0.53f);
+    paintFill(doc.partMesh(0), red); // the inactive sphere is painted
+    doc.syncBvh();
+    const glm::vec3 sphereC = doc.partMesh(0).bounds().center(), cubeC = doc.mesh.bounds().center();
+    // A camera looking down -z at a scene point (x, y): "screen" coordinates here are the scene's x and y.
+    const PartRayFn rayAt = [](float x, float y, glm::vec3& o, glm::vec3& d) {
+        o = glm::vec3(x, y, 10.0f);
+        d = glm::vec3(0.0f, 0.0f, -1.0f);
+    };
+
+    // Over the inactive, painted sphere: its colour, and the Part it came from.
+    PartColorPick p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y, base);
+    CHECK(p.part == 0 && p.from == PartColorPick::From::VertexPaint);
+    CHECK(glm::distance(p.colour, red) < 1e-3f);
+    // Over the active, unpainted cube: the colour the view shows it in.
+    p = pickPartColor(doc, rayAt, cubeC.x, cubeC.y, base);
+    CHECK(p.part == 1 && p.from == PartColorPick::From::Base && p.colour == base);
+
+    // Off the model: nothing, with a message.
+    p = pickPartColor(doc, rayAt, 50.0f, 50.0f, base);
+    CHECK(p.part < 0 && p.from == PartColorPick::From::None && p.message.find("visible Part") != std::string::npos);
+
+    // A hidden Part is not picked, and the message says it is hidden.
+    doc.parts[0].visible = false;
+    p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y, base);
+    CHECK(p.part < 0 && p.message.find("hidden") != std::string::npos);
+    doc.parts[0].visible = true;
+
+    // A Part moved on its own (a linked copy's transform) still gives its own colour.
+    doc.parts[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 5.0f, 0.0f));
+    p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y + 5.0f, base);
+    CHECK(p.part == 0 && glm::distance(p.colour, red) < 1e-3f);
+    doc.parts[0].transform = glm::mat4(1.0f);
+
+    // The nearest Part wins: a painted sphere behind the cube is not picked through it.
+    doc.parts[0].transform = glm::translate(glm::mat4(1.0f), cubeC - sphereC - glm::vec3(0.0f, 0.0f, 20.0f));
+    p = pickPartColor(doc, rayAt, cubeC.x, cubeC.y, base);
+    CHECK(p.part == 1 && p.colour == base);
 }

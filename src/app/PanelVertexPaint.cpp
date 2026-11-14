@@ -11,6 +11,9 @@
 #include "core/LitSphere.h"
 #include "core/VertexPaint.h"
 #include "core/Trash.h"
+#include "core/Parts.h"
+#include "core/Texture.h"
+#include "core/TextureChannels.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -463,34 +466,40 @@ void App::finishPaintStroke(UndoRecord& record) {
     record.paint = std::move(paintSnapshot_);
 }
 
+// C: the colour under the pointer, from the nearest visible Part (not only the active one): its texture or vertex paint, or
+// for a Part without either the colour the view shows it in (the base colour). Every miss says so in the status bar.
 void App::pickColorUnderCursor() {
     doc_.syncBvh();
-    RayHit hit;
-    if (!pick(mouseX_, mouseY_, hit)) return;
-    if (paintsTexture(doc_.mesh)) {
-        doc_.paintColor = sampleTextureAt(doc_.mesh, hit.triangle, hit.position);
-        if (hasMaterialChannels(*doc_.mesh.texture)) {
-            // C picks every channel: the brush material becomes the texture's material under the cursor, and the
-            // brush then paints all of the texture's channels.
-            BrushMaterial picked = doc_.paintMaterial;
-            sampleMaterialAt(doc_.mesh, hit.triangle, hit.position, picked);
-            doc_.paintMaterial = picked;
-            doc_.paintMaterial.color = doc_.paintColor;
-            char buf[160];
-            std::snprintf(buf, sizeof buf, "Picked the material: %s, roughness %.2f, metallic %.2f (every channel)",
-                          colorToHex(doc_.paintColor).c_str(), double(picked.roughness), double(picked.metallic));
-            status_ = buf;
-            return;
-        }
-        status_ = "Paint colour " + colorToHex(doc_.paintColor) + " (from the texture)";
+    if (!canvasRect().contains(mouseX_, mouseY_)) {
+        status_ = "Nothing to pick: point at a Part in the 3D view, then press C";
         return;
     }
-    if (!doc_.mesh.hasColors()) {
-        status_ = "The mesh has no vertex paint to pick from";
+    const PartColorPick pick = pickPartColor(
+        doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, mouseX_, mouseY_,
+        renderSettings_.baseColor);
+    if (pick.part < 0) {
+        status_ = pick.message;
         return;
     }
-    doc_.paintColor = sampleColor(doc_.mesh, hit.triangle, hit.position);
-    status_ = "Paint colour " + colorToHex(doc_.paintColor);
+    const Mesh& mesh = doc_.partMesh(pick.part);
+    doc_.paintColor = pick.colour;
+    if (pick.from == PartColorPick::From::Texture && hasMaterialChannels(*mesh.texture)) {
+        // C picks every channel: the brush material becomes the texture's material under the cursor, and the
+        // brush then paints all of the texture's channels.
+        BrushMaterial picked = doc_.paintMaterial;
+        sampleMaterialAt(mesh, pick.hit.triangle, pick.hit.position, picked);
+        doc_.paintMaterial = picked;
+        doc_.paintMaterial.color = doc_.paintColor;
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "Picked the material: %s, roughness %.2f, metallic %.2f (every channel)",
+                      colorToHex(doc_.paintColor).c_str(), double(picked.roughness), double(picked.metallic));
+        status_ = buf;
+        return;
+    }
+    const char* from = pick.from == PartColorPick::From::Texture ? " (from the texture)"
+                       : pick.from == PartColorPick::From::Base  ? " (the Part's colour: it has no paint)"
+                                                                  : "";
+    status_ = "Paint colour " + colorToHex(doc_.paintColor) + from + (pick.part != doc_.activePart ? ", from " + doc_.parts[size_t(pick.part)].name : "");
 }
 
 // Color palette: the Paint brush (Rgb / Raise), the colour, swatches and fills.
