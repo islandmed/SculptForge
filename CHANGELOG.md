@@ -6,6 +6,17 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-11-14
+
+### Fixed
+- **Pen side-button orbit** (#216, thanks @Calavera00): pressing a stylus side button to rotate (or pan) the view
+  started the drag at the position SDL puts on the button event, the pen's last one it knows, which can be far from
+  where the pen is; the first pen movement then threw the model across the view, or the press did nothing when that
+  position was off the canvas. The drag now starts at the cursor the pen has moved, and the first movement after the
+  pen comes into range never turns the view. A side button whose release never came (the pen left range or the window
+  lost focus with it down) is let go as soon as the next pen event shows SDL no longer holds it, so the stylus no
+  longer keeps turning the view or stops sculpting.
+
 ## [0.13.1] - 2026-11-14
 
 ### Fixed

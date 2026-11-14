@@ -8,12 +8,15 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.2
 
 ```features
-date: unreleased
+date: 2026-11-14
 tagline: Turning the view with a pen's side button starts where the pen is, and the pen no longer gets stuck.
 highlight: Turning the view with a pen's side button starts where the pen is, with no jump of the model
 highlight: A side button let go, or a window change mid-drag, no longer leaves the pen stuck
 highlight: After lifting the pen out of range or switching windows, the next stroke sculpts as it should
 ```
+
+- **Pen side buttons**: turning the view with a pen's side button starts where the pen is, with no jump of the model,
+  and a button or window change mid-drag no longer leaves the pen stuck.
 
 ## Version 0.13.1
 
