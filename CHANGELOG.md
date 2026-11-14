@@ -9,11 +9,6 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.13.1] - 2026-11-14
 
 ### Fixed
-- **Voxel Remesh** (Tool > Remesh, #193): areas laid in with Clay came out grainy. The tiny facets a stroke leaves in
-  the mesh (invisible under smooth shading) were sampled by the grid and showed up as blotches; the distance field is
-  now low-passed where the surface is smooth, keeping tips, creases and thin parts sharp, and the volume is held
-  (0.02% or less). Face groups are carried to the new surface as well (they used to reset); mask and vertex paint
-  already were.
 - Moving or resizing Tube points (Fixes #215, thanks @maratcgartist) closed the app on a long tube (one whose full
   mesh has over 60,000 triangles): while a point is dragged the Part shows a lighter preview, and the World Size
   cursor still cast its pick ray into the picking tree of the full mesh, reading triangles past the end of the

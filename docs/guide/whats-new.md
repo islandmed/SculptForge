@@ -9,16 +9,14 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-14
-tagline: Long Tubes edit without crashing, and Voxel Remesh keeps your sculpt smooth.
+tagline: Long Tubes edit without crashing, and heavy Ropes and Braids stay in check.
 highlight: Moving or resizing the points of a long Tube no longer closes the app
-highlight: Voxel Remesh keeps your sculpt smooth: Clay strokes no longer come out grainy after a remesh
-highlight: Face groups now come through a Voxel Remesh
+highlight: A Rope or Braid that would grow too heavy is drawn with longer edges instead of running away
+highlight: A Tube edit that cannot be drawn keeps the last good shape, and autosave waits while a point is dragged
 ```
 
-- **Voxel Remesh keeps your sculpt smooth**: Clay and other strokes no longer come out grainy after a remesh, and face
-  groups now come through it.
-- **Tube point edits no longer crash**: moving or resizing the points of a long Tube (many points) closed the app; and
-  a Rope or Braid that would be too heavy is drawn with longer edges instead of running away.
+- **Tube point edits no longer crash**: moving or resizing the points of a long Tube (many points) closed the
+  app; and a Rope or Braid that would be too heavy is drawn with longer edges instead of running away.
 
 ## Version 0.13.0
 
