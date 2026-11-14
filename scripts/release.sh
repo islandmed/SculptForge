@@ -343,6 +343,17 @@ feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 # headline_check: the launch headline the CMO picked for this version (~/Work/.sf/launch.py headline: state/launch/X.Y.Z.json,
 # {"line", "keywords"}) must show in what the release publishes: HIGHLIGHTS line 1 (Discord post, latest.json lead) and the What's
 # New tagline (site bar, README). Every keyword, case-insensitive. Warnings only, never a failed stage (0.12.7 led with the wrong story).
+# notes_names_check: the launch headline, README's "New in" line and HIGHLIGHTS name only what this release's CHANGELOG and
+# What's New sections name (tools/release/notes_names.py). 0.13.1: a fix pulled after the headline was written still
+# led the GitHub release and the README; a pull now stops the release here until the lines say what ships.
+notes_names_check() {
+    local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$BASE.json out
+    [ -n "$PRE" ] && return 0
+    out=$(python3 tools/release/notes_names.py "$BASE" --launch "$f" ${HIGHLIGHTS:+--highlights "$HIGHLIGHTS"} 2>&1) ||
+        die "what the release says up front names what it doesn't carry:
+$(sed 's/^/     /' <<<"$out")" "fix the line (the CMO's $f via launch.py headline, README.md's New in line, or HIGHLIGHTS), then $(resume "${STEP:-check}")"
+}
+
 headline_check() {
     local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$V.json kws k line tag miss said
     if [ ! -f "$f" ]; then
@@ -686,6 +697,7 @@ step_stage() {
     sha=$(git rev-parse HEAD)
     bumped || die "HEAD ${sha:0:8} is not at $V" "run the bump first: $(resume bump)"
     headline_check
+    STEP=stage notes_names_check
     [ -n "${STAGE_WITH+x}" ] || { [ -x "$HOME/Work/.sf/t1.sh" ] && with="$HOME/Work/.sf/t1.sh ."; }
     # The full suite runs once, on the batch (docs/testing-flow.md "Areas"): t1.sh logged that commit green, and the bump
     # on top only adds paperwork (as CI's reuse, ci_reused), so the PC doesn't run the whole suite a second time.
@@ -759,6 +771,7 @@ step_check() {
     fi
     grep -q "^project(SculptForge VERSION ${V//./\\.}[ )]" CMakeLists.txt || die "CMakeLists.txt is not at $V" "$bump"
     grep -q "^## \[${V//./\\.}\]" CHANGELOG.md || die "CHANGELOG.md has no '## [$V] - date' section" "$bump"
+    STEP=check notes_names_check
     grep -qF "<release version=\"$V\"" packaging/linux/org.sculptforge.SculptForge.metainfo.xml || die "metainfo has no <release version=\"$V\">" "$bump"
     grep -qx "version: $V" CITATION.cff || die "CITATION.cff is not at $V" "$bump"
     grep -qx "version = \"$V\"" packaging/rez/package.py || die "packaging/rez/package.py is not at $V" "$bump"
@@ -895,10 +908,19 @@ release_apk() {
     elif grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
     sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { printf '   WARNING: no APKs on %s: %s is not a commit here\n' "$T" "$T"; return 0; }
     id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
-    if [ -z "$id" ]; then
-        printf '   WARNING: no Android run for %s: the beta ships without APKs; gh workflow run android.yml -R %s --ref %s, then %s\n' \
-            "${sha:0:8}" "$REPO" "$T" "$(resume release)"
-        return 0
+    if [ -z "$id" ]; then # (0.13.1: a re-stage made a commit no Android run had built; the members' release came out empty)
+        echo "   no Android run for ${sha:0:8}: starting android.yml on $T ..."
+        gh workflow run android.yml -R "$REPO" --ref "$T" >/dev/null 2>&1 || true
+        for _ in $(seq 1 ${SF_APK_POLLS:-30}); do
+            id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+            [ -n "$id" ] && break
+            sleep "${SF_APK_POLL_S:-10}"
+        done
+        if [ -z "$id" ]; then
+            printf '   WARNING: no Android run for %s even after starting one: the release ships without APKs; gh workflow run android.yml -R %s --ref %s, then %s\n' \
+                "${sha:0:8}" "$REPO" "$T" "$(resume release)"
+            return 0
+        fi
     fi
     if [ "$(gh run view "$id" -R "$REPO" --json status -q .status 2>/dev/null)" != completed ]; then
         echo "   waiting for the Android run $id ..."

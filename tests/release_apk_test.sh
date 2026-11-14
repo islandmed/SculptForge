@@ -17,7 +17,8 @@ cat > "$S/bin/gh" <<'SH'
 # gh run list ... | gh run view ID --json status|conclusion | gh run download ID -n NAME -D DIR | gh release upload T -R repo --clobber FILES
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
-  "run list") echo "$GH_RUN" ;;
+  "run list") if [ -n "$GH_RUN" ]; then echo "$GH_RUN"; elif [ -e "$GH_DISPATCHED" ]; then echo "$GH_RUN_AFTER"; fi ;;
+  "workflow run") [ -z "$GH_NODISPATCH" ] || exit 1; touch "$GH_DISPATCHED" ;;
   "run view") case "$*" in *status*) echo completed ;; *) echo "$GH_CONC" ;; esac ;;
   "run download")
     [ -z "$GH_NODL" ] || exit 1
@@ -31,7 +32,7 @@ SH
 chmod +x "$S/bin/gh"
 printf '#!/bin/sh\necho "$*" >> "$HERDR_LOG"\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # never the real sfmonitor
 git init -q "$S/repo" && cd "$S/repo" && git -c user.name=t -c user.email=t@e commit -q --allow-empty -m beta && git tag v9.9.9-beta.3
-export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_CREATED=$S/created HERDR_LOG=$S/herdr.log
+export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_CREATED=$S/created HERDR_LOG=$S/herdr.log GH_DISPATCHED=$S/dispatched SF_APK_POLLS=2 SF_APK_POLL_S=0
 REPO=pub/app INSIDERS_REPO=pri/insiders
 V=9.9.9-beta.3 T=v9.9.9-beta.3 PRE=beta.3 RELEASE_REPO=pri/insiders
 work=$S/work
@@ -42,10 +43,10 @@ gh_watch() { return 0; }
 # shellcheck disable=SC1090
 eval "$(sed -n '/^release_apk()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
 reset() {
-    rm -rf "$work/apk" "$S/gh.log" "$S/uploads" "$S/created" "$S/herdr.log"
+    rm -rf "$work/apk" "$S/gh.log" "$S/uploads" "$S/created" "$S/herdr.log" "$S/dispatched"
     : > "$S/gh.log"
     printf 'SHA256SUMS.txt\nSculptForge-9.9.9-linux.tar.gz\n' > "$work/assets"
-    export GH_RUN=4242 GH_CONC=success GH_NODL= GH_UPFAIL= GH_IREL= GH_IASSETS= GH_CREATEFAIL=
+    export GH_RUN=4242 GH_CONC=success GH_NODL= GH_UPFAIL= GH_IREL= GH_IASSETS= GH_CREATEFAIL= GH_RUN_AFTER= GH_NODISPATCH=
 }
 
 # 1. the beta: both APKs and their sums, to the private repository only
@@ -74,10 +75,16 @@ reset; GH_CREATEFAIL=1; out=$(release_apk 2>&1) || fail "a failed create failed 
 echo "$out" | grep -q WARNING && [ ! -e "$S/uploads" ] || fail "stable create failure: $out"
 V=9.9.9-beta.3 T=v9.9.9-beta.3 PRE=beta.3 RELEASE_REPO=pri/insiders
 
-# 3. no run for the commit: a warning, no upload, success
-reset; GH_RUN=; out=$(release_apk 2>&1) || fail "failed without a run"
+# 3. no run for the commit: android.yml is started on the tag and its APKs land (0.13.1 shipped an empty members' release)
+reset; GH_RUN= GH_RUN_AFTER=5151; out=$(release_apk 2>&1) || fail "failed without a run: $out"
+grep -q 'workflow run android.yml -R pub/app --ref v9.9.9-beta.3' "$S/gh.log" || fail "android.yml not started: $(cat "$S/gh.log")"
+grep -q -- '-R pri/insiders' "$S/uploads" || fail "no APKs after starting the run: $out"
+# 3b. no run appears even after starting one (or the start fails): a warning, no upload, success
+reset; GH_RUN=; out=$(release_apk 2>&1) || fail "failed when no run appeared"
 echo "$out" | grep -q WARNING || fail "no warning without a run: $out"
 [ ! -e "$S/uploads" ] || fail "uploaded without a run"
+reset; GH_RUN= GH_NODISPATCH=1; out=$(release_apk 2>&1) || fail "failed when the start failed"
+echo "$out" | grep -q WARNING && [ ! -e "$S/uploads" ] || fail "start failure: $out"
 
 # 4. the run failed: warning, no upload
 reset; GH_CONC=failure; out=$(release_apk 2>&1) || fail "failed with a red run"

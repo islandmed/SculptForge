@@ -249,15 +249,16 @@ def rerun_args(args):
 
 def without_nightly(args):
     """The ctest args with nightly tests left out, unless the args pick labels themselves (-L / --label-regex, any
-    label: -L bench means every bench test, nightly ones too). ctest keeps only the last -LE: nightly folds into it."""
+    label: -L bench means every bench test, nightly ones too). ctest keeps only the last -LE: nightly folds into it. The
+    label `nightly` exactly: `nightly_area` tests (a real-model check T0 runs when its area changes) are not left out."""
     if any(x in ("-L", "--label-regex") or x.startswith(("-L=", "--label-regex=")) for x in args):
         return list(args)
     args = list(args)
     le = [i for i, x in enumerate(args) if x in ("-LE", "--label-exclude") and i + 1 < len(args)]
     if le:
-        args[le[-1] + 1] = f"({args[le[-1] + 1]})|nightly"
+        args[le[-1] + 1] = f"({args[le[-1] + 1]})|^nightly$"
     else:
-        args += ["-LE", "nightly"]
+        args += ["-LE", "^nightly$"]
     return args
 
 
@@ -580,8 +581,8 @@ def self_test():
                                '<testcase name="b" time="2" status="fail"><failure message="x"/></testcase></testsuite>')
         assert results(junit) == {"a": ("pass", 1.5), "b": ("fail", 2.0)}
         # Nightly tests stay out unless the args pick labels: any -L (bench tests labelled nightly too, pose-all).
-        assert without_nightly(["-j3"]) == ["-j3", "-LE", "nightly"]
-        assert without_nightly(["-LE", "ui", "-R", "x"]) == ["-LE", "(ui)|nightly", "-R", "x"]
+        assert without_nightly(["-j3"]) == ["-j3", "-LE", "^nightly$"]
+        assert without_nightly(["-LE", "ui", "-R", "x"]) == ["-LE", "(ui)|^nightly$", "-R", "x"]
         assert without_nightly(["-L", "bench", "-j2"]) == ["-L", "bench", "-j2"]
         assert without_nightly(["--label-regex", "nightly"]) == ["--label-regex", "nightly"]
         assert without_nightly(["--label-regex=bench", "-LE", "ui"]) == ["--label-regex=bench", "-LE", "ui"]

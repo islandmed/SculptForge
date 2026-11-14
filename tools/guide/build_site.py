@@ -885,16 +885,27 @@ def readme_news(page: "WhatsNewPage") -> str:
             f'(<a href="https://sculptforge.app/guide/{target}">how it works</a>)')
 
 
+def _news_words(line: str) -> str:
+    """A New in line's words, for comparing: no tags, no link, the first letter's case ignored."""
+    words = " ".join(re.sub(r"<[^>]+>|\(.*?\)", " ", line.split(":</strong>", 1)[-1]).split())
+    return words[:1].lower() + words[1:]
+
+
 def write_readme_news(page: "WhatsNewPage") -> str:
-    """README.md's "New in X" line brought up to the newest version; the same version's (hand-edited) line stays.
-    No README, no line or no versions: unchanged (never blocks a release)."""
+    """README.md's "New in X" line brought up to the newest version. The same version's line stays when it says the same
+    as the tagline (a hand edit of the first letter's case, like "Android", is kept); when the tagline changed (0.13.1: a
+    fix pulled and the notes rewritten after the first stage), it is written again. No README, no line or no versions:
+    unchanged (never blocks a release)."""
     if not page.versions or not README.exists():
         return ""
     t = README.read_text(encoding="utf-8")
     m = README_NEWS.search(t)
-    if not m or m.group(2) == page.versions[0]["version"]:
+    if not m:
         return t
-    return t[:m.start()] + readme_news(page) + t[m.end():]
+    fresh = readme_news(page)
+    if m.group(2) == page.versions[0]["version"] and _news_words(m.group(0)) == _news_words(fresh):
+        return t
+    return t[:m.start()] + fresh + t[m.end():]
 
 
 def write_home(page: "WhatsNewPage", check_only: bool) -> bool:

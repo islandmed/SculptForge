@@ -805,6 +805,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
   set_tests_properties(sculptforge_tests_nightly PROPERTIES LABELS nightly TIMEOUT 3600
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  # The voxel and remesh real-model nightlies alone: T0 runs them when Voxel/Remesh/MemoryGuard change (tools/test/impacted.py).
+  add_test(NAME sculptforge_tests_nightly_voxel COMMAND sculptforge_tests --nightly voxel remesh)
+  set_tests_properties(sculptforge_tests_nightly_voxel PROPERTIES LABELS nightly_area TIMEOUT 900
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
@@ -985,6 +989,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
+    # The launch headline, README line and HIGHLIGHTS name only what the release's notes name (release.sh stage/check).
+    add_test(NAME release_notes_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/notes_names.py --self-test)
     # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
     add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
     # A branch made from an old tree (a squash with reset --soft onto a moved origin/main) put older main files back (0.11.11).

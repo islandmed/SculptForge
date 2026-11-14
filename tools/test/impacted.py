@@ -33,6 +33,12 @@ import sys
 from collections import Counter, defaultdict
 
 # Files no test command names, and the tests that read them. Globs match the repo-relative path.
+# Nightly tests T0 runs anyway when these files change: the real-model checks of an area whose regressions the per-push
+# suite can't see (0.13.1: a Voxel Remesh change broke Keep masked on the lion; only the Packages nightly run caught it).
+NIGHTLY_AREAS = [
+    ("src/core/Voxel*", "sculptforge_tests_nightly_voxel"), ("src/core/MemoryGuard*", "sculptforge_tests_nightly_voxel"),
+    ("src/core/*Remesh*", "sculptforge_tests_nightly_voxel"),
+]
 HAND_MAP = [
     ("CMakeLists.txt", "."), ("cmake/*", "."),
     ("docs/guide/*", "guide_site guide_menu_paths ui_user_guide ui_user_guide_1080 ui_whats_new ui_guide_shortcuts ui_quick_tour"),
@@ -47,7 +53,7 @@ HAND_MAP = [
     ("tests/release_beta_test.sh", "release_script_beta"),
     ("tools/release/*", "release_notes release_notes_fragments release_script_beta release_pin_whats_new release_workflows"
                         " release_workflows_self_test release_paperwork release_staged_run release_verify_staged"
-                        " release_install_assets release_install_assets_self_test"),
+                        " release_install_assets release_install_assets_self_test release_notes_names"),
     (".github/workflows/*", "release_workflows release_script_beta release_install_assets"),
     ("install/*", "release_install_assets"),
     ("packaging/windows/*", "ui_windows_dpi_2560 ui_windows_dpi_2160 ui_ui_scale_900"),
@@ -314,14 +320,16 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
     graph = Graph(build, root) if graph is None else graph
     names = {t["name"] for t in tests}
     ui_names = {n for n in names if n.startswith("ui_")}
-    nightly = {t["name"] for t in tests if "nightly" in t["labels"]}
+    # (nightly_area: picked only through NIGHTLY_AREAS, never as a test of the binary it runs)
+    nightly = {t["name"] for t in tests if "nightly" in t["labels"] or "nightly_area" in t["labels"]}
     pick = {}
 
     def add(name, why):
         if name in names and name not in nightly and name not in pick:
             pick[name] = why
 
-    shards = sorted(t["name"] for t in tests if t["command"] and os.path.basename(t["command"][0]) == "sculptforge_tests")
+    shards = sorted(t["name"] for t in tests if t["command"] and os.path.basename(t["command"][0]) == "sculptforge_tests"
+                    and "--nightly" not in t["command"])  # (a nightly area entry runs only through NIGHTLY_AREAS)
     # Every file a test's command names, and that file's folder (a script's sibling modules).
     by_file, by_dir, by_output = defaultdict(set), defaultdict(set), defaultdict(set)
     for t in tests:
@@ -355,6 +363,11 @@ def impacted(root, build, files, verbose=False, graph=None, tests=None, history=
                     everything = True
                 for n in targets.split():
                     add(n, f"hand map {glob}")
+        for glob, targets in NIGHTLY_AREAS:
+            if fnmatch.fnmatch(f, glob):
+                for n in targets.split():
+                    if n in names and n not in pick:
+                        pick[n] = f"nightly area {glob}"
         for n in by_file.get(f, ()):
             add(n, f"runs {f}")
         d = os.path.dirname(f)
@@ -443,7 +456,8 @@ def self_test():
                  T("ui_bench", app, "--bench", labels=["ui", "nightly"]),
                  T("ui_shell_layout", app), T("marks", "python3", root + "/tools/check_marks.py"),
                  T("guide_site", "python3", root + "/tools/guide/build_site.py", "--check"),
-                 T("release_notes_fragments", "python3", "x.py")]
+                 T("release_notes_fragments", "python3", "x.py"),
+                 T("sculptforge_tests_nightly_voxel", os.path.join(b, "sculptforge_tests"), "--nightly", "voxel", labels=["nightly_area"])]
         r = lambda *f: impacted(root, b, list(f), graph=g, tests=tests, history=False)
         assert r("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_shell_layout)$", r("src/core/Mesh.h")
         assert r("src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels|ui_shell_layout)$", r("src/app/PanelMicro.cpp")
@@ -456,6 +470,9 @@ def self_test():
         assert r("tests/ui/bake.sfui") == "^(marks|ui_bake)$", r("tests/ui/bake.sfui")
         assert r("tests/ui/data/feed.json") == "^(marks|ui_bake)$"
         assert r("tools/guide/lib.py") == "^(guide_site|marks)$", r("tools/guide/lib.py")
+        # a nightly test only through its area: a Voxel change runs the real-model voxel nightlies, a Mesh change does not
+        assert "sculptforge_tests_nightly_voxel" in r0("src/core/Voxel.cpp"), r0("src/core/Voxel.cpp")
+        assert "nightly" not in r("src/core/Mesh.h"), r("src/core/Mesh.h")
         assert r("changes/x.md") == "^(marks|release_notes_fragments)$"  # (stale_tree: not in this fake build)
         assert r("CMakeLists.txt") == "."
         cm = ("project(x)\nadd_executable(sculptforge a.cpp\n  b.cpp)\nif(T)\n  # the bake\n"
