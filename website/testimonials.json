@@ -28,5 +28,11 @@
     "name": "Rand_Gogh",
     "role": "Concept Designer and Character Artist",
     "date": "2026-11-12"
+  },
+  {
+    "quote": "I've had a long-standing interest in sculpting various human faces. My goal is to block out the primary forms in Blender, send the base mesh or Shape Keys to SculptForge to sculpt fine forms and surface textures, and then complete the piece.",
+    "name": "Hong's Art Lab (hmh426)",
+    "context": "Blender to SculptForge for fine detail",
+    "date": "2026-11-14"
   }
 ]
