@@ -1,0 +1,39 @@
+# C (pick colour) picks from the Part under the pointer, whichever Part is active, and says why when it can't.
+# Two Parts: a red sphere (inactive) and the cube being sculpted (unpainted).
+run new_sphere subdivisions=4
+run set_color color=ff0000
+run paint_fill
+click "Parts/Append"
+click "Cube"
+expect_value parts == 2
+expect_value active_part == 1
+run set_color color=00ff00
+expect_value brush_color_g == 255
+camera 0 0
+shot scene
+
+# Pointing at the inactive, painted sphere: its red, and which Part it came from.
+click_part "Sphere" 0.5 0.5 0
+key c
+expect_value brush_color_r == 255
+expect_value brush_color_g == 0
+expect_status from Sphere
+shot picked_inactive_part
+
+# Pointing at the active, unpainted cube: the colour the Part is shown in, and the status says it has no paint.
+click_part "Cube" 0.5 0.5 0
+key c
+expect_value brush_color_r < 250
+expect_status it has no paint
+shot picked_unpainted_part
+
+# Off the model: nothing changes, and the status bar says what to do.
+run set_color color=00ff00
+camera_distance 40
+mouse_by 150 150
+key c
+expect_value brush_color_g == 255
+expect_status Nothing to pick
+wait 0.3
+expect_text then press C
+shot nothing_to_pick

@@ -2867,6 +2867,12 @@ private:
     // pixels; Preferences > Hints lists them. hintShown: not hidden by either.
     bool hintShown(const char* id) const;
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
+    // A short note over the 3D view for a key that found nothing to act on (C with nothing under the pointer): the status
+    // bar's message is small and elided in a narrow bar, and was missed. It also goes to the status bar.
+    void toastInViewport(const std::string& text);
+    void drawViewportToast();
+    std::string viewportToast_;
+    double viewportToastUntil_ = 0.0;
     void drawHintsSection();
     // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);

@@ -180,7 +180,8 @@
 //                            axis), camera_distance, camera_pan (target offset);
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
-//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255)
+//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
+//                            brush_color_r / brush_color_g / brush_color_b (the brush's colour, sRGB 0-255: what C picks)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
 //                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
 //                            texture_layers, active_texture_layer,
@@ -700,6 +701,8 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const glm::vec3& c : m.colors) sum += double(linearToSrgb(c)[k]);
         return 255.0 * sum / double(m.colors.size());
     }
+    if (name == "brush_color_r" || name == "brush_color_g" || name == "brush_color_b")
+        return std::round(255.0f * linearToSrgb(app_.doc_.paintColor)[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2]);
     if (name == "uvs") return m.hasUvs() ? 1.0 : 0.0;
     if (name == "subdiv_level") return subdivLevelCount(m) ? double(subdivCurrentLevel(m) + 1) : 0.0;
     if (name == "sdiv_levels") return double(subdivLevelCount(m));

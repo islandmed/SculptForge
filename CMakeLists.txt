@@ -1201,6 +1201,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
     sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
+    # C picks the colour of the Part under the pointer, active or not, and the status bar says when nothing can be picked
+    # (tests/ui/pick_colour_parts.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(pick_colour_parts_1440 pick_colour_parts --size 1440x900)
+    sculptforge_ui_test(pick_colour_parts_2880 pick_colour_parts --size 2880x1800)
     # View > Reference images (tests/ui/reference_images.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(reference_images_1440 reference_images --size 1440x900)
     sculptforge_ui_test(reference_images_2880 reference_images --size 2880x1800)

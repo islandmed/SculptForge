@@ -1522,6 +1522,38 @@ void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float
     ImGui::PopStyleVar(3);
 }
 
+void App::toastInViewport(const std::string& text) {
+    status_ = text;
+    viewportToast_ = text;
+    viewportToastUntil_ = ImGui::GetTime() + 3.5;
+    redrawIn(3.6); // it goes by itself
+}
+
+void App::drawViewportToast() {
+    if (viewportToast_.empty()) return;
+    if (ImGui::GetTime() >= viewportToastUntil_) {
+        viewportToast_.clear();
+        return;
+    }
+    const CanvasRect c = canvasRect();
+    const float s = uiScale_;
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 8.0f * s), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * s, 6.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme::rounding(4.0f * s));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoInputs;
+    if (ImGui::Begin("##viewport.toast", nullptr, flags)) {
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::textBright);
+        ImGui::TextUnformatted(tr(viewportToast_.c_str()));
+        ImGui::PopStyleColor();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(3);
+}
+
 void App::drawHintsSection() {
     ui::Checkbox("Show hints in the viewport##hints.show", &uiPrefs_.showHints);
     ui::HelpText("Show hints in the viewport", nullptr,
