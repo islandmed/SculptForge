@@ -1,7 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSets.h"
-#include "core/FileReplace.h"
 
 #include <algorithm>
 #include <cctype>
@@ -165,7 +164,12 @@ bool saveBrushSet(const std::string& dir, BrushSet& set, std::string& error) {
             return false;
         }
     }
-    if (!replaceFile(tmp, target, error)) return false;
+    fs::rename(tmp, target, ec);
+    if (ec) {
+        fs::remove(tmp, ec);
+        error = "Can't write " + u8str(target);
+        return false;
+    }
     set.path = u8str(target);
     return true;
 }

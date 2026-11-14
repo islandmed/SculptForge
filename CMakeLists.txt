@@ -108,7 +108,6 @@ add_library(sculptforge_core STATIC
   src/core/BrushPacks.cpp
   src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
-  src/core/FileReplace.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/Image.cpp
