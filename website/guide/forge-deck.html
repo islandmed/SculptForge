@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forge Deck (prototype) - SculptForge User Guide</title>
+  <meta name="description" content="In short:">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
+  <link rel="canonical" href="https://sculptforge.app/guide/forge-deck.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Forge Deck (prototype) - SculptForge User Guide">
+  <meta property="og:description" content="In short:">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/guide/forge-deck.html">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=40">
+  <script src="../motion.js?v=15" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=57" defer></script>
+</head>
+<body class="guide-page" data-section="ref" data-prev="discord.html" data-next="support.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="../guide/index.html" aria-current="page">Guide</a>
+        <a href="../studios.html">For studios</a>
+        <a href="../why.html">About</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="../support.html">Support</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Forge Deck (prototype)</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group" data-section="start">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li><li><a href="reference-images.html">Reference images</a></li></ul><p class="toc-group" data-section="sculpt">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html">Brush packs</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="linked-duplicates.html">Linked Duplicates</a></li><li><a href="garments.html">Garments: sewing patterns at real size</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="tube.html">Tube: draw in 3D space</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="edges.html">Edges: selecting and creasing edges</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group" data-section="ai">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group" data-section="files">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li><li><a href="security.html">Security overview for IT reviews</a></li></ul><p class="toc-group" data-section="ref">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="discord.html">Show SculptForge on Discord</a></li><li><a href="forge-deck.html" class="current" aria-current="page">Forge Deck (prototype)</a><ul class="toc-sections"><li><a href="#switch-it-on">Switch it on</a></li><li><a href="#the-controls">The controls</a></li><li><a href="#first-time-the-tour">First time: the tour</a></li><li><a href="#wi-fi-or-internet">Wi-Fi or internet</a></li><li><a href="#when-the-connection-drops">When the connection drops</a></li><li><a href="#what-it-can-and-cant-do">What it can and can&#x27;t do</a></li><li><a href="#troubleshooting">Troubleshooting</a></li></ul></li><li><a href="support.html">Support and membership</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="forge-deck-prototype">Forge Deck (prototype)</h1>
+<figure class="guide-hero"><img src="images/forge-deck-hero.jpg" alt="The Forge Deck on a phone: the current brush, Size and Intensity strips and the brush tiles" width="1704" height="972" decoding="async"></figure>
+<aside class="callout callout-short"><p><strong>In short:</strong></p><ul><li>Your phone becomes a control pad for your sculpting session: brush tiles, Size, Intensity, Undo, Redo and Mirror.</li><li>No app and no account: scan a QR code and the phone&#x27;s browser connects to SculptForge.</li><li>It is a prototype for testers: off until you switch it on in <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Experimental</span></span>.</li></ul></aside>
+<p>Keep your pen on the canvas and your other hand on the phone. Tap a brush tile and SculptForge switches to that brush. Drag a strip to change the brush size or intensity. Undo and Redo are two big buttons under your thumb. What you change in SculptForge shows up on the phone too, so the two always agree.</p>
+<p>The Forge Deck can do <strong>only</strong> these things (see <a href="#what-it-can-and-cant-do">What it can and can&#x27;t do</a>). It cannot open files, run scripts or see your model.</p>
+<h2 id="switch-it-on">Switch it on<a class="anchor" href="#switch-it-on" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>
+Open <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Experimental</span></span> and check <strong>Forge Deck (prototype)</strong>. It is off until you do, and it stays off after every restart.
+</li>
+<li>
+Choose <span class="path"><span>File</span><i>&#8250;</i><span>Forge Deck (prototype)</span></span>. A window opens with a QR code.
+</li>
+<li>
+Point the phone&#x27;s camera at the QR code and tap the link it shows. The Deck opens in the phone&#x27;s browser (Safari on iPhone, Chrome on Android).
+</li>
+<li>
+Android&#x27;s Chrome may ask to let the page reach devices on your local network. Tap <strong>Allow</strong>: that is how the phone finds your computer.
+</li>
+</ol>
+<p>The phone and the computer should be on the same Wi-Fi. If they aren&#x27;t, or the Wi-Fi blocks devices from talking to each other, the Deck still works over the internet (see <a href="#wi-fi-or-internet">Wi-Fi or internet</a>).</p>
+<p>While a phone is paired, a banner over the canvas says which phone is driving the session, with a <strong>Disconnect</strong> button. Closing the Forge Deck window, or <strong>Disconnect</strong> on either side, ends the link at once and the QR code stops working. The next time you open the window there is a new code.</p>
+<h2 id="the-controls">The controls<a class="anchor" href="#the-controls" aria-label="Link to this section">#</a></h2>
+<figure class="shot"><a href="images/forge-deck-controls.jpg" class="zoom"><img src="images/forge-deck-controls.jpg" alt="The Deck&#x27;s controls on an iPhone" width="592" height="1197" loading="lazy" decoding="async"></a><figcaption>The Deck&#x27;s controls on an iPhone</figcaption></figure>
+<ul>
+<li>
+<strong>The readout</strong> at the top shows the current brush, its size and intensity, and whether Mirror is on. It follows SculptForge: pick a brush on the computer and it changes on the phone.
+</li>
+<li>
+<strong>Brush tiles</strong> are the first brushes of your shelf, with the same thumbnails. Tap one to switch. The tile lights up at once and your phone gives a short tap of feedback; the readout confirms when SculptForge has switched.
+</li>
+<li>
+<strong>Size and Intensity</strong> are strips you can drag anywhere: you don&#x27;t have to hit a handle. The phone ticks at each quarter. For fine control, keep dragging while you slide your finger <strong>away</strong> from the strip (up or down): the further away, the finer the steps. Tap the number to <strong>type an exact value</strong> (Size in pixels, Intensity from 0 to 100).
+</li>
+<li>
+<strong>Undo</strong> and <strong>Redo</strong> work like the keys on the computer. They wait until a stroke is finished.
+</li>
+<li>
+<strong>Mirror</strong> turns mirroring across the X axis on or off.
+</li>
+</ul>
+<p>The Deck follows how you hold the phone or tablet. In landscape the controls sit on the left and the brushes on the right, so your thumbs reach both.</p>
+<figure class="shot"><a href="images/forge-deck-landscape.jpg" class="zoom"><img src="images/forge-deck-landscape.jpg" alt="The Deck in landscape" width="1400" height="646" loading="lazy" decoding="async"></a><figcaption>The Deck in landscape</figcaption></figure>
+<h2 id="first-time-the-tour">First time: the tour<a class="anchor" href="#first-time-the-tour" aria-label="Link to this section">#</a></h2>
+<p>The first time a phone or tablet connects, a four-step tour points at the brush tiles, the strips, the buttons and the connection. Tap <strong>Next</strong> to go through it or <strong>Skip</strong> to close it. The <strong>?</strong> button in the Deck&#x27;s top right corner shows it again whenever you like.</p>
+<h2 id="wi-fi-or-internet">Wi-Fi or internet<a class="anchor" href="#wi-fi-or-internet" aria-label="Link to this section">#</a></h2>
+<p>The pill at the top of the Deck shows how the phone is connected.</p>
+<div class="table-wrap"><table><thead><tr><th>It says</th><th>What it means</th></tr></thead><tbody><tr><td><strong>Connected · Wi-Fi</strong></td><td>The phone talks to your computer directly over your local network. This is the fastest, and nothing leaves your network.</td></tr><tr><td><strong>Connected · internet</strong></td><td>The phone can&#x27;t reach the computer directly (for example, a router that keeps devices apart, or Android&#x27;s Chrome without local-network access), so the commands go through SculptForge&#x27;s link relay instead. It works the same, with a short delay.</td></tr></tbody></table></div>
+<p>The relay sees only encrypted data. Every command is locked with a key that is only in the QR code&#x27;s link and on the two devices, each one carries a counter so an old or repeated message is thrown away, and the relay deletes what it holds five minutes after the last message. Only the six commands below are ever accepted, over either path.</p>
+<h2 id="when-the-connection-drops">When the connection drops<a class="anchor" href="#when-the-connection-drops" aria-label="Link to this section">#</a></h2>
+<p>The Deck reconnects by itself. The phone shows <strong>Reconnecting</strong> and keeps your place for 5 minutes, with a countdown. You don&#x27;t scan again. If the Wi-Fi comes back, or the relay can take over, the controls return where you left them. If the 5 minutes run out, the Deck says so and asks you to scan the new QR code.</p>
+<figure class="shot"><a href="images/forge-deck-states.jpg" class="zoom"><img src="images/forge-deck-states.jpg" alt="The Deck&#x27;s other screens: waiting for the computer, connecting, reconnecting and a connection error" width="1660" height="816" loading="lazy" decoding="async"></a><figcaption>The Deck&#x27;s other screens: waiting for the computer, connecting, reconnecting and a connection error</figcaption></figure>
+<p>A phone that goes to sleep or reloads the page picks up the same way, as long as it is within the 5 minutes.</p>
+<h2 id="what-it-can-and-cant-do">What it can and can&#x27;t do<a class="anchor" href="#what-it-can-and-cant-do" aria-label="Link to this section">#</a></h2>
+<p>The phone can send exactly six commands:</p>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td>Brush tile</td><td>Switches to a brush the Deck itself showed you</td></tr><tr><td>Size</td><td>Sets the brush size (the range shown on the strip)</td></tr><tr><td>Intensity</td><td>Sets the brush intensity</td></tr><tr><td>Undo, Redo</td><td>Steps through your history</td></tr><tr><td>Mirror</td><td>Turns X mirroring on or off</td></tr></tbody></table></div>
+<p>Anything else is refused, counted and written to the audit log. A phone can send at most 20 commands a second, and a message that is too long or has anything unexpected in it is dropped. Nothing about your model is sent to the phone: only the brush names and thumbnails, the size, the intensity and the Mirror setting.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="anchor" href="#troubleshooting" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>
+<strong>The phone says &quot;Can&#x27;t reach&quot; your computer.</strong> Check that both are on the same Wi-Fi: not a guest network, not mobile data, no VPN. Tap <strong>Try again</strong> or scan the new QR code. If the Wi-Fi keeps devices apart, the Deck switches to the internet path by itself.
+</li>
+<li>
+<strong>Chrome never asked about the local network.</strong> Open the link again from the QR code (not from your browser&#x27;s history) and tap <strong>Allow</strong> when asked. Without it the Deck uses the internet path.
+</li>
+<li>
+<strong>It says &quot;Connected · internet&quot; at home.</strong> Some routers keep Wi-Fi devices apart (&quot;client isolation&quot; or a guest network). The Deck works, with a short delay. Moving both devices to the main network gives you the direct link.
+</li>
+<li>
+<strong>The QR code doesn&#x27;t work any more.</strong> The code works only while the window is open, and ends when you disconnect. Close the Forge Deck window and choose <span class="path"><span>File</span><i>&#8250;</i><span>Forge Deck (prototype)</span></span> again.
+</li>
+<li>
+<strong>Nothing happens when I tap a brush.</strong> Brush, Undo and Redo wait while you are in the middle of a stroke. Lift the pen and try again.
+</li>
+<li>
+<strong>There&#x27;s no Forge Deck in the File menu.</strong> Switch it on in <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Experimental</span></span> first.
+</li>
+<li>
+<strong>I want it to stop.</strong> Press <strong>Disconnect</strong> on the banner (or on the phone), or close the Forge Deck window.
+</li>
+</ul>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> The Deck keeps the phone&#x27;s screen awake while it is open, and it has nothing to log in to. The phone remembers only that you&#x27;ve seen the tour, and, for 5 minutes, the link it needs to reconnect.</p></aside>
+<p>Forge Deck is a prototype, and your feedback shapes it. Tell us what you reach for that isn&#x27;t there, on the <a href="https://github.com/islandmed/SculptForge/issues" rel="noopener">issue tracker</a> (<span class="path"><span>Help</span><i>&#8250;</i><span>Report a problem</span></span>).</p>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="discord.html"><span>Previous</span>Show SculptForge on Discord</a><a class="next" rel="next" href="support.html"><span>Next</span>Support and membership</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/forge-deck.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#switch-it-on">Switch it on</a></li><li><a href="#the-controls">The controls</a></li><li><a href="#first-time-the-tour">First time: the tour</a></li><li><a href="#wi-fi-or-internet">Wi-Fi or internet</a></li><li><a href="#when-the-connection-drops">When the connection drops</a></li><li><a href="#what-it-can-and-cant-do">What it can and can&#x27;t do</a></li><li><a href="#troubleshooting">Troubleshooting</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="../performance/">Performance</a>
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Members</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

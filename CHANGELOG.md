@@ -6,6 +6,34 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-13
+
+### Added
+- **Tripo in Generate 3D** (with your own key): Tripo v3.1 / v3.0 from an image or a description (shape only, about
+  $0.20 / $0.10). The key lives in the system keychain only; each service has one pinned address, a timeout, a capped
+  wait and plain error messages; the model file is accepted only from the provider's own servers and checked before
+  import (docs/ai-services.md). **Recommended models** list: price per generation, a quality note and a link to the
+  provider's key page for each. **Free models that heal themselves**: the update check's feed now says which free
+  Hugging Face Spaces are up, slow to start or switched off (no extra request); a switched-off Space is greyed out
+  with the reason and a run moves to one that is up. When a paid service can't be reached or times out, the free
+  models you already allowed run instead (never another paid service). **Remove flat background** now also cuts a
+  plain backdrop (a flat colour, a vignette, a rounded icon plate) out of the picture before it is sent, so the models
+  don't build the backdrop too; a picture with a busy background gets the tip "Best results: a single object on a
+  plain or transparent background."
+- **Say what you want** (F3 search): plain words with numbers run existing actions. `clay 40` (brush and size, `30%`
+  for intensity), `intensity 30`, `size 40`, `mirror x`, `symmetry off`, `wireframe on`, `remesh 200k` (about 200 000
+  triangles) or `remesh 300` (voxels), `hide all but head`, `show all`, `isolate body`. Typo-tolerant, matches the
+  names in every shipped language and Part and custom brush names, shows "Clay - Size 40" before Enter and the
+  action's shortcut in the result line afterwards. The last 50 commands are kept (Up arrow). Offline, no scripting:
+  unknown input stays a normal search.
+- **Shadows & AO** (Material > Viewport Shading in the PBR view, Preferences > Display): cast shadows from the key
+  light (in PBR, the environment's brightest direction) and screen-space ambient occlusion, worked out from the drawn
+  view, blurred with a depth-aware filter. Shadows and Ambient occlusion are each On, Off or Auto (the default: on
+  from the Standard hardware tier up, off on the Essential tier and on phones and tablets); AO strength, AO softness
+  and Shadow softness sliders; "With Lit Sphere shading" adds them to the Lit Sphere and studio shading. While you
+  orbit or sculpt they step aside if the frame would fall behind, and come back when the view settles. Saved with the
+  preferences; scriptable as `view_shadows`. Both off draws the view exactly as before.
+
 ## [0.12.16] - 2026-11-13
 
 ### Added

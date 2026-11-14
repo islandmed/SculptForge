@@ -8,12 +8,23 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.0
 
 ```features
-date: unreleased
+date: 2026-11-13
 tagline: Shadows and ambient occlusion in the PBR view, and say what you want in the F3 search.
 highlight: Shadows and ambient occlusion in the PBR view: the key light casts shadows and creases darken, so form reads at a glance
 highlight: Say what you want in the F3 search: type clay 40, mirror x or hide all but head and Enter does it
 highlight: Start from an image, then make it yours: Recommended 3D models with their prices, and Tripo with your own key
 ```
+
+- **Start from an image, then make it yours**: a **Recommended models** list in the Generate 3D window shows what each
+  model costs per generation, what it is good at and a **Get a key** button. **Tripo v3.1** (about $0.20 a picture) is
+  new, with your own key. A free model that is switched off is greyed out with the reason, and a paid service that is
+  down falls back to the free models you have allowed instead of hanging.
+- **Say what you want** (<kbd>F3</kbd>): type `clay 40`, `intensity 30`, `mirror x`, `remesh 200k` or `hide all but
+  head` in the search and the first row shows what <kbd>Enter</kbd> will do. Typos are forgiven, every interface
+  language works, <kbd>Up</kbd> brings back your last commands, and the result line shows the key.
+- **Shadows and ambient occlusion in the view**: the key light casts shadows on the sculpt (the nose on the cheek, the
+  brow over the eyes) and creases and hollows darken softly. **Material > Viewport Shading** (PBR) and **Preferences >
+  Display > Shadows & AO**: on, off or Auto, with AO strength, AO softness and shadow softness.
 
 ## Version 0.12.16
 

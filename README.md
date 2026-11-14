@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.12.16:</strong> pop-ups and the guide take colour by role, and sculpts with Micro detail show again in PBR shading (<a href="https://sculptforge.app/guide/whats-new.html#version-01216">how it works</a>)
+  <strong>New in 0.13.0:</strong> shadows and ambient occlusion in the PBR view, and say what you want in the F3 search (<a href="https://sculptforge.app/guide/whats-new.html#version-0130">how it works</a>)
 </p>
 
 <p align="center">

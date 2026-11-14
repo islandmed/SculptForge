@@ -1,8 +1,0 @@
----
-testers:
-  - Prototype, not announced: Preferences > Experimental > Forge Deck, then File > Forge Deck and scan the QR code with a phone (Android Chrome, Android Firefox, iPhone Safari). Tap brush tiles, drag Size and Intensity (slide your finger up for fine control, tap the number to type it), Undo, Redo, Mirror: the desktop follows and the phone's readout matches. Note the tap-to-canvas delay and any mis-grabbed strips.
-  - Chrome asks for the camera (it only lets the phone find the computer) and, on newer versions, for local network access: allow both. A phone that can't reach the computer on Wi-Fi switches to the encrypted relay by itself (the pill says "internet"); turn Wi-Fi off on the phone, or use mobile data, to try that.
-  - The banner shows the phone's name while it drives; Disconnect on the banner or the phone ends it. Closing the window turns the Deck off. Put the phone to sleep for a minute and wake it: it should come back by itself without a new scan (within 5 minutes).
-  - FIRST measurement, please: tap-to-canvas latency on the local network (phone on the same Wi-Fi, pill says "Wi-Fi"). Film the phone and the desktop together with a second device and count the frames from the tap on a brush tile (and from a Size drag) to the desktop changing; report the number, your phone and browser. Then the same over mobile data (pill says "internet"). The strips move on the phone at once and send the latest value only, so a drag should never feel behind; tell us if it does.
----
-Held back from the release notes and What's New until the security review and the testers have seen it (no `added` or `whats_new` on purpose).
