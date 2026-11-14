@@ -93,7 +93,9 @@ void main() {
             float cosine = (dot(v, n) - 0.02 * r) / sqrt(vv + 1e-12);
             ao += max(cosine, 0.0) * max(1.0 - vv / r2, 0.0);
         }
-        ao = clamp(ao * 3.2 / float(N), 0.0, 1.0);
+        // (1.5x the gain of the first version, owner 11-13 "more AO", less a small floor: the creases go darker and the
+        // open surfaces, whose few grazing samples add up to little, stay clean)
+        ao = clamp((ao * 4.8 / float(N) - 0.06) / 0.94, 0.0, 1.0);
     }
     float shadow = 0.0;
     // (the mesh's own smooth normal, not the faceted one from the depth: a low-poly mesh shades smooth, and its facets

@@ -94,7 +94,7 @@ struct RenderSettings {
     // with occlusionInLitSphere, the Lit Sphere and studio shading too. The app turns them on by the hardware tier
     // (App::applyViewEffects) and off while the view moves or a stroke runs where they would cost the frame.
     bool ambientOcclusion = false;
-    float aoStrength = 0.65f; // 0..1
+    float aoStrength = 0.8f; // 0..1
     float aoSoftness = 0.4f;  // 0..1: the blur's width
     bool shadows = false;     // the key light's cast shadows (PBR: the environment's brightest direction)
     float shadowSoftness = 0.35f;

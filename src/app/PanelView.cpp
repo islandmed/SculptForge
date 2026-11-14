@@ -51,7 +51,7 @@ void App::registerViewUiCommands() {
                    "In the PBR view, and in the Lit Sphere shading with lit_sphere on. Saved with the preferences.",
                    {{"ao", T::String, "on, off or auto (by the hardware tier; the default).", false},
                     {"shadows", T::String, "on, off or auto (by the hardware tier; the default).", false},
-                    {"ao_strength", T::Number, "How dark the occlusion gets, 0 to 1 (default 0.65).", false},
+                    {"ao_strength", T::Number, "How dark the occlusion gets, 0 to 1 (default 0.8).", false},
                     {"ao_softness", T::Number, "How soft it is, 0 to 1 (default 0.4).", false},
                     {"shadow_softness", T::Number, "How soft the shadows' edges are, 0 to 1 (default 0.35).", false},
                     {"lit_sphere", T::Bool, "Also with Lit Sphere shading (default off).", false}},

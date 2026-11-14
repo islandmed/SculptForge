@@ -32,7 +32,7 @@ run viewport_shading mode=lit_sphere
 wait 0.3
 expect_value occlusion_on == 0
 shot lit-sphere-off
-run view_shadows lit_sphere=true ao_strength=0.65 ao_softness=0.4 shadow_softness=0.35
+run view_shadows lit_sphere=true ao_strength=0.8 ao_softness=0.4 shadow_softness=0.35
 expect_status "(PBR and Lit Sphere)"
 wait 0.3
 expect_value occlusion_on == 1

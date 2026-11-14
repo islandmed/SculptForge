@@ -139,7 +139,7 @@ struct UiPrefs {
     // tier (on from the Standard tier up on desktop GL, off on the Essential tier and GL ES), 0 off, 1 on. They shade
     // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.
     int viewAo = -1, viewShadows = -1;
-    float aoStrength = 0.65f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
+    float aoStrength = 0.8f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
     bool viewOcclusionLitSphere = false;
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the

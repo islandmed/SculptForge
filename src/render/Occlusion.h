@@ -21,7 +21,7 @@ namespace sf {
 
 struct OcclusionParams {
     bool ao = false, shadows = false;
-    float aoStrength = 0.65f;  // 0..1: how dark full occlusion gets
+    float aoStrength = 0.8f;  // 0..1: how dark full occlusion gets
     float aoSoftness = 0.4f;   // 0..1: the blur's width
     float aoRadius = 0.1f;     // view-space units: how far around a point occluders count
     glm::vec3 light{0.0f, 0.0f, 1.0f}; // view space, towards the key light
