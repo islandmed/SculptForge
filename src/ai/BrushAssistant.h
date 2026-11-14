@@ -34,6 +34,7 @@ struct AiSettings {
     // Image to 3D. service: "huggingface" (free Spaces), "fal", "meshy", "hyper3d" (Rodin direct), "tripo",
     // "comfyui" (your ComfyUI server), "command" (generatorCommand with
     // {input}/{output}) or "inflate" (offline).
+    bool cutImageBackground = true; // this run only (not saved): a picture with a plain backdrop is cut out before sending (Image::withoutPlainBackground)
     std::string generatorService = "huggingface";
     std::string hfToken;  // empty = HF_TOKEN from the environment (optional; raises the free quota)
     std::string hfModel = "hunyuan3d-2.1"; // the default (hfPresets()[0]): free, no token

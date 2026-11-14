@@ -6491,8 +6491,6 @@ constexpr Entry kJapanese[] = {
      "キーを取得"},
     {"Billed to your own account, at the provider's list price (it can change).",
      "あなた自身のアカウントに、プロバイダーの定価で請求（変更される場合があります）。"},
-    {"Fast and good all-round: the best price for the quality. Text costs $0.10.",
-     "速くて万能：品質に対して最安。テキストは $0.10。"},
     {"Sharp, clean shapes with fine detail.",
      "シャープできれいな形状。細かいディテール。"},
     {"Clean geometry. Not licensed in the EU, UK or South Korea.",
@@ -6527,6 +6525,10 @@ constexpr Entry kJapanese[] = {
      "画像から始めて、自分のものに仕上げましょう。"},
     {"List prices as of %s; they may change.",
      "定価は%s時点のものです。変更される場合があります。"},
+    {"About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+     "1 枚あたり約 2 分、20 クレジット（テキストは 10）。速くて万能。"},
+    {"Best results: a single object on a plain or transparent background.",
+     "最適な結果：単一のオブジェクトで、背景は無地または透明。"},
 };
 
 } // namespace

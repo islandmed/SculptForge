@@ -5839,8 +5839,6 @@ constexpr Entry kSpanish[] = {
      "Obtener una clave"},
     {"Billed to your own account, at the provider's list price (it can change).",
      "Facturado a tu propia cuenta, al precio de lista del proveedor (puede cambiar)."},
-    {"Fast and good all-round: the best price for the quality. Text costs $0.10.",
-     "Rápido y bueno en todo: el mejor precio para la calidad. El texto cuesta $0.10."},
     {"Sharp, clean shapes with fine detail.",
      "Formas nítidas y limpias, con detalle fino."},
     {"Clean geometry. Not licensed in the EU, UK or South Korea.",
@@ -5875,6 +5873,10 @@ constexpr Entry kSpanish[] = {
      "Empieza con una imagen y hazlo tuyo."},
     {"List prices as of %s; they may change.",
      "Precios de lista a %s; pueden cambiar."},
+    {"About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+     "Unos 2 minutos y 20 créditos por imagen (10 por texto). Rápido y bueno en todo."},
+    {"Best results: a single object on a plain or transparent background.",
+     "Mejores resultados: un solo objeto sobre un fondo liso o transparente."},
 };
 
 } // namespace

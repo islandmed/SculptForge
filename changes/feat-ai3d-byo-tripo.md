@@ -9,7 +9,9 @@ added: **Tripo in Generate 3D** (with your own key): Tripo v3.1 / v3.0 from an i
   **Free models that heal themselves**: the update check's feed now says which free Hugging Face Spaces are up, slow to
   start or switched off (no extra request); a switched-off Space is greyed out with the reason and a run moves to one that
   is up. When a paid service can't be reached or times out, the free models you already allowed run instead (never
-  another paid service).
+  another paid service). **Remove flat background** now also cuts a plain backdrop (a flat colour, a vignette, a rounded
+  icon plate) out of the picture before it is sent, so the models don't build the backdrop too; a picture with a busy
+  background gets the tip "Best results: a single object on a plain or transparent background."
 testers:
   - Any OS, no key: Generate 3D > Recommended models lists Tripo v3.1, TRELLIS.2, Hunyuan3D 3.1, Rodin 2.5 and the free models with a price each; clicking one picks the service and model; **Get a key** opens the provider's page.
   - Any OS, if you have a Tripo key (developers.tripo3d.ai): one generation, Generate 3D > Tripo > From image; report the time it took, the result (does the shape import?) and the cost your Tripo account shows. A wrong key says "Tripo rejected the API key".

@@ -53,7 +53,10 @@ you haven't touched (the starting sphere) is replaced by it.
    above 1 the window says how many are billed.
 5. Leave **Remove flat background** on (the default) to drop the flat plane a picture's background often
    becomes: a thin wall behind or a ground under the subject that covers most of the model's bounds. A relief
-   or a coin on its own is kept. The status line says when a plane was removed.
+   or a coin on its own is kept. The status line says when a plane was removed. It also cuts a plain backdrop (a flat
+   colour, a vignette, a rounded icon plate) out of the picture before it is sent, so the models don't build the
+   backdrop too. A picture with a busy background gets the tip "Best results: a single object on a plain or
+   transparent background."
 6. Click **Generate 3D model**. A progress bar shows the queue position and progress ("1 of 3 ready" with
    several candidates); **Cancel** stops the job.
 
@@ -164,7 +167,7 @@ it to refill, or pick another model.
 Start from an image, then make it yours: a generated model is a starting point, and it lands as a clean base ready
 for your brushes. The top of the Generate 3D window lists the models worth starting with, each with what one generation costs, a line
 on what it is good at, and a **Get a key** button that opens the provider's own key page: **Tripo v3.1** (about
-$0.20 a picture, $0.10 a description: fast and good all-round), TRELLIS.2, Hunyuan3D 3.1 and Rodin 2.5 through fal.ai, and the free
+$0.20 a picture, $0.10 a description; about two minutes a picture: fast and good all-round), TRELLIS.2, Hunyuan3D 3.1 and Rodin 2.5 through fal.ai, and the free
 Hugging Face models. Click one to choose it. All of it is optional and off with **Edit > Preferences > AI > Enable AI features**. The prices are the providers' list prices, read from their public pricing pages (the window shows the date) and can change;
 every paid generation is billed to your own account with the provider. A free model whose Space is switched off or
 slow to start says so there and is greyed out in the **Model** list, and Generate runs the first free model that is up.

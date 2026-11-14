@@ -78,7 +78,7 @@ DYNAMIC = {
         "Gen-2.5 Extreme High (more credits)"],
     "ai/Tripo.cpp models() labels (App::drawImageTo3D)": ["Tripo v3.1 (H3.1) - recommended", "Tripo v3.0"],
     "ai/ImageTo3DService.cpp recommendedModels() notes and ai/SpaceHealth.cpp label() (App::drawRecommendedModels)": [
-        "Fast and good all-round: the best price for the quality. Text costs $0.10.",
+        "About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
         "Sharp, clean shapes with fine detail.",
         "Clean geometry. Not licensed in the EU, UK or South Korea.",
         "The most photographic look.",

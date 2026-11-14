@@ -98,7 +98,7 @@ GeneratorResult runFal(const AiSettings& s, const std::string& imagePath, const 
         return result;
     }
     std::string uri;
-    if (!prepareImageDataUri(imagePath, uri, result.error)) return result;
+    if (!prepareImageDataUri(imagePath, uri, result.error, s.cutImageBackground)) return result;
     return runFalRequest(s, s.falModel, falSubmitBody(s.falModel, uri), outputStem, p);
 }
 
@@ -197,7 +197,7 @@ GeneratorResult runMeshy(const AiSettings& s, const std::string& imagePath, cons
         return result;
     }
     std::string uri;
-    if (!prepareImageDataUri(imagePath, uri, result.error)) return result;
+    if (!prepareImageDataUri(imagePath, uri, result.error, s.cutImageBackground)) return result;
     return runMeshyRequest(s, "/openapi/v1/image-to-3d", meshySubmitBody(s.meshyModel, uri), outputStem, p);
 }
 
@@ -287,7 +287,7 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
     Json image;
     if (!text) {
         std::string png;
-        if (!prepareImagePng(imagePath, png, result.error)) return result;
+        if (!prepareImagePng(imagePath, png, result.error, s.cutImageBackground)) return result;
         if (!client.upload(png, "input.png", image, result.error)) return result;
     }
 
@@ -405,7 +405,7 @@ const std::vector<ServiceModel>& falModels() {
 const std::vector<RecommendedModel>& recommendedModels() {
     // (labels are product names and prices are numbers: neither is translated; the notes are)
     static const std::vector<RecommendedModel> list = {
-        {"tripo", tripo::kDefaultModel, "Tripo v3.1", "~$0.20", "Fast and good all-round: the best price for the quality. Text costs $0.10.",
+        {"tripo", tripo::kDefaultModel, "Tripo v3.1", "~$0.20", "About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
          tripo::kKeyUrl, true},
         {"fal", "fal-ai/trellis-2", "TRELLIS.2 (fal.ai)", "$0.25-0.35", "Sharp, clean shapes with fine detail.",
          "https://fal.ai/dashboard/keys", true},
@@ -479,7 +479,7 @@ std::string base64Encode(const uint8_t* data, size_t size) {
     return out;
 }
 
-bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error) {
+bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error, bool cutPlainBackground) {
     Image img;
     if (!Image::load(imagePath, img, error)) return false;
     if (img.width < 16 || img.height < 16) {
@@ -487,6 +487,13 @@ bool prepareImagePng(const std::string& imagePath, std::string& png, std::string
         return false;
     }
     // Reconstruction models work best with the subject centred and filling most of a square frame.
+    // A picture with a plain backdrop (a flat colour, a vignette, a plate behind the object) is cut out first: the models
+    // otherwise build the backdrop too (a plate came back as a slab through the model). Transparent pictures are left as they are.
+    if (cutPlainBackground) {
+        bool cut = false;
+        Image cutout = img.withoutPlainBackground(&cut);
+        if (cut) img = std::move(cutout);
+    }
     Image framed = img.framedSubject(0.08f).downscaled(1024);
     std::vector<uint8_t> bytes;
     if (!framed.encodePng(bytes)) {
@@ -497,9 +504,9 @@ bool prepareImagePng(const std::string& imagePath, std::string& png, std::string
     return true;
 }
 
-bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error) {
+bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error, bool cutPlainBackground) {
     std::string png;
-    if (!prepareImagePng(imagePath, png, error)) return false;
+    if (!prepareImagePng(imagePath, png, error, cutPlainBackground)) return false;
     dataUri = "data:image/png;base64," + base64Encode(reinterpret_cast<const uint8_t*>(png.data()), png.size());
     return true;
 }

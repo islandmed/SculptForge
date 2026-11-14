@@ -806,6 +806,7 @@ private:
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256; // Generate 3D's sculpting base (its Voxel Remesh resolution)
     bool removeBackground_ = true; // Generate 3D's "Remove flat background" (core/Backdrop.h)
+    bool refImageBusyBackground_ = false; // the chosen picture has no transparency and no plain backdrop to cut out: the panel says what works best
     // Generate 3D (PanelGenerate3D.cpp): generate for form, remesh for topology. One press makes 1-3 candidates side by
     // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
     struct GeneratedCandidate {

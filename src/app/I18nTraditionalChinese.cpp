@@ -5354,8 +5354,6 @@ constexpr Entry kTraditionalChinese[] = {
      "取得金鑰"},
     {"Billed to your own account, at the provider's list price (it can change).",
      "向你自己的帳號收費，依供應商標價（可能會變）。"},
-    {"Fast and good all-round: the best price for the quality. Text costs $0.10.",
-     "快速且全面好用：以該品質而言價格最佳。文字費用 $0.10。"},
     {"Sharp, clean shapes with fine detail.",
      "銳利、乾淨、細節精細的形狀。"},
     {"Clean geometry. Not licensed in the EU, UK or South Korea.",
@@ -5390,6 +5388,10 @@ constexpr Entry kTraditionalChinese[] = {
      "從一張圖片開始，再把它變成你的作品。"},
     {"List prices as of %s; they may change.",
      "標價為 %s 的資料，可能會變動。"},
+    {"About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+     "每張圖片約 2 分鐘、20 點數（文字為 10 點）。快速且全面好用。"},
+    {"Best results: a single object on a plain or transparent background.",
+     "最佳效果：單一物件，搭配純色或透明背景。"},
 };
 
 } // namespace

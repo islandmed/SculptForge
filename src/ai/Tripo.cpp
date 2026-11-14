@@ -262,7 +262,7 @@ GeneratorResult run(const AiSettings& s, const std::string& imagePath, const std
     std::string png;
     if (!text) {
         std::string err;
-        if (!prepareImagePng(imagePath, png, err)) {
+        if (!prepareImagePng(imagePath, png, err, s.cutImageBackground)) {
             result.error = err;
             return result;
         }

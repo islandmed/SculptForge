@@ -4221,6 +4221,11 @@ bool App::loadReferenceImage(const std::string& path) {
     }
     refImage_ = std::move(img);
     refImagePath_ = path;
+    { // does Generate 3D get a clean subject from this picture? (transparent, or a plain backdrop it can cut out)
+        bool cut = false;
+        refImage_.withoutPlainBackground(&cut);
+        refImageBusyBackground_ = !cut && refImage_.transparentFraction() < 0.10f;
+    }
     if (!refTexture_) gl::GenTextures(1, &refTexture_);
     gl::BindTexture(GL_TEXTURE_2D, refTexture_);
     gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -4429,6 +4434,11 @@ void App::drawImageTo3D() {
         auto fileName = std::filesystem::path(std::u8string(refImagePath_.begin(), refImagePath_.end())).filename().u8string();
         ImGui::TextDisabled("%s  (%dx%d)", std::string(fileName.begin(), fileName.end()).c_str(), refImage_.width,
                             refImage_.height);
+        if (refImageBusyBackground_) { // (before anything is sent)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.45f, 1.0f));
+            ImGui::TextWrapped("%s", tr("Best results: a single object on a plain or transparent background."));
+            ImGui::PopStyleColor();
+        }
     }
 
     auto hint = [](const char* text) {

@@ -127,9 +127,10 @@ std::string falTextModel(const std::string& falModel);
 // Pieces exposed for tests.
 std::string meshyTextBody(const std::string& model, const std::string& prompt);
 std::string falTextBody(const std::string& prompt, const std::string& model = {});
-// The image as sent to services: subject framed on a square, <= 1024 px, PNG.
-bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error);
-bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error);
+// The image as sent to services: a plain backdrop (flat, a vignette, a rounded plate) cut out first unless CUTPLAINBACKGROUND is
+// off, then the subject framed on a square, <= 1024 px, PNG.
+bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error, bool cutPlainBackground = true);
+bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error, bool cutPlainBackground = true);
 std::string falSubmitBody(const std::string& model, const std::string& dataUri);
 std::string meshySubmitBody(const std::string& model, const std::string& dataUri);
 // Finds the model file URL in a service result; `extension` gets ".glb" or ".obj".

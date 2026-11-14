@@ -78,6 +78,7 @@ bool prepareGenerateJob(const std::string& name, const Args& a, const AiSettings
                         CommandResult& refused) {
     const bool text = name == "text_to_3d";
     AiSettings s = settings;
+    s.cutImageBackground = argBool(a, "remove_background", true); // (a plain backdrop is cut out of the picture first, then a flat plane out of the model)
     if (a.contains("service")) s.generatorService = argString(a, "service");
     if (a.contains("url")) s.comfyUrl = argString(a, "url");
     if (text && (s.generatorService == "command" || s.generatorService == "inflate")) {
@@ -208,7 +209,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
                                          "model. Default 1.", false},
-                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                   {"remove_background", T::Bool, "Cut a plain backdrop (flat, a vignette, a rounded plate) out of the picture before sending, and drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       return runGenerateJob("image_to_3d", doc, a, settings());
@@ -232,7 +233,7 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
                                          "model. Default 1.", false},
-                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                   {"remove_background", T::Bool, "Cut a plain backdrop (flat, a vignette, a rounded plate) out of the picture before sending, and drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
                       return runGenerateJob("text_to_3d", doc, a, settings());

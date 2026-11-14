@@ -172,6 +172,7 @@ void App::startGenerator() {
         return; // the first-use notice (PanelAiConsent.cpp): nothing sent before Allow
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
     ai::AiSettings settings = aiSettings_;
+    settings.cutImageBackground = removeBackground_; // "Remove flat background" also cuts a plain backdrop out of the picture first
     const bool hunyuan = settings.generatorService == "huggingface"
                              ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
                              : settings.generatorService == "fal" &&

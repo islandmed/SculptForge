@@ -5356,8 +5356,6 @@ constexpr Entry kSimplifiedChinese[] = {
      "获取密钥"},
     {"Billed to your own account, at the provider's list price (it can change).",
      "向你自己的账号收费，按提供商标价（可能会变）。"},
-    {"Fast and good all-round: the best price for the quality. Text costs $0.10.",
-     "快速且全面好用：以该品质而言价格最佳。文字费用 $0.10。"},
     {"Sharp, clean shapes with fine detail.",
      "锐利、干净、细节精细的形状。"},
     {"Clean geometry. Not licensed in the EU, UK or South Korea.",
@@ -5392,6 +5390,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "从一张图片开始，再把它变成你的作品。"},
     {"List prices as of %s; they may change.",
      "标价为 %s 的数据，可能会变动。"},
+    {"About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+     "每张图片约 2 分钟、20 点数（文字为 10 点）。快速且全面好用。"},
+    {"Best results: a single object on a plain or transparent background.",
+     "最佳效果：单个物体，纯色或透明背景。"},
 };
 
 } // namespace
