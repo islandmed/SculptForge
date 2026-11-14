@@ -2113,9 +2113,10 @@ bool Renderer::notePatches(MeshSlot& s, const Mesh& mesh) {
             for (uint32_t i = 0; i < s.order.clusterTriangles(c); i += UploadOrder::kChunkTriangles)
                 s.chunkCluster[s.order.triangle(c, i) >> UploadOrder::kChunkShift] = c;
     }
-    // More than this many and a full upload (a fresh layout) is cheaper to keep drawing. Not while a stroke remeshes
-    // (dynamic topology): a big brush over a dense Part changes clusters all over its disc every dab, and a full upload
-    // each frame (with its layout, bounds and, at the next sync, coarse levels made again) was the first stroke's stall.
+    // More than this many and a full upload (a fresh layout) is cheaper to keep drawing. (Only a remeshing stroke gets
+    // here: changedTriangles is dynamic topology's.) While one runs the limit is higher: a big brush over a dense Part
+    // changes clusters all over its disc every dab, and a full upload each frame (its layout, bounds and, at the next
+    // sync, coarse levels made again) was the first stroke's stall.
     const size_t limit = stroking_ ? std::max<size_t>(256, nc * 3 / 4) : std::max<size_t>(64, nc / 4);
     for (uint32_t t : mesh.changedTriangles) {
         uint32_t* slotOfPatch;
@@ -2422,6 +2423,9 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // Dynamic topology changes topology a little at a time: patches (notePatches) instead of a full upload,
     // until there are too many of them.
     const bool patched = !s.patches.empty() || !mesh.changedTriangles.empty();
+    // A stroke that remeshes (dynamic topology: only it fills changedTriangles) is under way on this mesh.
+    if (!stroking_) s.remeshing = false;
+    else if (!mesh.changedTriangles.empty()) s.remeshing = true;
     bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
@@ -2544,8 +2548,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
             }
         }
     }
-    // (Not while a stroke runs: a remeshing stroke's full uploads would each rebuild them, and they are for the view moving.)
-    if (coarseLod_ && !stroking_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
+    // (Not while a stroke remeshes this mesh: its full uploads would each rebuild them, and they are for the view moving.)
+    if (coarseLod_ && !s.remeshing && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
         buildCoarse(s, mesh);
     if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateCoarse(s, mesh); // (the stroke is over)
     s.coarseEdited = false;
