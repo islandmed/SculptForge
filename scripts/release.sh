@@ -876,15 +876,23 @@ step_release() {
     release_apk
 }
 
-# release_apk: a beta's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
-# PRIVATE Insiders release, from the android.yml run of the beta's commit. Never the public release: only when a beta
-# publishes to $INSIDERS_REPO. Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
+# release_apk: a release's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
+# PRIVATE Insiders release, from the android.yml run of the tagged commit. Never the public release: a beta's own release on
+# $INSIDERS_REPO, or for a stable release a members-only release $T made there (Android stays members-only, owner 11-13). Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
 # beta ships without APKs (scripts/release.sh $V --from release adds them later). SHA256SUMS.txt (signed) is left alone;
 # the APKs' sums are SHA256SUMS-android.txt.
 release_apk() {
-    [ -n "$PRE" ] && [ "$RELEASE_REPO" = "$INSIDERS_REPO" ] || return 0
+    [ -z "$PRE" ] || [ "$RELEASE_REPO" = "$INSIDERS_REPO" ] || return 0
     local sha id c dir="$work/apk" abi f n=0 sums
-    if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
+    if [ -z "$PRE" ]; then # stable: Android stays members-only, on its own $INSIDERS_REPO release (owner 11-13)
+        if ! gh release view "$T" -R "$INSIDERS_REPO" >/dev/null 2>&1; then
+            gh release create "$T" -R "$INSIDERS_REPO" --title "SculptForge $V for Android (members)" \
+                --notes "SculptForge $V for Android, for members: the arm64-v8a APK for phones and tablets, x86_64 for emulators. Please report problems in #members." >/dev/null 2>&1 ||
+                { printf '   WARNING: could not create %s on %s: %s ships without Android APKs; %s\n' "$T" "$INSIDERS_REPO" "$V" "$(resume release)"; return 0; }
+        fi
+        gh release view "$T" -R "$INSIDERS_REPO" --json assets -q '.assets[].name' > "$work/assets-android" 2>/dev/null || : > "$work/assets-android"
+        if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets-android"; then ok "the Android APKs are already on $INSIDERS_REPO $T"; return 0; fi
+    elif grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
     sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { printf '   WARNING: no APKs on %s: %s is not a commit here\n' "$T" "$T"; return 0; }
     id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
     if [ -z "$id" ]; then
@@ -914,6 +922,8 @@ release_apk() {
     for f in "${files[@]}"; do printf '%s  %s\n' "$(sha256 "$f")" "$(basename "$f")" >> "$sums"; n=$((n + 1)); done
     if gh release upload "$T" -R "$INSIDERS_REPO" --clobber "${files[@]}" "$sums" >/dev/null 2>&1; then
         ok "$n Android APK(s) from run $id on $INSIDERS_REPO $T (private; SHA256SUMS-android.txt)"
+        # A beta's #members post comes from release.yml; a stable release's Android drop is posted by sfmonitor.
+        [ -n "$PRE" ] || { herdr agent prompt sfmonitor "post in #members: SculptForge $V for Android is up for members: https://github.com/$INSIDERS_REPO/releases/tag/$T (arm64-v8a for phones and tablets)" >/dev/null 2>&1 & } 2>/dev/null || true
     else
         printf '   WARNING: the APK upload to %s %s failed: the beta ships without them; %s\n' "$INSIDERS_REPO" "$T" "$(resume release)"
     fi

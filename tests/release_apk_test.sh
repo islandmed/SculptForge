@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # scripts/release.sh release_apk (ctest release_apk): a beta's Android APKs (arm64-v8a + x86_64 from the android.yml run of the
-# beta's commit) go onto the PRIVATE Insiders release only. Nothing for a stable release or a public repository; a missing or
+# tagged commit) go onto the PRIVATE Insiders repository only: a beta's release, or a stable release's members-only one. Never a public repository; a missing or
 # failed run, a missing artifact or a failing upload is a warning and never fails the release; already uploaded: left alone.
 # Stand-in gh and git repository in a sandbox.
 set -euo pipefail
@@ -24,11 +24,14 @@ case "$1 $2" in
     while [ $# -gt 0 ]; do [ "$1" = -n ] && name=$2; [ "$1" = -D ] && dir=$2; shift; done
     mkdir -p "$dir"; echo apk > "$dir/SculptForge-9.9.9-android-${name#sculptforge-android-test-}-debug.apk" ;;
   "release upload") [ -z "$GH_UPFAIL" ] || exit 1; echo "$*" >> "$GH_UPLOADS" ;;
+  "release view") case "$*" in *--json*) printf '%s' "$GH_IASSETS" ;; *) [ -n "$GH_IREL" ] || exit 1 ;; esac ;;
+  "release create") [ -z "$GH_CREATEFAIL" ] || exit 1; echo "$*" >> "$GH_CREATED" ;;
 esac
 SH
 chmod +x "$S/bin/gh"
+printf '#!/bin/sh\necho "$*" >> "$HERDR_LOG"\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # never the real sfmonitor
 git init -q "$S/repo" && cd "$S/repo" && git -c user.name=t -c user.email=t@e commit -q --allow-empty -m beta && git tag v9.9.9-beta.3
-export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads
+export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_CREATED=$S/created HERDR_LOG=$S/herdr.log
 REPO=pub/app INSIDERS_REPO=pri/insiders
 V=9.9.9-beta.3 T=v9.9.9-beta.3 PRE=beta.3 RELEASE_REPO=pri/insiders
 work=$S/work
@@ -39,10 +42,10 @@ gh_watch() { return 0; }
 # shellcheck disable=SC1090
 eval "$(sed -n '/^release_apk()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
 reset() {
-    rm -rf "$work/apk" "$S/gh.log" "$S/uploads"
+    rm -rf "$work/apk" "$S/gh.log" "$S/uploads" "$S/created" "$S/herdr.log"
     : > "$S/gh.log"
     printf 'SHA256SUMS.txt\nSculptForge-9.9.9-linux.tar.gz\n' > "$work/assets"
-    export GH_RUN=4242 GH_CONC=success GH_NODL= GH_UPFAIL=
+    export GH_RUN=4242 GH_CONC=success GH_NODL= GH_UPFAIL= GH_IREL= GH_IASSETS= GH_CREATEFAIL=
 }
 
 # 1. the beta: both APKs and their sums, to the private repository only
@@ -54,11 +57,22 @@ if grep -q 'pub/app' "$S/uploads"; then fail "touched the public repository"; fi
 grep -qF 'android.yml' "$S/gh.log" || fail "did not look for the android.yml run"
 grep -q 'SculptForge-9.9.9-android-arm64-v8a-debug.apk$' "$work/apk/SHA256SUMS-android.txt" || fail "sums: $(cat "$work/apk/SHA256SUMS-android.txt")"
 
-# 2. a stable release, or a beta that publishes to the public repository: nothing, no gh call at all
-reset; PRE=; release_apk >/dev/null || fail "failed for a stable release"; PRE=beta.3
-[ ! -s "$S/gh.log" ] || fail "gh called for a stable release"
+# 2. a beta that publishes to the public repository: nothing, no gh call at all
 reset; RELEASE_REPO=pub/app; release_apk >/dev/null || fail "failed for the public repository"; RELEASE_REPO=pri/insiders
-[ ! -s "$S/gh.log" ] || fail "gh called for a public release"
+[ ! -s "$S/gh.log" ] || fail "gh called for a beta on the public repository"
+# 2b. a stable release (Android stays members-only): its own release on the Insiders repository is made, the APKs go there,
+# never to the public repository, and sfmonitor is asked to post in #members
+reset; V=9.9.9 T=v9.9.9-beta.3 PRE= RELEASE_REPO=pub/app; out=$(release_apk 2>&1) || fail "failed for a stable release: $out"
+grep -q -- '-R pri/insiders --title SculptForge 9.9.9 for Android (members)' "$S/created" || fail "no members' release made: $(cat "$S/created" 2>/dev/null)"
+grep -q -- '-R pri/insiders' "$S/uploads" && grep -q 'SHA256SUMS-android.txt' "$S/uploads" || fail "stable: files: $(cat "$S/uploads" 2>/dev/null)"
+if grep -q 'pub/app' "$S/uploads" "$S/created"; then fail "stable: touched the public repository"; fi
+wait; grep -q 'sfmonitor post in #members' "$S/herdr.log" || fail "no #members post asked: $(cat "$S/herdr.log" 2>/dev/null)"
+# 2c. the members' release exists with the APKs already: left alone; creating it fails: a warning, still success
+reset; GH_IREL=1 GH_IASSETS='SculptForge-9.9.9-android-arm64-v8a-debug.apk'; out=$(release_apk 2>&1) || fail "failed: $out"
+[ ! -e "$S/created" ] && [ ! -e "$S/uploads" ] || fail "stable: re-made or re-uploaded"
+reset; GH_CREATEFAIL=1; out=$(release_apk 2>&1) || fail "a failed create failed the release: $out"
+echo "$out" | grep -q WARNING && [ ! -e "$S/uploads" ] || fail "stable create failure: $out"
+V=9.9.9-beta.3 T=v9.9.9-beta.3 PRE=beta.3 RELEASE_REPO=pri/insiders
 
 # 3. no run for the commit: a warning, no upload, success
 reset; GH_RUN=; out=$(release_apk 2>&1) || fail "failed without a run"
