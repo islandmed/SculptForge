@@ -121,6 +121,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, DepthFunc, GLenum)                                                               \
     X(void, DepthMask, GLboolean)                                                            \
     X(void, ColorMask, GLboolean, GLboolean, GLboolean, GLboolean)                           \
+    X(void, DrawBuffers, GLsizei, const GLenum*)                                             \
     X(void, BlendFunc, GLenum, GLenum)                                                       \
     X(void, PolygonMode, GLenum, GLenum)                                                     \
     X(void, PolygonOffset, GLfloat, GLfloat)                                                 \

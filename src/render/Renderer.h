@@ -12,6 +12,7 @@
 #include "render/Clusters.h"
 #include "render/GL.h"
 #include "render/Ghost.h"
+#include "render/Occlusion.h"
 #include "render/ScreenStroke.h"
 
 #include <cstdint>
@@ -89,6 +90,15 @@ struct RenderSettings {
     float backgroundBlur = 0.4f;        // 0 = sharp .. 1 = the roughest level
     float pbrRoughness = 0.45f, pbrMetallic = 0.0f;
     float pbrCavity = 0.5f; // how much the sculpt's creases darken under PBR (0 = physically plain)
+    // View shadows and ambient occlusion (render/Occlusion.h): traced in the drawn view's depth, in the PBR view and,
+    // with occlusionInLitSphere, the Lit Sphere and studio shading too. The app turns them on by the hardware tier
+    // (App::applyViewEffects) and off while the view moves or a stroke runs where they would cost the frame.
+    bool ambientOcclusion = false;
+    float aoStrength = 0.8f; // 0..1
+    float aoSoftness = 0.4f;  // 0..1: the blur's width
+    bool shadows = false;     // the key light's cast shadows (PBR: the environment's brightest direction)
+    float shadowSoftness = 0.35f;
+    bool occlusionInLitSphere = false;
     // Lit Sphere and studio lighting (#80): the light turned from where the material has it, in degrees about the
     // view's up axis (yaw, + to the right) and its side axis (pitch, + up), its intensity (a multiplier) and an
     // ambient term that lifts the shadows (a share of the colour). The defaults leave the material as it is.
@@ -204,6 +214,8 @@ public:
     // Persistent offscreen target (4x MSAA) for recording: draw between these calls.
     bool beginCapture(int width, int height, std::string& error);
     void endCapture(std::vector<uint8_t>& rgba); // top-down RGBA rows
+    // Between draw() and the interface drawn over it: the view's shadows and AO into the capture (never on the UI).
+    void captureViewDrawn();
 
     // PBR view: an environment's lighting is being built (the view shows the previous one meanwhile). `wake` is
     // called from the worker thread when it is ready (the app redraws then).
@@ -223,6 +235,14 @@ public:
     void setScreenStroke(const GhostStroke& stroke) { screenStroke_ = stroke; }
     // The last drawView applied the screen stroke.
     bool screenStrokeDrawn() const { return screenStrokeDrawn_; }
+    // View shadows and AO (render/Occlusion.h): the last view frame had them; false once the driver can't.
+    bool occlusionDrawn() const { return occlusionDrawn_; }
+    bool occlusionSupported() const { return !occlusion_.failed(); }
+    // `s` asks for them in its shading (and the driver hasn't refused them).
+    bool occlusionWanted(const RenderSettings& s) const {
+        return (s.ambientOcclusion || s.shadows) && (s.pbr() || s.occlusionInLitSphere) && !s.unlit && s.showMesh &&
+               !occlusion_.failed();
+    }
     // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
     // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
     // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
@@ -515,6 +535,14 @@ private:
     void setGhostUniforms(const MeshProgram& p);
     GhostStroke screenStroke_;
     ScreenStroke screenPass_;
+    // View shadows and AO (render/Occlusion.h): the pass, and what draw() worked out for it this frame.
+    OcclusionPass occlusion_;
+    OcclusionParams frameOcclusion_;
+    bool frameOcclusionWanted_ = false;
+    bool occlusionDrawn_ = false;
+    // The pass over the frame draw() just drew into `drawFbo` (resolved into `resolveFbo`), when it is wanted.
+    void applyOcclusion(GLuint drawFbo, GLuint resolveFbo, int width, int height);
+    void prepareOcclusion(const RenderSettings& settings, bool pbr, const glm::mat4& view);
     bool screenStrokeDrawn_ = false;
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
@@ -593,7 +621,7 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1, microWire = -1;
+              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostD = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;

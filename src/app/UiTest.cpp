@@ -1557,6 +1557,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
     }
     if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
+    if (name == "view_ao") return app_.renderSettings_.ambientOcclusion ? 1.0 : 0.0;
+    if (name == "view_shadows") return app_.renderSettings_.shadows ? 1.0 : 0.0;
+    if (name == "occlusion_on") return app_.renderer_.occlusionWanted(app_.renderSettings_) ? 1.0 : 0.0; // shadows or AO shade the view
     if (name == "view_resolution") return double(app_.uiPrefs_.viewResolution);
     if (name == "light_yaw") return double(app_.renderSettings_.lightYaw);
     if (name == "light_pitch") return double(app_.renderSettings_.lightPitch);

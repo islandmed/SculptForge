@@ -145,6 +145,12 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("viewResolution", double(p.viewResolution));
+    j.set("viewAo", double(p.viewAo));
+    j.set("viewShadows", double(p.viewShadows));
+    j.set("aoStrength", double(p.aoStrength));
+    j.set("aoSoftness", double(p.aoSoftness));
+    j.set("shadowSoftness", double(p.shadowSoftness));
+    j.set("viewOcclusionLitSphere", p.viewOcclusionLitSphere);
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
@@ -266,6 +272,12 @@ void fromJson(const Json& j, UiPrefs& p) {
         const int r = int(j["viewResolution"].asNumber(p.viewResolution));
         p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
     }
+    p.viewAo = std::clamp(int(j["viewAo"].asNumber(p.viewAo)), -1, 1);
+    p.viewShadows = std::clamp(int(j["viewShadows"].asNumber(p.viewShadows)), -1, 1);
+    p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
+    p.aoSoftness = std::clamp(float(j["aoSoftness"].asNumber(p.aoSoftness)), 0.0f, 1.0f);
+    p.shadowSoftness = std::clamp(float(j["shadowSoftness"].asNumber(p.shadowSoftness)), 0.0f, 1.0f);
+    p.viewOcclusionLitSphere = j["viewOcclusionLitSphere"].asBool(p.viewOcclusionLitSphere);
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
