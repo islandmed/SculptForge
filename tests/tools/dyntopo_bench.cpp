@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
     int dabs = 40;
     bool log = false, symX = false;
     float bigSize = 0.0f;
+    int groups = 0;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         auto next = [&]() { return i + 1 < argc ? std::atof(argv[++i]) : 0.0; };
@@ -40,12 +41,21 @@ int main(int argc, char** argv) {
         else if (a == "--dabs") dabs = int(next());
         else if (a == "--sym") symX = true;
         else if (a == "--big") bigSize = float(next());
+        else if (a == "--groups") groups = int(next());
         else if (a == "--log") log = true;
     }
     Document doc;
     const int res = std::max(2, int(std::sqrt(double(tris) / 12.0)));
     doc.mesh = makeQuadSphere(res, 2.0f);
     doc.mesh.multires.reset();
+    if (groups > 0) { // face groups in a grid of cells over the Part: many group borders (feature edges)
+        doc.mesh.facegroups.resize(doc.mesh.triangleCount());
+        for (size_t t = 0; t < doc.mesh.triangleCount(); ++t) {
+            const glm::uvec3& tri = doc.mesh.triangles[t];
+            const glm::vec3 c = (doc.mesh.positions[tri.x] + doc.mesh.positions[tri.y] + doc.mesh.positions[tri.z]) / 3.0f;
+            doc.mesh.facegroups[t] = uint32_t(int((c.x + 2.0f) * float(groups) / 4.0f) + groups * int((c.y + 2.0f) * float(groups) / 4.0f)) + 1;
+        }
+    }
     if (bigSize > 0.0f) { // beside the dense Part, a plane of a few huge triangles (a flat area of a remeshed head), stroked instead
         Mesh plane = makePlane(2, bigSize);
         for (glm::vec3& p : plane.positions) p = glm::vec3(p.x, -p.z, 3.0f); // (facing the camera)
@@ -91,7 +101,7 @@ int main(int argc, char** argv) {
     const double endMs = msSince(t);
     std::printf("dabs: worst %.1f ms, total %.1f ms; stroke end %.1f ms; triangles after %zu\n", worst, sum, endMs, m.triangleCount());
     const DyntopoStats& st = doc.sculptor.dynamicTopology().stats;
-    std::printf("limited %zu; remesh phases (ms, summed): gather %.1f, split %.1f, collapse %.1f, flip %.1f, relax %.1f, finish %.1f\n", st.limited, st.gatherMs,
+    std::printf("collapses %zu of %zu tries; limited %zu; remesh phases (ms, summed): gather %.1f, split %.1f, collapse %.1f, flip %.1f, relax %.1f, finish %.1f\n", st.collapses, st.collapseTries, st.limited, st.gatherMs,
                 st.splitMs, st.collapseMs, st.flipMs, st.relaxMs, st.finishMs);
     return 0;
 }

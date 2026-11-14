@@ -875,7 +875,8 @@ void DynamicTopology::splitPass() {
         return x.len2 != y.len2 ? x.len2 < y.len2 : x.a != y.a ? x.a > y.a : x.b > y.b;
     };
     std::make_heap(heap_.begin(), heap_.end(), less);
-    while (!heap_.empty() && ops_ < maxOps_) {
+    size_t tries = 0; // (candidates that fail don't count as operations: bound them too, see kTriesPerOp)
+    while (!heap_.empty() && ops_ < maxOps_ && tries++ < maxOps_ * kTriesPerOp) {
         std::pop_heap(heap_.begin(), heap_.end(), less);
         const Edge e = heap_.back();
         heap_.pop_back();
@@ -1050,7 +1051,8 @@ void DynamicTopology::collapsePass() {
         glm::vec3 p;
     };
     std::vector<Plan> plans;
-    while (!heap_.empty() && ops_ < maxOps_) {
+    size_t tries = 0;
+    while (!heap_.empty() && ops_ < maxOps_ && tries++ < maxOps_ * kTriesPerOp) {
         std::pop_heap(heap_.begin(), heap_.end(), less);
         const Edge e = heap_.back();
         heap_.pop_back();
@@ -1058,6 +1060,7 @@ void DynamicTopology::collapsePass() {
         const int n = edgeTriangles(e.a, e.b, tris);
         if (n < 1 || n > 2 || len2(e.a, e.b) >= collapseLen2_) continue;
         if (locked(e.a) || locked(e.b)) continue;
+        ++stats.collapseTries;
         orbit(e.a, e.b, edges);
         if (edges.size() > 1 && orbitSharesTriangle(edges)) continue; // at the symmetry plane: leave it
         plans.clear();
@@ -1190,8 +1193,9 @@ void DynamicTopology::flipPass() {
         uint32_t a, b, c, d;
     };
     std::vector<Plan> plans;
+    size_t tries = 0;
     for (const auto& [a0, b0] : candidates) {
-        if (ops_ >= maxOps_) break;
+        if (ops_ >= maxOps_ || tries++ >= maxOps_ * kTriesPerOp) break;
         if (deadV_[a0] || deadV_[b0] || locked(a0) || locked(b0)) continue;
         uint32_t c, d;
         if (!flipGain(a0, b0, c, d)) continue;
