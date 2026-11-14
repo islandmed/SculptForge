@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.1
+
+```features
+date: unreleased
+tagline: Long Tubes edit without crashing, and Voxel Remesh keeps your sculpt smooth.
+highlight: Moving or resizing the points of a long Tube no longer closes the app
+highlight: Voxel Remesh keeps your sculpt smooth: Clay strokes no longer come out grainy after a remesh
+highlight: Face groups now come through a Voxel Remesh
+```
+
 ## Version 0.13.0
 
 ```features
