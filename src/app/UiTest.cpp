@@ -291,7 +291,9 @@
 //                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
 //                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
 //                            and a new pen id, as SDL 3.2 on Windows after WM_POINTERCAPTURECHANGED)
-//   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
+//   pen_button N down|up [at X Y]   side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click;
+//                            at: the event carries that position (window fractions) instead of the pen's, as a
+//                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -322,7 +324,7 @@
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
-//                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
+//                            pen_buttons / pen_nav_button / view_dragging (side buttons held, the one driving a view drag, a view drag on), pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
@@ -1634,6 +1636,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "pen_buttons") return double(app_.penButtons_);                       // the side buttons the app holds (bit per button)
+    if (name == "pen_nav_button") return double(app_.penNavButton_);                  // the button driving a view drag (0: none)
+    if (name == "view_dragging") return app_.drag_ == App::Drag::Orbit || app_.drag_ == App::Drag::Pan || app_.drag_ == App::Drag::Zoom ? 1.0 : 0.0;
     if (name == "tier_card") return app_.hwProfile_ && app_.hwProfile_->tierCard ? 1.0 : 0.0; // the first-run card is up
     if (name == "tier_card_saved") { // the saved profile puts it away on this machine (what the next start reads)
         HardwareProfile saved;
@@ -3982,9 +3987,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "pen_button needs down or up";
             return false;
         }
-        run([this, button, down = w[2] == "down"] {
+        const bool stale = w.size() >= 6 && w[3] == "at";
+        const float sx = stale ? num(4, 0.0f) : 0.0f, sy = stale ? num(5, 0.0f) : 0.0f;
+        run([this, button, down = w[2] == "down", stale, sx, sy] {
             if (!penIn_) penProximity(true);
-            penButtonEvent(button, down);
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const ImVec2 at(sx * float(ww), sy * float(wh));
+            penButtonEvent(button, down, stale ? &at : nullptr);
         });
         wait(0.05f);
         break;
@@ -4633,7 +4643,7 @@ void Demo::penTouch(bool down, bool eraser) {
     if (huionStream_ && down) mouseButton(true, SDL_BUTTON_LEFT, kDriverMouse); // its release never comes
 }
 
-void Demo::penButtonEvent(int button, bool down) {
+void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     const SDL_PenInputFlags bit = SDL_PenInputFlags(1u << button);
     penState_ = down ? (penState_ | bit) : (penState_ & ~bit);
     SDL_Event e{};
@@ -4641,8 +4651,8 @@ void Demo::penButtonEvent(int button, bool down) {
     e.pbutton.windowID = SDL_GetWindowID(app_.window_);
     e.pbutton.which = testPen_;
     e.pbutton.pen_state = penState_;
-    e.pbutton.x = penAt_.x;
-    e.pbutton.y = penAt_.y;
+    e.pbutton.x = at ? at->x : penAt_.x;
+    e.pbutton.y = at ? at->y : penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
     app_.handleEvent(e);

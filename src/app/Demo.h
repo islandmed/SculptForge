@@ -165,7 +165,7 @@ private:
     void penMove(float x, float y);                 // PEN_MOTION (+ mouse motion), touching or hovering
     void penPressure(float pressure);               // PEN_AXIS pressure
     void penTouch(bool down, bool eraser);          // PEN_DOWN / PEN_UP (+ left button)
-    void penButtonEvent(int button, bool down);     // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button)
+    void penButtonEvent(int button, bool down, const ImVec2* at = nullptr); // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button); at: the event's position
     void penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
                    std::function<void()> afterSample = {}, // afterSample: e.g. a driver's stray mouse event
                    bool tail = false); // tail: the pressure falls to 0 over the last samples before the lift (#146)

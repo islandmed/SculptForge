@@ -237,6 +237,13 @@ void App::handlePenEvent(const SDL_Event& e) {
         mouseSincePen_ = false;
     }
     switch (e.type) {
+    case SDL_EVENT_PEN_MOTION: penButtonsSync(e.pmotion.pen_state); break;
+    case SDL_EVENT_PEN_AXIS: penButtonsSync(e.paxis.pen_state); break;
+    case SDL_EVENT_PEN_DOWN:
+    case SDL_EVENT_PEN_UP: penButtonsSync(e.ptouch.pen_state); break;
+    default: break;
+    }
+    switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
         ++penDiag_.proximity;
         // A pen coming into range while a pen drag is still open: it left without saying so (some drivers never
@@ -307,12 +314,20 @@ void App::handlePenEvent(const SDL_Event& e) {
     }
 }
 
+// A side button's press starts the drag (or the radial menu) where the app's cursor is, which the pen's own motion has
+// kept current (the cursor is mouse-mode mapped there, too): the position in the button event is SDL's last one for the
+// pen, stale before the first motion since the pen came into range and not the cursor's after the mouse moved it. Taking
+// it as the drag's start made the first pen motion a jump of the view across the screen (#216, Wacom on Wayland).
+// penJump_ keeps the first motion after coming into range from moving a drag.
 void App::penButton(int button, bool down, float x, float y) {
     if (button < 1 || button > 31) return;
     const uint32_t bit = 1u << button;
     if (((penButtons_ & bit) != 0) == down) return;
     penButtons_ = down ? penButtons_ | bit : penButtons_ & ~bit;
     penSeen_ = true;
+    if (!canvasRect().contains(mouseX_, mouseY_) && canvasRect().contains(x, y)) mouseX_ = x, mouseY_ = y; // (nothing moved yet)
+    x = mouseX_;
+    y = mouseY_;
     if (radialPenButton(button, down, x, y)) return; // a radial menu's button (RadialMenu.cpp)
     // Invert and Smooth need nothing here: inputMods() reports them as Alt / Shift while held.
     const PenAction a = penButtonAction(button);
@@ -323,13 +338,13 @@ void App::penButton(int button, bool down, float x, float y) {
         io.AddMouseButtonEvent(ImGuiMouseButton_Right, down);
     }
     if (down) {
+        // A pen drag whose end never came (the tip's lift lost, a window that took the pen): end it, the press is a new one.
+        if (drag_ != Drag::None && dragFromPen_ && !penTouching_ && !penNavButton_) onMouseUp();
         if (drag_ != Drag::None || io.WantCaptureMouse || !canvasRect().contains(x, y)) return;
         lastInputPen_ = true;
         if (a == PenAction::RightClick) {
             onMouseDown(x, y, SDL_BUTTON_RIGHT); // drag to rotate (Shift: pan), as with the mouse
         } else {
-            mouseX_ = x;
-            mouseY_ = y;
             drag_ = a == PenAction::RotateView ? Drag::Orbit : Drag::Pan;
             dragFromPen_ = true;
         }
@@ -342,6 +357,14 @@ void App::penButton(int button, bool down, float x, float y) {
         }
         penNavButton_ = 0;
     }
+}
+
+// Every pen event carries the buttons SDL holds for it. A button the app holds and SDL does not is one whose release the
+// app never got (the pen left or the window lost focus with it down, a pop-up took the release): let go of it, or its
+// view drag goes on and the tip's next press only navigates (#216, "the stylus stops responding").
+void App::penButtonsSync(SDL_PenInputFlags state) {
+    for (int b = 1; b <= 5; ++b)
+        if ((penButtons_ & (1u << b)) && !(state & (1u << b))) penButton(b, false, mouseX_, mouseY_);
 }
 
 void App::penLeft() {

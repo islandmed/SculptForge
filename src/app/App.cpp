@@ -1862,6 +1862,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        // A pen button or the tip let go in another window never reaches us: its view drag, held buttons and stroke end
+        // here, or the pen's next press only navigates (#216).
+        if (penInProximity_ || penButtons_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();
         touchReset(); // (a lift in another window never reaches us)
         keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
         actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
