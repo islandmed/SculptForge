@@ -208,6 +208,7 @@ bool BVH::raycast(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& di
         if (!rayBox(n.box, origin, invDir, best)) continue;
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
+                if (triIndices_[i] >= mesh.triangles.size()) continue; // (a stale tree over a smaller mesh: a tube drag's preview)
                 if (skipHidden && mesh.triangleHidden(triIndices_[i])) continue;
                 const auto& t = mesh.triangles[triIndices_[i]];
                 float tt;

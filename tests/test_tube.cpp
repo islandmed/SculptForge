@@ -5,6 +5,7 @@
 // into control points, the tube_* commands with undo, merging, and projects.
 #include "TestHarness.h"
 
+#include "core/BVH.h"
 #include "core/Commands.h"
 #include "core/MeshTransform.h"
 #include "core/Primitives.h"
@@ -15,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <random>
 
 using namespace sf;
 using glm::vec3;
@@ -959,4 +961,131 @@ TEST(tube_repeat_turns_flat_pieces_about_the_curve) {
         CHECK((y > 0.14f) != (z > 0.14f));        // exactly one axis carries the width
         CHECK((k % 2 == 0) == (y > z));            // and it alternates (the first copy's wide side faces up)
     }
+}
+
+namespace {
+
+bool finiteMesh(const Mesh& m) {
+    for (const vec3& p : m.positions)
+        if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
+    for (const vec3& n : m.normals)
+        if (!std::isfinite(n.x) || !std::isfinite(n.y) || !std::isfinite(n.z)) return false;
+    for (const glm::uvec3& t : m.triangles)
+        for (int k = 0; k < 3; ++k)
+            if (t[k] >= m.positions.size()) return false;
+    return true;
+}
+
+} // namespace
+
+// GitHub #215: moving or scaling points of a long tube crashed the app. Whatever the edit (a point dragged onto its
+// neighbour, folded back, scaled to nothing, flung far away), every rebuild is finite, in range and not unbounded.
+TEST(tube_invariant_point_edits_stay_finite_and_bounded) {
+    std::mt19937 rng(215);
+    auto U = [&](float a, float b) { return std::uniform_real_distribution<float>(a, b)(rng); };
+    auto I = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
+    const TubeShape::Profile profiles[] = {TubeShape::Profile::Round, TubeShape::Profile::Square, TubeShape::Profile::Triangle,
+                                           TubeShape::Profile::Ribbon, TubeShape::Profile::Rope, TubeShape::Profile::Braid,
+                                           TubeShape::Profile::Sleeve};
+    size_t built = 0;
+    for (int round = 0; round < 7; ++round) {
+        TubeShape s;
+        vec3 p(0.0f);
+        const int n = I(50, 300);
+        for (int i = 0; i < n; ++i) {
+            p += vec3(U(-1, 1), U(-1, 1), U(-1, 1)) * U(0.01f, 0.4f);
+            s.points.push_back({p, U(0.03f, 0.25f)});
+        }
+        s.profile = profiles[round % 7];
+        s.flatCaps = (round & 1) != 0;
+        s.mirrorX = round % 5 == 0;
+        s.strands = I(1, 8);
+        s.spread = U(0, 1);
+        s.roll = U(-180, 180);
+        if (round % 3 == 0) s.twist = U(-720, 720);
+        if (round % 4 == 0) s.taperEnd = U(0, 1);
+        for (int edit = 0; edit < 10; ++edit) {
+            TubeShape t = s;
+            const int k = I(0, int(t.points.size()) - 1);
+            TubePoint& q = t.points[size_t(k)];
+            switch (I(0, 8)) {
+            case 0: q.position += vec3(U(-1, 1), U(-1, 1), U(-1, 1)) * U(0.0f, 0.5f); break; // a drag
+            case 1: if (k > 0) q.position = t.points[size_t(k - 1)].position; break;             // onto its neighbour
+            case 2: if (k + 1 < int(t.points.size())) q.position = t.points[size_t(k + 1)].position; break;
+            case 3: if (k > 1) q.position = 2.0f * t.points[size_t(k - 1)].position - t.points[size_t(k - 2)].position; break; // folded back
+            case 4: q.radius *= std::exp(U(-6, 6)); break;                                          // Ctrl+drag
+            case 5: q.radius = 1e-5f; break;
+            case 6: q.position *= U(-3, 3); break;
+            case 7: q.position += vec3(U(-1, 1), U(-1, 1), U(-1, 1)) * std::exp(U(0, 10)); break;   // flung far away
+            default: for (TubePoint& all : t.points) all.radius *= std::exp(U(-3, 3)); break;       // scale them all
+            }
+            if (!tubeValidate(t).empty()) continue;
+            const Mesh m = tubeMesh(t, (edit & 1) ? kTubePreviewTriangles : 0);
+            ++built;
+            CHECK(m.triangleCount() <= kTubeMaxTriangles);
+            CHECK(finiteMesh(m)); // (an empty mesh is allowed only for a runaway; the editor keeps the last shape then)
+            if (m.triangleCount() > 0) CHECK(m.tube.points.size() == t.points.size());
+            if (I(0, 2)) s = t;
+        }
+    }
+    CHECK(built > 40);
+    // Invalid input (NaN, negative or zero radius) is refused, never swept.
+    TubeShape bad = curvy();
+    bad.points[3].radius = std::nanf("");
+    CHECK(!tubeValidate(bad).empty() && tubeSweep(bad).triangleCount() == 0);
+    bad.points[3].radius = -1.0f;
+    CHECK(!tubeValidate(bad).empty());
+    bad.points[3].radius = 0.2f;
+    bad.points[3].position.y = INFINITY;
+    CHECK(!tubeValidate(bad).empty() && tubeSweep(bad).triangleCount() == 0);
+}
+
+TEST(tube_invariant_sweep_stays_within_the_triangle_budget) {
+    // A rope and a braid of 100 points, one flung 3000 units away (its strands times rings times sides once ran to
+    // tens of millions of triangles): swept with longer edges, within the budget, still closed and finite.
+    for (TubeShape::Profile profile : {TubeShape::Profile::Rope, TubeShape::Profile::Braid}) {
+        TubeShape s;
+        for (int i = 0; i < 100; ++i) s.points.push_back({vec3(float(i) * 0.3f, std::sin(float(i) * 0.4f), 0.0f), 0.2f});
+        s.profile = profile;
+        s.strands = 8;
+        s.points[50].position = vec3(3000.0f, 40.0f, 0.0f);
+        const Mesh m = tubeMesh(s);
+        CHECK(m.triangleCount() > 0 && m.triangleCount() <= kTubeMaxTriangles);
+        CHECK(finiteMesh(m) && watertight(m));
+        CHECK(tubeMatchesMesh(m)); // the same shape sweeps to the same mesh again (so it stays editable)
+    }
+    // As a command on a Tube Part: the edit either lands, or says no and leaves the Part as it was.
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 2,1,0 3,1,1 4,0,1")}, {"radius", 0.05}}).ok);
+    doc.selectPart(1);
+    const size_t before = doc.mesh.triangleCount();
+    reg.execute(doc, "tube_set_point", {{"index", 2.0}, {"position", std::string("1e9,0,0")}});
+    CHECK(doc.mesh.triangleCount() > 0 && doc.mesh.triangleCount() <= std::max(before, kTubeMaxTriangles));
+    CHECK(finiteMesh(doc.mesh) && tubeMatchesMesh(doc.mesh));
+}
+
+// GitHub #215 (plain Round tube, many points): dragging a point swaps the Part's mesh for a coarser preview while the
+// picking tree still belongs to the full-density mesh. A ray cast then (the World Size cursor casts one every frame)
+// read triangles past the end of the smaller mesh. It must not: the stale tree is skipped, not walked out of range.
+TEST(tube_invariant_drag_preview_with_the_full_density_tree_is_safe_to_pick) {
+    TubeShape s;
+    for (int i = 0; i < 300; ++i) {
+        const float a = float(i) * 0.15f;
+        s.points.push_back({vec3(std::cos(a) * (1.0f + 0.02f * float(i)), std::sin(a) * (1.0f + 0.02f * float(i)), a * 0.05f), 0.04f});
+    }
+    s.edge = 0.01f;
+    const Mesh full = tubeMesh(s);
+    const Mesh preview = tubeMesh(s, kTubePreviewTriangles);
+    CHECK(full.triangleCount() > 2 * preview.triangleCount() && preview.triangleCount() > 0); // (the drag does shrink it)
+    BVH tree;
+    tree.build(full); // built for the Part before the drag; stays until let go
+    size_t hits = 0;
+    for (int i = 0; i < 400; ++i) {
+        const float a = float(i) * 0.31f;
+        RayHit hit;
+        hits += tree.raycast(preview, vec3(std::cos(a) * 3.0f, std::sin(a) * 3.0f, 0.5f), vec3(-std::cos(a), -std::sin(a), 0.0f), hit) ? 1 : 0;
+        if (hit.t > 0.0f) CHECK(hit.triangle < preview.triangleCount());
+    }
+    CHECK(hits < 1000); // (any answer will do, as long as the rays came back)
 }
