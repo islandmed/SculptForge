@@ -77,12 +77,15 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
 
 // Tests: above this resolution voxelRemesh uses the brick grid (default kVoxelDenseMax).
 void setVoxelSparseAbove(int resolution);
+// Tests: the field low-pass of the dense remesh (Voxel.cpp denoiseField; the brick grid above 512 has none: its cells are
+// finer than the sculpt's facets), default on.
+void setVoxelDenoise(bool on);
 
 // Rebuilds the mesh as an even, watertight surface (`resolution` cells across
 // its longest side). Overlapping parts are merged. Sculpt layers are baked. Open borders (a neck, a cut) are capped
 // first; a mesh that still isn't solid gives an empty result and `error` says why (never a surface full of holes).
-// Mask and colours transfer from the nearest original vertex; face groups,
-// hidden flags and UVs reset (all visible, group 0, no UVs); the original's
+// Mask and colours transfer from the nearest original vertex, face groups from the nearest original triangle; hidden
+// flags and UVs reset (all visible, no UVs); the original's
 // quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).
 // Parallel and narrow-band throughout: well under a second at the default resolution; run it off the UI thread.
 // Resolutions 32-4096; a remesh that won't fit in the free memory gives an empty result and `error` says what it needs.
