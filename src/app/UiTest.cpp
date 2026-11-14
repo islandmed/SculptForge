@@ -1627,6 +1627,7 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.patchErrors(app_.doc_.parts[size_t(app_.doc_.activePart)].id, app_.displayedMesh()));
     }
+    if (name == "part_full_uploads") return double(app_.renderer_.fullUploads(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
     if (name == "render_patches") return double(app_.renderer_.patchCount(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel

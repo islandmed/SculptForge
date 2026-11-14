@@ -314,6 +314,12 @@ public:
     // Dynamic topology patches (tests): the triangles of mesh slot `id`'s uploaded patches whose indices on the GPU
     // (read back) aren't the mesh's triangles now.
     size_t patchErrors(uint32_t id, const Mesh& mesh);
+    // Full uploads of mesh slot `id` (tests): a stroke that remeshes must not send the whole Part every frame.
+    uint64_t fullUploads(uint32_t id) const {
+        for (const MeshSlot& s : slots_)
+            if (s.id == id) return s.fullUploads;
+        return 0;
+    }
     size_t patchCount(uint32_t id) const {
         for (const MeshSlot& s : slots_)
             if (s.id == id) return s.patches.size();
@@ -406,6 +412,7 @@ private:
     // The GPU copy of one mesh (one Part), in the cluster layout of `order`.
     struct MeshSlot {
         uint32_t id = 0;
+        uint64_t fullUploads = 0; // (tests)
         GLuint vao = 0, lineVao = 0;
         GLuint vertexBuffer = 0; // PackedVertex per GPU slot (render/Clusters.h)
         GLuint indexBuffer = 0;  // 16-bit, relative to each cluster's first vertex; kClusterTriangles * 3 per cluster

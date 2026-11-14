@@ -2895,6 +2895,10 @@ void App::drainStrokeDabs(double budgetSeconds) {
     } else {
         doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
     }
+    // A slow remeshing frame says so in the log (Help > Copy log): a Dynamic dab used to stall for seconds with no trace.
+    if (const double remeshMs = doc_.sculptor.timings.remeshMs - before.remeshMs; remeshMs > 150.0)
+        SDL_Log("Dynamic: %llu dabs remeshed in %.0f ms (%llu triangles in the Part)", (unsigned long long)placed, remeshMs,
+                (unsigned long long)doc_.mesh.triangleCount());
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
         SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",
