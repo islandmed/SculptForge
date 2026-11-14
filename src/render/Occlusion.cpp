@@ -64,9 +64,11 @@ void main() {
         return;
     }
     vec3 P = posAt(p, d);
-    // The normal from the neighbours on the side nearer in depth (no smearing across a silhouette).
-    vec3 pr = posAt(p + ivec2(1, 0), depthAt(p + ivec2(1, 0))), pl = posAt(p - ivec2(1, 0), depthAt(p - ivec2(1, 0)));
-    vec3 pu = posAt(p + ivec2(0, 1), depthAt(p + ivec2(0, 1))), pd = posAt(p - ivec2(0, 1), depthAt(p - ivec2(0, 1)));
+    // The normal from the neighbours on the side nearer in depth (no smearing across a silhouette), three pixels out:
+    // fine wrinkles and pores would tilt a one-pixel normal and their flanks would read as occluded (blotches).
+    const int K = 3;
+    vec3 pr = posAt(p + ivec2(K, 0), depthAt(p + ivec2(K, 0))), pl = posAt(p - ivec2(K, 0), depthAt(p - ivec2(K, 0)));
+    vec3 pu = posAt(p + ivec2(0, K), depthAt(p + ivec2(0, K))), pd = posAt(p - ivec2(0, K), depthAt(p - ivec2(0, K)));
     vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;
     vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;
     vec3 n = cross(dx, dy);
@@ -90,12 +92,13 @@ void main() {
             if (dq >= 1.0) continue;
             vec3 v = posAt(q, dq) - P;
             float vv = dot(v, v);
-            float cosine = (dot(v, n) - 0.02 * r) / sqrt(vv + 1e-12);
+            // (less a horizon bias of ~9 degrees: surface detail smaller than the radius doesn't occlude)
+            float cosine = (dot(v, n) - 0.02 * r) / sqrt(vv + 1e-12) - 0.15;
             ao += max(cosine, 0.0) * max(1.0 - vv / r2, 0.0);
         }
         // (1.5x the gain of the first version, owner 11-13 "more AO", less a small floor: the creases go darker and the
         // open surfaces, whose few grazing samples add up to little, stay clean)
-        ao = clamp((ao * 4.8 / float(N) - 0.06) / 0.94, 0.0, 1.0);
+        ao = clamp((ao * 5.6 / float(N) - 0.06) / 0.94, 0.0, 1.0);
     }
     float shadow = 0.0;
     // (the mesh's own smooth normal, not the faceted one from the depth: a low-poly mesh shades smooth, and its facets
