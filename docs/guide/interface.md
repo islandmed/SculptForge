@@ -134,7 +134,7 @@ ask.
 | AI Brush, Anthropic, OpenAI or OpenRouter | The same text | `api.anthropic.com`, `api.openai.com` or `openrouter.ai` | You, on your own key |
 | AI Brush, Ollama, LM Studio, llama.cpp, vLLM | The same text | This computer (or the server address you typed) | Nobody / your server |
 | Generate 3D, **Hugging Face** (the default) | The picture (framed, at most 1024 px) or your text | The model author's Space, for example `tencent-hunyuan3d-2-1.hf.space` | Hugging Face's free shared GPUs (a daily allowance) |
-| Generate 3D, fal.ai, Meshy, Hyper3D, Tripo | The picture or your text | `queue.fal.run`, `api.meshy.ai`, `api.hyper3d.com` or `openapi.tripo3d.ai` | You, per generation, on your own key |
+| Generate 3D, fal.ai, Meshy, Hyper3D, Tripo, Stability AI | The picture or your text (Stability AI: the picture only) | `queue.fal.run`, `api.meshy.ai`, `api.hyper3d.com`, `openapi.tripo3d.ai` or `api.stability.ai` | You, per generation, on your own key |
 | Generate 3D, ComfyUI | The picture or your text | Your ComfyUI (this computer by default) | Your own GPU |
 | Generate 3D, your command, Offline blockout | Nothing | Stays on this computer | - |
 | Connect an AI tool (MCP) | Nothing from SculptForge | Your AI tool talks to SculptForge on this computer | Your tool |

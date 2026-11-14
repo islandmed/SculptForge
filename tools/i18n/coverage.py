@@ -79,6 +79,7 @@ DYNAMIC = {
     "ai/Tripo.cpp models() labels (App::drawImageTo3D)": ["Tripo v3.1 (H3.1) - recommended", "Tripo v3.0"],
     "ai/ImageTo3DService.cpp recommendedModels() notes and ai/SpaceHealth.cpp label() (App::drawRecommendedModels)": [
         "About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+        "A quick look: a rough shape in seconds, to sculpt over. Picture only.",
         "Sharp, clean shapes with fine detail.",
         "Clean geometry. Not licensed in the EU, UK or South Korea.",
         "The most photographic look.",

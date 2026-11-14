@@ -41,6 +41,7 @@ std::vector<std::string> allAccounts() {
     out.push_back(kMeshy);
     out.push_back(kHyper3d);
     out.push_back(kTripo);
+    out.push_back(kStability);
     return out;
 }
 
@@ -95,6 +96,7 @@ bool storeKeys(const AiSettings& s) {
     if (!s.meshyKey.empty()) ok = put(kMeshy, s.meshyKey) && ok;
     if (!s.hyper3dKey.empty()) ok = put(kHyper3d, s.hyper3dKey) && ok;
     if (!s.tripoKey.empty()) ok = put(kTripo, s.tripoKey) && ok;
+    if (!s.stabilityKey.empty()) ok = put(kStability, s.stabilityKey) && ok;
     return ok;
 }
 

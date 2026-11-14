@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The direct provider added with Generate 3D's Recommended list: Tripo (ai/Tripo.h) is off without the user's own
-// key (keychain only), pinned to one host, sends the key nowhere else,
+// The direct providers added with Generate 3D's Recommended list: Tripo (ai/Tripo.h) and Stability SPAR3D
+// (ai/Stability.h) are off without the user's own key (keychain only), pinned to one host, send the key nowhere else,
 // check the file before the importer sees it, give every failure a plain message, and fall back to the free models
 // only for what another provider would not share. The feed's Space health (ai/SpaceHealth.h) greys a dead Space and
 // moves a run to one that is up. No test talks to a provider: the transports are faked.
@@ -14,6 +14,7 @@
 #include "ai/ImageTo3DService.h"
 #include "ai/Secrets.h"
 #include "ai/SpaceHealth.h"
+#include "ai/Stability.h"
 #include "ai/Tripo.h"
 #include "core/AuditLog.h"
 #include "core/Image.h"
@@ -31,6 +32,7 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr const char* kKey = "tripo-test-key-123";
+constexpr const char* kSKey = "sk-stability-test-456";
 
 std::string glb(std::string json) {
     while (json.size() % 4) json += ' ';
@@ -64,9 +66,11 @@ struct State {
     ~State() {
         tripo::setTransportForTests({});
         tripo::setTimeoutSecondsForTests(0);
+        stability::setTransportForTests({});
         policy::resetPolicyForTests();
         audit::setPathForTests({});
         secrets::put(secrets::kTripo, "");
+        secrets::put(secrets::kStability, "");
         secrets::clearCacheForTests();
         health::set({});
         setAiEnabled(true);
@@ -84,6 +88,14 @@ AiSettings tripoSettings() {
     allowSend(s, generateTarget(s, false).id);
     return s;
 }
+AiSettings stabilitySettings() {
+    AiSettings s = AiSettings::defaults(AiSettings::Provider::Free);
+    s.generatorService = "stability";
+    s.stabilityKey = kSKey;
+    allowSend(s, generateTarget(s, false).id);
+    return s;
+}
+
 std::string pngFile(const char* name) {
     Image img;
     img.width = img.height = 64;
@@ -148,46 +160,64 @@ void useFake(FakeTripo& fake, State& st) {
 
 } // namespace
 
-TEST(tripo_key_only_from_the_keychain) {
+TEST(tripo_and_stability_keys_only_from_the_keychain) {
     State st;
     AiSettings s = AiSettings::defaults(AiSettings::Provider::Free);
-    CHECK(s.resolvedTripoKey().empty()); // no environment variable, no built-in key
+    CHECK(s.resolvedTripoKey().empty() && s.resolvedStabilityKey().empty()); // no environment variable, no built-in key
     s.tripoKey = kKey;
+    s.stabilityKey = kSKey;
     const std::string json = s.toJson().dump();
-    CHECK(json.find(kKey) == std::string::npos); // never in ai.json
+    CHECK(json.find(kKey) == std::string::npos && json.find(kSKey) == std::string::npos); // never in ai.json
     CHECK(secrets::storeKeys(s));
     secrets::clearCacheForTests();
     CHECK(AiSettings::defaults(AiSettings::Provider::Free).resolvedTripoKey() == kKey);
+    CHECK(AiSettings::defaults(AiSettings::Provider::Free).resolvedStabilityKey() == kSKey);
     int listed = 0;
-    for (const auto& a : secrets::allAccounts()) listed += a == secrets::kTripo;
-    CHECK(listed == 1);
+    for (const auto& a : secrets::allAccounts()) listed += a == secrets::kTripo || a == secrets::kStability;
+    CHECK(listed == 2);
     Json j = s.toJson();
     j.set("tripoKey", "planted");
     CHECK(AiSettings::fromJson(j).resolvedTripoKey() == kKey || AiSettings::fromJson(j).resolvedTripoKey().empty());
 }
 
-TEST(tripo_without_key_sends_nothing) {
+TEST(tripo_and_stability_without_key_send_nothing) {
     State st;
     FakeTripo fake;
     useFake(fake, st);
+    int stabilityCalls = 0;
+    stability::setTransportForTests([&](const std::string&, const std::string&, const std::vector<std::string>&, const std::string&) {
+        ++stabilityCalls;
+        return HttpResponse{};
+    });
     AiSettings t = AiSettings::defaults(AiSettings::Provider::Free);
     t.generatorService = "tripo";
     GeneratorResult r = generate3DFromText(t, "a dragon head", (fs::temp_directory_path() / "sf_tripo_nokey").string());
     CHECK(!r.ok && r.error.find("Tripo API key") != std::string::npos && fake.calls.empty());
-    // the AI switch and the studio policy stop it before anything is sent
+    const std::string png = pngFile("sf_stab_nokey.png");
+    AiSettings s = AiSettings::defaults(AiSettings::Provider::Free);
+    s.generatorService = "stability";
+    r = generate3D(s, png, (fs::temp_directory_path() / "sf_stab_nokey").string());
+    CHECK(!r.ok && r.error.find("Stability AI API key") != std::string::npos && stabilityCalls == 0);
+    // the AI switch and the studio policy stop both before anything is sent
     t.tripoKey = kKey;
+    s.stabilityKey = kSKey;
     setAiEnabled(false);
-    CHECK(!tripo::run(t, {}, "a vase", nullptr).ok);
+    CHECK(!tripo::run(t, {}, "a vase", nullptr).ok && !stability::run(s, png, nullptr).ok);
     setAiEnabled(true);
     policy::Policy p;
     p.present = true;
     p.aiProviders = {"fal"};
     policy::setPolicyForTests(p);
-    CHECK(!tripo::run(t, {}, "a vase", nullptr).ok);
-    CHECK(fake.calls.empty());
-    bool known = false;
-    for (const auto& id : policy::aiProviderIds()) known = known || id == "tripo";
-    CHECK(known);
+    CHECK(!tripo::run(t, {}, "a vase", nullptr).ok && !stability::run(s, png, nullptr).ok);
+    CHECK(fake.calls.empty() && stabilityCalls == 0);
+    bool known = false, known2 = false;
+    for (const auto& id : policy::aiProviderIds()) {
+        known = known || id == "tripo";
+        known2 = known2 || id == "stability";
+    }
+    CHECK(known && known2);
+    std::error_code ec;
+    fs::remove(png, ec);
 }
 
 TEST(tripo_hosts_are_pinned) {
@@ -207,6 +237,9 @@ TEST(tripo_hosts_are_pinned) {
     CHECK(!tripo::downloadUrlAllowed("https://tripo3d.ai.evil.example/model.glb"));
     CHECK(!tripo::downloadUrlAllowed("https://eviltripo3d.ai/model.glb"));
     CHECK(!tripo::downloadUrlAllowed("https://127.0.0.1/model.glb"));
+    CHECK(stability::apiUrl("https://api.stability.ai/v2beta/3d/stable-point-aware-3d"));
+    CHECK(!stability::apiUrl("https://api.stability.ai/v2beta/3d/stable-point-aware-3d/../x"));
+    CHECK(!stability::apiUrl("https://evil.example/v2beta/3d/stable-point-aware-3d"));
 }
 
 TEST(tripo_request_pieces) {
@@ -384,6 +417,65 @@ TEST(paid_service_falls_back_to_the_free_models_only_when_allowed_and_up) {
     CHECK(!r.ok && r.error == "Out of credits on your Tripo account");
 }
 
+TEST(stability_spar3d_flow) {
+    State st;
+    const std::string png = pngFile("sf_stab_in.png");
+    std::vector<std::vector<std::string>> headers;
+    std::string url, body;
+    stability::setTransportForTests([&](const std::string& m, const std::string& u, const std::vector<std::string>& h, const std::string& b) {
+        CHECK(m == "POST");
+        url = u;
+        body = b;
+        headers.push_back(h);
+        HttpResponse r;
+        r.status = 200;
+        r.body = kGoodGlb;
+        return r;
+    });
+    AiSettings s = stabilitySettings();
+    const uint64_t before = httpRequestCount();
+    GeneratorResult r = generate3D(s, png, (fs::temp_directory_path() / "sf_stab_flow").string());
+    CHECK(r.ok && httpRequestCount() == before);
+    CHECK(url == "https://api.stability.ai/v2beta/3d/stable-point-aware-3d" && headers.size() == 1);
+    CHECK(hasKeyHeader(headers[0], kSKey));
+    CHECK(body.find("name=\"image\"; filename=\"input.png\"") != std::string::npos && body.find("\x89PNG") != std::string::npos);
+    CHECK(!r.privateDir.empty() && fs::path(r.outputPath).parent_path() == fs::path(r.privateDir));
+    const std::string log = st.audit();
+    CHECK(log.find("stability") != std::string::npos && log.find(kSKey) == std::string::npos && log.find("PNG") == std::string::npos);
+    std::error_code ec;
+    fs::remove_all(r.privateDir, ec);
+    // text: not supported, said plainly, nothing sent
+    GeneratorResult t = generate3DFromText(s, "a vase", (fs::temp_directory_path() / "sf_stab_text").string());
+    CHECK(!t.ok && t.error.find("builds from a picture") != std::string::npos && headers.size() == 1);
+    fs::remove(png, ec);
+}
+
+TEST(stability_errors_read_plainly) {
+    bool transient = false;
+    auto msg = [&](long status, const std::string& body) { return stability::errorMessage(status, {}, body, transient); };
+    CHECK(msg(403, R"({"id":"x","name":"content_moderation","errors":["flagged"]})").find("refused the content") != std::string::npos && !transient);
+    CHECK(msg(401, "").find("rejected the API key") != std::string::npos);
+    CHECK(msg(402, "").find("Out of credits") == 0);
+    CHECK(msg(413, "").find("too large") != std::string::npos);
+    CHECK(msg(429, "").find("rate limiting") != std::string::npos && transient);
+    CHECK(msg(500, R"({"id":"x","name":"internal_error","errors":["boom"]})").find("HTTP 500") != std::string::npos && transient);
+    CHECK(msg(400, R"({"id":"x","name":"bad_request","errors":["image: too small"]})").find("too small") != std::string::npos && !transient);
+    CHECK(stability::errorMessage(0, "timeout", "", transient).find("Could not reach Stability AI") == 0 && transient);
+    // a 200 that is not a GLB (an API change) never reaches the importer
+    State st;
+    const std::string png = pngFile("sf_stab_bad.png");
+    stability::setTransportForTests([&](const std::string&, const std::string&, const std::vector<std::string>&, const std::string&) {
+        HttpResponse r;
+        r.status = 200;
+        r.body = R"({"unexpected":"json"})";
+        return r;
+    });
+    GeneratorResult r = stability::run(stabilitySettings(), png, nullptr);
+    CHECK(!r.ok && r.error.find("not a valid GLB") != std::string::npos);
+    std::error_code ec;
+    fs::remove(png, ec);
+}
+
 TEST(space_health_comes_from_the_feed_and_moves_a_run_to_a_space_that_is_up) {
     State st;
     UpdateInfo info;
@@ -418,12 +510,13 @@ TEST(space_health_comes_from_the_feed_and_moves_a_run_to_a_space_that_is_up) {
 TEST(recommended_list_has_prices_notes_and_no_referral_tags) {
     const auto& list = recommendedModels();
     CHECK(list.size() >= 5);
-    bool tripoFirst = std::string(list[0].service) == "tripo";
+    bool tripoFirst = std::string(list[0].service) == "tripo", stability = false;
     for (const RecommendedModel& m : list) {
         CHECK(*m.label && *m.price && *m.note);
         const std::string url = m.keyUrl;
         CHECK(url.empty() || url.rfind("https://", 0) == 0);
         CHECK(url.find('?') == std::string::npos && url.find("ref") == std::string::npos); // the provider's own page: no affiliate tags
+        if (std::string(m.service) == "stability") stability = !m.text;
     }
-    CHECK(tripoFirst);
+    CHECK(tripoFirst && stability);
 }

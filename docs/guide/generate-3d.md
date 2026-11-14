@@ -49,7 +49,7 @@ you haven't touched (the starting sphere) is replaced by it.
    - free models**.
 3. Set the service's options (model, token or key, see below).
 4. Set **Candidates** (1 to 3): how many shapes to make at once. Free and local services start at 3. Paid
-   services (fal.ai, Meshy, Hyper3D, Tripo) start at 1, because each candidate is one generation billed to your key;
+   services (fal.ai, Meshy, Hyper3D, Tripo, Stability AI) start at 1, because each candidate is one generation billed to your key;
    above 1 the window says how many are billed.
 5. Leave **Remove flat background** on (the default) to drop the flat plane a picture's background often
    becomes: a thin wall behind or a ground under the subject that covers most of the model's bounds. A relief
@@ -167,7 +167,8 @@ it to refill, or pick another model.
 Start from an image, then make it yours: a generated model is a starting point, and it lands as a clean base ready
 for your brushes. The top of the Generate 3D window lists the models worth starting with, each with what one generation costs, a line
 on what it is good at, and a **Get a key** button that opens the provider's own key page: **Tripo v3.1** (about
-$0.20 a picture, $0.10 a description; about two minutes a picture: fast and good all-round), TRELLIS.2, Hunyuan3D 3.1 and Rodin 2.5 through fal.ai, and the free
+$0.20 a picture, $0.10 a description; about two minutes a picture: fast and good all-round), **Stability SPAR3D** (about $0.04: a rough shape in
+seconds to sculpt over, pictures only), TRELLIS.2, Hunyuan3D 3.1 and Rodin 2.5 through fal.ai, and the free
 Hugging Face models. Click one to choose it. All of it is optional and off with **Edit > Preferences > AI > Enable AI features**. The prices are the providers' list prices, read from their public pricing pages (the window shows the date) and can change;
 every paid generation is billed to your own account with the provider. A free model whose Space is switched off or
 slow to start says so there and is greyed out in the **Model** list, and Generate runs the first free model that is up.
@@ -192,6 +193,9 @@ When a paid service can't be reached, the free models take over if you have allo
   (the cheaper tier). Paste your key from developers.tripo3d.ai into **API key**, then **Save settings**: the key goes
   into the system keychain. It stays off until you add a key, and your image or description goes to Tripo
   (openapi.tripo3d.ai) and nowhere else.
+- **Stability SPAR3D (direct)**: Stable Point Aware 3D on Stability AI's own service, from a picture only: a rough
+  shape in a few seconds, to sculpt over. Paste your key from platform.stability.ai (Account > API keys) into
+  **API key**, then **Save settings**. Powered by Stability AI.
 
 Generations are billed to your account with that service. Errors such as "The API key was rejected", "Out of
 credits on this account" or "Rate limited" come from the service.
@@ -349,7 +353,7 @@ Without `service=`, commands use the settings you saved in the app. See
   (not for use in the EU, UK or South Korea); Stable Fast 3D uses the Stability AI Community License (free
   under US $1M annual revenue). Read the licence before commercial use.
 - With ComfyUI, the picture goes only to the server address you entered.
-- Before the first request to a hosted service (each Hugging Face Space family, fal.ai, Meshy, Hyper3D, Tripo, or a
+- Before the first request to a hosted service (each Hugging Face Space family, fal.ai, Meshy, Hyper3D, Tripo, Stability AI, or a
   ComfyUI on another computer), the panel says what is sent, where, and who pays, and nothing goes until you press
   **Allow**. See [What leaves your computer](interface.md#what-leaves-your-computer).
 

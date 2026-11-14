@@ -21,12 +21,12 @@ way (see [IT deployment](guide/studios.md#it-deployment)).
 | Feature | Service (your choice) | What is sent | Key |
 |---|---|---|---|
 | Brush Lab | Free (default): Pollinations.ai's hosted open models, falling back to a running local Ollama. Or Anthropic (Claude), or any OpenAI-compatible endpoint such as a local Ollama / LM Studio | Your brush description and the current brush settings (text only) | None for Free and local models; your API key otherwise |
-| Generate 3D (image) | Hugging Face Spaces (free), fal.ai, Meshy, Hyper3D, Tripo, your own ComfyUI, or your own command | The image you chose, cropped and resized to at most 1024 px | Optional HF token; your fal.ai / Meshy / Hyper3D / Tripo key; none for ComfyUI |
+| Generate 3D (image) | Hugging Face Spaces (free), fal.ai, Meshy, Hyper3D, Tripo, Stability AI (SPAR3D), your own ComfyUI, or your own command | The image you chose, cropped and resized to at most 1024 px | Optional HF token; your fal.ai / Meshy / Hyper3D / Tripo / Stability AI key; none for ComfyUI |
 | Generate 3D (text) | Hugging Face Spaces (free), fal.ai, Meshy, Hyper3D, Tripo, your own ComfyUI | Your text description | As above |
 | Send to Unreal | Your own Unreal Editor (local network) | The exported FBX | None |
 
 Before the first request to a service on someone else's computer (Pollinations, each Hugging Face Space family,
-fal.ai, Meshy, Hyper3D, Tripo, a remote OpenAI-compatible server or ComfyUI), the panel shows what is sent, to which host and
+fal.ai, Meshy, Hyper3D, Tripo, Stability AI, a remote OpenAI-compatible server or ComfyUI), the panel shows what is sent, to which host and
 who pays; nothing is sent until **Allow**, which is remembered per service (`sendAllowed` in `ai.json`) and can be
 revoked in **Preferences > AI > Online AI services**. Scripts, `sculptforge-cli` and AI tools get the same refusal
 until it is allowed in the app. Servers on this computer never ask. A studio policy's `ai.providers` / `ai.endpoints`
@@ -34,7 +34,7 @@ pre-allow what they list and forbid the rest.
 
 Keys are stored in your operating system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
 Service on Linux), never in a settings file, or read from environment variables (`ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`; the Hyper3D and Tripo keys are keychain only, there is no environment variable for them). Keys saved by older versions in
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `FAL_KEY`, `MESHY_API_KEY`; the Hyper3D, Tripo and Stability AI keys are keychain only, there is no environment variable for them). Keys saved by older versions in
 `ai.json` move into the keychain at the first start.
 
 **Preferences > AI > Provider** has presets for Anthropic, OpenAI, Ollama, LM Studio, vLLM, llama.cpp server,
@@ -82,7 +82,7 @@ See [Generate 3D with your own ComfyUI](comfyui.md).
 
 ## Paid services
 
-fal.ai, Meshy, Hyper3D and Tripo are paid services with their own terms of service and pricing; generations are
+fal.ai, Meshy, Hyper3D, Tripo and Stability AI are paid services with their own terms of service and pricing; generations are
 billed to your account with them. Model availability and names can change on their side.
 
 Hyper3D Rodin 2.5 can run two ways:
@@ -105,11 +105,11 @@ Hyper3D Rodin 2.5 can run two ways:
     `ai.providers` (and `https://api.hyper3d.com/` in `ai.endpoints` when that list is used); each
     generation writes one audit log line (tier, image or text, prompt length; never the key or the image).
 
-### Tripo (direct)
+### Tripo and Stability AI (direct)
 
-One more direct provider, built the same way as Hyper3D above: off until you enter your own key (kept in the
+Two more direct providers, built the same way as Hyper3D above: off until you enter your own key (kept in the
 system keychain, never in `ai.json`, never in a log, never in a project; no environment variable, no shared or trial
-key), one fixed API address, https with certificates checked and no redirects followed, the key sent only there.
+key), one fixed API address each, https with certificates checked and no redirects followed, the key sent only there.
 
 - **Tripo** (`openapi.tripo3d.ai`, provider id `tripo`): image or text to 3D with Tripo v3.1 (or v3.0), asked for the
   shape only (no texture, the cheaper tier: about $0.20 a picture, $0.10 a description, billed to your Tripo account;
@@ -118,8 +118,12 @@ key), one fixed API address, https with certificates checked and no redirects fo
   is saved in a private temporary folder and deleted after import. If a file would come from anywhere else it is not
   downloaded, and the message gives the task id: the model stays in your Tripo account. Tripo's terms apply to your
   key and your results (paid accounts own their outputs; keys may not be shared).
+- **Stability AI** (`api.stability.ai`, provider id `stability`): Stable Point Aware 3D (SPAR3D) from a picture, a
+  "quick look" in a few seconds to sculpt over (4 credits, about $0.04, nothing charged for a failed call, billed to
+  your Stability AI account). Pictures only: SPAR3D has no text input. The answer is the model file itself, checked
+  the same way. Under the Stability AI Community License (free below US $1M annual revenue); "Powered by Stability AI".
 
-With a studio policy the provider id is `tripo` in `ai.providers` (and the hosts in `ai.endpoints`);
+With a studio policy the provider ids are `tripo` and `stability` in `ai.providers` (and the hosts in `ai.endpoints`);
 each generation writes one audit log line (model, input kind, prompt length; never the key or the image).
 
 ## When a service is down

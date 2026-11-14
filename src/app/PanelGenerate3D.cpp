@@ -33,7 +33,7 @@ constexpr float kSameOutline = 0.02f; // silhouettes closer than this are the sa
 
 // Services billed per generation on the user's key: one candidate unless the user asks for more.
 bool paidService(const std::string& id) {
-    return id == "fal" || id == "meshy" || id == "hyper3d" || id == "tripo";
+    return id == "fal" || id == "meshy" || id == "hyper3d" || id == "tripo" || id == "stability";
 }
 // Services on the user's own machine or server: one generation at a time (a local GPU runs one model at once).
 bool localService(const std::string& id) { return id == "comfyui" || id == "command"; }
@@ -139,6 +139,7 @@ void App::drawRecommendedModels() {
         ImGui::Dummy(ImVec2(0, 0)); // (an item after moving the cursor: ImGui's boundary check)
         if (*m.keyUrl) {
             const bool missing = svc == "tripo" ? aiSettings_.resolvedTripoKey().empty() && !tripoKey_[0]
+                                 : svc == "stability" ? aiSettings_.resolvedStabilityKey().empty() && !stabilityKey_[0]
                                  : svc == "fal" ? aiSettings_.resolvedFalKey().empty() && !falKey_[0]
                                                 : aiSettings_.resolvedHfToken().empty() && !hfToken_[0];
             if (missing && ImGui::SmallButton(tr(free ? "Get a free token" : "Get a key"))) sf::dialogs::openUrl(m.keyUrl);
@@ -165,6 +166,7 @@ void App::startGenerator() {
     aiSettings_.meshyKey = meshyKey_;
     aiSettings_.hyper3dKey = hyper3dKey_;
     aiSettings_.tripoKey = tripoKey_;
+    aiSettings_.stabilityKey = stabilityKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     if (!ai::generateKeyMissing(aiSettings_) &&
