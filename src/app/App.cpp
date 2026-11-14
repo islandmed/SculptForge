@@ -561,7 +561,6 @@ int App::renderHeadless() {
     camera_.pitch = glm::radians(options_.pitchDegrees);
     camera_.distance /= options_.zoom;
     renderSettings_.wireframe = renderSettings_.wireframe || options_.wireframe; // syncScene builds its edges
-    applyViewEffects();
     RenderSettings settings = renderSettings_;
     settings.wireframe = options_.wireframe;
     settings.showFaceGroups = settings.showFaceGroups || options_.facegroups;
@@ -741,7 +740,6 @@ int App::runUiTest(int w, int h, int fps) {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
         noteStillness();
-        applyViewEffects();
         hardwareProfileFrameEnd();
         if (tracing) {
             tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
@@ -755,7 +753,6 @@ int App::runUiTest(int w, int h, int fps) {
             return 1;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
-        renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         if (video) {
@@ -967,7 +964,6 @@ int App::runRecording() {
         buildGhost(); // (the stroke preview, as run() draws it)
 
         syncScene();
-        applyViewEffects();
         ++frames;
         // While waiting on a model, keep only every Nth frame (marked on screen as sped up).
         if ((frames % demo_->frameStride()) != 0) continue;
@@ -976,7 +972,6 @@ int App::runRecording() {
             break;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
-        renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         ImVec2 vc;
@@ -1481,7 +1476,6 @@ int App::run() {
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         noteStillness();
-        applyViewEffects();
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops

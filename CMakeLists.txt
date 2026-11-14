@@ -551,7 +551,6 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/StrokePopup.cpp
     src/render/GL.cpp
     src/render/ScreenStroke.cpp
-    src/render/Occlusion.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
     src/render/MicroFocus.cpp

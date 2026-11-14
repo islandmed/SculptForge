@@ -97,9 +97,6 @@ int runAppBenchmark(BenchCommandLine cl) {
             // SF_BENCH_FLOOR_GRID=1: View > Display > Floor grid on (#115).
             const char* grid = std::getenv("SF_BENCH_FLOOR_GRID");
             settings.floorGrid = grid && std::string(grid) == "1";
-            // SF_BENCH_OCCLUSION=1: view shadows and AO on (render/Occlusion.h), with the bench's Lit Sphere shading.
-            const char* occ = std::getenv("SF_BENCH_OCCLUSION");
-            settings.ambientOcclusion = settings.shadows = settings.occlusionInLitSphere = occ && std::string(occ) == "1";
             renderer.syncScene(scene(m));
             const int warmup = 5, frames = 120;
             Clock::time_point t;
