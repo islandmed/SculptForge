@@ -275,6 +275,17 @@ Add one:
 5. A scenario that needs its own process (the thread pool, quit paths) is a script plus a small driver, like
    `tests/e2e/quit_clean.py`. The language has no loops: generate repeated blocks and commit the result.
 
+## Render matrix (label `t0`)
+
+Tests that check "no crash" miss a model that is simply not drawn (0.12.15: a micro level was invisible in PBR). The matrix
+`tests/render_matrix/matrix.sfui` (`ui_render_matrix`, in T0's smoke set) draws the scene offscreen at 256 px in each shading
+mode (Lit Sphere, PBR, flat, wire) on each mesh path (a plain mesh, a dense Micro level, Focus Detail, and Micro and Focus
+Detail with the GPU buffer limit lowered by `gl_limits texels=N`, as a small GPU's is). `render_cell "MODE x PATH" mode=...`
+fails, naming the cell, when under 25% of the pixels inside the model's projected box differ from the background or they are
+all one colour; the picture goes to `--ui-out` as `FAIL-cell-*.png`. A failing cell does not stop the script: every empty cell is listed.
+**Rule: a new render path, shading mode or GPU limit adds its cells in the same branch** (`ready.sh` warns on `src/render/` without them).
+`SF_BENCH_RENDER_CHECK=1 sculptforge --bench ...` runs the same check on the benchmark scenes on the real GPU (`render_check_gpu`, nightly).
+
 ## T3 nightly
 
 - `TEST(nightly_*)` cases (tests/test_main.cpp) are left out of every shard. They run in

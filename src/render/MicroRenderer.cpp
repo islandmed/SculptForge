@@ -23,7 +23,7 @@ namespace sf {
 namespace {
 
 constexpr GLenum kUnitTris = 0x84C8, kUnitBase = 0x84C9, kUnitDisp = 0x84CA, kUnitLevels = 0x84CB, kUnitShade = 0x84CC;
-constexpr uint32_t kChunkTexels = 1u << 26;
+constexpr uint32_t kChunkTexels = 1u << 26; // (gl::bufferChunkTexels: lower under a test's limit)
 constexpr uint32_t kNoCluster = 0xFFFFFFFFu;
 
 // Evaluates the micro surface exactly as MicroTriangle::evalWeights (corners in ascending vertex order), so
@@ -302,7 +302,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     const uint32_t dispPer = focus_ ? focus_->recordPoints() : mm.samples, shadePer = focus_ ? focus_->shadePoints() : mm.samples;
     const uint32_t clusterSize = std::clamp(65536u >> (2 * mm.level), 16u, 1024u);
     clusterShift_ = uint32_t(std::countr_zero(clusterSize));
-    chunkSlots_ = std::max(clusterSize, (kChunkTexels / dispPer) & ~(clusterSize - 1));
+    chunkSlots_ = std::max(clusterSize, (gl::bufferChunkTexels(kChunkTexels) / dispPer) & ~(clusterSize - 1));
     const uint32_t clusters = (nt + clusterSize - 1) >> clusterShift_;
     // Corners, the edges the wireframe draws (#128: the base's, without quad diagonals, as Renderer's own
     // wireframe) and the clusters across the edges, per slot.

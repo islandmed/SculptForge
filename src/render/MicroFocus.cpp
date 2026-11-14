@@ -192,7 +192,7 @@ void MicroFocus::shadeCoarse(const Mesh& mesh, MicroRenderer& r, const std::vect
 
 bool MicroFocus::growPool(uint32_t want) {
     const size_t S = samples_;
-    const uint32_t maxPages = uint32_t(std::min<size_t>(kChunkTexels / S, poolBudgetBytes / (S * 6)));
+    const uint32_t maxPages = uint32_t(std::min<size_t>(gl::bufferChunkTexels(kChunkTexels) / S, poolBudgetBytes / (S * 6)));
     if (capacity_ >= maxPages) return false;
     const uint32_t cap = std::min(maxPages, std::max({want, capacity_ * 2, 256u}));
     GLuint disp = 0, shade = 0;

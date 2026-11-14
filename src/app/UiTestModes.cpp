@@ -300,6 +300,7 @@ bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::strin
     handled = true;
     const std::string& verb = w[0];
     if (verb == "drag_item_to") return parseDragItemTo(line, w, error); // not in the chain: MSVC C1061 nesting limit
+    if (verb == "gl_limits" || verb == "render_cell") return parseRenderStep(line, w, error); // (UiTestRender.cpp)
     if (verb == "start_view") { // start_view: the camera as a fresh start has it, then the first frame's fit (App::fitStartView)
         run([this] {
             app_.camera_ = Camera();

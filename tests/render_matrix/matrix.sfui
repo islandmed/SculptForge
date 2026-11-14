@@ -1,0 +1,82 @@
+# The render matrix (T0): is the model DRAWN, in every shading mode on every way a mesh reaches the GPU? 0.12.15 shipped
+# meshes past a size limit invisible in PBR because the tests only checked that nothing crashed. Each cell draws the scene
+# offscreen (256 px, the real renderer on software GL) and fails, named "MODE x PATH", when the pixels inside the model's
+# projected box are still the background (coverage below its floor) or all one colour; its picture goes to --ui-out.
+#
+# The paths: a plain mesh; a dense Micro level; Micro streamed from a Focus Detail file; and the last two with the GPU buffer
+# limit lowered (gl_limits, tests only) the way a small GPU's is, so grids split over several buffers and the per-triangle
+# data a plain mesh sends is left out.
+#
+# RULE (qa-plan.md): a new render path, shading mode or GPU limit adds its cells here in the same branch. A mode that is a
+# setting of the view (AO, shadows) goes in render_cell's list of modes (src/app/UiTestRender.cpp) and as a line per path below.
+# cold: the matrix sets a GL limit and an environment variable; a warm server keeps neither between scripts.
+run new_sphere subdivisions=2
+# the PBR view builds its environment once, in the background: wait for it, then the cells ask for what they want
+run viewport_shading mode=pbr
+wait_value environment_pending == 0
+run viewport_shading mode=lit
+
+# --- small
+run new_sphere subdivisions=4
+wait 0.3
+render_cell "Lit Sphere x small" mode=lit
+render_cell "PBR x small" mode=pbr
+render_cell "flat x small" mode=flat
+render_cell "wire x small" mode=wire
+
+# --- dense Micro
+run new_sphere subdivisions=3
+run micro_divide level=3
+wait 0.3
+render_cell "Lit Sphere x dense Micro" mode=lit
+render_cell "PBR x dense Micro" mode=pbr
+render_cell "flat x dense Micro" mode=flat
+render_cell "wire x dense Micro" mode=wire
+
+# --- Focus Detail
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=3
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+wait 0.3
+render_cell "Lit Sphere x Focus Detail" mode=lit
+render_cell "PBR x Focus Detail" mode=pbr
+render_cell "flat x Focus Detail" mode=flat
+render_cell "wire x Focus Detail" mode=wire
+
+# --- small, over the buffer limit
+gl_limits texels=16384
+run new_sphere subdivisions=5
+wait 0.3
+render_cell "Lit Sphere x small, over the buffer limit" mode=lit
+render_cell "PBR x small, over the buffer limit" mode=pbr
+render_cell "flat x small, over the buffer limit" mode=flat
+render_cell "wire x small, over the buffer limit" mode=wire
+gl_limits texels=0
+
+# --- dense Micro, over the buffer limit
+gl_limits texels=16384
+run new_sphere subdivisions=4
+run micro_divide level=3
+wait 0.3
+render_cell "Lit Sphere x dense Micro, over the buffer limit" mode=lit
+render_cell "PBR x dense Micro, over the buffer limit" mode=pbr
+render_cell "flat x dense Micro, over the buffer limit" mode=flat
+render_cell "wire x dense Micro, over the buffer limit" mode=wire
+gl_limits texels=0
+
+# --- Focus Detail, over the buffer limit
+gl_limits texels=16384
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=4
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+wait 0.3
+render_cell "Lit Sphere x Focus Detail, over the buffer limit" mode=lit
+render_cell "PBR x Focus Detail, over the buffer limit" mode=pbr
+render_cell "flat x Focus Detail, over the buffer limit" mode=flat
+render_cell "wire x Focus Detail, over the buffer limit" mode=wire
+gl_limits texels=0
+
+# What the matrix would have caught (see the PBR x Micro cells on 0.12.15): the same cells all pass here.
+expect_value render_coverage > 0.3

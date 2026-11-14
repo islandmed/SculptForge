@@ -4,6 +4,7 @@
 // sculptforge --bench: the benchmark of core/Benchmark.h with the GPU side added (uploading what each dab
 // changed, and the frame time while orbiting), in a window the size of the app's default one.
 #include "app/Bench.h"
+#include "app/RenderCoverage.h"
 
 #include "render/Camera.h"
 #include "render/GL.h"
@@ -75,7 +76,15 @@ int runAppBenchmark(BenchCommandLine cl) {
                           reinterpret_cast<const char*>(gl::GetString(GL_VERSION));
         // SF_BENCH_FLAT=1: the mesh drawn with flat shading (the Material palette's Flat).
         const bool flat = std::getenv("SF_BENCH_FLAT") && std::string(std::getenv("SF_BENCH_FLAT")) == "1";
-        auto scene = [flat](Mesh& m) { return std::vector<SceneMesh>{SceneMesh{1, &m, true, true, nullptr, false, flat}}; };
+        // SF_BENCH_RENDER_CHECK=1: each scene also drawn in Lit Sphere, PBR, flat and wire on this GPU, and the run fails (exit 4)
+        // when the model is not in the picture (render_matrix's check on the real hardware: nightly).
+        const bool renderCheck = std::getenv("SF_BENCH_RENDER_CHECK") && std::string(std::getenv("SF_BENCH_RENDER_CHECK")) == "1";
+        bool checkPbr = false, checkWire = false, checkFlat = false, renderCheckFailed = false;
+        auto scene = [&flat, &checkPbr, &checkWire, &checkFlat](Mesh& m) {
+            SceneMesh sm{1, &m, true, true, nullptr, checkWire, flat || checkFlat};
+            sm.pbr = checkPbr;
+            return std::vector<SceneMesh>{sm};
+        };
         gpu.upload = [&](Mesh& m) {
             SDL_PumpEvents();
             const auto t = Clock::now();
@@ -134,6 +143,50 @@ int runAppBenchmark(BenchCommandLine cl) {
                 img.savePng(std::string(shot) + "-" + std::to_string(m.triangleCount()) + "-" + std::to_string(samples) + (moving ? "x-moving" : "x") + ".png", err);
                 settings.motionProxy = false;
             }
+            if (renderCheck) {
+                struct Mode { const char* name; bool pbr, flat, wire; };
+                for (const Mode mode : {Mode{"Lit Sphere", false, false, false}, Mode{"PBR", true, false, false},
+                                        Mode{"flat", false, true, false}, Mode{"wire", false, false, true}}) {
+                    checkPbr = mode.pbr, checkWire = mode.wire, checkFlat = mode.flat;
+                    RenderSettings view;
+                    view.shading = mode.pbr ? RenderSettings::Shading::Pbr : RenderSettings::Shading::LitSphere;
+                    view.flatShading = mode.flat;
+                    view.wireframe = mode.wire;
+                    view.gradientBackground = false;
+                    view.backgroundColor = glm::vec3(0.06f, 0.30f, 0.12f);
+                    renderer.syncScene(scene(m));
+                    for (int k = 0; k < 400; ++k) { // (the PBR view's environment is built in the background)
+                        renderer.drawView(camera, w, h, view, {}, samples);
+                        if (!renderer.environmentPending() && k >= 2) break;
+                        SDL_Delay(20);
+                    }
+                    gl::Finish();
+                    Image img;
+                    img.width = w;
+                    img.height = h;
+                    img.rgba.resize(size_t(w) * size_t(h) * 4);
+                    gl::PixelStorei(GL_PACK_ALIGNMENT, 1);
+                    gl::ReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
+                    std::vector<uint8_t> flipped(img.rgba.size());
+                    for (int y = 0; y < h; ++y)
+                        std::copy_n(img.rgba.data() + size_t(h - 1 - y) * size_t(w) * 4, size_t(w) * 4, flipped.data() + size_t(y) * size_t(w) * 4);
+                    img.rgba = std::move(flipped);
+                    for (size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
+                    const RenderCoverage r = measureRenderCoverage(img, camera, m.bounds());
+                    const bool ok = r.coverage >= kRenderCoverageFloor && r.colors >= 6;
+                    std::printf("render-check %-10s %zu triangles: coverage %.1f%%, %d colours%s\n", mode.name, m.triangleCount(),
+                                r.coverage * 100.0, r.colors, ok ? "" : "  FAIL: the model is not drawn");
+                    if (!ok) {
+                        renderCheckFailed = true;
+                        if (const char* shot = std::getenv("SF_BENCH_SHOT")) {
+                            std::string err;
+                            img.savePng(std::string(shot) + "-FAIL-" + mode.name + ".png", err);
+                        }
+                    }
+                }
+                checkPbr = checkWire = checkFlat = false;
+                renderer.syncScene(scene(m));
+            }
             renderer.drawView(camera, w, h, settings, {}, samples);
             gl::Finish();
             return ms;
@@ -159,6 +212,7 @@ int runAppBenchmark(BenchCommandLine cl) {
         gpu.gpuBytes = [&] { return renderer.gpuBytes(); };
         gpu.drawnTriangles = [&] { return orbitDrawn; };
         code = runBenchCommandLine(cl, "## With the GPU (sculptforge --bench)\n\n", &gpu);
+        if (renderCheckFailed && code == 0) code = 4;
         renderer.shutdown();
     }
     SDL_GL_DestroyContext(context);
