@@ -1,0 +1,737 @@
+<!doctype html>
+<!-- SculptForge Forge Deck (docs/phone-link.md): the phone as a control pad for a sculpting session on a computer.
+     This page is served over HTTPS from the website; it talks to SculptForge on your computer over a WebRTC data channel
+     (set up through this URL's #fragment, which browsers never send to the website) and, when a phone cannot reach the
+     computer on the home network, through the link relay with AES-256-GCM envelopes only SculptForge can read or forge.
+     Every tap is ONE command from a short list (brush, undo, redo, size, intensity, mirror); the computer refuses
+     anything else. The page has no canvas on purpose. GPL-3.0-or-later. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f0f12">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; connect-src https: http:; base-uri 'none'; form-action 'none'">
+<title>SculptForge Deck</title>
+<style>
+:root { --bg:#0f0f12; --bg2:#15151a; --panel:#1b1b21; --panel2:#24242c; --border:#2a2a31; --text:#ececf1; --muted:#a3a3ad;
+        --accent:#f28c3c; --accent2:#ffb06a; --ok:#4ad295; --bad:#ff6b6b; --warn:#ffcf5a;
+        --gap:10px; --pad:14px; --r:18px; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { margin:0; height:100%; background:var(--bg); color:var(--text); overscroll-behavior:none; }
+body { font:400 16px/1.35 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing:antialiased;
+       user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; overflow:hidden; }
+button { font:inherit; color:inherit; }
+.app { height:100vh; height:100dvh; display:grid; gap:var(--gap); padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + var(--pad))
+       calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + var(--pad)); max-width:1100px; margin:0 auto;
+       grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto minmax(0,1fr) auto;
+       grid-template-areas:"head" "read" "ctl" "tiles" "bar"; }
+header { grid-area:head; display:flex; align-items:center; gap:10px; min-height:44px; }
+header .brand { display:flex; align-items:center; gap:8px; font-weight:650; flex:1; min-width:0; }
+header .brand span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pill { display:flex; align-items:center; gap:7px; font-size:13px; padding:5px 11px 5px 9px; border-radius:999px; background:var(--panel);
+        border:1px solid var(--border); color:var(--muted); white-space:nowrap; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
+.pill.ok .dot { background:var(--ok); box-shadow:0 0 8px var(--ok); } .pill.wait .dot { background:var(--warn); animation:pulse 1.2s infinite; }
+.pill.bad .dot { background:var(--bad); } .pill.relay { color:#c9c9d2; }
+@keyframes pulse { 50% { opacity:.35; } }
+.quiet { min-height:44px; min-width:44px; padding:0 14px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--muted); font-size:14px; font-weight:600; }
+.quiet:active { background:var(--panel2); }
+
+.readout { grid-area:read; background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:12px 16px; min-height:104px;
+           display:flex; flex-direction:column; justify-content:center; }
+.readout .where { font-size:13px; color:var(--muted); letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.readout .tool { font-size:clamp(34px, 11vw, 56px); font-weight:720; letter-spacing:-.025em; line-height:1.05; color:var(--accent2);
+                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.readout .sub { color:var(--muted); font-size:15px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.ctl { grid-area:ctl; display:grid; gap:var(--gap); align-content:start; }
+.ctlrow { background:var(--panel); border:1px solid var(--border); border-radius:var(--r); padding:8px 10px 6px; }
+.ctlhead { display:flex; align-items:baseline; justify-content:space-between; padding:0 4px; min-height:30px; }
+.ctlhead .name { font-weight:650; font-size:15px; color:var(--muted); }
+.ctlhead .hint { flex:1; text-align:center; font-size:12px; color:var(--accent2); opacity:0; transition:opacity .12s; }
+.ctlhead .hint.on { opacity:1; }
+.val { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; background:none; border:0; padding:2px 6px; border-radius:10px; min-width:84px; text-align:right; }
+.val:active { background:var(--panel2); }
+.track { position:relative; height:56px; border-radius:14px; background:var(--bg2); border:1px solid var(--border); overflow:hidden; touch-action:none; cursor:pointer; outline:none; }
+.track:focus-visible { box-shadow:0 0 0 2px var(--accent); }
+.track .fill { position:absolute; inset:0 auto 0 0; width:50%; background:linear-gradient(90deg, rgba(242,140,60,.18), rgba(242,140,60,.6)); }
+.track .grip { position:absolute; top:6px; bottom:6px; width:6px; margin-left:-3px; border-radius:3px; background:var(--accent2); box-shadow:0 0 10px rgba(255,176,106,.6); }
+.track .tick { position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.12); }
+
+.tiles { grid-area:tiles; overflow-y:auto; overflow-x:hidden; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--gap); align-content:start;
+         padding:2px 2px 6px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; }
+.tile { position:relative; display:block; width:100%; border-radius:var(--r); border:2px solid var(--border); background:var(--panel); padding:0; overflow:hidden; cursor:pointer; touch-action:manipulation; }
+.tile::before { content:""; display:block; padding-top:100%; }
+.tile img, .tile .art { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.tile span { position:absolute; left:0; right:0; bottom:0; padding:6px 4px; background:rgba(15,15,18,.8); font-size:15px; font-weight:650; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile.noimg span { top:0; display:grid; place-items:center; background:none; font-size:17px; }
+.tile.on { border-color:var(--accent); box-shadow:0 0 0 3px rgba(242,140,60,.3); }
+.tile:active { transform:scale(.97); }
+
+.bar { grid-area:bar; display:grid; grid-template-columns:repeat(3, 1fr); gap:var(--gap); }
+.bar button { min-height:64px; border-radius:var(--r); border:1px solid var(--border); background:var(--panel); font-size:18px; font-weight:650; }
+.bar button:active { background:var(--panel2); transform:scale(.97); }
+.bar button.on { background:rgba(242,140,60,.22); border-color:var(--accent); color:var(--accent2); }
+
+.scrim { position:fixed; inset:0; display:none; place-items:center; padding:24px; background:rgba(15,15,18,.9); z-index:5; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+.scrim.on { display:grid; } .scrim.soft { background:rgba(15,15,18,.72); }
+.card { width:min(420px, 100%); text-align:center; }
+.card .spin { width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); margin:0 auto 16px; animation:spin 1s linear infinite; }
+.card .spin.static { animation:none; border-top-color:var(--border); } .card .spin.bad { animation:none; border-color:var(--bad); }
+@keyframes spin { to { transform:rotate(360deg); } }
+.card h1 { font-size:26px; line-height:1.15; margin:0 0 8px; letter-spacing:-.02em; }
+.card p { margin:0 0 12px; color:var(--muted); font-size:16px; }
+.card button { display:flex; align-items:center; justify-content:center; width:100%; min-height:52px; border-radius:14px; font-weight:650; font-size:17px; margin-top:10px; cursor:pointer; }
+.card .primary { border:0; color:#1a0d04; background:linear-gradient(180deg,#f6994d,#e2742a); }
+.card .secondary { border:1px solid var(--border); background:var(--panel2); }
+
+.sheet { position:fixed; left:0; right:0; bottom:0; z-index:6; background:var(--panel); border-top:1px solid var(--border); border-radius:22px 22px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom) + 16px);
+         transform:translateY(105%); transition:transform .18s ease-out; max-width:600px; margin:0 auto; }
+.sheet.on { transform:none; }
+.sheet h2 { margin:0 0 10px; font-size:18px; }
+.sheet .field { display:flex; gap:10px; align-items:center; }
+.sheet input { flex:1; min-width:0; height:56px; border-radius:14px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:26px; padding:0 14px; font-variant-numeric:tabular-nums; user-select:text; -webkit-user-select:text; }
+.sheet .step { width:56px; height:56px; border-radius:14px; border:1px solid var(--border); background:var(--panel2); font-size:26px; }
+.sheet .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.sheet .row button { min-height:52px; border-radius:14px; border:1px solid var(--border); background:var(--panel2); font-weight:650; font-size:17px; }
+.sheet .row .go { border:0; color:#1a0d04; background:linear-gradient(180deg,#f6994d,#e2742a); }
+.hidden { display:none !important; }
+
+/* Landscape phones and tablets: controls left, brushes right. */
+@media (orientation:landscape) and (min-width:640px) {
+  .app { grid-template-columns:minmax(300px, 44%) minmax(0,1fr); grid-template-rows:auto auto 1fr auto; column-gap:14px;
+         grid-template-areas:"head head" "read tiles" "ctl tiles" "bar tiles"; }
+  .readout { min-height:0; padding:8px 14px; } .readout .tool { font-size:clamp(28px, 6vh, 44px); }
+  .track { height:48px; } .bar button { min-height:54px; }
+  .tiles { grid-template-columns:repeat(4, minmax(0,1fr)); }
+}
+@media (orientation:landscape) and (max-height:430px) { .ctlrow { padding:4px 8px; } .ctlhead { min-height:24px; } .val { font-size:20px; } .track { height:40px; } .ctl { align-content:start; gap:8px; }
+  .readout { min-height:0; padding:4px 14px; flex-direction:row; align-items:baseline; gap:12px; border-radius:14px; } .readout .where { display:none; }
+  .readout .tool { font-size:26px; flex:none; max-width:55%; } .readout .sub { margin:0; font-size:13px; }
+  .app { grid-template-rows:auto auto 1fr auto; gap:8px; } .bar button { min-height:48px; } }
+@media (min-width:760px) and (orientation:portrait) { :root { --gap:14px; --pad:24px; } .tiles { grid-template-columns:repeat(4, minmax(0,1fr)); } .track { height:64px; } .readout .tool { font-size:64px; } }
+@media (min-width:1000px) and (orientation:landscape) { .tiles { grid-template-columns:repeat(5, minmax(0,1fr)); } }
+@media (max-width:420px) { header .brand span { display:none; } header .brand { flex:0 0 auto; } header .pill { flex:1; justify-content:center; } }
+@media (prefers-reduced-motion:reduce) { .sheet { transition:none; } .card .spin, .pill.wait .dot { animation:none; } }
+.help { min-height:44px; min-width:44px; padding:0; border-radius:50%; border:1px solid var(--border); background:var(--panel); color:var(--muted); font-size:18px; font-weight:700; }
+.help:active { background:var(--panel2); }
+.tour { position:fixed; inset:0; z-index:7; display:none; }
+.tour.on { display:block; }
+.tour .spot { position:fixed; border-radius:22px; box-shadow:0 0 0 9999px rgba(10,10,13,.78), 0 0 0 2px var(--accent); transition:left .2s ease-out, top .2s ease-out, width .2s ease-out, height .2s ease-out; pointer-events:none; }
+.tour .tcard { position:fixed; width:min(400px, calc(100vw - 24px)); background:var(--panel); border:1px solid var(--border); border-radius:22px; padding:16px 16px 14px; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+.tour .count { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.tour .count i { width:7px; height:7px; border-radius:50%; background:var(--border); } .tour .count i.on { background:var(--accent); }
+.tour h2 { margin:6px 0 6px; font-size:22px; letter-spacing:-.015em; }
+.tour p { margin:0 0 12px; color:var(--muted); font-size:16px; line-height:1.4; }
+.tour .row { display:grid; grid-template-columns:1fr 1.6fr; gap:10px; }
+.tour .row button { min-height:52px; border-radius:14px; border:1px solid var(--border); background:var(--panel2); font-weight:650; font-size:17px; cursor:pointer; }
+.tour .row .go { border:0; color:#1a0d04; background:linear-gradient(180deg,#f6994d,#e2742a); }
+@media (prefers-reduced-motion:reduce) { .tour .spot { transition:none; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z" fill="none" stroke="#f28c3c" stroke-width="1.6" stroke-linejoin="round"/><path d="M3.8 7.4L12 12l8.2-4.6M12 12v9.2" fill="none" stroke="#ffb06a" stroke-width="1.6" stroke-linejoin="round"/></svg><span>Forge Deck</span></div>
+    <div class="pill" id="pill"><i class="dot"></i><span id="pillText">Not connected</span></div>
+    <button class="quiet" id="bye" type="button">Disconnect</button>
+    <button class="help" id="help" type="button" aria-label="How the Forge Deck works">?</button>
+  </header>
+  <section class="readout" aria-live="polite"><div class="where" id="who">&nbsp;</div><div class="tool" id="tool">&nbsp;</div><div class="sub" id="sub">&nbsp;</div></section>
+  <section class="ctl">
+    <div class="ctlrow"><div class="ctlhead"><span class="name">Size</span><span class="hint" id="sizeHint"></span><button class="val" id="sizeVal" type="button" aria-label="Type a size">-</button></div>
+      <div class="track" id="size" role="slider" tabindex="0" aria-label="Size" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="grip"></div></div></div>
+    <div class="ctlrow"><div class="ctlhead"><span class="name">Intensity</span><span class="hint" id="intHint"></span><button class="val" id="intVal" type="button" aria-label="Type an intensity">-</button></div>
+      <div class="track" id="int" role="slider" tabindex="0" aria-label="Intensity" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="grip"></div></div></div>
+  </section>
+  <section class="tiles" id="tiles" aria-label="Brushes"></section>
+  <section class="bar"><button id="undo" type="button">Undo</button><button id="redo" type="button">Redo</button><button id="mirror" type="button" aria-pressed="false">Mirror</button></section>
+</div>
+
+<div class="scrim on" id="scrim"><div class="card">
+  <div class="spin" id="spin"></div><h1 id="cardTitle">Forge Deck</h1><p id="cardText"></p><p id="cardText2" class="hidden"></p>
+  <button class="primary hidden" id="cardMain" type="button"></button><button class="secondary hidden" id="cardAlt" type="button"></button>
+</div></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <h2 id="sheetTitle">Size</h2>
+  <div class="field"><button class="step" id="stepDown" type="button" aria-label="Smaller">&minus;</button>
+    <input id="sheetInput" type="text" inputmode="decimal" autocomplete="off" aria-label="Value"><button class="step" id="stepUp" type="button" aria-label="Larger">+</button></div>
+  <div class="row"><button id="sheetCancel" type="button">Cancel</button><button class="go" id="sheetGo" type="button">Set</button></div>
+</div>
+
+<div class="tour" id="tour" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+  <div class="spot" id="tourSpot"></div>
+  <div class="tcard" id="tourCard"><div class="count" id="tourCount"></div><h2 id="tourTitle"></h2><p id="tourText"></p>
+    <div class="row"><button id="tourSkip" type="button">Skip</button><button class="go" id="tourNext" type="button">Next</button></div></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var now = function () { return performance.now(); };
+
+  // ---- Link details: #v=1&k=token&d=desktop&o=offer&n=name&x=key&m=deck&b=relay blob url&r=answer relays... ----
+  var DEMO = (location.hash.match(/[#&]demo=([a-z]+)/) || [])[1] || "";
+  var STORE = "sfdeck-link";
+  var fresh = false, fragText = location.hash.slice(1);
+  if (!DEMO) {
+    if (fragText.indexOf("o=") >= 0) {
+      fresh = true;
+      try { sessionStorage.setItem(STORE, JSON.stringify({ frag: fragText, at: Date.now() })); sessionStorage.removeItem("sfdeck-dseq"); } catch (e) {}
+    } else {
+      // A reload (the phone slept, the tab was discarded): the link is good for 5 minutes, through the relay.
+      try {
+        var saved = JSON.parse(sessionStorage.getItem(STORE) || "null");
+        if (saved && Date.now() - saved.at < 5 * 60 * 1000) fragText = saved.frag; else { fragText = ""; sessionStorage.removeItem(STORE); }
+      } catch (e) { fragText = ""; }
+    }
+  }
+  var frag = new URLSearchParams(fragText);
+  var token = frag.get("k"), desktopUrl = frag.get("d"), offer = frag.get("o"), keyText = frag.get("x"), blobUrl = frag.get("b");
+  var computerName = frag.get("n") || "your computer";
+  var relayBase = "", topic = "";
+  if (blobUrl) { var bm = blobUrl.match(/^(https:\/\/[^/]+|http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?)\/blob\/(sculptforge-[0-9a-f]{24})$/); if (bm) { relayBase = bm[1]; topic = bm[2]; } }
+  if (!DEMO) try { history.replaceState(null, "", location.pathname); } catch (e) {}
+
+  var b64u = {
+    enc: function (bytes) { var s = ""; bytes = new Uint8Array(bytes); for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+                            return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); },
+    dec: function (t) { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; var s = atob(t), b = new Uint8Array(s.length);
+                        for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; },
+    str: function (t) { return new TextDecoder().decode(b64u.dec(t)); }
+  };
+
+  // ---- State shown ----
+  var st = { tool: "", brushId: "", size: 0, sizeMinPx: 2, sizeMaxPx: 800, intensity: 0, mirrorX: false, brushes: [], desktop: "" };
+  var hold = {};               // control -> time until which an incoming value must not move what the person just set
+  var got = false;             // a state has arrived
+  var images = {};             // tile name -> blob url
+  var via = "direct";          // "direct" | "relay"
+  var phase = "pairing";       // pairing | connecting | connected | reconnecting | ended | error
+  var vibrates = !!navigator.vibrate;
+
+  // ---- Feel: haptics (Android: vibrate; iPhone Safari 17.4+: a switch input's tick) ----
+  var tick = null;
+  function buzz(ms) {
+    try {
+      if (vibrates) { navigator.vibrate(ms || 8); return; }
+      if (!tick) {
+        tick = document.createElement("label");
+        tick.style.cssText = "position:fixed;left:-99px;top:-99px;opacity:0;pointer-events:none";
+        tick.innerHTML = '<input type="checkbox" switch>';
+        document.body.appendChild(tick);
+      }
+      tick.click();
+    } catch (e) {}
+  }
+
+  // ---- Size mapping: the strip's 0..1 on the desktop's log scale between the published range ----
+  function sizePx(p) { return st.sizeMinPx * Math.pow(st.sizeMaxPx / st.sizeMinPx, p); }
+  function sizePos(px) { px = Math.min(st.sizeMaxPx, Math.max(st.sizeMinPx, px)); return Math.log(px / st.sizeMinPx) / Math.log(st.sizeMaxPx / st.sizeMinPx); }
+  var fmt = { size: function (p) { return Math.round(sizePx(p)) + " px"; }, int: function (p) { return String(Math.round(p * 100)); } };
+
+  // ---- Sliders: drag anywhere; slide the finger away from the strip for fine control; tap the number to type it ----
+  var sliders = {};
+  function slider(id, cmd) {
+    var el = $(id), fill = el.querySelector(".fill"), grip = el.querySelector(".grip"), valEl = $(id + "Val"), hintEl = $(id + "Hint");
+    var o = { id: id, cmd: cmd, value: 0, dragging: false };
+    [0.25, 0.5, 0.75].forEach(function (f) { var t = document.createElement("i"); t.className = "tick"; t.style.left = (f * 100) + "%"; el.appendChild(t); });
+    o.show = function (v) {
+      o.value = v;
+      fill.style.width = (v * 100) + "%"; grip.style.left = (v * 100) + "%";
+      valEl.textContent = fmt[id](v);
+      el.setAttribute("aria-valuenow", Math.round(v * 100)); el.setAttribute("aria-valuetext", fmt[id](v));
+    };
+    var sentAt = 0, pending = null, band = -1, anchor = null, rate = 1;
+    function flush() {
+      if (pending === null) return;
+      var v = pending; pending = null; sentAt = now();
+      hold[id] = now() + 500;
+      sendCmd({ cmd: cmd, value: Math.round(v * 1000) / 1000 });
+    }
+    o.set = function (v, send) {
+      v = Math.min(1, Math.max(0, v));
+      var nb = Math.round(v * 4);
+      if (nb !== band) { if (band !== -1) buzz(10); band = nb; } // a short tick at each quarter
+      o.show(v);
+      if (send) { pending = v; if (now() - sentAt > (via === "relay" ? 160 : 50)) flush(); else setTimeout(flush, via === "relay" ? 160 : 50); }
+    };
+    function fromX(e) { var r = el.getBoundingClientRect(); return (e.clientX - r.left) / r.width; }
+    function move(e) {
+      var r = el.getBoundingClientRect(), cy = r.top + r.height / 2, away = Math.max(0, Math.abs(e.clientY - cy) - r.height * 0.9);
+      var nr = away <= 0 ? 1 : away < 70 ? 0.5 : away < 140 ? 0.2 : 0.05;
+      hintEl.textContent = nr < 1 ? "Fine control ×" + nr : ""; hintEl.classList.toggle("on", nr < 1);
+      if (nr !== rate || anchor) { // relative from here on: the finger's distance from the strip sets the precision
+        if (!anchor || nr !== rate) { anchor = { x: e.clientX, v: o.value }; rate = nr; }
+        o.set(anchor.v + ((e.clientX - anchor.x) / r.width) * rate, true);
+      } else {
+        var v = fromX(e);
+        [0, 0.25, 0.5, 0.75, 1].forEach(function (d) { if (Math.abs(v - d) < 0.02) v = d; }); // detents
+        o.set(v, true);
+      }
+    }
+    el.addEventListener("pointerdown", function (e) { o.dragging = true; anchor = null; rate = 1; band = -1; try { el.setPointerCapture(e.pointerId); } catch (x) {} move(e); e.preventDefault(); });
+    el.addEventListener("pointermove", function (e) { if (o.dragging) move(e); });
+    function up() { if (!o.dragging) return; flush(); o.dragging = false; anchor = null; hintEl.classList.remove("on"); hold[id] = now() + 500; }
+    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    el.addEventListener("keydown", function (e) {
+      var step = e.shiftKey ? 0.1 : 0.01, d = e.key === "ArrowRight" || e.key === "ArrowUp" ? step : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -step : 0;
+      if (d) { o.set(o.value + d, true); e.preventDefault(); }
+    });
+    valEl.addEventListener("click", function () { buzz(8); openSheet(o); });
+    sliders[id] = o;
+    return o;
+  }
+  var sizeCtl = slider("size", "size_set"), intCtl = slider("int", "intensity_set");
+
+  // ---- Typed value ----
+  var sheetFor = null;
+  function sheetValue(o, text) {
+    var n = parseFloat(String(text).replace(",", "."));
+    if (!isFinite(n)) return null;
+    return o.id === "size" ? sizePos(n) : Math.min(1, Math.max(0, n / 100));
+  }
+  function openSheet(o) {
+    sheetFor = o;
+    $("sheetTitle").textContent = o.id === "size" ? "Size (pixels, " + st.sizeMinPx + " to " + st.sizeMaxPx + ")" : "Intensity (0 to 100)";
+    $("sheetInput").value = o.id === "size" ? String(Math.round(sizePx(o.value))) : String(Math.round(o.value * 100));
+    $("sheet").classList.add("on");
+    setTimeout(function () { $("sheetInput").focus(); $("sheetInput").select(); }, 60);
+  }
+  function closeSheet() { $("sheet").classList.remove("on"); sheetFor = null; $("sheetInput").blur(); }
+  function step(dir) {
+    var n = parseFloat($("sheetInput").value) || 0, big = sheetFor && sheetFor.id === "size" ? Math.max(1, Math.round(n * 0.1)) : 1;
+    $("sheetInput").value = String(Math.round(n + dir * big));
+  }
+  $("stepDown").onclick = function () { buzz(6); step(-1); };
+  $("stepUp").onclick = function () { buzz(6); step(1); };
+  $("sheetCancel").onclick = closeSheet;
+  $("sheetGo").onclick = function () {
+    var v = sheetFor && sheetValue(sheetFor, $("sheetInput").value);
+    if (v !== null && sheetFor) { sheetFor.set(v, true); hold[sheetFor.id] = now() + 700; buzz(12); }
+    closeSheet();
+  };
+  $("sheetInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("sheetGo").click(); if (e.key === "Escape") closeSheet(); });
+
+  // ---- Buttons and tiles ----
+  function tap(id, fn) { $(id).addEventListener("click", function () { buzz(10); fn(); }); }
+  tap("undo", function () { sendCmd({ cmd: "undo" }); });
+  tap("redo", function () { sendCmd({ cmd: "redo" }); });
+  tap("mirror", function () { st.mirrorX = !st.mirrorX; hold.mirror = now() + 600; render(); sendCmd({ cmd: "symmetry_toggle", axis: "x" }); });
+  tap("bye", function () { endLink(true); });
+
+  var tilesKey = "";
+  function drawTiles() {
+    var key = JSON.stringify(st.brushes.map(function (b) { return [b.id, !!images[b.img || ""]]; }));
+    var box = $("tiles");
+    if (key !== tilesKey) {
+      tilesKey = key; box.textContent = "";
+      st.brushes.forEach(function (b) {
+        var t = document.createElement("button"); t.type = "button"; t.dataset.id = b.id;
+        var src = images[b.img || ""];
+        t.className = "tile" + (src || DEMO ? "" : " noimg");
+        if (src) { var im = document.createElement("img"); im.alt = ""; im.src = src; t.appendChild(im); }
+        else if (DEMO) { var art = document.createElement("div"); art.className = "art"; art.style.background = demoArt(b.id); t.appendChild(art); }
+        var s = document.createElement("span"); s.textContent = b.label; t.appendChild(s);
+        t.addEventListener("click", function () { // instant: the tile lights up now, the desktop's state confirms
+          buzz(14); st.brushId = b.id; st.tool = b.label; hold.brush = now() + 700; render();
+          sendCmd({ cmd: "brush_use", name: b.id });
+        });
+        box.appendChild(t);
+      });
+    }
+    Array.prototype.forEach.call(box.children, function (t) { t.classList.toggle("on", t.dataset.id === st.brushId); });
+  }
+  function demoArt(id) { var h = 0; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+    return "radial-gradient(circle at 40% 35%, hsl(" + h + " 25% 62%), hsl(" + h + " 18% 28%) 55%, #1b1b21 100%)"; }
+
+  function render() {
+    var t = now();
+    $("tool").textContent = st.tool || " ";
+    $("sub").textContent = got ? "Size " + fmt.size(sizeCtl.dragging ? sizeCtl.value : st.size) + "  ·  Intensity " + fmt.int(intCtl.dragging ? intCtl.value : st.intensity) + (st.mirrorX ? "  ·  Mirror" : "") : " ";
+    if (!sizeCtl.dragging && !(hold.size > t)) sizeCtl.show(st.size);
+    if (!intCtl.dragging && !(hold.int > t)) intCtl.show(st.intensity);
+    $("mirror").classList.toggle("on", st.mirrorX); $("mirror").setAttribute("aria-pressed", st.mirrorX ? "true" : "false");
+    $("who").textContent = got ? "Driving " + (st.desktop || computerName) : "\u00a0";
+    drawTiles();
+  }
+  // The readout follows the strips while a finger is on them.
+  setInterval(function () { if (sizeCtl.dragging || intCtl.dragging) $("sub").textContent = "Size " + fmt.size(sizeCtl.value) + "  ·  Intensity " + fmt.int(intCtl.value) + (st.mirrorX ? "  ·  Mirror" : ""); }, 100);
+
+  function applyState(m) {
+    var t = now();
+    if (typeof m.size === "number" && !(hold.size > t)) st.size = m.size;
+    if (typeof m.intensity === "number" && !(hold.int > t)) st.intensity = m.intensity;
+    if (typeof m.sizeMinPx === "number" && m.sizeMinPx > 0) st.sizeMinPx = m.sizeMinPx;
+    if (typeof m.sizeMaxPx === "number" && m.sizeMaxPx > m.sizeMinPx) st.sizeMaxPx = m.sizeMaxPx;
+    if (!(hold.brush > t)) { st.tool = String(m.tool || ""); st.brushId = String(m.brushId || ""); }
+    if (m.mirror && typeof m.mirror === "object" && !(hold.mirror > t)) st.mirrorX = !!m.mirror.x;
+    if (Array.isArray(m.brushes)) st.brushes = m.brushes.slice(0, 64).map(function (b) { return { id: String(b.id || ""), label: String(b.label || b.id || ""), img: b.img ? String(b.img) : "" }; });
+    if (m.desktop) st.desktop = String(m.desktop).slice(0, 80);
+    var first = !got; got = true;
+    if (first) { setPhase("connected"); }
+    render();
+    measure(m);
+  }
+
+  // ---- Latency: tap -> the desktop's state shows it (debug: window.deckStats()) ----
+  var waits = [], lat = { direct: [], relay: [] };
+  function note(kind, expect) { waits.push({ kind: kind, expect: expect, t0: now(), via: via }); if (waits.length > 20) waits.shift(); }
+  function measure(m) {
+    waits = waits.filter(function (w) {
+      var ok = w.kind === "size" ? Math.abs(m.size - w.expect) < 0.004 : w.kind === "int" ? Math.abs(m.intensity - w.expect) < 0.004 : m.brushId === w.expect;
+      if (ok) { lat[w.via].push(Math.round(now() - w.t0)); return false; }
+      return now() - w.t0 < 5000;
+    });
+  }
+  window.deckStats = function () {
+    var s = {}; ["direct", "relay"].forEach(function (k) { var a = lat[k].slice().sort(function (x, y) { return x - y; });
+      s[k] = { n: a.length, median: a.length ? a[a.length >> 1] : null, max: a.length ? a[a.length - 1] : null }; });
+    return s;
+  };
+
+  // ---- Status and cards ----
+  function pill(kind, text) { $("pill").className = "pill " + kind; $("pillText").textContent = text; }
+  function card(o) {
+    $("scrim").className = "scrim on" + (o.soft ? " soft" : "");
+    $("spin").className = "spin" + (o.kind === "bad" ? " bad" : o.kind === "still" ? " static" : "");
+    $("cardTitle").textContent = o.title; $("cardText").textContent = o.text || "";
+    $("cardText2").textContent = o.text2 || ""; $("cardText2").classList.toggle("hidden", !o.text2);
+    [["cardMain", o.main], ["cardAlt", o.alt]].forEach(function (p) {
+      var b = $(p[0]); b.classList.toggle("hidden", !p[1]); if (p[1]) { b.textContent = p[1][0]; b.onclick = p[1][1]; }
+    });
+  }
+  var deadline = 0, countdown = 0;
+  function setPhase(p, o) {
+    phase = p; o = o || {};
+    clearInterval(countdown);
+    if (p !== "connected" && tourAt >= 0) { tourClose(false); tourDone = false; } // the connection dropped mid-tour: it comes back with it
+    if (p === "connected") {
+      $("scrim").className = "scrim";
+      pill("ok" + (via === "relay" ? " relay" : ""), via === "relay" ? "Connected · internet" : "Connected · Wi‑Fi");
+      setTimeout(maybeTour, 400);
+    } else if (p === "connecting") {
+      pill("wait", "Connecting..."); card({ title: o.title || "Connecting to " + computerName, text: o.text || "", text2: o.text2 || "", alt: o.alt });
+    } else if (p === "reconnecting") {
+      pill("wait", "Reconnecting...");
+      var tick = function () {
+        var left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+        card({ soft: true, title: "Reconnecting...", text: "Your place is kept for " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + ". No need to scan again.",
+               alt: ["Disconnect", function () { endLink(true); }] });
+      };
+      tick(); countdown = setInterval(tick, 1000);
+    } else if (p === "ended") {
+      pill("bad", "Disconnected"); card({ kind: "still", title: o.title || "Disconnected", text: o.text || "Scan the QR code on your computer to start again.",
+                                          main: o.main });
+    } else if (p === "error") {
+      pill("bad", "Not connected"); card({ kind: "bad", title: o.title || "Can't connect", text: o.text || "", main: o.main, alt: o.alt });
+    } else if (p === "pairing") {
+      pill("bad", "Not connected");
+      card({ kind: "still", title: "Open the Forge Deck on your computer",
+             text: "In SculptForge choose File > Forge Deck (switch it on first in Preferences > Experimental), then scan the QR code with this phone's camera." });
+    }
+  }
+
+  // ---- Commands out: direct channel or relay ----
+  var channel = null, pc = null;
+  function sendCmd(msg) {
+    if (msg.cmd === "size_set") note("size", msg.value); else if (msg.cmd === "intensity_set") note("int", msg.value); else if (msg.cmd === "brush_use") note("brush", msg.name);
+    if (DEMO) return demoEcho(msg);
+    if (phase !== "connected") return;
+    sendRaw(JSON.stringify(msg), msg.cmd);
+  }
+  function sendRaw(text, cmd) {
+    if (via === "direct") { try { if (channel && channel.readyState === "open") channel.send(text); } catch (e) {} return; }
+    relayQueue(text, cmd);
+  }
+
+  // ---- The relay (when this phone can't reach the computer, or the Wi-Fi link dropped) ----
+  var rkey = null, upQ = [], upBusy = false, upSeq = 0, downSeq = 0, downN = 0, relayTimer = 0, relayPing = 0, relayOn = false, relayHelloAt = 0;
+  try { upSeq = Number(sessionStorage.getItem("sfdeck-seq") || 0); downSeq = Number(sessionStorage.getItem("sfdeck-dseq") || 0); } catch (e) {}
+  function nextSeq() { upSeq = Math.max(upSeq + 1, Date.now()); try { sessionStorage.setItem("sfdeck-seq", String(upSeq)); } catch (e) {} return upSeq; }
+  async function seal(obj) {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, rkey, new TextEncoder().encode(JSON.stringify(obj))));
+    var packed = new Uint8Array(12 + ct.length); packed.set(iv); packed.set(ct, 12); return b64u.enc(packed);
+  }
+  async function open(text) {
+    var bytes = b64u.dec(text);
+    return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, rkey, bytes.slice(12))));
+  }
+  function relayQueue(text, cmd) {
+    // The newest value of a strip replaces an older one still waiting; everything else keeps its order.
+    if (cmd === "size_set" || cmd === "intensity_set") upQ = upQ.filter(function (q) { return q.cmd !== cmd; });
+    upQ.push({ text: text, cmd: cmd }); if (upQ.length > 40) upQ.shift();
+    pumpUp();
+  }
+  async function pumpUp() {
+    if (upBusy || !rkey) return; upBusy = true;
+    try {
+      while (upQ.length) {
+        var q = upQ.shift();
+        var body = await seal({ d: "p2d", s: nextSeq(), m: q.text }); // one at a time: the sequence number must arrive in order
+        var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, 5000);
+        var r = await fetch(relayBase + "/deck/" + topic + "/up", { method: "POST", body: body, signal: ctl.signal }); clearTimeout(timer);
+        if (r.status === 429) await new Promise(function (ok) { setTimeout(ok, 400); });
+      }
+    } catch (e) {}
+    upBusy = false;
+  }
+  async function startRelay(why) {
+    if (!relayBase || !keyText) return false;
+    if (!rkey) { try { rkey = await crypto.subtle.importKey("raw", b64u.dec(keyText), "AES-GCM", false, ["encrypt", "decrypt"]); } catch (e) { return false; } }
+    via = "relay"; relayOn = true;
+    if (phase !== "reconnecting") {
+      setPhase("connecting", { title: "Connecting through the internet", text: "Your phone can't reach " + computerName + " directly, so this goes through an encrypted relay. A little slower, same controls." });
+      guardRelay(20000);
+    }
+    relayHello();
+    clearInterval(relayPing); relayPing = setInterval(function () { relayQueue(JSON.stringify({ type: "ping" }), "ping"); if (!got) relayHello(); }, 3000);
+    relayPoll();
+    return true;
+  }
+  function relayHello() { relayHelloAt = now(); upQ = upQ.filter(function (q) { return q.cmd !== "hello"; }); relayQueue(JSON.stringify({ type: "hello", ua: navigator.userAgent.slice(0, 300) }), "hello"); }
+  // The relay gets `ms` to bring a state back; then the person is told what to do (one line).
+  function guardRelay(ms) {
+    var t0 = Date.now(), w = setInterval(function () {
+      if (phase === "connected" || phase === "ended" || userEnded) return clearInterval(w);
+      if (Date.now() - t0 > ms) {
+        clearInterval(w); relayOn = false; clearInterval(relayPing);
+        setPhase("error", { title: "Can't reach " + computerName, text: "Is the Forge Deck still open on your computer? Open it and scan the new QR code.", main: ["Try again", function () { location.reload(); }] });
+      }
+    }, 1000);
+  }
+  var tilesTried = -1e9, tilesBusy = false, tilesGap = 2000; // (the gap between fetches doubles, to 30 s: a brush may never get a picture)
+  async function relayPoll() {
+    clearTimeout(relayTimer);
+    if (!relayOn) return;
+    try {
+      var r = await fetch(relayBase + "/deck/" + topic + "/down?after=" + downN, { cache: "no-store" });
+      if (r.ok) {
+        var j = await r.json();
+        if (j.message && j.n > downN) {
+          downN = j.n;
+          var env = await open(j.message);
+          if (env.d === "d2p" && env.s > downSeq) { downSeq = env.s; try { sessionStorage.setItem("sfdeck-dseq", String(downSeq)); } catch (e) {} lastRx = now(); handle(JSON.parse(env.m)); }
+        }
+      }
+    } catch (e) {}
+    // Tiles: fetched when the state first lists brushes, and again (every 4 s at first, then slower) while a listed brush has no picture yet.
+    if (got && !tilesBusy && now() - tilesTried > tilesGap && st.brushes.some(function (b) { return !images[b.img || ""]; })) { tilesBusy = true; tilesTried = now(); tilesGap = Math.min(30000, tilesGap * 2); fetchTiles().then(function () { tilesBusy = false; }); }
+    relayTimer = setTimeout(relayPoll, document.hidden ? 2000 : via === "relay" && phase === "connected" ? 350 : 700);
+  }
+  async function fetchTiles() {
+    for (var i = 0; i < 4; i++) {
+      try {
+        var r = await fetch(blobUrl + "?data=1", { cache: "no-store" });
+        if (r.ok) {
+          var bytes = new Uint8Array(await r.arrayBuffer());
+          var set = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, rkey, bytes.slice(12))));
+          Object.keys(set).forEach(function (k) { setImage(k, new Blob([b64u.dec(set[k])], { type: "image/png" })); });
+          tilesKey = ""; render(); return;
+        }
+      } catch (e) {}
+      await new Promise(function (ok) { setTimeout(ok, 2500); });
+    }
+  }
+  function setImage(name, blob) { if (!/^[A-Za-z0-9_-]{1,32}$/.test(name)) return; if (images[name]) URL.revokeObjectURL(images[name]); images[name] = URL.createObjectURL(blob); }
+
+  // ---- Messages in (both transports) ----
+  var lastRx = 0, imgWait = null;
+  function handle(m) {
+    if (!m || typeof m !== "object") return;
+    if (m.type === "state") applyState(m);
+    else if (m.type === "img" && typeof m.name === "string" && m.bytes > 0 && m.bytes <= 131072) imgWait = { name: m.name, bytes: m.bytes };
+    else if (m.type === "bye") endLink(false);
+  }
+  function onChannelMessage(data) {
+    lastRx = now();
+    if (typeof data !== "string") {
+      if (imgWait && data.byteLength === imgWait.bytes) { setImage(imgWait.name, new Blob([data], { type: "image/png" })); tilesKey = ""; render(); }
+      imgWait = null; return;
+    }
+    try { handle(JSON.parse(data)); } catch (e) {}
+  }
+
+  // ---- The direct link (WebRTC data channel; set up as the face and AR pages do) ----
+  var pinger = 0, watchdog = 0, everConnected = false, userEnded = false;
+  async function connectDirect() {
+    setPhase("connecting", { title: "Connecting to " + computerName, text: "Allow the camera if asked: it only lets this phone find your computer on Wi‑Fi. Nothing is recorded or sent." });
+    // The camera first: until a page may use it, Chrome hides this phone's network address behind a name the computer
+    // can't look up, and a firewall then blocks the connection. (Refusing is fine on most networks.)
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        stream.getTracks().forEach(function (t) { t.stop(); });
+      }
+    } catch (e) {}
+    // Chrome's local network permission: a request to the computer brings up "access devices on your local network".
+    setPhase("connecting", { title: "Connecting to " + computerName, text: "If Chrome asks to let this page reach devices on your local network, tap Allow." });
+    try { await fetch(desktopUrl + "/api/hello", { mode: "no-cors", cache: "no-store", targetAddressSpace: "local" }); } catch (e) {}
+    setPhase("connecting", { title: "Connecting to " + computerName, text: "Finding your computer on the Wi‑Fi..." });
+
+    pc = new RTCPeerConnection({ iceServers: [] });
+    channel = pc.createDataChannel("deck", { negotiated: true, id: 0 });
+    channel.binaryType = "arraybuffer";
+    channel.onmessage = function (e) { onChannelMessage(e.data); };
+    channel.onopen = function () {
+      via = "direct"; everConnected = true; lastRx = now();
+      channel.send(JSON.stringify({ type: "hello", ua: navigator.userAgent.slice(0, 300) }));
+      clearInterval(pinger); pinger = setInterval(function () { try { channel.send(JSON.stringify({ type: "ping" })); } catch (e) {} }, 2000);
+      clearInterval(watchdog); watchdog = setInterval(function () { if (phase === "connected" && via === "direct" && now() - lastRx > 7000) lost(); }, 1000);
+      setPhase("connecting", { title: "Loading your brushes", text: "Connected to " + computerName + "." });
+    };
+    channel.onclose = function () { if (!userEnded && via === "direct") lost(); };
+    pc.onconnectionstatechange = function () { if (pc && pc.connectionState === "failed" && via === "direct" && !userEnded) lost(); };
+    await pc.setRemoteDescription({ type: "offer", sdp: b64u.str(offer) });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await new Promise(function (ok) {
+      if (pc.iceGatheringState === "complete") return ok();
+      pc.addEventListener("icegatheringstatechange", function () { if (pc.iceGatheringState === "complete") ok(); });
+      setTimeout(ok, 2500);
+    });
+    var answerSdp = pc.localDescription.sdp, sent = false;
+    // The answer goes back through the link relay, encrypted with the key from the fragment (the relay can't read it).
+    var relays = frag.getAll("r");
+    if (relays.length && keyText) {
+      try {
+        var k = await crypto.subtle.importKey("raw", b64u.dec(keyText), "AES-GCM", false, ["encrypt"]);
+        var iv = crypto.getRandomValues(new Uint8Array(12));
+        var ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, k, new TextEncoder().encode(JSON.stringify({ k: token, sdp: answerSdp }))));
+        var packed = new Uint8Array(12 + ct.length); packed.set(iv); packed.set(ct, 12);
+        for (var i = 0; i < relays.length && !sent; i++) {
+          try { var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, 5000);
+                var r = await fetch(relays[i], { method: "POST", body: b64u.enc(packed), signal: ctl.signal }); clearTimeout(timer); sent = r.ok; } catch (e) {}
+        }
+      } catch (e) {}
+    }
+    window.__answerSdp = answerSdp;
+    // Not open in time: the relay (when this link has one), else say what to check.
+    setTimeout(async function () {
+      if (channel && channel.readyState === "open") return;
+      if (!(await startRelay("timeout")))
+        setPhase("error", { title: "Can't reach " + computerName, text: "Check that this phone and the computer are on the same Wi‑Fi (not a guest network or VPN), then scan the new QR code.",
+                            alt: sent ? null : ["Connect without internet", directTab] });
+      else if (!sent) { /* no internet to send the answer either: the relay can't help; keep the card */ }
+    }, 14000);
+  }
+  function directTab() { window.open(desktopUrl + "/rtc-answer?k=" + encodeURIComponent(token) + "&a=" + b64u.enc(new TextEncoder().encode(window.__answerSdp || "")), "_blank"); }
+
+  // The direct link dropped: keep the place for 5 minutes, through the relay when there is one.
+  async function lost() {
+    if (userEnded || phase === "ended") return;
+    clearInterval(pinger); clearInterval(watchdog);
+    try { channel && (channel.onclose = null); pc && pc.close(); } catch (e) {}
+    channel = null; pc = null; got = false; // (the last values stay on screen behind the card until new ones arrive)
+    deadline = Date.now() + 5 * 60 * 1000;
+    if (phase === "connected") setPhase("reconnecting");
+    if (await startRelay("lost")) return guardRelay(5 * 60 * 1000);
+    setPhase("error", { title: "Lost the connection", text: "Check that the computer is awake and on the same Wi\u2011Fi, then scan the new QR code to continue.", main: ["Try again", function () { location.reload(); }] });
+  }
+  function endLink(byPerson) {
+    userEnded = true; relayOn = false; clearInterval(pinger); clearInterval(watchdog); clearInterval(relayPing); clearTimeout(relayTimer);
+    try { if (byPerson) { if (via === "direct" && channel && channel.readyState === "open") channel.send(JSON.stringify({ type: "bye" })); else if (rkey) relayQueue(JSON.stringify({ type: "bye" }), "bye"); } } catch (e) {}
+    setTimeout(function () { try { pc && pc.close(); } catch (e) {} }, 150);
+    try { sessionStorage.removeItem(STORE); } catch (e) {}
+    setPhase("ended", { title: byPerson ? "Disconnected" : "Disconnected by your computer" });
+  }
+  window.addEventListener("pagehide", function () { try { if (via === "direct" && channel && channel.readyState === "open") channel.send(JSON.stringify({ type: "bye" })); } catch (e) {} });
+  try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
+  document.addEventListener("visibilitychange", function () { try { if (!document.hidden && navigator.wakeLock) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {} });
+
+  // ---- Demo (#demo=connected|connecting|reconnecting|relay|ended|error|pairing): the page's own states, no computer ----
+  function demoEcho(msg) {
+    setTimeout(function () {
+      if (msg.cmd === "size_set") st.size = msg.value; else if (msg.cmd === "intensity_set") st.intensity = msg.value;
+      else if (msg.cmd === "brush_use") { st.brushId = msg.name; st.tool = (st.brushes.filter(function (b) { return b.id === msg.name; })[0] || {}).label || msg.name; }
+      else if (msg.cmd === "symmetry_toggle") { /* shown optimistically */ }
+      render(); measure({ size: st.size, intensity: st.intensity, brushId: st.brushId });
+    }, 20);
+  }
+  function demo() {
+    var names = ["Clay", "Standard", "Smooth", "Move", "Inflate", "Crease", "Flatten", "Pinch", "Layer", "Sharp Crease", "Nudge", "Snake Hook"];
+    var s = { type: "state", tool: "Clay", brushId: "Clay", size: 0.55, sizeMinPx: 2, sizeMaxPx: 800, intensity: 0.42, mirror: { x: true }, desktop: "Studio PC",
+              brushes: names.map(function (n) { return { id: n.replace(" ", ""), label: n }; }) };
+    s.brushes[0].id = "Clay";
+    if (DEMO === "pairing") return setPhase("pairing");
+    if (DEMO === "connecting") { st.brushes = s.brushes; render(); return setPhase("connecting", { title: "Connecting to Studio PC", text: "If Chrome asks to let this page reach devices on your local network, tap Allow." }); }
+    got = false; applyState(s);
+    if (DEMO === "relay") { via = "relay"; setPhase("connected"); }
+    else if (DEMO === "reconnecting") { deadline = Date.now() + 4 * 60 * 1000 + 52000; setPhase("reconnecting"); }
+    else if (DEMO === "ended") setPhase("ended", { title: "Disconnected" });
+    else if (DEMO === "error") setPhase("error", { title: "Can't reach Studio PC", text: "Check that this phone and the computer are on the same Wi‑Fi (not a guest network or VPN), then scan the new QR code.", main: ["Try again", function () {}] });
+    else setPhase("connected");
+  }
+
+  // ---- First-run tour (skippable; the ? button opens it again) ----
+  var TOUR_KEY = "sfdeck-tour", tourAt = -1, tourDone = false;
+  var tourSteps = [
+    { sel: "#tiles", title: "Pick a brush", text: "Tap a tile and your computer switches to that brush at once." },
+    { sel: ".ctl", title: "Size and Intensity", text: "Drag anywhere on a strip. Slide your finger away from the strip as you drag for finer steps. Tap the number to type an exact value." },
+    { sel: ".bar", title: "Undo, Redo, Mirror", text: "Big buttons for what you reach for most. Whatever you change on your computer shows up here too." },
+    { sel: "header", title: "It stays connected", text: "If the Wi\u2011Fi drops, the Deck reconnects by itself for 5 minutes, with no new scan. Disconnect ends the session. Tap ? any time to see this again." }
+  ];
+  function tourSeen() { try { return localStorage.getItem(TOUR_KEY) === "1"; } catch (e) { return false; } }
+  function tourPlace() {
+    if (tourAt < 0) return;
+    var t = tourSteps[tourAt], el = document.querySelector(t.sel), r = el.getBoundingClientRect(), pad = 6;
+    var sp = $("tourSpot"), card = $("tourCard"), W = window.innerWidth, H = window.innerHeight;
+    sp.style.left = (r.left - pad) + "px"; sp.style.top = (r.top - pad) + "px"; sp.style.width = (r.width + 2 * pad) + "px"; sp.style.height = (r.height + 2 * pad) + "px";
+    card.style.left = card.style.right = card.style.top = card.style.bottom = "auto";
+    var cw = card.offsetWidth, ch = card.offsetHeight, cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (W >= 640 && W > H) { // landscape: beside the controls, on the side the highlight isn't
+      card.style.left = Math.max(12, cx > W / 2 ? 12 : W - cw - 12) + "px"; card.style.top = Math.max(12, (H - ch) / 2) + "px";
+    } else { // portrait: the half of the screen the highlight isn't in
+      card.style.left = Math.max(12, (W - cw) / 2) + "px";
+      card.style.top = (cy > H / 2 ? Math.max(12, Math.min(r.top - ch - 18, 24)) : Math.max(12, H - ch - 24 - 12)) + "px";
+    }
+  }
+  function tourShow(i) {
+    tourAt = i; var t = tourSteps[i], last = i === tourSteps.length - 1;
+    $("tour").classList.add("on");
+    $("tourTitle").textContent = t.title; $("tourText").textContent = t.text;
+    var dots = ""; for (var k = 0; k < tourSteps.length; k++) dots += '<i class="' + (k === i ? "on" : "") + '"></i>';
+    $("tourCount").innerHTML = dots + "<span>" + (i + 1) + " of " + tourSteps.length + "</span>";
+    $("tourNext").textContent = last ? "Got it" : "Next"; $("tourSkip").classList.toggle("hidden", last);
+    $("tourCard").style.visibility = "hidden"; tourPlace(); $("tourCard").style.visibility = "";
+    $("tourCard").querySelector(".row").style.gridTemplateColumns = last ? "1fr" : "";
+  }
+  function tourClose(mark) {
+    tourAt = -1; $("tour").classList.remove("on");
+    if (mark) { try { localStorage.setItem(TOUR_KEY, "1"); } catch (e) {} }
+  }
+  function maybeTour() { if (!tourDone && tourAt < 0 && (DEMO ? DEMO === "tour" : !tourSeen())) { tourDone = true; tourShow(Math.max(0, Math.min(tourSteps.length - 1, +((location.hash.match(/[#&]step=(\d)/) || [])[1] || 1) - 1))); } }
+  $("tourNext").onclick = function () { buzz(8); if (tourAt >= tourSteps.length - 1) tourClose(true); else tourShow(tourAt + 1); };
+  $("tourSkip").onclick = function () { tourClose(true); };
+  $("help").addEventListener("click", function () { buzz(8); tourDone = true; tourShow(0); });
+  window.addEventListener("resize", tourPlace);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && tourAt >= 0) tourClose(true); });
+
+  // ---- Start ----
+  render();
+  sizeCtl.show(0); intCtl.show(0);
+  (async function () {
+    if (DEMO) return demo();
+    if (!token || !offer) return setPhase("pairing");
+    if (!fresh) { // a reload within 5 minutes: the offer was used, so go straight to the relay
+      deadline = Date.now() + 5 * 60 * 1000;
+      setPhase("reconnecting"); // (before the relay can answer: a state arriving first must not be overwritten by the card)
+      if (await startRelay("reload")) return guardRelay(5 * 60 * 1000);
+      return setPhase("pairing");
+    }
+    if (typeof RTCPeerConnection === "undefined") {
+      if (await startRelay("no-webrtc")) return;
+      return setPhase("error", { title: "This browser can't connect", text: "Open this link in Chrome or Safari, then scan the code again." });
+    }
+    connectDirect().catch(function (e) {
+      startRelay("failed").then(function (ok) { if (!ok) setPhase("error", { title: "Couldn't connect", text: String(e && e.message || e).slice(0, 120) + ". Scan the new QR code to try again." }); });
+    });
+  })();
+})();
+</script>
+</body>
+</html>

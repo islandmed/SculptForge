@@ -157,6 +157,7 @@ Json toJson(const UiPrefs& p) {
     j.set("liveMove", p.liveMove);
     j.set("backgroundPreview", p.backgroundPreview);
     j.set("fastUpload", p.fastUpload);
+    j.set("forgeDeck", p.forgeDeck);
     j.set("fastBigBrushes", p.fastBigBrushes);
     j.set("dyntopoConstantDetail", p.dyntopoConstantDetail);
     j.set("flatShading", p.flatShading);
@@ -284,6 +285,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.liveMove = j["liveMove"].asBool(p.liveMove);
     p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
     p.fastUpload = j["fastUpload"].asBool(p.fastUpload);
+    p.forgeDeck = j["forgeDeck"].asBool(p.forgeDeck);
     p.fastBigBrushes = j["fastBigBrushes"].asBool(p.fastBigBrushes);
     p.dyntopoConstantDetail = j["dyntopoConstantDetail"].asBool(p.dyntopoConstantDetail);
     p.flatShading = j["flatShading"].asBool(p.flatShading);

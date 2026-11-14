@@ -7,6 +7,7 @@
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "app/Ui.h"
+#include "core/AuditLog.h"
 
 #include "link/PhoneRtc.h"
 
@@ -123,6 +124,15 @@ void App::setPhoneLinkOpen(bool open) {
     if (!phone_) {
         phone_ = std::make_unique<link::PhoneLink>();
         phone_->setWake(wakeMainLoop); // the app sleeps while idle (#14): a phone message wakes it
+        phone_->setDeckLog([](const std::string& command, bool ok, const std::string& message) { // Forge Deck: audit log
+            audit::Entry e;
+            e.client = "deck";
+            e.tool = "deck";
+            e.command = command;
+            e.ok = ok;
+            e.message = message;
+            audit::record(e);
+        });
     }
     phoneError_.clear();
     if (library_.user.empty()) {
@@ -234,10 +244,15 @@ void App::startPhoneArExport() {
 }
 
 void App::pollPhone() {
-    if (showPhone_ && (!phone_ || !phone_->running()) && phoneError_.empty()) setPhoneLinkOpen(true);
-    if (!showPhone_ && phone_ && phone_->running()) setPhoneLinkOpen(false);
-    if (!showPhone_) phoneError_.clear(); // try again the next time the window opens
-    if (!phone_ || !phone_->running()) return;
+    const bool wanted = showPhone_ || showDeck_; // the link serves while either window is open
+    if (wanted && (!phone_ || !phone_->running()) && phoneError_.empty()) setPhoneLinkOpen(true);
+    if (!wanted && phone_ && phone_->running()) setPhoneLinkOpen(false);
+    if (!wanted) phoneError_.clear(); // try again the next time the window opens
+    if (!phone_ || !phone_->running()) {
+        deckApplied_ = false;
+        return;
+    }
+    pollDeck();
 
     for (const link::PhoneEvent& e : phone_->takeEvents()) {
         using T = link::PhoneEvent::Type;

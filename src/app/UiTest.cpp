@@ -270,6 +270,8 @@
 //   phone_face NAME=W ... [frames=N]   N face messages (default 5) with these ARKit weights
 //   phone_request METHOD PATH STATUS [BODY]   any request with the session token; fails unless the answer has
 //                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"part","size":20})
+//   deck_message ok|refused JSON   one message from the Forge Deck page, as its WebRTC channel delivers it (hello, ping,
+//                            or ONE command); fails unless the desktop accepts (ok) or refuses (refused) it
 // A scripted AI tool for live mode (PanelAiLink.cpp), over the real local socket / pipe (link/AiLink.h):
 //   ai_client connect        connect to this window's live-mode endpoint (Preferences > AI > Let AI tools ...)
 //   ai_client send JSON      send one message as is (a hello, a code, a tools/call)
@@ -1049,6 +1051,18 @@ double Demo::query(const std::string& name, bool& known) const {
         if (name == "phone_ar_version") return double(st.arVersion);
         if (name == "phone_ar_busy") return st.arBusy || app_.phoneBusy() ? 1.0 : 0.0;
     }
+    if (name.rfind("deck_", 0) == 0) { // Forge Deck prototype (PanelDeck.cpp)
+        const link::DeckStatus ds = app_.phone_ && app_.phone_->running() ? app_.phone_->deckStatus() : link::DeckStatus{};
+        if (name == "deck_on") return app_.showDeck_ && ds.enabled ? 1.0 : 0.0;
+        if (name == "deck_window") return app_.showDeck_ ? 1.0 : 0.0;
+        if (name == "deck_connected") return ds.connected ? 1.0 : 0.0;
+        if (name == "deck_qr") return app_.deckQr_.size > 0 ? 1.0 : 0.0; // the pairing code is drawn
+        if (name == "deck_accepted") return double(ds.accepted);
+        if (name == "deck_refused") return double(ds.refused);
+        if (name == "deck_symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
+        if (name == "deck_size_position") return std::round(link::deckPxToSize(app_.radiusPx_) * 100.0f); // the strip's number
+        if (name == "deck_intensity") return std::round(app_.strength_ * 100.0f);
+    }
     if (name == "dynamic") return app_.doc_.sculptor.dyntopo.enabled ? 1.0 : 0.0;
     if (name == "dynamic_detail") return std::round(app_.doc_.sculptor.dyntopo.detail * 100.0f);
     if (name == "saved_views") return double(app_.savedViews_.size());
@@ -1816,7 +1830,7 @@ enum class StepVerb { None,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
-    AnswerDialog, RadialImport, Copy, AiClient, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
+    AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
@@ -1877,7 +1891,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"answer_dialog", StepVerb::AnswerDialog},
         {"radial_import", StepVerb::RadialImport}, {"radial_export", StepVerb::RadialImport},
         {"copy", StepVerb::Copy},
-        {"ai_client", StepVerb::AiClient},
+        {"ai_client", StepVerb::AiClient}, {"deck_message", StepVerb::DeckMessage},
         {"phone_upload", StepVerb::PhoneUpload}, {"phone_face", StepVerb::PhoneUpload}, {"phone_request", StepVerb::PhoneUpload},
         {"ui_scale", StepVerb::UiScale},
         {"display_scale", StepVerb::DisplayScale},
@@ -3178,6 +3192,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "ai_client connect | send JSON | expect TEXT [S] | close";
             return false;
         }
+        break;
+    }
+    case StepVerb::DeckMessage: {
+        if (!need(2)) return false;
+        const std::string expected = w[1];
+        const std::string body = restOf(lineText_, 2);
+        run([this, line, expected, body] {
+            if (!app_.phone_ || !app_.phone_->running()) {
+                fail(line, "the phone link isn't running (turn the Forge Deck on first)");
+                return;
+            }
+            std::string err;
+            const bool ok = app_.phone_->receiveDeckMessage(body, "WebRTC", err);
+            if (ok != (expected == "ok")) fail(line, std::string("the Deck ") + (ok ? "accepted" : "refused (" + err + ")") + " " + body);
+        });
         break;
     }
     case StepVerb::PhoneUpload: {

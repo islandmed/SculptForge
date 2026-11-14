@@ -353,7 +353,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedPhone.cpp sf::phone_assets
   capturePage ${CMAKE_CURRENT_SOURCE_DIR}/assets/phone/capture.html
   facePage ${CMAKE_CURRENT_SOURCE_DIR}/website/link/index.html)
 add_library(sculptforge_phone STATIC ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedPhone.cpp src/link/HttpServer.cpp
-  src/link/PhoneLink.cpp src/link/FaceFeed.cpp src/link/PhoneRtc.cpp src/link/Qr.cpp third_party/qrcodegen/qrcodegen.cpp)
+  src/link/PhoneLink.cpp src/link/DeckCommands.cpp src/link/FaceFeed.cpp src/link/PhoneRtc.cpp src/link/Qr.cpp third_party/qrcodegen/qrcodegen.cpp)
 target_include_directories(sculptforge_phone PRIVATE third_party/qrcodegen)
 target_link_libraries(sculptforge_phone PUBLIC sculptforge_ai)
 if(SCULPTFORGE_WEBRTC)
@@ -521,6 +521,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelBlender.cpp
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
+    src/app/PanelDeck.cpp
     src/app/PanelProject.cpp
     src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
@@ -1161,6 +1162,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Guide Strength, Target Quads and Level dropped on a shelf (tests/ui/shelf_slider_drop.sfui), and plain slider drags (slider_drag).
     sculptforge_ui_test(shelf_slider_drop_1440 shelf_slider_drop --size 1440x900)
     sculptforge_ui_test(shelf_slider_drop_2880 shelf_slider_drop --size 2880x1800)
+    # Forge Deck prototype (tests/ui/deck.sfui), at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(deck_1440 deck --size 1440x900)
+    sculptforge_ui_test(deck_2880 deck --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)

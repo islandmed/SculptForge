@@ -153,6 +153,9 @@ struct UiPrefs {
     // move is applied once when the pen lifts (SF_LIVE_MOVE=0 / 1 overrides). Background Preview: heavy meshes'
     // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides). Fast Upload: stroke uploads
     // go through persistently mapped staging buffers and a GPU copy (SF_PERSISTENT_UPLOAD=0 / 1 overrides).
+    // Forge Deck prototype (PanelDeck.cpp), Preferences > Experimental: off by default. While off the File menu has
+    // no entry for it and nothing about it runs; the Deck itself is off at every start even when this is on.
+    bool forgeDeck = false;
     bool liveMove = false;
     bool backgroundPreview = false;
     bool fastUpload = false;

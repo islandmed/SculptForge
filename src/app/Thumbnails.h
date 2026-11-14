@@ -44,6 +44,9 @@ public:
     ThumbnailCache& operator=(const ThumbnailCache&) = delete;
 
     ImTextureID brush(int brushType); // BrushType, or kPaintBrush (AssetLibrary.h)
+    // The disk-cache PNG of a brush's thumbnail once it has been made ("" before, or with no cache folder): the
+    // Forge Deck sends these to the phone (PanelDeck.cpp).
+    std::string brushCacheFile(int brushType) const;
     ImTextureID recipe(const BrushRecipe& recipe);
     ImTextureID alpha(const BrushAlpha& alpha);
     ImTextureID vdm(const std::shared_ptr<const VectorDisplacement>& vdm); // one stamp of the map on a plane

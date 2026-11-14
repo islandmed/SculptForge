@@ -14,6 +14,8 @@
 // The same link carries a sculpt to the phone's AR page (website/link/ar.html, Mode::Ar): then the channel is
 // reliable and ordered, and the model goes down it as binary chunks (Android's Scene Viewer can't load a model from
 // this computer's plain-HTTP address, so the page shows it in AR itself, with WebXR).
+// The Forge Deck (website/link/deck.html, Mode::Deck) rides the same link: a reliable channel carrying the allowlisted
+// commands up and the desktop's state and brush tiles down.
 // Built with libdatachannel and Mbed TLS (cmake/WebRTC.cmake, -DSCULPTFORGE_WEBRTC=ON); without them
 // webrtcAvailable() is false and FaceRtc refuses to start.
 #pragma once
@@ -30,7 +32,7 @@ bool webrtcAvailable();
 class FaceRtc {
 public:
     enum class State { Idle, Offered, Connecting, Connected, Closed, Failed };
-    enum class Mode { Face, Ar }; // Face: the "face" channel, unordered and lossy; Ar: the "ar" channel, reliable
+    enum class Mode { Face, Ar, Deck }; // Face: the "face" channel, unordered and lossy; Ar, Deck: reliable and ordered
 
     // `icePort`: the local UDP port for every link (0 = any), shared through ICE UDP multiplexing, so a firewall
     // needs one rule (the phone link uses its HTTP port number). Falls back to any port if it is taken.

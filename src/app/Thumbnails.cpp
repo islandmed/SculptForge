@@ -146,6 +146,14 @@ ImTextureID ThumbnailCache::brush(int brushType) {
         true);
 }
 
+std::string ThumbnailCache::brushCacheFile(int brushType) const {
+    if (cacheDir_.empty()) return {};
+    const std::string path =
+        thumbnailCachePath(cacheDir_, hex64(fnv1a64("brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion))));
+    std::error_code ec;
+    return std::filesystem::is_regular_file(fsPath(path), ec) ? path : std::string();
+}
+
 ImTextureID ThumbnailCache::recipe(const BrushRecipe& recipe) {
     const std::string key = "recipe|" + recipe.toJson().dump() + "|" + std::to_string(kThumbnailVersion);
     return request(

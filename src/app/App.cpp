@@ -372,6 +372,7 @@ bool App::init(const AppOptions& options) {
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
+    initDeckActions();  // File > Forge Deck (PanelDeck.cpp)
     initLibraryBrowser();
     timer.step("project, actions, library");
     splashCheckpoint();
@@ -3536,6 +3537,7 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+    drawDeckWindow();  // File > Forge Deck (PanelDeck.cpp)
     drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
     drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)

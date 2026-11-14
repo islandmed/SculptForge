@@ -175,7 +175,7 @@ rtc::DataChannelInit channelInit(FaceRtc::Mode mode) {
     return init;
 }
 
-const char* channelLabel(FaceRtc::Mode mode) { return mode == FaceRtc::Mode::Ar ? "ar" : "face"; }
+const char* channelLabel(FaceRtc::Mode mode) { return mode == FaceRtc::Mode::Ar ? "ar" : mode == FaceRtc::Mode::Deck ? "deck" : "face"; }
 
 rtc::Configuration localConfiguration(uint16_t port = 0) {
     rtc::Configuration config; // no STUN or TURN servers: the phone and this computer share a network
