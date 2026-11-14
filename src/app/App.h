@@ -3108,6 +3108,7 @@ private:
     void runRadialSlot(int slot);
     bool radialMouseEvent(const SDL_Event& e); // true: the pie used the event (clicks while open, bound buttons)
     bool radialPenButton(int button, bool down, float x, float y);
+    void penButtonsSync(SDL_PenInputFlags state); // lets go of buttons SDL no longer holds (Tablet.cpp)
     void radialKeyUp(SDL_Keycode key);
     int radialMenuForButton(RadialButton b) const; // -1: none
     PenAction penButtonAction(int button) const;   // Preferences > Tablet, unless a radial menu claims the button
