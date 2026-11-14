@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.13.0 LANGUAGES C CXX)
+project(SculptForge VERSION 0.13.1 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()

@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.0:</strong> shadows and ambient occlusion in the PBR view, and say what you want in the F3 search (<a href="https://sculptforge.app/guide/whats-new.html#version-0130">how it works</a>)
+  <strong>New in 0.13.1:</strong> long Tubes edit without crashing, and Voxel Remesh keeps your sculpt smooth (<a href="https://sculptforge.app/guide/whats-new.html#version-0131">how it works</a>)
 </p>
 
 <p align="center">
