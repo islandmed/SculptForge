@@ -735,6 +735,8 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.display", "Display")) {
         tray::Section section;
         drawBackgroundControls("prefs");
+        ImGui::Spacing();
+        drawViewEffectsControls("prefs");
     }
     if (subpalette("preferences.library", "Library")) {
         tray::Section section;

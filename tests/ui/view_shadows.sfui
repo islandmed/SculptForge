@@ -1,0 +1,55 @@
+# View shadows and ambient occlusion (render/Occlusion.h): the key light's cast shadows and the occlusion of creases,
+# traced in the drawn view's depth. In the PBR view (Material > Viewport Shading) and, with "With Lit Sphere shading",
+# the Lit Sphere view too; Auto follows the hardware tier. Preferences > Display has the same controls.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_head
+camera 25 5
+key f
+run view_shadows ao=off shadows=off
+click "Material##palette.material"
+click "PBR##view.shading_pbr"
+wait_value environment_pending == 0
+key escape
+wait 0.3
+expect_value view_ao == 0
+expect_value occlusion_on == 0
+shot pbr-off
+
+run view_shadows ao=on shadows=on
+expect_status "View AO on, shadows on (PBR)"
+wait 0.3
+expect_value view_ao == 1
+expect_value view_shadows == 1
+expect_value occlusion_on == 1
+shot pbr-on
+
+run view_shadows ao_strength=1 ao_softness=0.8 shadow_softness=0.8
+wait 0.3
+shot pbr-strong-soft
+
+# Lit Sphere: off there until asked for.
+run viewport_shading mode=lit_sphere
+wait 0.3
+expect_value occlusion_on == 0
+shot lit-sphere-off
+run view_shadows lit_sphere=true ao_strength=0.8 ao_softness=0.4 shadow_softness=0.35
+expect_status "(PBR and Lit Sphere)"
+wait 0.3
+expect_value occlusion_on == 1
+shot lit-sphere-on
+
+# The controls: Material > Viewport Shading (PBR) and Preferences > Display.
+run viewport_shading mode=pbr
+click "Material##palette.material"
+wait 0.2
+shot material-palette
+key escape
+click "Preferences##palette.preferences"
+click "Display##preferences.display"
+wait 0.2
+shot preferences-display
+key escape
+
+run_fails view_shadows ao=maybe
+run view_shadows ao=auto shadows=auto lit_sphere=false
+expect_status "(PBR)"

@@ -135,6 +135,12 @@ struct UiPrefs {
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     int viewResolution = 100;   // the 3D view's resolution, % of the window's (#80): 100, 75 or 50
+    // Preferences > Display > Shadows & AO, and next to the PBR controls (render/Occlusion.h): -1 = by the hardware
+    // tier (on from the Standard tier up on desktop GL, off on the Essential tier and GL ES), 0 off, 1 on. They shade
+    // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.
+    int viewAo = -1, viewShadows = -1;
+    float aoStrength = 0.8f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
+    bool viewOcclusionLitSphere = false;
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.

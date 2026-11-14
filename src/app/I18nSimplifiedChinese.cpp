@@ -5334,6 +5334,20 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Show %s", "显示 %s"},
     {"Isolate", "独显"},
     {"Isolate %s", "独显 %s"},
+    // View shadows and AO (PanelView.cpp)
+    {"AO softness", "AO 柔和度"},
+    {"AO strength", "AO 强度"},
+    {"Ambient occlusion", "环境光遮蔽"},
+    {"Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has room for it (Standard tier and up).", "模型周围光线照不到的褶皱与凹陷会变暗。自动：显卡有余量时开启（Standard 级及以上）。"},
+    {"How dark the occlusion gets.", "遮蔽变暗的程度。"},
+    {"How soft and wide the occlusion looks.", "遮蔽看起来多柔和、多宽。"},
+    {"How soft the shadows' edges are.", "阴影边缘有多柔和。"},
+    {"Shadow softness", "阴影柔和度"},
+    {"Shadows", "阴影"},
+    {"Shadows & AO", "阴影与 AO"},
+    {"Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", "阴影与环境光遮蔽也用于 Lit Sphere 和摄影棚着色，不只在 PBR 视图。"},
+    {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "主光投下的阴影：鼻子落在脸颊、眉骨落在眼睛上。自动：显卡有余量时开启（Standard 级及以上）。若这一帧需要，环绕或雕刻时会暂时让出。"},
+    {"With Lit Sphere shading", "配合 Lit Sphere 着色"},
 };
 
 } // namespace

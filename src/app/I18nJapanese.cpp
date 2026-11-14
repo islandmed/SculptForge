@@ -6457,6 +6457,20 @@ constexpr Entry kJapanese[] = {
     {"Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
      "attached or found.",
      "sculptforge.log の最後の60行をコピーします。ファイルを添付できない、または見つからない場合に、不具合報告へ貼り付けられます。"},
+    // View shadows and AO (PanelView.cpp)
+    {"AO softness", "AO の柔らかさ"},
+    {"AO strength", "AO の強さ"},
+    {"Ambient occlusion", "アンビエントオクルージョン"},
+    {"Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has room for it (Standard tier and up).", "モデル周囲の光が届かないしわやくぼみが暗くなります。自動：グラフィックカードの性能が足りるときオン（Standard 以上）。"},
+    {"How dark the occlusion gets.", "オクルージョンの暗さ。"},
+    {"How soft and wide the occlusion looks.", "オクルージョンの柔らかさと広がり。"},
+    {"How soft the shadows' edges are.", "影の縁の柔らかさ。"},
+    {"Shadow softness", "影の柔らかさ"},
+    {"Shadows", "影"},
+    {"Shadows & AO", "影と AO"},
+    {"Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", "影とアンビエントオクルージョンは Lit Sphere とスタジオシェーディングでも有効で、PBR ビューだけではありません。"},
+    {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "キーライトが落とす影：鼻が頬に、眉が目の上に。自動：グラフィックカードの性能が足りるときオン（Standard 以上）。フレームが必要なら、オービットやスカルプト中は一時的にオフになります。"},
+    {"With Lit Sphere shading", "Lit Sphere シェーディング時"},
 };
 
 } // namespace

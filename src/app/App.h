@@ -1466,6 +1466,14 @@ private:
     void applyPerformancePrefs();
     void notePerformanceFrame(double syncMs); // after syncScene: upload time, GPU memory warnings
     void noteStillness();                     // after viewSamples: RenderSettings::stillSeconds, stroking
+    // View shadows and AO (render/Occlusion.h; PanelView.cpp): the preferences into renderSettings_, by the hardware
+    // tier where they are left to it, and off while the view moves or a stroke runs where they would cost the frame
+    // (the Essential tier, Turbo, or frames slower than the display's), back on once it settles.
+    void applyViewEffects();
+    void drawViewEffectsControls(const char* idSuffix); // Preferences > Display and Material > Viewport Shading
+    bool viewEffectsDropped_ = false;
+    int viewEffectsBusyFrames_ = 0;
+    double viewEffectsBusyAt_ = 0.0, viewEffectsBusyMs_ = 0.0;
     struct PerfState {
         glm::mat4 lastView{0.0f};
         int framesStill = 0;          // frames since the view last moved

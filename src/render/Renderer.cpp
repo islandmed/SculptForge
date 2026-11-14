@@ -436,6 +436,9 @@ uniform int uDim;             // 1: an inactive Part, shown a little darker and 
 uniform mat3 uLightRot;       // turns the light (Lit Sphere and studio) in view space (RenderSettings::lightYaw / Pitch)
 uniform vec2 uLightLevels;    // light intensity, ambient
 uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
+uniform int uOccAlpha;        // 1: alpha carries the shading normal's facing to the shadow light (render/Occlusion.h)
+uniform vec3 uOccLight;       // that light, view space
+vec3 gShadeN = vec3(0.0, 0.0, 1.0); // (main sets it: the normal the pixel is shaded with)
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
 out vec4 fragColor;
@@ -452,6 +455,9 @@ vec4 finish(vec3 c) {
 #ifdef MICRO
     g = mix(g, vec3(0.05, 0.05, 0.08), 0.5775 * gWire); // (the wireframe program's colour and opacity)
 #endif
+    // Opaque Parts under view shadows: alpha = the smooth normal's facing to the light (0.5 + 0.5 N.L), which the
+    // shadow pass reads instead of the faceted normal it would rebuild from the depth, then sets back to 1.
+    if (uOccAlpha == 1 && uAlpha >= 1.0) return vec4(g, 0.5 + 0.5 * dot(gShadeN, uOccLight));
     return vec4(g, uAlpha);
 }
 )" // (two literals: MSVC stops at ~16K characters a literal, C2026; tools/dev/check_literals.py)
@@ -594,6 +600,7 @@ void main() {
 #ifndef FLAT
     if (!gl_FrontFacing && uTwoSided == 1) n = -n;
 #endif
+    gShadeN = n;
     if (uUnlit == 1) { // the base colour alone: vertex paint, texture or face groups, plus the mask tint
         vec3 c = albedo;
         if (uShowMask == 1) c = maskTint(c, V_MASK);
@@ -1152,6 +1159,8 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.lightRot = at("uLightRot");
     p.lightLevels = at("uLightLevels");
     p.alpha = at("uAlpha");
+    p.occAlpha = at("uOccAlpha");
+    p.occLight = at("uOccLight");
     p.microWire = at("uMicroWire");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
@@ -1374,6 +1383,7 @@ size_t Renderer::gpuBytes() const {
 
 void Renderer::shutdown() {
     screenPass_.release();
+    occlusion_.release();
     for (auto& s : slots_) freeSlot(s);
     for (Staging& st : persist_) {
         if (st.fence) gl::DeleteSync(st.fence);
@@ -2882,6 +2892,7 @@ bool Renderer::renderToImage(const Camera& camera, int width, int height, const 
         gl::BindFramebuffer(GL_READ_FRAMEBUFFER, fbo[0]);
         gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo[1]);
         gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        applyOcclusion(fbo[0], fbo[1], width, height);
         gl::BindFramebuffer(GL_READ_FRAMEBUFFER, fbo[1]);
         std::vector<uint8_t> pixels(size_t(width) * size_t(height) * 4);
         gl::PixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -2971,8 +2982,66 @@ static void logViewFrame(const char* what, int width, int height, int samples, f
     ++frames;
 }
 
+// View shadows and AO: what the pass needs from this frame (its light, the scene's size), or nothing when it is off.
+void Renderer::prepareOcclusion(const RenderSettings& settings, bool pbr, const glm::mat4& view) {
+    frameOcclusionWanted_ = false;
+    if (thumbnailPass_ || !occlusionWanted(settings) || (!pbr && !settings.occlusionInLitSphere)) return;
+    // The drawn Parts' bounds, in view space: the AO's reach and the shadows' length go with the model's size.
+    AABB box;
+    for (const DrawItem& item : drawList_)
+        for (const auto& s : slots_)
+            if (s.id == item.id && s.drawnTriangles > 0 && s.box.valid()) {
+                const glm::mat4 mv = item.moved ? view * item.model : view;
+                for (int c = 0; c < 8; ++c)
+                    box.expand(glm::vec3(mv * glm::vec4(c & 1 ? s.box.max.x : s.box.min.x, c & 2 ? s.box.max.y : s.box.min.y,
+                                                        c & 4 ? s.box.max.z : s.box.min.z, 1.0f)));
+            }
+    if (!box.valid()) return;
+    const float r = std::max(0.5f * glm::length(box.max - box.min), 1e-5f);
+    OcclusionParams& o = frameOcclusion_;
+    o.ao = settings.ambientOcclusion;
+    o.shadows = settings.shadows;
+    o.aoStrength = settings.aoStrength;
+    o.aoSoftness = settings.aoSoftness;
+    o.shadowSoftness = settings.shadowSoftness;
+    o.aoRadius = 0.06f * r;
+    o.shadowLength = 0.4f * r;
+    o.thickness = 0.06f * r;
+    o.depthRange = std::max(-box.min.z, 1e-4f) * 1.05f + 1e-4f;
+    if (pbr) {
+        // The environment's brightest direction (its SH9's linear band, by luminance), and how much of the light
+        // comes from there: a sun casts dark shadows, an even sky light ones.
+        const glm::vec3 lum(0.2126f, 0.7152f, 0.0722f);
+        const glm::vec3 dirEnv(glm::dot(envSh_.c[3], lum), glm::dot(envSh_.c[1], lum), glm::dot(envSh_.c[2], lum));
+        const float l0 = 0.282095f * glm::dot(envSh_.c[0], lum), l1 = 0.488603f * glm::length(dirEnv);
+        o.light = l1 > 1e-6f ? glm::transpose(frameViewToEnv_) * (dirEnv / glm::length(dirEnv)) : glm::vec3(0.0f, 1.0f, 0.0f);
+        o.shadowDarkness = std::clamp(l1 / std::max(l0 + l1, 1e-6f), 0.3f, 0.55f);
+        } else {
+        o.light = lightRotation(settings.lightYaw, settings.lightPitch) * glm::normalize(glm::vec3(0.45f, 0.65f, 0.6f));
+        o.shadowDarkness = 0.6f; // (the studio key's share of the light)
+    }
+    frameOcclusionWanted_ = true;
+}
+
+void Renderer::applyOcclusion(GLuint drawFbo, GLuint resolveFbo, int width, int height) {
+    if (!frameOcclusionWanted_) return;
+    if (occlusion_.apply(frameOcclusion_, drawFbo, resolveFbo, width, height, frameProj_, frameViewport_)) {
+        occlusionDrawn_ = true;
+    } else if (frameOcclusion_.shadows) { // (the pass couldn't run: the meshes' facing in the alpha back to opaque)
+        gl::BindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+        gl::Disable(GL_SCISSOR_TEST);
+        gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+        gl::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        gl::Clear(GL_COLOR_BUFFER_BIT);
+        gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    gl::Viewport(int(frameViewport_.x), int(frameViewport_.y), int(frameViewport_.z), int(frameViewport_.w)); // (as draw() left it)
+}
+
 int Renderer::drawView(const Camera& camera, int width, int height, const RenderSettings& settings, const Viewport& viewport,
                        int samples) {
+    occlusionDrawn_ = false;
     GLint maxSamples = 1;
     gl::GetIntegerv(GL_MAX_SAMPLES, &maxSamples);
     samples = std::clamp(samples, 1, std::max(1, int(maxSamples)));
@@ -2998,6 +3067,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
             gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
             gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
             gl::BlitFramebuffer(0, 0, sw, sh, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            applyOcclusion(viewFbo_, viewResolveFbo_, sw, sh);
             gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
             gl::Disable(GL_SCISSOR_TEST);
             gl::Viewport(0, 0, width, height);
@@ -3022,7 +3092,9 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
     const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
-    if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
+    // ... and so do the view's shadows and AO (they read its depth).
+    const bool occlusion = occlusionWanted(settings);
+    if (samples <= 1 && !((screen || occlusion) && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
         logViewFrame("window", width, height, 1, 1.0f, lastDrawn_, false);
@@ -3034,6 +3106,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    if (occlusion) applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
                                                frameViewport_, litsphereTexture(settings.litsphere),
@@ -3083,6 +3156,12 @@ bool Renderer::beginCapture(int width, int height, std::string& error) {
     }
     gl::BindFramebuffer(GL_FRAMEBUFFER, captureFbo_[0]);
     return true;
+}
+
+void Renderer::captureViewDrawn() {
+    occlusionDrawn_ = false;
+    applyOcclusion(captureFbo_[0], captureFbo_[0], captureW_, captureH_); // (into the multisample target itself)
+    gl::BindFramebuffer(GL_FRAMEBUFFER, captureFbo_[0]);
 }
 
 void Renderer::endCapture(std::vector<uint8_t>& rgba) {
@@ -3297,6 +3376,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Enable(GL_DEPTH_TEST);
     gl::DepthFunc(GL_LEQUAL);
     floorGridDrawn_ = false;
+    prepareOcclusion(settings, pbr, view);
     if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
         if (!references_.empty()) drawReferences(false, view, proj, camera.ortho, viewAspect);
@@ -3837,6 +3917,9 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     gl::UniformMatrix3fv(p.lightRot, 1, GL_FALSE, glm::value_ptr(r));
     gl::Uniform2f(p.lightLevels, std::max(settings.lightIntensity, 0.0f), std::max(settings.lightAmbient, 0.0f));
     gl::Uniform1f(p.alpha, drawAlpha_);
+    const bool occ = frameOcclusionWanted_ && frameOcclusion_.shadows;
+    gl::Uniform1i(p.occAlpha, occ ? 1 : 0);
+    if (occ) gl::Uniform3fv(p.occLight, 1, glm::value_ptr(glm::normalize(frameOcclusion_.light)));
 }
 
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {

@@ -5817,6 +5817,20 @@ constexpr Entry kSpanish[] = {
     {"Show %s", "Mostrar %s"},
     {"Isolate", "Aislar"},
     {"Isolate %s", "Aislar %s"},
+    // View shadows and AO (PanelView.cpp)
+    {"AO softness", "Suavidad de AO"},
+    {"AO strength", "Intensidad de AO"},
+    {"Ambient occlusion", "Oclusión ambiental"},
+    {"Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has room for it (Standard tier and up).", "Los pliegues y huecos se oscurecen donde no llega la luz alrededor del modelo. Auto: activado si la tarjeta gráfica tiene margen (Standard o superior)."},
+    {"How dark the occlusion gets.", "Cuánto se oscurece la oclusión."},
+    {"How soft and wide the occlusion looks.", "Qué tan suave y ancha se ve la oclusión."},
+    {"How soft the shadows' edges are.", "Qué tan suaves son los bordes de las sombras."},
+    {"Shadow softness", "Suavidad de sombras"},
+    {"Shadows", "Sombras"},
+    {"Shadows & AO", "Sombras y AO"},
+    {"Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", "Sombras y oclusión ambiental también con el sombreado Lit Sphere y de estudio, no solo en la vista PBR."},
+    {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "Sombras de la luz principal: la nariz sobre la mejilla, la ceja sobre los ojos. Auto: activadas si la tarjeta gráfica tiene margen (Standard o superior). Se apartan al orbitar o esculpir si el fotograma lo necesita."},
+    {"With Lit Sphere shading", "Con sombreado Lit Sphere"},
 };
 
 } // namespace
