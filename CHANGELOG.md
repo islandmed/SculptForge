@@ -22,11 +22,6 @@ All notable changes to SculptForge are listed here. The format follows
   a refused Subdivide shows what the presses before it made.
 
 ### Fixed
-- On Windows, saving could fail with "Access is denied" and your settings, shelf layout, brush edits or recent
-  projects were silently lost on the next start (reports from noved_ and rand_gogh on Discord). Start-up no longer
-  keeps the settings file open while it saves it, and every save that replaces a file now waits and retries for about
-  a second when the file is busy (a virus scanner, a sync client) or marked read-only, and finally writes over it
-  directly. If a save still can't land, the status bar says which file.
 - **A thin shell no longer shows dark specks while you orbit.** Make Shell on a dense model and a thin Thickness:
   while the view moved (Fast Navigation) or the model drew its lighter preview, the two faces of the shell were
   treated as one surface, so the inner face's dark side showed through as specks, or the shell collapsed to a single
