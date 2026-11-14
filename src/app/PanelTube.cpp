@@ -377,9 +377,12 @@ void App::drawTubeShapeControls(float full) {
                 TubeShape s = doc_.mesh.tube;
                 s.*field = v;
                 if (tubeValidate(s).empty()) {
-                    doc_.mesh = tubeMesh(s, kTubePreviewTriangles);
-                    doc_.mesh.topologyDirty = true;
-                    doc_.bvhDirty = true;
+                    Mesh m = tubeMesh(s, kTubePreviewTriangles);
+                    if (m.triangleCount() > 0) {
+                        doc_.mesh = std::move(m);
+                        doc_.mesh.topologyDirty = true;
+                        doc_.bvhDirty = true;
+                    }
                 }
             }
         }
@@ -572,7 +575,9 @@ void App::tubeDragTo(float x, float y) {
     } else {
         p.position = planeHit(o, dir, p.position, tubeViewDir()) + d.grab;
     }
-    doc_.mesh = tubeMesh(s, kTubePreviewTriangles); // (coarser while dragging a long or thin tube)
+    Mesh m = tubeMesh(s, kTubePreviewTriangles); // (coarser while dragging a long or thin tube)
+    if (m.triangleCount() == 0) return; // (too long or fine to sweep: the last good shape stays)
+    doc_.mesh = std::move(m);
     doc_.mesh.topologyDirty = true;
     doc_.bvhDirty = true; // (built once when let go)
     tubeDrag_.preview = s;
@@ -600,7 +605,15 @@ void App::tubeRelease() {
         }
     } else if (d.changed) {
         doc_.mesh = std::move(d.before);
-        doc_.replaceMeshUndoable(tubeMesh(d.preview), d.resize ? "Tube point size" : "Tube point"); // (full density)
+        Mesh full = tubeMesh(d.preview); // (full density)
+        if (full.triangleCount() == 0) {
+            status_ = "Tube: that is too long or fine to sweep; the point stays where it was";
+            doc_.mesh.topologyDirty = true;
+            doc_.bvhDirty = true;
+            d = {};
+            return;
+        }
+        doc_.replaceMeshUndoable(std::move(full), d.resize ? "Tube point size" : "Tube point");
         status_ = std::string("Tube: ") + (d.resize ? "point size" : "point moved") + "; " +
                   std::to_string(doc_.mesh.tube.points.size()) + " points";
     }

@@ -27,6 +27,7 @@ struct CommandResult;
 
 constexpr size_t kTubeMaxPoints = 2000;      // control points per tube
 constexpr size_t kTubeStrokePoints = 500;    // a drawn stroke is simplified to at most this many
+constexpr size_t kTubeMaxTriangles = 2000000; // one tube's sweep: longer edges are used when it would make more
 constexpr int kTubeMaxStrands = 8;           // rope / braid strands
 constexpr uint32_t kTubeBodyGroup = 1;       // face groups: the body, the start cap, the end cap
 constexpr uint32_t kTubeStartCapGroup = 2;   // (the mirror copy adds 3)
@@ -83,7 +84,7 @@ std::vector<glm::vec3> tubeFrames(const std::vector<TubeSample>& line, const glm
 // The tube as a plain mesh (no Mesh::tube): watertight, face groups as above. `uniform`: every edge near the edge
 // length (triangles; rings get as many sides as their radius needs) for dynamic topology; else rings with the
 // same number of sides, in quads. `edge` <= 0: tubeEdgeLength(shape). Empty when the shape is invalid.
-Mesh tubeSweep(const TubeShape& shape, bool uniform = false, float edge = 0.0f);
+Mesh tubeSweep(const TubeShape& shape, bool uniform = false, float edge = 0.0f, size_t budget = kTubeMaxTriangles);
 // The mesh a Tube Part shows: tubeSweep in quads, carrying `shape` in Mesh::tube. `maxTriangles` > 0: a coarser
 // sweep when the full one would have more (the live preview while a point is dragged: 60 fps on the floor tier).
 Mesh tubeMesh(const TubeShape& shape, size_t maxTriangles = 0);

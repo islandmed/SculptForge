@@ -46,7 +46,7 @@ void App::syncWorldSize() {
     RayHit hit;
     const CanvasRect c = canvasRect();
     const bool inCanvas = mouseX_ >= c.x && mouseY_ >= c.y && mouseX_ < c.x + c.w && mouseY_ < c.y + c.h;
-    if (inCanvas && pick(mouseX_, mouseY_, hit)) {
+    if (inCanvas && !doc_.bvhDirty && pick(mouseX_, mouseY_, hit)) { // (a stale tree is rebuilt at the next press: a tube point drag)
         cursorSurface_ = hit.position;
         haveCursorSurface_ = true;
     }

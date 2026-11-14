@@ -359,6 +359,7 @@ void App::tickProject(float dt) {
     // Edits only `modified` tracks (layer weights, Python setters) leave the revision alone, so
     // while it is set autosave every interval rather than trusting an unchanged revision.
     if (autosaveMinutes_ <= 0 || autosaveTimer_ < float(autosaveMinutes_) * 60.0f || doc_.sculptor.strokeActive() ||
+        drag_ == Drag::Tube || // (a tube point drag shows a coarse preview, not the Part)
         (revision == autosaveRevision_ && !doc_.modified))
         return;
     autosaveTimer_ = 0.0f;

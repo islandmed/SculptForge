@@ -115,6 +115,16 @@ struct Builder {
     bool quads = true; // pair matching bands into quads (not for even-edge sweeps: triangles for dynamic topology)
     Profile profile = Profile::Round;
     float thickness = 1.0f;
+    // A sweep that would make more than `budget` triangles stops before it allocates them (`overflow`): a stretched
+    // or thickened point on a rope or braid (strands times rings times sides) once asked for tens of millions.
+    size_t budget = kTubeMaxTriangles, planned = 0;
+    float coarsen = 1.0f; // > 1 on a retry: a braid's strands turn in longer steps too (their turns don't shrink with the edge)
+    bool overflow = false;
+    bool charge(size_t triangles) {
+        planned += triangles;
+        if (planned > budget) overflow = true;
+        return !overflow;
+    }
 
     uint32_t addRing(const Ring& r) {
         const uint32_t first = uint32_t(m.positions.size());
@@ -200,6 +210,9 @@ struct Builder {
                 outer.push_back(turned({s.position, normals[i], glm::cross(s.tangent, normals[i]), s.radius,
                                         sidesFor(s.radius, leastBody), groupOffset + kTubeBodyGroup}, i));
             }
+            size_t ringSides = 0;
+            for (const Ring& r : outer) ringSides += size_t(r.sides);
+            if (!charge(4 * ringSides)) return;
             std::vector<uint32_t> o, in;
             for (size_t i = 0; i < outer.size(); ++i) {
                 o.push_back(addRing(outer[i]));
@@ -253,6 +266,9 @@ struct Builder {
         }
         cap(line.size() - 1, false);
 
+        size_t ringSides = 0;
+        for (const Ring& r : rings) ringSides += size_t(r.sides);
+        if (!charge(2 * ringSides)) return;
         uint32_t prev = addRing(rings[0]);
         for (size_t i = 1; i < rings.size(); ++i) {
             const uint32_t cur = addRing(rings[i]);
@@ -302,10 +318,20 @@ struct Builder {
             for (const TubePoint& p : shape.points) widest = std::max(widest, p.radius);
             const BraidLayout lay = braidLayout(count, shape.spread, std::max(widest, 1e-12f));
             const float rate = 2.0f * kPi / lay.pitch * hand; // phase per unit length
+            auto stepsAt = [&](size_t i) {
+                return i == 0 ? 1 : std::clamp(int(std::ceil(std::abs(rate) * (along[i] - along[i - 1]) / (coarsen * kPi / 12.0f))), 1, 64);
+            };
+            size_t fineCount = 0;
+            for (size_t i = 0; i < line.size(); ++i) fineCount += size_t(stepsAt(i));
+            if (fineCount * size_t(count) * 12 > budget - std::min(planned, budget)) { // (at least 6 sides a ring, 2 triangles a side)
+                overflow = true;
+                planned += fineCount * size_t(count) * 12; // (sizes the longer edge)
+                return;
+            }
             std::vector<TubeSample> fine;
             std::vector<float> fineAlong, fineAngle;
             for (size_t i = 0; i < line.size(); ++i) {
-                const int steps = i == 0 ? 1 : std::clamp(int(std::ceil(std::abs(rate) * (along[i] - along[i - 1]) / (kPi / 12.0f))), 1, 64);
+                const int steps = stepsAt(i);
                 for (int k = 1; k <= steps; ++k) {
                     const float f = float(k) / float(steps);
                     const size_t j = i == 0 ? 0 : i - 1;
@@ -324,7 +350,7 @@ struct Builder {
             const std::vector<vec3> normals = tubeFrames(fine, vec3(0.0f));
             // The thin strands keep a round outline: about 12 sides each however much of the tube's radius they take.
             const float strandEdge = edge * lay.radius / std::max(widest, 1e-12f) * (16.0f / 12.0f);
-            for (int strand = 0; strand < count; ++strand) {
+            for (int strand = 0; strand < count && !overflow; ++strand) {
                 std::vector<TubeSample> sub(fine.size());
                 for (size_t i = 0; i < fine.size(); ++i) {
                     const TubeSample& s = fine[i];
@@ -348,7 +374,7 @@ struct Builder {
             const float packing = count <= 2 ? 1.0f : std::sin(kPi / float(count)); // strands of one ring touch at spread 0.5
             const std::vector<vec3> normals = tubeFrames(line, vec3(0.0f));
             const float lay = 360.0f / (7.0f * mean) * hand; // degrees of strand phase per unit length
-            for (int strand = 0; strand < count; ++strand) {
+            for (int strand = 0; strand < count && !overflow; ++strand) {
                 std::vector<TubeSample> sub(line.size());
                 for (size_t i = 0; i < line.size(); ++i) {
                     const TubeSample& s = line[i];
@@ -692,21 +718,29 @@ static TubeShape curveWire(TubeShape w) {
     return w;
 }
 
-Mesh tubeSweep(const TubeShape& shape_, bool uniform, float edge) {
+Mesh tubeSweep(const TubeShape& shape_, bool uniform, float edge, size_t budget) {
     if (!tubeValidate(shape_).empty()) return {};
     const TubeShape shape = shape_.curve ? curveWire(shape_) : shape_;
     if (!(edge > 0.0f)) edge = tubeEdgeLength(shape_); // (a curve's wire is swept at its tube's edge length)
-    Builder b;
-    b.sweep(shape, uniform, edge, 0);
-    if (shape.mirrorX) {
-        float xmax = 0.0f, rmax = 0.0f;
-        for (const TubePoint& p : shape.points) {
-            xmax = std::max(xmax, std::abs(p.position.x));
-            rmax = std::max(rmax, p.radius);
-        }
-        if (xmax > 1e-4f * rmax) b.sweep(tubeMirrored(shape), uniform, edge, kTubeEndCapGroup, -1.0f); // not on the plane
+    float xmax = 0.0f, rmax = 0.0f;
+    for (const TubePoint& p : shape.points) {
+        xmax = std::max(xmax, std::abs(p.position.x));
+        rmax = std::max(rmax, p.radius);
     }
-    return b.finish();
+    // Over budget: sweep again with longer edges (about the square root of the excess: triangles go as 1/edge^2).
+    const float edge0 = edge;
+    for (int attempt = 0; attempt < 12; ++attempt) {
+        Builder b;
+        b.budget = budget;
+        b.coarsen = edge / edge0;
+        b.sweep(shape, uniform, edge, 0);
+        if (shape.mirrorX && !b.overflow && xmax > 1e-4f * rmax) // (not on the plane)
+            b.sweep(tubeMirrored(shape), uniform, edge, kTubeEndCapGroup, -1.0f);
+        if (!b.overflow) return b.finish();
+        const float excess = float(b.planned) / float(std::max<size_t>(budget, 1));
+        edge *= std::max(1.25f, 1.1f * (attempt < 3 ? std::sqrt(excess) : excess)); // (a runaway tube: straight to the size)
+    }
+    return {};
 }
 
 Mesh tubeMesh(const TubeShape& shape, size_t maxTriangles) {
@@ -870,7 +904,9 @@ CommandResult tubeEdit(Document& doc, TubeShape shape, const std::string& label)
         return {false, "Tube: this Part was moved or changed since the tube was drawn, so its points no longer fit; "
                        "Bake keeps it as it is (or undo the change to edit the points)"};
     if (const std::string err = tubeValidate(shape); !err.empty()) return {false, "Tube: " + err};
-    doc.replaceMeshUndoable(tubeMesh(shape), label);
+    Mesh m = tubeMesh(shape);
+    if (m.triangleCount() == 0) return {false, "Tube: too long or too fine to sweep; fewer points or a thicker radius"};
+    doc.replaceMeshUndoable(std::move(m), label);
     return {true, label + "; " + std::to_string(shape.points.size()) + " points"};
 }
 
@@ -1199,6 +1235,7 @@ void registerTubeCommands(CommandRegistry& reg) {
                  Mesh m = argBool(a, "uniform", false) ? tubeSweep(doc.mesh.tube, true) : doc.mesh;
                  m.tube = {};
                  const size_t tris = m.triangleCount();
+                 if (tris == 0) return {false, "Tube: too long or too fine to sweep; fewer points or a thicker radius"};
                  doc.replaceMeshUndoable(std::move(m), "Tube bake");
                  return {true, "Baked the tube: " + std::to_string(tris) + " triangles, ready to sculpt"};
              }});
