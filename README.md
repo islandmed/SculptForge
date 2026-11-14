@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.1:</strong> long Tubes edit without crashing, and heavy Ropes and Braids stay in check (<a href="https://sculptforge.app/guide/whats-new.html#version-0131">how it works</a>)
+  <strong>New in 0.13.2:</strong> turning the view with a pen&#x27;s side button starts where the pen is, and the pen no longer gets stuck (<a href="https://sculptforge.app/guide/whats-new.html#version-0132">how it works</a>)
 </p>
 
 <p align="center">
