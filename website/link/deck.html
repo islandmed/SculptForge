@@ -694,8 +694,9 @@ header .brand span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap
     tourAt = i; var t = tourSteps[i], last = i === tourSteps.length - 1;
     $("tour").classList.add("on");
     $("tourTitle").textContent = t.title; $("tourText").textContent = t.text;
-    var dots = ""; for (var k = 0; k < tourSteps.length; k++) dots += '<i class="' + (k === i ? "on" : "") + '"></i>';
-    $("tourCount").innerHTML = dots + "<span>" + (i + 1) + " of " + tourSteps.length + "</span>";
+    var count = $("tourCount"); count.textContent = "";
+    for (var k = 0; k < tourSteps.length; k++) { var dot = document.createElement("i"); if (k === i) dot.className = "on"; count.appendChild(dot); }
+    var label = document.createElement("span"); label.textContent = (i + 1) + " of " + tourSteps.length; count.appendChild(label);
     $("tourNext").textContent = last ? "Got it" : "Next"; $("tourSkip").classList.toggle("hidden", last);
     $("tourCard").style.visibility = "hidden"; tourPlace(); $("tourCard").style.visibility = "";
     $("tourCard").querySelector(".row").style.gridTemplateColumns = last ? "1fr" : "";
