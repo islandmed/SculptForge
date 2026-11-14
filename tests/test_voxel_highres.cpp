@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <new>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -131,6 +132,74 @@ TEST(voxel_remesh_refuses_what_wont_fit) {
     err.clear();
     CHECK(voxelRemesh(makeIcosphere(3), 600, &err, [](float f) { return f < 0.3f; }).triangleCount() == 0);
     CHECK(err.find("cancelled") != std::string::npos);
+}
+
+TEST(voxel_remesh_past_free_memory_needs_the_go_ahead) {
+    // 4 GB computer with 10 MB free: a 600 remesh of a small sphere is past the free memory but well within the
+    // computer. Refused unless the person agreed (allowSwap); with 1 MB of computer it is refused either way.
+    const Mesh sphere = makeIcosphere(3);
+    setMemoryLimitsOverride({size_t(10) << 20, size_t(4) << 30, size_t(2) << 30});
+    std::string err;
+    CHECK(voxelRemesh(sphere, 600, &err).triangleCount() == 0);
+    CHECK_MSG(err.find("needs ~") != std::string::npos && err.find("Lower the Resolution") != std::string::npos, err);
+    err.clear();
+    const Mesh made = voxelRemesh(sphere, 600, &err, {}, true);
+    CHECK_MSG(made.triangleCount() > 10000, err);
+    setMemoryLimitsOverride({size_t(10) << 20, size_t(1) << 20, 0});
+    err.clear();
+    CHECK(voxelRemesh(sphere, 600, &err, {}, true).triangleCount() == 0);
+    CHECK_MSG(err.find("can't hold it even with swap") != std::string::npos, err);
+    setMemoryLimitsOverride({}, false);
+}
+
+TEST(voxel_remesh_one_estimate_every_resolution) {
+    // The same tiers and the same words at 256, 512, 600 and 1024 (artist-qa 11-12: 512 used to ask a different question
+    // than 600). The figure rises with the Resolution within the dense grid (up to 512) and within the bricks (above it); it
+    // falls once at 513 because the bricks hold only the surface (measured peak, 20k-triangle sphere: 512 2.0 GB, 600 0.5 GB).
+    const Mesh sphere = makeIcosphere(5);
+    CHECK(estimateVoxelRemesh(sphere, 512).bytes > estimateVoxelRemesh(sphere, 256).bytes);
+    CHECK(estimateVoxelRemesh(sphere, 1024).bytes > estimateVoxelRemesh(sphere, 600).bytes);
+    CHECK(estimateVoxelRemesh(sphere, 512).bytes < size_t(3) << 30); // (measured 2.0 GB; was 3.5 with 22 bytes a sample)
+    setMemoryLimitsOverride({size_t(10) << 20, size_t(64) << 30, size_t(32) << 30});
+    for (int r : {256, 512, 600, 1024}) {
+        std::string err;
+        CHECK(voxelRemesh(sphere, r, &err).triangleCount() == 0);
+        const std::string need = "Voxel Remesh at " + std::to_string(r) + " needs ~" + memoryText(estimateVoxelRemesh(sphere, r).bytes) + "; 10 MB is free.";
+        CHECK_MSG(err.find(need) == 0, err);
+    }
+    setMemoryLimitsOverride({}, false);
+}
+
+TEST(voxel_remesh_swap_path_invariant_same_surface) {
+    // Invariant: agreeing to a remesh past the free memory (allowSwap) changes how it is allowed, never what it makes. On a
+    // curved mesh, both paths give the identical surface: same counts, same bounds, same volume, no open edges.
+    const Mesh sphere = makeIcosphere(3);
+    setMemoryLimitsOverride({size_t(10) << 20, size_t(4) << 30, size_t(2) << 30});
+    std::string err;
+    const Mesh swap = voxelRemesh(sphere, 600, &err, {}, true);
+    setMemoryLimitsOverride({}, false);
+    const Mesh plain = voxelRemesh(sphere, 600, &err);
+    CHECK_MSG(swap.triangleCount() > 10000, err);
+    CHECK(swap.triangleCount() == plain.triangleCount());
+    CHECK(swap.vertexCount() == plain.vertexCount());
+    for (size_t i = 0; i < plain.vertexCount(); i += 997) CHECK(glm::distance(swap.positions[i], plain.positions[i]) < 1e-5f);
+}
+
+TEST(voxel_remesh_out_of_memory_rolls_back) {
+    // An allocation failing midway (here from the progress callback, as a worker's would surface): an empty result and a
+    // clear message, on the dense grid and on the bricks, the source untouched.
+    const Mesh sphere = makeIcosphere(3);
+    const size_t before = sphere.triangleCount();
+    for (int res : {96, 600}) {
+        std::string err;
+        const Mesh r = voxelRemesh(sphere, res, &err, [](float f) -> bool {
+            if (f > 0.2f) throw std::bad_alloc();
+            return true;
+        });
+        CHECK(r.triangleCount() == 0);
+        CHECK_MSG(err.find("ran out of memory") != std::string::npos && err.find("unchanged") != std::string::npos, err);
+        CHECK(sphere.triangleCount() == before);
+    }
 }
 
 TEST(voxel_remesh_4096_end_to_end) {

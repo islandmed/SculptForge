@@ -88,8 +88,11 @@ void setVoxelDenoise(bool on);
 // flags and UVs reset (all visible, no UVs); the original's
 // quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).
 // Parallel and narrow-band throughout: well under a second at the default resolution; run it off the UI thread.
-// Resolutions 32-4096; a remesh that won't fit in the free memory gives an empty result and `error` says what it needs.
+// Resolutions 32-4096; a remesh that won't fit in the free memory gives an empty result and `error` says what it needs
+// and which Resolution would fit. `allowSwap`: the person agreed to one that is past the free memory but within RAM +
+// swap (core/MemoryGuard.h, MemoryTier::NeedsSwap); past that it still refuses. Running out of memory midway
+// (bad_alloc) is caught: an empty result, `error` says so, the source is never touched.
 Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
-                 const std::function<bool(float)>& progress = {});
+                 const std::function<bool(float)>& progress = {}, bool allowSwap = false);
 
 } // namespace sf

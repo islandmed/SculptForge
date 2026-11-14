@@ -737,7 +737,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_strength") return double(app_.curvesStrength_);
     if (name == "sdiv_slider") return double(app_.sdivSlider_);
     if (name == "voxel_triangle_estimate") return double(app_.voxelEstimate().triangles);
-    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open ? 1.0 : 0.0;
+    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open && !app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "voxel_swap_confirm") return app_.voxelHighResConfirm_.open && app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "autosave_written") return app_.autosaveWritten_ ? 1.0 : 0.0;
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);

@@ -27,7 +27,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <new>
 #include <thread>
+#include <utility>
 
 namespace sf {
 
@@ -276,8 +278,9 @@ void App::drawVoxelResolution(bool compact) {
     ui::HelpText("Resolution", nullptr,
                  "Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x "
                  "for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of "
-                 "millions of triangles and take minutes; it asks once first, and won't start if it can't fit in "
-                 "the free memory. Ctrl+click to type a value.",
+                 "millions of triangles and take minutes; it asks once first. If it needs more than the free memory it "
+                 "asks every time (swap makes it slow), and it won't start if the computer can't hold it at all. "
+                 "Ctrl+click to type a value.",
                  "Tool > Remesh");
     if (ImGui::BeginPopup("##voxrestype")) {
         ImGui::SetNextItemWidth(120.0f * uiScale_);
@@ -295,34 +298,40 @@ void App::drawVoxelResolution(bool compact) {
     const std::string tris = formatTriangles(e.triangles);
     char line[256];
     bool fits = true;
-    if (voxelResolution_ <= kVoxelDenseMax) {
+    MemoryTier tier = MemoryTier::Fits;
+    const MemoryLimits limits = memoryLimits();
+    tier = classifyMemory(e.bytes, limits);
+    fits = tier == MemoryTier::Fits;
+    if (fits && voxelResolution_ <= kVoxelDenseMax) // (the everyday range: memory only when it is a problem)
         std::snprintf(line, sizeof line, tr("About %s triangles"), tris.c_str());
-    } else {
-        const MemoryCheck c = checkMemory(e.bytes);
-        fits = c.enough;
-        if (fits) std::snprintf(line, sizeof line, tr("About %s triangles, ~%s of memory"), tris.c_str(), memoryText(e.bytes).c_str());
-        else
-            std::snprintf(line, sizeof line, tr("About %s triangles, needs ~%s, %s free"), tris.c_str(), memoryText(e.bytes).c_str(),
-                          memoryText(c.availableBytes).c_str());
-    }
+    else if (fits)
+        std::snprintf(line, sizeof line, tr("About %s triangles, ~%s of memory"), tris.c_str(), memoryText(e.bytes).c_str());
+    else
+        std::snprintf(line, sizeof line, tier == MemoryTier::NeedsSwap ? tr("About %s triangles, needs ~%s, %s free (may use swap)")
+                                                                       : tr("About %s triangles, needs ~%s, %s free"),
+                      tris.c_str(), memoryText(e.bytes).c_str(), memoryText(limits.available).c_str());
     if (smallFont()) ImGui::PushFont(smallFont());
-    ImGui::TextColored(fits ? theme::textDim : theme::danger, "%s", line);
+    ImGui::PushStyleColor(ImGuiCol_Text, fits ? theme::textDim : tier == MemoryTier::NeedsSwap ? theme::brand : theme::danger);
+    ImGui::TextWrapped("%s", line); // (the swap and red lines are long: wrap, never clip at the panel edge)
+    ImGui::PopStyleColor();
     if (smallFont()) ImGui::PopFont();
     ui::HelpText("Estimate", nullptr,
                  "About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine "
                  "detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the "
-                 "remesh needs; in red when that is more than is free now.",
+                 "remesh needs; in orange when that is more than is free now but could run on swap (slow), in red when the "
+                 "computer can't hold it at all.",
                  "Tool > Remesh");
 }
 
 void App::drawVoxelHighResConfirm() {
     if (!voxelHighResConfirm_.open) return;
     const float s = uiScale_;
+    const bool swap = voxelHighResConfirm_.swap;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + vp->WorkSize.y * 0.5f),
                             ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     bool open = true;
-    if (!ImGui::Begin(tr("High resolution remesh"), &open,
+    if (!ImGui::Begin(swap ? tr("Remesh may use swap") : tr("High resolution remesh"), &open,
                       ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
         if (!open) voxelHighResConfirm_ = {};
@@ -331,26 +340,54 @@ void App::drawVoxelHighResConfirm() {
     const VoxelRemeshEstimate& e = voxelEstimate();
     const MemoryCheck c = checkMemory(e.bytes);
     ImGui::PushTextWrapPos(460 * s);
-    char what[512];
-    std::snprintf(what, sizeof what, tr("Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free)."),
-                  voxelResolution_, formatTriangles(e.triangles).c_str(), memoryText(e.bytes).c_str(), memoryText(c.availableBytes).c_str());
-    ImGui::Text("%s", what);
-    ImGui::TextWrapped("%s", tr("It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. "
-                                "This won't ask again until the Resolution goes back to 512 or less."));
-    // Only for a heavy result: tens of millions of triangles, or most of the free memory.
-    if (e.triangles > 10'000'000 || (c.availableBytes > 0 && e.bytes > c.availableBytes / 2))
-        ImGui::TextWrapped("%s", tr("Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter."));
+    if (swap) {
+        char what[512];
+        std::snprintf(what, sizeof what, tr("Voxel Remesh at resolution %d makes about %s triangles."), voxelResolution_,
+                      formatTriangles(e.triangles).c_str());
+        ImGui::Text("%s", what);
+        char need[256];
+        std::snprintf(need, sizeof need, tr("This needs about %s; %s is free. It may use swap and be slow."), memoryText(e.bytes).c_str(),
+                      memoryText(c.availableBytes).c_str());
+        ImGui::TextColored(theme::brand, "%s", need);
+        const std::string limit = "Limit used: " + memoryCeilingText(memoryLimits());
+        if (smallFont()) ImGui::PushFont(smallFont());
+        ImGui::TextColored(theme::textDim, "%s", limit.c_str());
+        if (smallFont()) ImGui::PopFont();
+        ImGui::TextWrapped("%s", tr("Your work is saved to the recovery copy first. Cancel in Tool > Remesh stops it and the Part "
+                                    "stays as it is. This asks every time. A lower Resolution is lighter."));
+    } else {
+        char what[512];
+        std::snprintf(what, sizeof what, tr("Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free)."),
+                      voxelResolution_, formatTriangles(e.triangles).c_str(), memoryText(e.bytes).c_str(), memoryText(c.availableBytes).c_str());
+        ImGui::Text("%s", what);
+        ImGui::TextWrapped("%s", tr("It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. "
+                                    "This won't ask again until the Resolution goes back to 512 or less."));
+        // Only for a heavy result: tens of millions of triangles, or most of the free memory.
+        if (e.triangles > 10'000'000 || (c.availableBytes > 0 && e.bytes > c.availableBytes / 2))
+            ImGui::TextWrapped("%s", tr("Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter."));
+    }
     ImGui::PopTextWrapPos();
     bool go = false;
-    if (ImGui::Button(tr("Remesh##voxelhighres"), ImVec2(140 * s, 0))) go = true;
-    ImGui::SameLine();
-    if (ImGui::Button(tr("Cancel##voxelhighres"), ImVec2(120 * s, 0))) open = false;
+    if (swap) {
+        if (ImGui::Button(tr("Proceed anyway##voxelswap"), ImVec2(160 * s, 0))) go = true;
+        ImGui::SameLine();
+        if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere(); // Cancel is the default: Enter and Escape cancel too
+        if (ImGui::Button(tr("Cancel##voxelswap"), ImVec2(120 * s, 0)) || (!ImGui::IsWindowAppearing() && ImGui::IsKeyPressed(ImGuiKey_Enter)) ||
+            ImGui::IsKeyPressed(ImGuiKey_Escape))
+            open = false;
+    } else {
+        if (ImGui::Button(tr("Remesh##voxelhighres"), ImVec2(140 * s, 0))) go = true;
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##voxelhighres"), ImVec2(120 * s, 0))) open = false;
+    }
     ImGui::End();
     if (go) {
         const RemeshTrigger trigger = voxelHighResConfirm_.trigger;
         voxelHighResConfirm_ = {};
-        voxelHighResOk_ = true;
+        if (swap) voxelSwapOk_ = true; // (this one run only: the next remesh asks again)
+        else voxelHighResOk_ = true;
         startVoxelRemesh(trigger);
+        voxelSwapOk_ = false; // (in case it stopped before the check)
     } else if (!open) {
         voxelHighResConfirm_ = {};
         status_ = "Voxel Remesh cancelled";
@@ -366,28 +403,45 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     if (!levelsAllow("Voxel Remesh", [this, trigger] { startVoxelRemesh(trigger); }, trigger != RemeshTrigger::Button)) return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
-    if (voxelResolution_ > kVoxelDenseMax) {
-        // Never past the free memory up there (it would take the whole computer down); asked once per trip above 512.
+    bool allowSwap = false;
+    {
+        // ONE estimate (core/Voxel.h) and ONE dialog for every Resolution. Past the free memory it asks every time (it may
+        // use swap and be slow), and past RAM + the most swap it won't start at all (it would take the whole computer
+        // down). Only above 512 does a remesh that fits ask once first (tens of millions of triangles, minutes).
         const VoxelRemeshEstimate& e = voxelEstimate();
-        if (const MemoryCheck c = checkMemory(e.bytes); !c.enough) {
-            status_ = "Voxel Remesh at " + std::to_string(voxelResolution_) + " needs ~" + memoryText(e.bytes) + " free, " +
-                      memoryText(c.availableBytes) + " available. Lower the Resolution or close other apps"; // (as the panel)
+        const MemoryLimits limits = memoryLimits();
+        const MemoryTier tier = classifyMemory(e.bytes, limits);
+        if (tier == MemoryTier::TooBig) {
+            status_ = voxelRemeshTooBigMessage(doc_.mesh, voxelResolution_, limits);
             lastCommandOk_ = false;
             return;
         }
-        if (!voxelHighResOk_) {
-            voxelHighResConfirm_ = {true, trigger};
+        if (tier == MemoryTier::NeedsSwap) {
+            if (!std::exchange(voxelSwapOk_, false)) {
+                voxelHighResConfirm_ = {true, trigger, true};
+                status_ = memorySwapMessage(e.bytes, limits.available) + " Proceed or cancel in the dialog";
+                return;
+            }
+            allowSwap = true;
+        } else if (voxelResolution_ <= kVoxelDenseMax) {
+            voxelHighResOk_ = false;
+        } else if (!voxelHighResOk_) {
+            voxelHighResConfirm_ = {true, trigger, false};
             status_ = "Voxel Remesh at " + std::to_string(voxelResolution_) + ": about " + formatTriangles(e.triangles) +
                       " triangles. Remesh or cancel in the dialog";
             return;
         }
-    } else {
-        voxelHighResOk_ = false;
-        if (!memoryAllows("remesh", args, [this, trigger] { startVoxelRemesh(trigger); })) return;
     }
     // Always in the background with progress, so the UI never freezes (keeping a texture adds Auto UV of the
     // result, seconds to minutes); the result lands as the remesh command's would (pollVoxelRemesh).
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (allowSwap && interactive() && !prefDir_.empty() && doc_.dirty()) { // (the crash recovery path: Restore on the next start)
+        if (!autosaveNow()) { // (sets status_ "Autosave failed: ...")
+            status_ = "Voxel Remesh not started: the recovery copy couldn't be saved first (" + status_ + "). Save the project, then try again";
+            lastCommandOk_ = false;
+            return;
+        }
+    }
     auto job = std::make_unique<VoxelRemeshJob>();
     job->trigger = trigger;
     job->revision = doc_.undo.revision();
@@ -407,35 +461,51 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     job->keepMasked = !keep.empty();
     job->keepTexture = keepTexture_;
+    job->allowSwap = allowSwap;
     const bool texture = hasTexture(doc_.mesh) && keepTexture_;
     std::promise<bool> promise;
     job->done = promise.get_future();
-    std::thread([promise = std::move(promise), source = std::make_shared<Mesh>(doc_.mesh), res = job->resolution,
+    std::shared_ptr<Mesh> source;
+    try {
+        source = std::make_shared<Mesh>(doc_.mesh);
+    } catch (const std::bad_alloc&) { // not even a copy of the Part fits: nothing started, the Part is as it was
+        status_ = "Voxel Remesh not started: out of memory. Close other apps or lower the Resolution";
+        lastCommandOk_ = false;
+        return;
+    }
+    std::thread([promise = std::move(promise), source = std::move(source), res = job->resolution, allowSwap,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
                  note = job->note, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
-        progress->store(0.02f);
-        const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
-        *result = voxelRemesh(*source, res, error.get(), [&](float f) {
-            progress->store(0.02f + remeshShare * f);
-            return !cancel->load();
-        });
-        bool ok = result->triangleCount() > 0;
-        if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
-            Mesh stitched;
-            std::string keepNote;
-            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error, &keepNote);
-            if (ok) *result = std::move(stitched);
-            else *error = "Remesh (Keep Masked): " + *error;
-            if (ok && !keepNote.empty()) *note = "; Keep masked: " + keepNote;
-        }
-        progress->store(texture ? 0.15f : 0.98f);
-        if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
-            progress->store(0.15f + 0.85f * f);
-            return !cancel->load();
-        }) + *note;
-        if (ok && cancel->load()) {
+        bool ok = false;
+        try {
+            progress->store(0.02f);
+            const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
+            *result = voxelRemesh(*source, res, error.get(), [&](float f) {
+                progress->store(0.02f + remeshShare * f);
+                return !cancel->load();
+            }, allowSwap);
+            ok = result->triangleCount() > 0;
+            if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
+                Mesh stitched;
+                std::string keepNote;
+                ok = stitchKeptTriangles(*source, keep, *result, stitched, *error, &keepNote);
+                if (ok) *result = std::move(stitched);
+                else *error = "Remesh (Keep Masked): " + *error;
+                if (ok && !keepNote.empty()) *note = "; Keep masked: " + keepNote;
+            }
+            progress->store(texture ? 0.15f : 0.98f);
+            if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
+                progress->store(0.15f + 0.85f * f);
+                return !cancel->load();
+            }) + *note;
+            if (ok && cancel->load()) {
+                ok = false;
+                *error = "Voxel Remesh cancelled";
+            }
+        } catch (const std::bad_alloc&) { // ran out of memory midway: no half mesh, the Part stays as it was
             ok = false;
-            *error = "Voxel Remesh cancelled";
+            *result = Mesh();
+            *error = "Voxel Remesh ran out of memory; the Part is unchanged. Close other apps or lower the Resolution";
         }
         promise.set_value(ok);
     }).detach();
@@ -483,7 +553,13 @@ void App::pollVoxelRemesh() {
         return;
     }
     const JobPart part(*this, index);
-    doc_.replaceMeshUndoable(std::move(*job->result), "Remesh", true); // as the remesh command
+    try {
+        doc_.replaceMeshUndoable(std::move(*job->result), "Remesh", true); // as the remesh command
+    } catch (const std::bad_alloc&) { // (replaceMeshUndoable put the Part back)
+        status_ = "Voxel Remesh ran out of memory landing the result; the Part is unchanged. Close other apps or lower the Resolution";
+        lastCommandOk_ = false;
+        return;
+    }
     CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
                                       : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
                                                                                    : "Remeshed") +

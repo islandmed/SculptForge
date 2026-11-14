@@ -10,6 +10,7 @@
 #include <cctype>
 #include <filesystem>
 #include <memory>
+#include <new>
 
 namespace sf {
 
@@ -458,7 +459,13 @@ void Document::replaceMeshUndoable(Mesh m, std::string label, bool keepTree) {
     bvh = BVH();
     mesh = std::move(m);
     mesh.topologyDirty = true;
-    bvh.build(mesh);
+    try {
+        bvh.build(mesh);
+    } catch (const std::bad_alloc&) { // out of memory landing a big mesh: the Part goes back as it was, then the caller reports
+        mesh = std::move(*r.mesh);
+        bvhDirty = true;
+        throw;
+    }
     bvhDirty = false;
     undo.push(std::move(r));
     modified = true;

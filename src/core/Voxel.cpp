@@ -9,6 +9,7 @@
 #include <cmath>
 #include <new>
 #include <numeric>
+#include <stdexcept>
 
 #include "core/CloseHoles.h"
 #include "core/HardwareProfile.h"
@@ -787,9 +788,9 @@ void transferAttributes(const Mesh& source, Mesh& out) {
     }, 2048);
     out.markAllDirty();
 }
-} // namespace
 
-Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress) {
+Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
+                     bool allowSwap) {
     VoxelGrid grid;
     // An open Part (a starter head's neck, an extracted shell): the flood fill would pour in through the opening and
     // leave only a thin, holed shell. Its borders are capped first, on a copy of just the positions and triangles.
@@ -811,23 +812,31 @@ Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const s
         if (error) *error = "Voxel Remesh cancelled";
         return false;
     };
-    if (resolution > g_sparseAbove && mesh.triangleCount() > 0) {
-        // The brick grid (VoxelSparse.cpp): the same steps, memory going with the surface instead of the volume.
-        resolution = std::min(resolution, kVoxelResolutionMax);
-        // Up front, from the surface area: the grid and the surface it makes. Past the free memory the remesh doesn't
-        // start (the brick count is checked again once known).
+    resolution = std::min(resolution, kVoxelResolutionMax);
+    if (mesh.triangleCount() > 0) {
+        // One check for every Resolution, up front, from the surface area (estimateVoxelRemesh): the grid and the surface it
+        // makes. Past the free memory the remesh doesn't start unless the person agreed to swap (the panel asks; the brick
+        // count is checked again once known).
         const VoxelRemeshEstimate e = estimateVoxelRemesh(mesh, resolution);
-        if (const MemoryCheck c = checkMemory(e.bytes); !c.enough) {
-            if (error)
-                *error = "Voxel Remesh at " + std::to_string(resolution) + " (about " + formatTriangles(e.triangles) +
-                         " triangles) needs ~" + formatGigabytes(e.bytes + memoryMargin(e.bytes)) + " free, " +
-                         formatGigabytes(c.availableBytes) + " available. Lower the Resolution or close other apps";
+        const MemoryLimits limits = memoryLimits();
+        const MemoryTier tier = classifyMemory(e.bytes, limits);
+        if (tier == MemoryTier::TooBig) {
+            if (error) *error = voxelRemeshTooBigMessage(mesh, resolution, limits);
             return {};
         }
+        if (tier == MemoryTier::NeedsSwap && !allowSwap) {
+            if (error)
+                *error = "Voxel Remesh at " + std::to_string(resolution) + " needs ~" + memoryText(e.bytes) + "; " + memoryText(limits.available) +
+                         " is free. Tool > Remesh asks to use swap (slow). Lower the Resolution to avoid it";
+            return {};
+        }
+    }
+    if (resolution > g_sparseAbove && mesh.triangleCount() > 0) {
+        // The brick grid (VoxelSparse.cpp): the same steps, memory going with the surface instead of the volume.
         std::string why;
         Mesh out;
         try {
-            out = sparseVoxelSurface(mesh, resolution, 4, 3.0f, open, &why, step);
+            out = sparseVoxelSurface(mesh, resolution, 4, 3.0f, open, &why, step, allowSwap);
         } catch (const std::bad_alloc&) {
             why = "Voxel Remesh at " + std::to_string(resolution) + " ran out of memory; the Part is unchanged. Lower the Resolution";
         }
@@ -883,6 +892,19 @@ Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const s
     transferAttributes(source, out);
     step(1.0f);
     return out;
+}
+
+} // namespace
+
+Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
+                 bool allowSwap) {
+    try {
+        return voxelRemeshImpl(source, resolution, error, progress, allowSwap);
+    } catch (const std::bad_alloc&) { // (the grid, the bricks or the surface didn't fit after all: nothing half made)
+    } catch (const std::length_error&) {
+    }
+    if (error) *error = "Voxel Remesh at " + std::to_string(resolution) + " ran out of memory; the Part is unchanged. Lower the Resolution or close other apps";
+    return {};
 }
 
 } // namespace sf
