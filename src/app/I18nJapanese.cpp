@@ -6470,7 +6470,18 @@ constexpr Entry kJapanese[] = {
     {"Shadows & AO", "影と AO"},
     {"Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", "影とアンビエントオクルージョンは Lit Sphere とスタジオシェーディングでも有効で、PBR ビューだけではありません。"},
     {"Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.", "キーライトが落とす影：鼻が頬に、眉が目の上に。自動：グラフィックカードの性能が足りるときオン（Standard 以上）。フレームが必要なら、オービットやスカルプト中は一時的にオフになります。"},
-    {"With Lit Sphere shading", "Lit Sphere シェーディング時"},
+    {"With Lit Sphere shading", "Lit Sphere シェーディング時"},    // --- The command line of the F3 search (CommandBar.cpp) ---
+    {"Search, or say what you want: clay 40, mirror x", "検索、またはしたいことを入力：clay 40、mirror x"},
+    {"%s - type a number", "%s - 数値を入力"},
+    {"%s - name a Part, or say all", "%s - パーツ名、または all"},
+    {"%s - about %s triangles", "%s - 約 %s 三角面"},
+    {"%s - %s voxels", "%s - %s ボクセル"},
+    {"Hide all", "すべて非表示"},
+    {"Hide all except %s", "%s 以外をすべて非表示"},
+    {"Isolate", "孤立表示"},
+    {"Isolate %s", "%s を孤立表示"},
+    {"Show all except %s", "%s 以外をすべて表示"},
+    {"Show only %s", "%s のみ表示"},
 };
 
 } // namespace
