@@ -1,0 +1,29 @@
+# A micro level in the PBR view (Material > Viewport Shading > PBR): the mesh draws. The environment and BRDF table were
+# bound to texture units the micro level's own buffers use, so every micro draw failed in PBR and only the other Parts
+# (or nothing) showed.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=5
+click "Geometry##tool.geometry"
+click "Geometry/Add Micro"
+expect_status "Added micro"
+run set_background color="10,10,10"
+shot micro-lit-sphere
+expect_value luma@0.41,0.5 > 60
+expect_value luma@0.15,0.75 < 30
+
+run viewport_shading mode=pbr
+wait_value environment_pending == 0
+wait 0.3
+shot micro-pbr
+expect_value luma@0.41,0.5 > 60
+expect_value luma@0.15,0.75 < 30
+
+
+# Flat shading takes another program variant with the same units.
+click "Material##palette.material"
+click "Flat##material.flat"
+expect_value flat_shading == 1
+key escape
+wait 0.3
+shot micro-pbr-flat
+expect_value luma@0.41,0.5 > 60

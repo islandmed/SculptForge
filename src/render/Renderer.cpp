@@ -1189,8 +1189,14 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     gl::Uniform1i(at("uClusterPrims"), 7);
     gl::Uniform1i(at("uOrmTex"), 8);
     gl::Uniform1i(at("uEmissiveTex"), 9);
-    gl::Uniform1i(at("uEnvTex"), 10);
-    gl::Uniform1i(at("uBrdfLut"), 11);
+    // A micro level's buffer textures take units 8-15 (render/MicroRenderer.cpp, MicroFocus.cpp): two samplers of
+    // different types on one unit fail every draw, and a micro mesh in the PBR view drew nothing at all. Its program has
+    // no UVs or painted texture, so the environment and BRDF table go on their units (3, 4) there.
+    const bool micro = (features & kMicro) != 0;
+    p.envUnit = micro ? GL_TEXTURE3 : kTexture10;
+    p.brdfUnit = micro ? GL_TEXTURE4 : kTexture11;
+    gl::Uniform1i(at("uEnvTex"), GLint(p.envUnit - GL_TEXTURE0));
+    gl::Uniform1i(at("uBrdfLut"), GLint(p.brdfUnit - GL_TEXTURE0));
     gl::UseProgram(0);
     return &p;
 }
@@ -2828,9 +2834,9 @@ uint32_t Renderer::pbrPlanes(uint32_t id) const {
 
 void Renderer::setPbrUniforms(const MeshProgram& p, const RenderSettings& settings, bool textured, const MeshSlot& s) {
     if (p.envLevels < 0 && p.material < 0) return; // (not a PBR program)
-    gl::ActiveTexture(kTexture10);
+    gl::ActiveTexture(p.envUnit);
     gl::BindTexture(GL_TEXTURE_2D, envTexture_);
-    gl::ActiveTexture(kTexture11);
+    gl::ActiveTexture(p.brdfUnit);
     gl::BindTexture(GL_TEXTURE_2D, brdfTexture_);
     gl::ActiveTexture(kTexture8);
     gl::BindTexture(GL_TEXTURE_2D, textured ? s.ormTexture : 0);
@@ -3374,7 +3380,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     }
-    for (GLenum unit : {kTexture11, kTexture10, kTexture9, kTexture8, kTexture5, GL_TEXTURE4, kTexture2}) {
+    for (GLenum unit : {kTexture11, kTexture10, kTexture9, kTexture8, kTexture5, GL_TEXTURE4, GL_TEXTURE3, kTexture2}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_2D, 0);
     }
