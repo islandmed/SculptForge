@@ -789,3 +789,24 @@ TEST(dyntopo_dab_work_is_bounded_on_large_triangles_under_a_small_brush) {
     CHECK(bvhMatches(d.mesh, d.bvh));
     d.undo.push(d.sculptor.endStroke());
 }
+
+// Candidates that fail don't count as operations: where face groups, borders or masks are everywhere (every edge is a feature
+// edge here), a collapse pass used to try every short edge under the brush each dab (a tester's 803k Part froze the app,
+// the sample all in collapseTarget / featureEdges). Tries per pass are bounded now, and the surface stays valid.
+TEST(dyntopo_failing_candidates_are_bounded_per_dab) {
+    Document d = sphereDoc(6); // 81,920 triangles
+    d.sculptor.dyntopo.detail = 0.23f;
+    d.mesh.facegroups.resize(d.mesh.triangleCount());
+    for (size_t t = 0; t < d.mesh.triangleCount(); ++t) d.mesh.facegroups[t] = uint32_t(t) + 1; // every edge is a group border
+    CHECK(d.sculptor.beginStroke(d.mesh, "Clay Block"));
+    DynamicTopology& dt = d.sculptor.dynamicTopology();
+    dt.stats = {};
+    const int dabs = 6;
+    for (int i = 0; i < dabs; ++i)
+        CHECK(dabToward(d, glm::vec3(0.1f * float(i), 0.2f, 3.0f), 0.8f, BrushType::ClayBlock, Symmetry{false, false, false}));
+    // (A dab remeshes up to twice: once, and again to repair triangles the brush squashed.)
+    CHECK(dt.stats.collapseTries <= size_t(dabs) * 2 * 6000 * DynamicTopology::kTriesPerOp);
+    CHECK(dt.stats.collapses == 0); // (nothing can collapse: every edge is a feature)
+    CHECK(invalid(d.mesh, true).empty());
+    d.undo.push(d.sculptor.endStroke());
+}

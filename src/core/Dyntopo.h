@@ -99,6 +99,7 @@ struct TopologyUndo {
 
 struct DyntopoStats {
     size_t splits = 0, collapses = 0, flips = 0;
+    size_t collapseTries = 0; // collapse candidates looked at (most can fail: features, link condition)
     size_t maxRegion = 0, maxOps = 0; // the most triangles one remesh looked at, and the most operations it did
     size_t limited = 0;  // remeshes whose region was cut to maxRegionTriangles
     size_t unpaired = 0; // operations whose mirror image wasn't found (an asymmetric mesh, or one edited without symmetry)
@@ -113,6 +114,10 @@ public:
     // The most triangles one dab looks at (see limitRegion): about 40 ms of a dab on a dense Part; a brush covering
     // more is remeshed over the nearest ones. (A member so a test can set it low on a small mesh.)
     size_t maxRegionTriangles = 100000;
+    // Candidates a pass looks at per operation it may do: most fail where face groups, borders or masks are
+    // everywhere (a collapse needs a free end or a feature edge), and a pass that only stopped at its operations
+    // scanned every edge of the brush's disc, seconds a dab on a dense Part.
+    static constexpr size_t kTriesPerOp = 4;
     // Remeshes within `radius` of `center` and of its symmetric copies (`mirrors` as Sculptor::copies makes them:
     // mirror images and radial turns, the identity first) towards edges of `edgeLength`. Returns false when
     // nothing changed.
