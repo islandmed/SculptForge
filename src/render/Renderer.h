@@ -413,6 +413,7 @@ private:
     struct MeshSlot {
         uint32_t id = 0;
         uint64_t fullUploads = 0; // (tests)
+        bool remeshing = false;   // a stroke that changes this mesh's topology runs (dynamic topology)
         GLuint vao = 0, lineVao = 0;
         GLuint vertexBuffer = 0; // PackedVertex per GPU slot (render/Clusters.h)
         GLuint indexBuffer = 0;  // 16-bit, relative to each cluster's first vertex; kClusterTriangles * 3 per cluster
