@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Dyntopo.h"
 
+#include "core/ThreadPool.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -665,13 +667,22 @@ void DynamicTopology::matchMirrors(const std::vector<uint32_t>& verts) {
         }
         return best;
     };
+    // Each vertex's partner is worked out in parallel (the grid is only read), then taken in order, so the pairs are
+    // those the one-by-one search finds.
+    std::vector<uint32_t> partner(verts.size());
     for (size_t k = 0; k < mirrorSigns_.size(); ++k) {
         const SymCopy& s = mirrorSigns_[k];
-        for (uint32_t v : verts) {
-            if (mirrorOf(k, v) != kNone) continue; // (its partner found it first)
-            const uint32_t w = nearest(s.point(m.positions[v]));
-            if (w == kNone || nearest(s.inversePoint(m.positions[w])) != v) continue;
-            setMirror(k, v, w);
+        poolFor(verts.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = verts[i];
+                const uint32_t w = nearest(s.point(m.positions[v]));
+                partner[i] = w != kNone && nearest(s.inversePoint(m.positions[w])) == v ? w : kNone;
+            }
+        });
+        for (size_t i = 0; i < verts.size(); ++i) {
+            const uint32_t v = verts[i];
+            if (mirrorOf(k, v) != kNone || partner[i] == kNone) continue; // (its partner found it first)
+            setMirror(k, v, partner[i]);
         }
     }
 }
@@ -1274,7 +1285,8 @@ void DynamicTopology::gatherRegion() {
     };
     // With a margin around each image of the brush: the mirror images of the corners found under one must be
     // among those found under the others, though the sides never match exactly.
-    const float reach = radius_ * 1.25f + std::min(target_, 4.0f * meshEdge_) * 2.0f;
+    // (With the region cut the margin is the mesh's own size: the target edge of a big brush would bring the disc back.)
+    const float reach = radius_ * 1.25f + (cut_ ? std::min(target_, 4.0f * meshEdge_) : target_) * 2.0f;
     bvh_->queryTriangles(*mesh_, center_, reach, tris);
     addCorners(tris);
     for (const SymCopy& s : mirrorSigns_) {
@@ -1298,7 +1310,7 @@ void DynamicTopology::gatherRegion() {
     matchMirrors(verts);
 }
 
-// A dab remeshes at most kMaxRegionTriangles triangles, the ones nearest its centre: radius_ shrinks to hold them.
+// A dab remeshes at most maxRegionTriangles triangles, the ones nearest its centre: radius_ shrinks to hold them.
 // Finding the region, pairing its mirror images and building the edge heaps cost time in proportion to it, and a
 // dab does at most maxOps_ operations whatever its size, so a big brush over a dense Part (803k triangles under a
 // brush as big as the head: 100-380 ms a dab, a stalled first stroke) spent most of every dab looking at triangles
@@ -1316,7 +1328,9 @@ void DynamicTopology::limitRegion() {
         edge += glm::distance(p[tri.x], p[tri.y]);
     }
     meshEdge_ = edge / float(std::max<size_t>(sampled, 1));
-    if (regionTris_.size() <= kMaxRegionTriangles) return;
+    cut_ = false;
+    if (regionTris_.size() <= maxRegionTriangles) return;
+    cut_ = true;
     std::vector<float>& d2 = capDist_;
     d2.clear();
     d2.reserve(regionTris_.size());
@@ -1325,8 +1339,8 @@ void DynamicTopology::limitRegion() {
         const glm::vec3 c = (p[tri.x] + p[tri.y] + p[tri.z]) * (1.0f / 3.0f) - center_;
         d2.push_back(glm::dot(c, c));
     }
-    std::nth_element(d2.begin(), d2.begin() + std::ptrdiff_t(kMaxRegionTriangles), d2.end());
-    const float nearest = std::sqrt(d2[kMaxRegionTriangles]) + 2.0f * meshEdge_; // (a triangle or two past the last centre kept)
+    std::nth_element(d2.begin(), d2.begin() + std::ptrdiff_t(maxRegionTriangles), d2.end());
+    const float nearest = std::sqrt(d2[maxRegionTriangles]) + 2.0f * meshEdge_; // (a triangle or two past the last centre kept)
     radius_ = std::min(radius_, nearest);
     ++stats.limited;
 }
@@ -1376,7 +1390,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
         mirrorStamp_ = 1;
     }
     ops_ = 0;
-    maxOps_ = 2500; // (bounds a dab's time: a big brush over fine triangles coarsens them over several dabs)
+    maxOps_ = 6000; // (bounds a dab's time: a big brush over fine triangles coarsens them over several dabs)
     limitRegion(); // (and so does the region it looks at: the work follows what it does, not the brush size)
 
     auto lap = std::chrono::steady_clock::now();
