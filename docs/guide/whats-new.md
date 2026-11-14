@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.0
+
+```features
+date: unreleased
+tagline: Shadows and ambient occlusion in the PBR view, and say what you want in the F3 search.
+highlight: Shadows and ambient occlusion in the PBR view: the key light casts shadows and creases darken, so form reads at a glance
+highlight: Say what you want in the F3 search: type clay 40, mirror x or hide all but head and Enter does it
+highlight: Start from an image, then make it yours: Recommended 3D models with their prices, and Tripo with your own key
+```
+
 ## Version 0.12.16
 
 ```features

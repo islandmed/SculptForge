@@ -2,7 +2,6 @@
 whats_new: **Shadows and ambient occlusion in the view**: the key light casts shadows on the sculpt (the nose on the cheek,
   the brow over the eyes) and creases and hollows darken softly. **Material > Viewport Shading** (PBR) and **Preferences >
   Display > Shadows & AO**: on, off or Auto, with AO strength, AO softness and shadow softness.
-highlight: Shadows and ambient occlusion in the PBR view
 added: **Shadows & AO** (Material > Viewport Shading in the PBR view, Preferences > Display): cast shadows from the key
   light (in PBR, the environment's brightest direction) and screen-space ambient occlusion, worked out from the drawn
   view, blurred with a depth-aware filter. Shadows and Ambient occlusion are each On, Off or Auto (the default: on from the

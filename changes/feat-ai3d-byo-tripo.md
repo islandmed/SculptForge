@@ -1,6 +1,5 @@
 ---
 whats_new: **Start from an image, then make it yours**: a **Recommended models** list in the Generate 3D window shows what each model costs per generation, what it is good at and a **Get a key** button. **Tripo v3.1** (about $0.20 a picture) is new, with your own key. A free model that is switched off is greyed out with the reason, and a paid service that is down falls back to the free models you have allowed instead of hanging.
-highlight: Recommended 3D models with prices, Tripo with your own key
 added: **Tripo in Generate 3D** (with your own key): Tripo v3.1 / v3.0 from an image or a description
   (shape only, about $0.20 / $0.10). The key lives in the
   system keychain only; each service has one pinned address, a timeout, a capped wait and plain error messages; the model
