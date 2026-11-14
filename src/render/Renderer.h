@@ -338,6 +338,9 @@ public:
     void setStroking(bool on) { stroking_ = on; } // a stroke runs: sync leaves the edited clusters' levels until it ends
     // The last syncScene left motion proxies to build (a few milliseconds of them a frame; the rest draw in full).
     bool proxiesPending() const { return proxyPending_; }
+    // The last syncScene left a stroke's coarse levels to update (a few milliseconds of them a frame; the mesh draws
+    // in full until they are all done).
+    bool coarseUpdatePending() const { return coarseUpdatePending_; }
     // Build stale motion proxies on still frames too (after a stroke, so the next orbit starts with them), at a
     // smaller budget; only for meshes whose proxies were drawn before. The app turns it on when nothing sculpts.
     void setProxyPrebuild(bool on) { proxyPrebuild_ = on; }
@@ -523,6 +526,8 @@ private:
     const bool coarseLod_ = !(std::getenv("SF_COARSE_LOD") && std::string(std::getenv("SF_COARSE_LOD")) == "0");
     void markCoarseDirty(MeshSlot& s, uint32_t c);
     void updateCoarse(MeshSlot& s, const Mesh& mesh);
+    bool coarseUpdatePending_ = false; // (coarseUpdatePending)
+    double coarseMsPerCluster_ = 0.0;  // measured, as proxyMsPerCluster_
     size_t lodBudget_ = 0; // the last still draw's triangle budget: sync builds the coarse levels of meshes over it
     void buildCoarse(MeshSlot& s, const Mesh& mesh);
     void uploadCoarsePoints(MeshSlot& s);

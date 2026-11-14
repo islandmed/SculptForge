@@ -524,20 +524,27 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
     if (L.levels.empty() || dirty.empty() || L.vertexCell.size() != nv) return changed;
     const auto fromGpu = order.fromGpu();
     const uint32_t base0 = L.levels[0].base;
-    // The level-0 cells of the dirty clusters' vertices (the build's cells: membership doesn't change).
+    // The level-0 cells of the dirty clusters' vertices (the build's cells: membership doesn't change). The renderer
+    // updates a stroke's clusters a batch a frame: the cost is the batch's, not a pass over every cell.
     const size_t cells0 = L.levels[0].keys.size();
-    std::vector<uint8_t> flagged(cells0, 0);
+    if (L.cellFlags.size() != cells0) L.cellFlags.assign(cells0, 0);
+    std::vector<std::vector<uint32_t>> found(dirty.size());
     poolFor(dirty.size(), [&](size_t d0, size_t d1) {
         for (size_t d = d0; d < d1; ++d) {
             const auto& cl = order.clusters()[dirty[d]];
             for (uint32_t l = 0; l < cl.vertexCount; ++l)
-                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv)
-                    AtomicRef<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
+                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) {
+                    const uint32_t k = L.vertexCell[v] - base0;
+                    if (!AtomicRef<uint8_t>(L.cellFlags[k]).load(std::memory_order_relaxed) &&
+                        !AtomicRef<uint8_t>(L.cellFlags[k]).exchange(1, std::memory_order_relaxed))
+                        found[d].push_back(base0 + k);
+                }
         }
     }, 16);
     std::vector<uint32_t> cells;
-    for (size_t k = 0; k < cells0; ++k)
-        if (flagged[k]) cells.push_back(base0 + uint32_t(k));
+    for (const auto& f : found) cells.insert(cells.end(), f.begin(), f.end());
+    std::sort(cells.begin(), cells.end());
+    for (uint32_t k : cells) L.cellFlags[k - base0] = 0;
     const bool hasNormals = mesh.normals.size() == nv;
     // Each one the mean of its vertices where they are now; then each level's cells above them from their children.
     poolFor(cells.size(), [&](size_t i0, size_t i1) {

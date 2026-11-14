@@ -108,6 +108,7 @@ struct CoarseLevels {
     std::vector<uint32_t> parent;                  // per cell: its cell one level up (~0u at the top)
     std::vector<uint32_t> childFirst, children;    // per cell: its cells one level down (level 0: none)
     std::vector<uint32_t> weight;                  // per cell: its vertices
+    std::vector<uint8_t> cellFlags;                // (updateCoarseLevels' scratch, per level-0 cell: all 0 between calls)
     // The cell of point p at a level by its grid position (cell id into positions), or ~0u: none there at the build.
     uint32_t cellOf(const glm::vec3& p, int level) const;
 };
