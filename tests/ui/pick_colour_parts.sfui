@@ -10,7 +10,7 @@ expect_value active_part == 1
 run set_color color=00ff00
 expect_value brush_color_g == 255
 camera 0 0
-snapshot
+shot scene
 
 # Pointing at the inactive, painted sphere: its red, and which Part it came from.
 click_part "Sphere" 0.5 0.5 0
@@ -18,12 +18,14 @@ key c
 expect_value brush_color_r == 255
 expect_value brush_color_g == 0
 expect_status from Sphere
+shot picked_inactive_part
 
 # Pointing at the active, unpainted cube: the colour the Part is shown in, and the status says it has no paint.
 click_part "Cube" 0.5 0.5 0
 key c
 expect_value brush_color_r < 250
 expect_status it has no paint
+shot picked_unpainted_part
 
 # Off the model: nothing changes, and the status bar says what to do.
 run set_color color=00ff00
@@ -32,4 +34,5 @@ mouse_by 150 150
 key c
 expect_value brush_color_g == 255
 expect_status Nothing to pick
-snapshot
+wait 0.3
+shot nothing_to_pick
