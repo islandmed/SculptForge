@@ -5,7 +5,7 @@ if(APPLE)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "beta.1")
+set(SCULPTFORGE_PRERELEASE "")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)

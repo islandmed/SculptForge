@@ -99,10 +99,10 @@ When it is done, the status line reports what was baked and where the files went
 <p>When the low-poly&#x27;s UVs go beyond the 0..1 square (UDIM tiles, for example from the <a href="uv-editor.html">UV Editor</a>), every tile bakes as its own set of maps: <code>&lt;name&gt;_normal.1001.png</code>, <code>&lt;name&gt;_normal.1002.png</code>, ... (1001 + u + 10 v, the usual numbering).</p>
 <p>The same maps, baked on the texture&#x27;s own UVs, feed <a href="fill-layers.html">Fill layers</a> inside SculptForge.</p>
 <h3 id="tangent-space-normal-maps-that-look-right-everywhere">Tangent-space normal maps that look right everywhere<a class="anchor" href="#tangent-space-normal-maps-that-look-right-everywhere" aria-label="Link to this section">#</a></h3>
-<p>SculptForge computes tangents with <strong>MikkTSpace</strong>, the same method Blender, Unreal Engine, Unity, Godot, Substance and xNormal use. A map baked here shows correctly in all of them, as long as the low-poly is exported with its normals and UVs (every SculptForge export keeps them). Choose the green channel convention under the map settings:</p>
+<p>SculptForge computes tangents with <strong>MikkTSpace</strong>, the same method Blender, Unreal Engine, Unity and Godot use. A map baked here shows correctly in all of them, as long as the low-poly is exported with its normals and UVs (every SculptForge export keeps them). Choose the green channel convention under the map settings:</p>
 <ul>
 <li>
-<strong>OpenGL (Y+)</strong>: Blender, Unity, Godot, Substance, three.js. The default.
+<strong>OpenGL (Y+)</strong>: Blender, Unity, Godot, three.js. The default.
 </li>
 <li>
 <strong>DirectX (Y-)</strong>: Unreal Engine&#x27;s native convention. <strong>Send to Unreal</strong> flips an OpenGL map on import (see below), so you only need DirectX when you import into Unreal by hand.

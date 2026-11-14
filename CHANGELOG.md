@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.12.16] - 2026-11-13
+
 ### Added
 - **Pop-up colours** (Preferences > Interface > Look): pop-ups get a colour by role (a strip across the top, an edge,
   a tinted title bar and an icon after the title, on a surface one step lighter than the panels): tips and help blue,
@@ -27,6 +29,9 @@ All notable changes to SculptForge are listed here. The format follows
   treated as one surface, so the inner face's dark side showed through as specks, or the shell collapsed to a single
   sheet; they cleared up at rest. A thin shell now keeps its faces apart in the moving preview and draws in full where
   the lighter preview would merge them. A user report.
+- A mesh with a micro level (Geometry > Micro) drew nothing in the PBR view (Material > Viewport Shading > PBR): the
+  environment and its lookup table shared texture units with the micro level's own data, so the graphics driver
+  refused every draw. Lit Sphere and the other shadings were not affected.
 
 ## [0.12.15] - 2026-11-13
 

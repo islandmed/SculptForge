@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.12.15:</strong> Android tablet trays open again, and links on Linux open one browser window (<a href="https://sculptforge.app/guide/whats-new.html#version-01215">how it works</a>)
+  <strong>New in 0.12.16:</strong> pop-ups and the guide take colour by role, and sculpts with Micro detail show again in PBR shading (<a href="https://sculptforge.app/guide/whats-new.html#version-01216">how it works</a>)
 </p>
 
 <p align="center">
