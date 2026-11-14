@@ -138,6 +138,17 @@ bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& erro
         }
         f.memberRequests = count(support["member_requests_this_release"]);
     }
+    const Json& spaces = j["ai3d"]["spaces"];
+    if (spaces.isObject())
+        for (const auto& [id, v] : spaces.members()) {
+            if (info.spaceHealth.size() >= 16) break;
+            const bool idOk = !id.empty() && id.size() <= 40 && std::all_of(id.begin(), id.end(), [](char c) {
+                return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '.';
+            });
+            const std::string state = v["state"].isString() ? v["state"].asString() : std::string();
+            if (!idOk || (state != "up" && state != "slow" && state != "off")) continue;
+            info.spaceHealth.push_back({id, state, v["note"].isString() ? feedText(v["note"].asString(), 96) : std::string()});
+        }
     out = std::move(info);
     return true;
 }

@@ -321,7 +321,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
-  src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
+  src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GlbFetch.cpp src/ai/SpaceHealth.cpp src/ai/Tripo.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
   src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -1257,6 +1257,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # image_to_3d / text_to_3d from a command run on a worker (tests/ui/generate_command_background.sfui).
     sculptforge_ui_test(generate_command_background_1440 generate_command_background --size 1440x900)
     sculptforge_ui_test(generate_command_background_2880 generate_command_background --size 2880x1800)
+    # Recommended models, Tripo and a free Space the feed reports switched off (tests/ui/generate_recommended.sfui).
+    sculptforge_ui_test(generate_recommended_1440 generate_recommended --size 1440x900)
+    sculptforge_ui_test(generate_recommended_2880 generate_recommended --size 2880x1800)
     sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)

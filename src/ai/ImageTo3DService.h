@@ -55,6 +55,24 @@ struct ServiceModel {
 // Curated fal.ai image-to-3D models (any other fal model id also works).
 const std::vector<ServiceModel>& falModels();
 
+// The models worth starting with, in the order Generate 3D's "Recommended" list shows them: what each costs per
+// generation (list prices, they change: see kPricesChecked), a line on its quality, and where to get a key. Choosing one
+// sets the service and its model. Free ones show the Space's health (ai/SpaceHealth.h). No affiliate or referral tags:
+// the key links are the providers' own pages.
+struct RecommendedModel {
+    const char* service; // generatorService
+    const char* model;   // the service's model id ("" = nothing to set)
+    const char* label;
+    const char* price;   // "$0.20", "about $0.30", "Free"
+    const char* note;    // one line on what it is good at
+    const char* keyUrl;  // where to make a key ("" = none needed)
+    bool text;           // also text to 3D
+};
+const std::vector<RecommendedModel>& recommendedModels();
+// When those prices were read from the providers' public pricing pages (Tripo: 20 credits an image, 10 a text, at about
+// $0.01 a credit; fal: the model pages). The panel shows it: "List prices as of 2026-11-13".
+inline constexpr const char* kPricesChecked = "2026-11-13";
+
 // Free models on Hugging Face Spaces (shared GPUs; a free HF token raises the daily quota).
 // An input a step must fill, found by its label (else its component type) wherever the Space puts it (GradioSlot).
 struct HfSlot {

@@ -32,6 +32,8 @@
 #include "core/Keychain.h"
 #include "core/ManagedPolicy.h"
 #include "ai/Hyper3D.h"
+#include "ai/SpaceHealth.h"
+#include "ai/Tripo.h"
 #include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
@@ -310,6 +312,7 @@ bool App::init(const AppOptions& options) {
         io.IniFilename = nullptr;
     }
     if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
+    if (!options.uiTest.empty()) ai::health::set({});          // (nor its ui_space_health)
     if (!options.uiTest.empty()) aiSettings_.sendAllowed.clear(); // UI tests: every online AI service asks first
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
@@ -4443,10 +4446,12 @@ void App::drawImageTo3D() {
     hint(tr(textMode_ ? "Builds a whole model from the description with a generative 3D model, then makes it sculptable."
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best."));
+    drawRecommendedModels(); // PanelGenerate3D.cpp
     const char* services[] = {tr("Hugging Face - free models"), tr("fal.ai - paid, your key"), tr("Meshy - paid, your key"),
-                              tr("Hyper3D Rodin (direct) - paid, your key"), tr("ComfyUI - your server"),
+                              tr("Hyper3D Rodin (direct) - paid, your key"), tr("Tripo (direct) - paid, your key"),
+                              tr("ComfyUI - your server"),
                               tr("My generator command"), tr("Offline blockout (inflate silhouette)")};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "tripo", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -4465,15 +4470,27 @@ void App::drawImageTo3D() {
         for (const auto& p : presets)
             if (aiSettings_.hfModel == p.id) preview = tr(p.label);
         if (ImGui::BeginCombo(tr("Model"), preview)) {
-            for (const auto& p : presets)
-                if (ImGui::Selectable(tr(p.label), aiSettings_.hfModel == p.id)) {
+            for (const auto& p : presets) {
+                // A Space the feed reports switched off is greyed with the reason, not offered to hang on.
+                const ai::health::Entry hs = ai::health::of(p.id);
+                const bool off = hs.state == ai::health::State::Off;
+                std::string label = tr(p.label);
+                if (hs.state != ai::health::State::Up)
+                    label += std::string("  (") + tr(ai::health::label(hs.state)) + (hs.note.empty() ? "" : ": " + hs.note) + ")";
+                if (off) ImGui::BeginDisabled();
+                if (ImGui::Selectable((label + "##" + p.id).c_str(), aiSettings_.hfModel == p.id)) {
                     aiSettings_.hfModel = p.id;
                     aiSettings_.hfModelChosen = true;
                 }
+                if (off) ImGui::EndDisabled();
+            }
             ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr(ai::kHunyuanLicenceNote));
         const bool hasToken = hfToken_[0] || !ai::AiSettings{}.resolvedHfToken().empty(); // field, else HF_TOKEN
+        if (std::string note; ai::resolveHfPreset(aiSettings_, textMode_, &note).id != aiSettings_.hfModel && !note.empty() &&
+                              ai::health::of(aiSettings_.hfModel).state == ai::health::State::Off)
+            hint(note.c_str()); // (the chosen Space is switched off: this one runs instead)
         if (ai::hunyuanModel(aiSettings_.hfModel)) hint(tr(ai::kHunyuanLicenceNote));
         if (aiSettings_.hfModel == "trellis-2" && !hasToken)
             hint(tr("TRELLIS.2 needs a free Hugging Face token; without one, Hunyuan3D 2.1 runs instead."));
@@ -4522,6 +4539,23 @@ void App::drawImageTo3D() {
                      : tr("Using your key from the system keychain."));
         hint(tr("Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation "
                 "is billed to your Hyper3D account. Basic API access covers Extreme Low and Low."));
+    } else if (serviceId == "tripo") {
+        const auto& models = ai::tripo::models();
+        const std::string model = ai::tripo::resolvedModel(aiSettings_.tripoModel);
+        const char* preview = tr(models[0].label);
+        for (const auto& m : models)
+            if (model == m.id) preview = tr(m.label);
+        if (ImGui::BeginCombo(tr("Model"), preview)) {
+            for (const auto& m : models)
+                if (ImGui::Selectable(tr(m.label), model == m.id)) aiSettings_.tripoModel = m.id;
+            ImGui::EndCombo();
+        }
+        ImGui::InputText(tr("API key##tripo"), tripoKey_, sizeof tripoKey_, ImGuiInputTextFlags_Password);
+        if (!tripoKey_[0])
+            hint(aiSettings_.resolvedTripoKey().empty() ? tr("Off until you add your own key from your Tripo account (developers.tripo3d.ai).")
+                                                        : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image or description to Tripo (openapi.tripo3d.ai), which builds the shape. About $0.20 a picture "
+                "and $0.10 a description, billed to your Tripo account."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -4535,12 +4569,13 @@ void App::drawImageTo3D() {
     if (serviceId != "inflate") {
         // Candidates: several shapes side by side to pick from. Billed services start at one (each is a generation
         // on the user's key); the free and local ones at three.
-        int& count = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" ? paidCandidateCount_ : candidateCount_;
+        const bool paid = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" || serviceId == "tripo";
+        int& count = paid ? paidCandidateCount_ : candidateCount_;
         ImGui::SliderInt(tr("Candidates"), &count, 1, 3);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", tr("How many shapes to make at once, shown side by side so you can pick the strongest "
                                        "form before you spend time sculpting it."));
-        if (count > 1 && (serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d")) {
+        if (count > 1 && paid) {
             char billed[160];
             std::snprintf(billed, sizeof billed, tr("Each candidate is one generation on your key: %d are billed."), count);
             hint(billed);
@@ -4573,6 +4608,13 @@ void App::drawImageTo3D() {
             if (generatorProgress_) generatorProgress_->cancel = true;
             for (const auto& p : candidateProgress_) p->cancel = true;
         }
+    } else if (const std::string offReason = hfOffReason(); !offReason.empty()) {
+        ImGui::BeginDisabled();
+        ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0));
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", offReason.c_str());
+        hint(offReason.c_str());
+        hint(tr("Choose another model, or a paid service from the Recommended list."));
     } else if (const std::string offKey = textOffKey(); !offKey.empty() && textOffPresets_.count(offKey)) {
         ImGui::BeginDisabled();
         ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0));
@@ -4613,6 +4655,7 @@ void App::drawImageTo3D() {
         aiSettings_.falModel = falModel_;
         aiSettings_.meshyKey = meshyKey_;
         aiSettings_.hyper3dKey = hyper3dKey_;
+        aiSettings_.tripoKey = tripoKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;
