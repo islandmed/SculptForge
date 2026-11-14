@@ -1125,7 +1125,7 @@ if(SCULPTFORGE_BUILD_TESTS)
              --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu.md)
     add_test(NAME render_check_gpu_micro COMMAND sculptforge --bench --bench-view --bench-micro --bench-sizes 2 --bench-no-project
              --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu_micro.md)
-    set_tests_properties(render_check_gpu render_check_gpu_micro PROPERTIES LABELS "nightly" TIMEOUT 900 RUN_SERIAL TRUE
+    set_tests_properties(render_check_gpu render_check_gpu_micro PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE
                          ENVIRONMENT "SF_BENCH_RENDER_CHECK=1")
     # --ui-test x.sfui --record out.mp4: the before/after clips of bug fixes (needs ffmpeg + ffprobe, else the test skips: exit 77).
     if(NOT WIN32 AND Python3_Interpreter_FOUND)
