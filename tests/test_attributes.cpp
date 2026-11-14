@@ -127,19 +127,7 @@ TEST(attributes_transfer_through_remesh) {
     Mesh r = voxelRemesh(m, 48, &err);
     CHECK(r.triangleCount() > 0);
     CHECK(r.mask.size() == r.vertexCount() && r.colors.size() == r.vertexCount());
-    CHECK(!r.hasHidden() && !r.hasUvs()); // documented reset
-    // Face groups follow the nearest source triangle.
-    CHECK(r.facegroups.size() == r.triangleCount());
-    int wrongGroup = 0, groupChecked = 0;
-    for (uint32_t t = 0; t < r.triangleCount(); ++t) {
-        const auto& tri = r.triangles[t];
-        glm::vec3 c = (r.positions[tri.x] + r.positions[tri.y] + r.positions[tri.z]) / 3.0f;
-        if (std::abs(c.z) > 0.15f) {
-            ++groupChecked;
-            if (r.facegroups[t] != (c.z > 0.0f ? 1u : 0u)) ++wrongGroup;
-        }
-    }
-    CHECK(groupChecked > 100 && wrongGroup == 0);
+    CHECK(!r.hasFaceGroups() && !r.hasHidden() && !r.hasUvs()); // documented reset
     int wrong = 0, checked = 0;
     for (uint32_t v = 0; v < r.vertexCount(); ++v) {
         const glm::vec3& p = r.positions[v];

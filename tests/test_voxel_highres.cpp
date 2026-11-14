@@ -40,9 +40,7 @@ Mesh joined(const Mesh& a, Mesh b, const glm::vec3& offset) {
 bool sameOnBricks(const Mesh& source, int resolution, std::string* why) {
     std::string e1, e2;
     setVoxelSparseAbove(kVoxelDenseMax);
-    setVoxelDenoise(false); // (the brick grid has no field low-pass: the dense grid's is compared separately)
     const Mesh dense = voxelRemesh(source, resolution, &e1);
-    setVoxelDenoise(true);
     setVoxelSparseAbove(0);
     const Mesh bricks = voxelRemesh(source, resolution, &e2);
     setVoxelSparseAbove(kVoxelDenseMax);
