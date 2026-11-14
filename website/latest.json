@@ -1,11 +1,11 @@
 {
-  "version": "0.12.15",
+  "version": "0.12.16",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle",
-    "On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage",
-    "Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes"
+    "Pop-ups and the guide take colour by role: tips, lessons, what's new, warnings and deletes each look their own, and Plain keeps the old look",
+    "Sculpts with Micro detail show again in PBR shading, however big the model",
+    "A thin shell keeps a clean surface while you orbit, without dark specks"
   ],
   "support": {
     "founding": {

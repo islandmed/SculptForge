@@ -1,7 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSettings.h"
-#include "core/FileReplace.h"
 #include "core/Precision.h"
 #include "core/Sculpt.h"
 
@@ -179,7 +178,12 @@ bool BrushSettingsStore::save(const std::string& path, std::string& error) const
             return false;
         }
     }
-    return replaceFile(utf8Path(tmp), utf8Path(path), error);
+    std::filesystem::rename(utf8Path(tmp), utf8Path(path), ec);
+    if (ec) {
+        error = "Cannot write " + path + ": " + ec.message();
+        return false;
+    }
+    return true;
 }
 
 bool BrushSettingsStore::load(const std::string& path, std::string& error) {

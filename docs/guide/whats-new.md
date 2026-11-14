@@ -8,16 +8,19 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.12.16
 
 ```features
-date: unreleased
-highlight: Pop-ups and the guide in colour by role
+date: 2026-11-13
+tagline: Pop-ups and the guide take colour by role, and sculpts with Micro detail show again in PBR shading.
+highlight: Pop-ups and the guide take colour by role: tips, lessons, what's new, warnings and deletes each look their own, and Plain keeps the old look
+highlight: Sculpts with Micro detail show again in PBR shading, however big the model
+highlight: A thin shell keeps a clean surface while you orbit, without dark specks
 ```
 
 - **Pop-up colours**: pop-ups now stand out from the panels, each kind in its own colour with an icon: tips blue, the
   welcome and the quick tour teal, What's New orange, warnings amber, deletes red. **Preferences > Interface > Look >
   Pop-up colours > Plain** keeps the old look. The User Guide's tips, notes and warnings get the same colours and
   icons, and each part of the guide has its own accent.
-- **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
-  names the file instead of staying quiet.
+- **Micro levels in the PBR view**: a mesh with a micro level (Geometry > Micro) now draws in **Material > Viewport
+  Shading > PBR**; before, it vanished and only the other Parts showed.
 
 ## Version 0.12.15
 

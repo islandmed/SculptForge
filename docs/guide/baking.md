@@ -74,12 +74,12 @@ The same maps, baked on the texture's own UVs, feed [Fill layers](fill-layers.md
 
 ### Tangent-space normal maps that look right everywhere
 
-SculptForge computes tangents with **MikkTSpace**, the same method Blender, Unreal Engine, Unity, Godot,
-Substance and xNormal use. A map baked here shows correctly in all of them, as long as the low-poly is exported
+SculptForge computes tangents with **MikkTSpace**, the same method Blender, Unreal Engine, Unity and
+Godot use. A map baked here shows correctly in all of them, as long as the low-poly is exported
 with its normals and UVs (every SculptForge export keeps them). Choose the green channel convention under the
 map settings:
 
-- **OpenGL (Y+)**: Blender, Unity, Godot, Substance, three.js. The default.
+- **OpenGL (Y+)**: Blender, Unity, Godot, three.js. The default.
 - **DirectX (Y-)**: Unreal Engine's native convention. **Send to Unreal** flips an OpenGL map on import (see
   below), so you only need DirectX when you import into Unreal by hand.
 
