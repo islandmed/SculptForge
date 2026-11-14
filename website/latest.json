@@ -1,11 +1,11 @@
 {
-  "version": "0.12.16",
+  "version": "0.13.0",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Pop-ups and the guide take colour by role: tips, lessons, what's new, warnings and deletes each look their own, and Plain keeps the old look",
-    "Sculpts with Micro detail show again in PBR shading, however big the model",
-    "A thin shell keeps a clean surface while you orbit, without dark specks"
+    "Shadows and ambient occlusion in the PBR view: the key light casts shadows and creases darken, so form reads at a glance",
+    "Say what you want in the F3 search: type clay 40, mirror x or hide all but head and Enter does it",
+    "Start from an image, then make it yours: Recommended 3D models with their prices, and Tripo with your own key"
   ],
   "support": {
     "founding": {
