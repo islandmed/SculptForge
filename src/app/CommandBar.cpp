@@ -41,7 +41,7 @@ std::string number(double v) {
     return buf;
 }
 
-std::string format(const char* pattern, const std::string& a, const std::string& b = {}) {
+std::string fillIn(const char* pattern, const std::string& a, const std::string& b = {}) {
     std::string out;
     int used = 0;
     for (const char* p = pattern; *p; ++p) {
@@ -178,7 +178,7 @@ std::string App::commandPreview(const cmd::Interpretation& r) {
         return with.empty() ? out : out + " - " + with;
     }
     case cmd::Role::Value: {
-        if (!r.hasNumber) return format(tr("%s - type a number"), e.label);
+        if (!r.hasNumber) return fillIn(tr("%s - type a number"), e.label);
         return e.label + " " + number(r.number) + (e.id == "@intensity" ? "%" : "");
     }
     case cmd::Role::Switch: {
@@ -199,24 +199,24 @@ std::string App::commandPreview(const cmd::Interpretation& r) {
         if (r.unit == cmd::Unit::Triangles) {
             const double n = r.number;
             const std::string shown = n >= 1e6 ? number(n / 1e6) + "m" : n >= 1e3 ? number(n / 1e3) + "k" : number(n);
-            return format(tr("%s - about %s triangles"), e.label, shown);
+            return fillIn(tr("%s - about %s triangles"), e.label, shown);
         }
-        return format(tr("%s - %s voxels"), e.label, number(r.number));
+        return fillIn(tr("%s - %s voxels"), e.label, number(r.number));
     }
     case cmd::Role::Visibility: {
         std::vector<std::string> names;
         for (size_t i : r.parts)
             if (i < c.parts.size()) names.push_back(c.parts[i]);
         const std::string some = joinNames(names);
-        if (r.needsTarget) return format(tr("%s - name a Part, or say all"), e.label);
-        if (e.id == "@isolate") return format(tr("Isolate %s"), some);
+        if (r.needsTarget) return fillIn(tr("%s - name a Part, or say all"), e.label);
+        if (e.id == "@isolate") return fillIn(tr("Isolate %s"), some);
         if (e.id == "@hide") {
-            if (r.all && r.except) return format(tr("Hide all except %s"), some);
-            return r.all ? std::string(tr("Hide all")) : format(tr("Hide %s"), some);
+            if (r.all && r.except) return fillIn(tr("Hide all except %s"), some);
+            return r.all ? std::string(tr("Hide all")) : fillIn(tr("Hide %s"), some);
         }
-        if (r.only) return format(tr("Show only %s"), some);
-        if (r.all && r.except) return format(tr("Show all except %s"), some);
-        return r.all ? std::string(tr("Show all")) : format(tr("Show %s"), some);
+        if (r.only) return fillIn(tr("Show only %s"), some);
+        if (r.all && r.except) return fillIn(tr("Show all except %s"), some);
+        return r.all ? std::string(tr("Show all")) : fillIn(tr("Show %s"), some);
     }
     case cmd::Role::Plain: break;
     }
