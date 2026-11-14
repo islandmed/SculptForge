@@ -1,17 +1,15 @@
 {
-  "version": "0.12.12",
+  "version": "0.12.15",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips",
-    "25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded",
-    "The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)",
-    "Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)",
-    "Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times"
+    "On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle",
+    "On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage",
+    "Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes"
   ],
   "support": {
     "founding": {
-      "taken": 9,
+      "taken": 10,
       "limit": 100
     }
   }

@@ -7,6 +7,12 @@
 #ifdef SF_TEST_ACTIONS
 #include "app/Actions.h"
 #include "core/Commands.h"
+#include "core/LegacyNames.h"
+
+#include <cctype>
+#include <fstream>
+#include <regex>
+#include <sstream>
 
 using namespace sf;
 
@@ -82,6 +88,29 @@ TEST(action_registry_style_default_before_add) {
     reg.setDefaultShortcut("ui.size_popup", "F");
     reg.add({"ui.size_popup", "Size at cursor", nullptr, "", "Draw", "S", "", [] {}, nullptr, nullptr});
     CHECK(reg.shortcutText("ui.size_popup") == "Ctrl+Alt+S");
+}
+
+// A key given to a custom brush is stored under its action id, "brush.recipe.<name>": a name that holds one of the retired
+// words is the user's text, and its key comes back under that name (it used to be rewritten, and the key was lost).
+TEST(action_custom_brush_key_survives_an_old_word_in_its_name) {
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../docs/legal/trademarks.md"); // where the old words are spelled
+    std::stringstream table;
+    table << f.rdbuf();
+    std::smatch m;
+    const std::string text = table.str();
+    CHECK(std::regex_search(text, m, std::regex(R"(\| W1 \| `([^`]+)` \| `classic` \|)")));
+    if (m.size() < 2) return;
+    std::string word = m[1];
+    word[0] = char(std::toupper(static_cast<unsigned char>(word[0])));
+    const std::string id = "brush.recipe.Polish - " + word + " Soft"; // made up
+    CHECK(legacy::modernize(id) != id);
+    ActionRegistry reg;
+    reg.add({id, "Polish", nullptr, "", "Brush", "", "", [] {}, nullptr, nullptr});
+    reg.setShortcut(id, "Ctrl+Alt+8");
+    const Json saved = legacy::modernizeKeys(reg.overridesToJson()); // as read back from ui.json
+    reg.clearOverrides();
+    reg.overridesFromJson(saved);
+    CHECK(reg.shortcutText(id) == "Ctrl+Alt+8");
 }
 
 TEST(action_brush_size_keys_follow_rebinding) {

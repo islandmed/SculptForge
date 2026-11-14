@@ -42,9 +42,12 @@ public:
     // Runs the endpoint `apiName`. `slots` fill the inputs they name (gradioBuildInputs), `args` the remaining non-state
     // inputs in order (buttons included: their value is their label); state inputs come from the session and any
     // missing inputs take the app's own defaults. `outputs` receives every output
-    // value; `onStatus` gets queue/progress text.
+    // value; `onStatus` gets queue/progress text. A Space that doesn't start within kStartSeconds, or doesn't finish within
+    // kRunSeconds of starting, is given up on ("isn't answering"); `cancelled` (polled with each message) stops it sooner.
+    static constexpr int kStartSeconds = 240, kRunSeconds = 420;
     bool call(const std::string& apiName, const std::vector<Json>& args, std::vector<Json>& outputs, std::string& error,
-              const std::function<void(const std::string&)>& onStatus = {}, const std::vector<GradioSlot>& slots = {});
+              const std::function<void(const std::string&)>& onStatus = {}, const std::vector<GradioSlot>& slots = {},
+              const std::function<bool()>& cancelled = {});
 
     // The first 3D model / file output of the last call, as a downloadable URL.
     std::string lastModelUrl() const { return lastModelUrl_; }
@@ -71,5 +74,8 @@ std::string gradioModelUrl(const Json& config, const std::string& apiName, const
 
 // Turns Gradio/ZeroGPU failures into advice for artists.
 std::string friendlyGradioError(const std::string& raw);
+// A failure of the Space itself (down, asleep, not answering, connection lost), where another Space may still work;
+// not a quota, a missing token or the artist's own cancel.
+bool gradioSpaceUnavailable(const std::string& error);
 
 } // namespace sf::ai

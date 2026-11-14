@@ -54,6 +54,18 @@ void App::touchEvent(const SDL_Event& e) {
                                                                   : SDL_GetTouchDeviceType(f.touchID);
         if (t != SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && t != SDL_TOUCH_DEVICE_INDIRECT_RELATIVE) return;
     }
+    if (e.type == SDL_EVENT_FINGER_DOWN && touch_.fingers() > 0) {
+        // A finger SDL no longer has down (its lift was lost) isn't one: it would keep this touch a gesture, and a
+        // gesture's touches never reach the canvas or the panels. (Scripted touches have no device to ask.)
+        int n = 0;
+        if (SDL_Finger** live = SDL_GetTouchFingers(f.touchID, &n)) {
+            std::vector<uint64_t> ids{uint64_t(f.fingerID)};
+            for (int i = 0; i < n; ++i) ids.push_back(uint64_t(live[i]->id));
+            SDL_free(live);
+            touch_.retain(ids);
+            if (touch_.fingers() == 0) touchReset();
+        }
+    }
     if (e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED) {
         touch_.up(f.fingerID);
         if (e.type == SDL_EVENT_FINGER_CANCELED) touchPalm_ = false; // (no mouse release comes for it)
@@ -129,6 +141,16 @@ void App::touchApply(const TwoFingerStep& step) {
         orbitStarted_ = false;
     }
     if (!touchDirect_ && (touchTwisting_ || std::abs(touchZoomSum_) > kTouchPinchStart)) touchPinching_ = true;
+}
+
+// Fingers that were down when the window lost focus, rotated or resized never report their lift here.
+void App::touchReset() {
+    touch_.clear();
+    touchTwisting_ = touchPinching_ = false;
+    touchTwistSum_ = touchZoomSum_ = 0.0f;
+    touchSwallowMouse_ = false;
+    touchPalm_ = false;
+    touchPress_.held = false;
 }
 
 bool App::palmGuard() const {

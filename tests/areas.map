@@ -33,6 +33,7 @@ ui_e2e_export_*             io
 ui_e2e_prefs_*              io
 ui_e2e_quit_*               ai
 e2e_quit_*                  ai
+e2e_record_clip            io
 ui_e2e_*                    sculpt
 ui_cloth*                   cloth
 ui_garment*                 cloth
@@ -259,6 +260,7 @@ test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
 test_micro                  mesh
+test_micro_mask_grab        mesh
 test_multires*              mesh
 test_part*                  mesh
 test_primitives_insert      mesh

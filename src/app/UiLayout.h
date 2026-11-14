@@ -8,6 +8,7 @@
 
 #include "core/Json.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@ struct UiLayout {
                      // popup; 5: the right shelf has Turntable, Ortho, Floor and Flat (older stored layouts get them on load)
     bool shelvesVisible = true, paletteBarVisible = true, leftHanded = false;
     bool leftTrayOpen = false, rightTrayOpen = true;
+    bool rightTrayPeek = false; // not saved: on a narrow window the right tray shows only after it was asked for (a tap)
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
     std::vector<std::string> openSubpalettes;         // "tool.part", ...
@@ -42,6 +44,9 @@ struct UiLayout {
     float libraryTile = 64;
     std::string libraryTab = "project";
     bool libraryBottom = false;
+    // Custom brush shelf slots ("brush.recipe.<name>") -> the brush's stable id (BrushRecipe::id): the slot finds its brush
+    // by it after a rename or a move, and the name is only a hint. Learned when a slot's brush is first seen.
+    std::map<std::string, std::string> brushIds;
     int shelfTiles = 1; // bottom shelf brush tiles: 0 small, 1 medium, 2 large (shell::bottomShelfSize)
     bool customize = false; // runtime only, never stored
 };

@@ -7,12 +7,18 @@
 
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
+#include "core/FileReplace.h"
 #include "core/Project.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace sf;
 namespace fs = std::filesystem;
@@ -493,4 +499,273 @@ TEST(brush_library_reload_keeps_session_brushes) {
     CHECK(find(doc, "Unsaved")->origin.source == BrushSource::Session);
     loadBrushLibrary(doc, lib.paths());
     CHECK(find(doc, "Unsaved") != nullptr);
+}
+
+// A shelf slot keeps pointing at its brush (relinkBrush: the stable id in the .sfbrush first, the name as a hint). The
+// bottom shelf stores "brush.recipe.<name>" and the id it learned (UiLayout::brushIds); these are the moves that broke
+// it for @rand_gogh's slot 8: the brush's file still on disk, the slot marked missing.
+namespace {
+int indexOf(const Document& doc, const std::string& name) {
+    for (size_t i = 0; i < doc.brushes.size(); ++i)
+        if (doc.brushes[i].name == name) return int(i);
+    return -1;
+}
+
+// A .sfbrush file with the given name and id, as the library writes it.
+void writeIdBrush(const fs::path& path, const std::string& name, const std::string& id) {
+    BrushRecipe r;
+    r.name = name;
+    Json j = r.toJson();
+    j.set("format", "sfbrush");
+    j.set("version", 1);
+    j.set("id", id);
+    writeText(path, j.dump(true) + "\n");
+}
+
+BrushRecipe installed(Document& doc, const LibraryFixture& lib, const std::string& name) {
+    BrushRecipe r;
+    r.name = name;
+    std::string err;
+    const int i = installBrush(doc, r, err, false, lib.paths());
+    CHECK(err.empty());
+    return doc.brushes[size_t(i)];
+}
+} // namespace
+
+TEST(brush_slot_identity_is_stored_and_survives_restart) {
+    LibraryFixture lib("slotid");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Finish - Classic");
+    CHECK(!made.id.empty());
+    Document restarted;
+    CHECK(loadBrushLibrary(restarted, lib.paths()).empty());
+    const BrushRecipe* back = find(restarted, "Finish - Classic");
+    CHECK(back && back->id == made.id);
+    std::string note;
+    const int i = relinkBrush(restarted, "Finish - Classic", made.id, note, lib.paths());
+    CHECK(i >= 0 && restarted.brushes[size_t(i)].id == made.id);
+    // A brush code (chat, forum) never carries the id: two installs of one code are two brushes.
+    std::string err;
+    BrushRecipe fromCode;
+    CHECK(decodeBrushCode(encodeBrushCode(restarted.brushes[size_t(i)]), fromCode, err));
+    CHECK(fromCode.id.empty());
+}
+
+TEST(brush_slot_follows_a_rename) {
+    LibraryFixture lib("slotrename");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Old Name");
+    std::string err, note;
+    const int renamed = renameBrush(doc, indexOf(doc, "Old Name"), "New Name", err, lib.paths());
+    CHECK(renamed >= 0 && err.empty());
+    CHECK(doc.brushes[size_t(renamed)].id == made.id);
+    // The slot still says "Old Name": the id finds the brush, loaded or after a restart.
+    CHECK(relinkBrush(doc, "Old Name", made.id, note, lib.paths()) == renamed);
+    Document restarted;
+    loadBrushLibrary(restarted, lib.paths());
+    const int i = relinkBrush(restarted, "Old Name", made.id, note, lib.paths());
+    CHECK(i >= 0 && restarted.brushes[size_t(i)].name == "New Name");
+    // An older slot with no id has nothing to follow, but is still never dropped: it is reported missing (-1).
+    CHECK(relinkBrush(restarted, "Old Name", "", note, lib.paths()) < 0);
+}
+
+TEST(brush_slot_follows_a_file_moved_or_renamed_by_hand) {
+    LibraryFixture lib("slotmove");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Mover");
+    const fs::path file = lib.user / "Mover.sfbrush";
+    std::string note;
+
+    // The file renamed by hand: the brush inside is the same.
+    fs::rename(file, lib.user / "mover copy.sfbrush");
+    Document a;
+    loadBrushLibrary(a, lib.paths());
+    CHECK(relinkBrush(a, "Mover", made.id, note, lib.paths()) >= 0);
+
+    // Moved into a folder of the user library (the library sorted into folders): the library doesn't list it, the slot finds it.
+    fs::create_directories(lib.user / "Polish");
+    fs::rename(lib.user / "mover copy.sfbrush", lib.user / "Polish" / "Mover.sfbrush");
+    Document b;
+    loadBrushLibrary(b, lib.paths());
+    CHECK(find(b, "Mover") == nullptr);
+    const int ib = relinkBrush(b, "Mover", made.id, note, lib.paths());
+    CHECK(ib >= 0 && b.brushes[size_t(ib)].origin.path == (lib.user / "Polish" / "Mover.sfbrush").string());
+    CHECK(b.brushes[size_t(ib)].origin.source == BrushSource::User);
+    CHECK(fs::exists(lib.user / "Polish" / "Mover.sfbrush")); // looked at, never moved or changed
+
+    // Moved to a studio folder: loaded from there, the slot finds it by id and name.
+    fs::rename(lib.user / "Polish" / "Mover.sfbrush", lib.studioA / "Mover.sfbrush");
+    Document c;
+    loadBrushLibrary(c, lib.paths());
+    const int ic = relinkBrush(c, "Mover", made.id, note, lib.paths());
+    CHECK(ic >= 0 && c.brushes[size_t(ic)].origin.source == BrushSource::Studio);
+}
+
+TEST(brush_slot_follows_the_internal_name_and_its_case) {
+    LibraryFixture lib("slotname");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Finish - Classic");
+    std::string note;
+    // The name inside the file changed (edited by hand, a sync tool): same id, the slot follows it.
+    writeIdBrush(lib.user / "Finish - Classic.sfbrush", "Finish - Classic v2", made.id);
+    Document a;
+    loadBrushLibrary(a, lib.paths());
+    CHECK(find(a, "Finish - Classic") == nullptr);
+    const int ia = relinkBrush(a, "Finish - Classic", made.id, note, lib.paths());
+    CHECK(ia >= 0 && a.brushes[size_t(ia)].name == "Finish - Classic v2");
+
+    // Case-only change (Windows and macOS don't tell the files apart), with and without an id on the slot.
+    writeIdBrush(lib.user / "Finish - Classic.sfbrush", "finish - classic", made.id);
+    for (const std::string& id : {made.id, std::string()}) {
+        Document c;
+        loadBrushLibrary(c, lib.paths());
+        const int ic = relinkBrush(c, "Finish - Classic", id, note, lib.paths());
+        CHECK(ic >= 0 && c.brushes[size_t(ic)].name == "finish - classic");
+    }
+    // Same, with the file in a subfolder and not loaded.
+    fs::create_directories(lib.user / "sub");
+    fs::rename(lib.user / "Finish - Classic.sfbrush", lib.user / "sub" / "x.sfbrush");
+    Document d;
+    loadBrushLibrary(d, lib.paths());
+    CHECK(relinkBrush(d, "Finish - Classic", "", note, lib.paths()) >= 0);
+}
+
+TEST(brush_slot_of_a_deleted_brush_stays_missing) {
+    LibraryFixture lib("slotdeleted");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    const BrushRecipe made = installed(doc, lib, "Gone");
+    std::string err, note;
+    CHECK(deleteBrush(doc, indexOf(doc, "Gone"), err, lib.paths()));
+    CHECK(relinkBrush(doc, "Gone", made.id, note, lib.paths()) < 0); // missing: the slot is kept, the UI says so
+    CHECK(relinkBrush(doc, "Gone", "", note, lib.paths()) < 0);
+    CHECK(fs::exists(lib.user / "backups" / "deleted" / "Gone.sfbrush"));
+    // Another brush with a different id and name never answers for it.
+    installed(doc, lib, "Other");
+    CHECK(relinkBrush(doc, "Gone", made.id, note, lib.paths()) < 0);
+}
+
+TEST(brush_files_get_their_own_identity) {
+    LibraryFixture lib("slotcopy");
+    // A file from an older version (no id) gets one on load, written back, and it reads back as the same brush.
+    writeBrush(lib.user / "Old.sfbrush", "Old", 0.3f);
+    Document a;
+    CHECK(loadBrushLibrary(a, lib.paths()).empty());
+    const BrushRecipe* old = find(a, "Old");
+    CHECK(old && !old->id.empty());
+    BrushRecipe disk;
+    std::string err;
+    CHECK(readBrushFile((lib.user / "Old.sfbrush").string(), disk, err) && disk.id == old->id && disk.depth == 0.3f);
+    // The same file copied (a duplicate in the folder): the copy gets an identity of its own.
+    fs::copy_file(lib.user / "Old.sfbrush", lib.user / "Old (copy).sfbrush");
+    writeIdBrush(lib.user / "Old (copy).sfbrush", "Old (copy)", disk.id);
+    Document b;
+    loadBrushLibrary(b, lib.paths());
+    const BrushRecipe* one = find(b, "Old");
+    const BrushRecipe* two = find(b, "Old (copy)");
+    CHECK(one && two && one->id != two->id && !one->id.empty() && !two->id.empty());
+    CHECK(one->id == disk.id || two->id == disk.id); // one keeps the original identity
+}
+
+// The id is bookkeeping: a brush with an id and the same brush without one are the same recipe (the JSON the sculpting
+// engine, projects and brush codes read), and the library's id writes never change a brush's parameters.
+TEST(brush_identity_invariant_recipe_is_unchanged) {
+    for (const BrushRecipe& builtin : builtinBrushRecipes()) {
+        BrushRecipe with = builtin;
+        with.id = "0123456789abcdef";
+        CHECK(with.toJson().dump() == builtin.toJson().dump());
+        CHECK(encodeBrushCode(with) == encodeBrushCode(builtin));
+    }
+    LibraryFixture lib("idinvariant");
+    BrushRecipe r = builtinBrushRecipes()[2];
+    r.name = "Keeps Its Look";
+    r.jitter = 0.37f;
+    r.frontFacesOnly = true;
+    r.alpha = "";
+    writeText(lib.user / "Keeps Its Look.sfbrush", r.toJson().dump(true)); // an older file: no id
+    Document doc;
+    CHECK(loadBrushLibrary(doc, lib.paths()).empty()); // gives it an id, writes it back
+    const BrushRecipe* got = find(doc, "Keeps Its Look");
+    CHECK(got && !got->id.empty());
+    BrushRecipe disk;
+    std::string err;
+    CHECK(readBrushFile((lib.user / "Keeps Its Look.sfbrush").string(), disk, err));
+    CHECK(disk.toJson().dump() == got->toJson().dump());
+    CHECK(got->toJson().dump() == BrushRecipe::fromJson(r.toJson()).toJson().dump());
+}
+
+// Every save writes next to the target and replaces it (core/FileReplace.h). On Windows a read-only target, or one something
+// else holds for a moment, made the rename fail with "Access is denied" and the save was lost (a failed write must either
+// land or tell the user which file).
+TEST(file_replace_lands_or_names_the_file) {
+    const fs::path dir = fs::temp_directory_path() / "sculptforge_filereplace";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    std::string err;
+    // A new target, and an existing one: the temp file is gone, the target holds the new bytes.
+    writeText(dir / "a.tmp", "new");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err) && err.empty());
+    writeText(dir / "a.tmp", "newer");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err));
+    std::ifstream in(dir / "a.json");
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(text == "newer" && !fs::exists(dir / "a.tmp"));
+    in.close();
+    // A read-only target (the flag a copied or synced file can carry): replaced all the same.
+    fs::permissions(dir / "a.json", fs::perms::owner_read, fs::perm_options::replace);
+    writeText(dir / "a.tmp", "after read-only");
+    CHECK(replaceFile(dir / "a.tmp", dir / "a.json", err));
+    std::ifstream in2(dir / "a.json");
+    CHECK(std::string((std::istreambuf_iterator<char>(in2)), std::istreambuf_iterator<char>()) == "after read-only");
+    in2.close();
+    // The target held open by a reader that allows other readers and writers but not delete (what std::ifstream does on
+    // Windows: the cause of "Access is denied" at start-up when project.json was still open while it was saved).
+    {
+        writeText(dir / "held.json", "old");
+        std::ifstream holder(dir / "held.json", std::ios::binary);
+        CHECK(holder.is_open());
+        writeText(dir / "held.tmp", "after open");
+        CHECK(replaceFile(dir / "held.tmp", dir / "held.json", err));
+        holder.close();
+        std::ifstream check(dir / "held.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after open");
+    }
+#ifdef _WIN32
+    { // ... and by a second handle without FILE_SHARE_DELETE (a scanner, a sync client), opened the Win32 way.
+        writeText(dir / "held2.json", "old");
+        HANDLE h = CreateFileW((dir / "held2.json").c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, nullptr);
+        CHECK(h != INVALID_HANDLE_VALUE);
+        writeText(dir / "held2.tmp", "after handle");
+        CHECK(replaceFile(dir / "held2.tmp", dir / "held2.json", err));
+        CloseHandle(h);
+        std::ifstream check(dir / "held2.json");
+        CHECK(std::string((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>()) == "after handle");
+    }
+#endif
+    // A target that can't be replaced (a folder is in the way): false, the error names the file, the temp file is gone.
+    fs::create_directories(dir / "blocked" / "inner");
+    writeText(dir / "b.tmp", "x");
+    CHECK(!replaceFile(dir / "b.tmp", dir / "blocked", err));
+    CHECK(err.find("blocked") != std::string::npos && !fs::exists(dir / "b.tmp"));
+    // The brush library goes through it: a read-only brush file still takes its edit.
+    LibraryFixture lib("replacero");
+    Document doc;
+    loadBrushLibrary(doc, lib.paths());
+    BrushRecipe r;
+    r.name = "Locked";
+    std::string e2;
+    const int i = installBrush(doc, r, e2, false, lib.paths());
+    CHECK(e2.empty());
+    fs::permissions(lib.user / "Locked.sfbrush", fs::perms::owner_read, fs::perm_options::replace);
+    doc.brushes[size_t(i)].depth = 0.31f;
+    CHECK(saveBrushToLibrary(doc, i, e2, false, lib.paths()) && e2.empty());
+    BrushRecipe back;
+    CHECK(readBrushFile((lib.user / "Locked.sfbrush").string(), back, e2) && std::abs(back.depth - 0.31f) < 1e-4f);
+    fs::permissions(dir / "a.json", fs::perms::owner_all, fs::perm_options::replace);
+    fs::remove_all(dir);
 }

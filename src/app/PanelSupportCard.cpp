@@ -216,7 +216,9 @@ void App::drawSupportCard() {
     redrawIn(0.0); // animated while open (60 fps with vsync); nothing is drawn for it once closed
 
     // The current look's colours (Theme.h), so the card fits Classic and every other look.
-    const ImVec4 bg = theme::shellBg, tierBg = theme::panelBg, raised = theme::header, accent = theme::accent;
+    // (Its orange is the New role's, Theme.h: the SculptForge orange in every look, the look's accent with Pop-up colours off.)
+    const ImVec4 bg = theme::shellBg, tierBg = theme::panelBg, raised = theme::header,
+                 accent = theme::rolePopups ? theme::edge(theme::Role::New) : theme::accent;
     const ImVec4 ink = theme::textBright, body = theme::text, dim = theme::textDim, line = theme::text;
 
     const float s = uiScale_;
@@ -631,11 +633,13 @@ void App::drawMemberCard() {
     ImGui::SetNextWindowSize(ImVec2(std::min(560.0f * s, c.w - 32.0f * s), 0.0f), ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * s, 14.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f * s);
-    ImGui::PushStyleColor(ImGuiCol_Border, theme::accent);
+    ui::PushRole(theme::Role::New); // the lifted surface; its edge stays the full orange
+    ImGui::PushStyleColor(ImGuiCol_Border, theme::rolePopups ? theme::edge(theme::Role::New) : theme::accent);
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
                                    ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
     const bool began = ImGui::Begin("##member_card", nullptr, flags);
     ImGui::PopStyleColor();
+    ui::PopRole();
     ImGui::PopStyleVar(2);
     if (began) {
         ImFont* bold = boldFont();

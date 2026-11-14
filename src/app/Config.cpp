@@ -20,6 +20,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "app/UserData.h"
+#include "core/FileReplace.h"
 #include "core/LegacyNames.h"
 #include "core/Bake.h"
 #include "core/MaskColour.h"
@@ -61,6 +62,7 @@ void lookToJson(const UiPrefs& p, Json& j) {
     look.set("effects", p.look.effects);
     look.set("outlines", std::string(p.look.outlines == 0 ? "off" : p.look.outlines == 2 ? "on" : "subtle"));
     look.set("outlineOpacity", double(p.look.outlineOpacity));
+    look.set("popupColors", std::string(p.look.rolePopups ? "role" : "plain"));
     j.set("look", std::move(look));
     j.set("layout", std::string(p.shellLayout == 1 ? "sculptforge" : "classic"));
 }
@@ -78,6 +80,7 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
             p.look.outlines = o == "off" ? 0 : o == "on" ? 2 : 1;
         }
         p.look.outlineOpacity = std::clamp(float(look["outlineOpacity"].asNumber(p.look.outlineOpacity)), 0.0f, 1.0f);
+        if (look["popupColors"].isString()) p.look.rolePopups = look["popupColors"].asString() != "plain";
     }
     if (j["layout"].isString()) p.shellLayout = j["layout"].asString() == "sculptforge" ? 1 : 0;
     return j["look"].isObject() || j["layout"].isString();
@@ -874,6 +877,30 @@ void App::initActions() {
         ICON_LC_FILE_TEXT, nullptr, nullptr, nullptr,
         "Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
         "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.");
+    add("help.log_copy", "Copy log to clipboard", "Help", nullptr,
+        [this] {
+            // The end of the log as text, for a report where a file can't be attached or found (Android keeps the app's
+            // folder out of the Files app: a Pixel owner, 11-12).
+            std::ifstream f(fsPath(crashlog::path()), std::ios::binary | std::ios::ate);
+            if (!f) {
+                status_ = "There is no log file to copy.";
+                return;
+            }
+            constexpr std::streamoff kTail = 24 * 1024;
+            const std::streamoff size = f.tellg();
+            f.seekg(std::max<std::streamoff>(0, size - kTail));
+            std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            if (size > kTail) text.erase(0, text.find('\n') == std::string::npos ? 0 : text.find('\n') + 1); // (a whole first line)
+            size_t keep = text.size(), lines = 0; // the last 60 lines
+            while (keep > 0 && lines <= 60)
+                if (text[--keep] == '\n') ++lines;
+            if (lines > 60) text.erase(0, keep + 1);
+            SDL_SetClipboardText(text.c_str());
+            status_ = "Copied the end of the log: paste it into your report.";
+        },
+        ICON_LC_COPY, nullptr, nullptr, nullptr,
+        "Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+        "attached or found.");
     add("help.perf_trace", "Record a performance trace", "Help", nullptr, [this] { togglePerfTrace(); }, ICON_LC_ACTIVITY,
         nullptr, [] { return perftrace::on(); }, nullptr,
         "While on, sculptforge-trace.log in the log folder records what makes SculptForge slow: every frame over 33 ms "
@@ -1124,12 +1151,7 @@ bool App::writeJsonAtomic(const std::string& path, const Json& j, std::string& e
             return false;
         }
     }
-    std::filesystem::rename(fsPath(tmp), fsPath(path), ec);
-    if (ec) {
-        err = "Could not write " + path + ": " + ec.message();
-        return false;
-    }
-    return true;
+    return replaceFile(fsPath(tmp), fsPath(path), err);
 }
 
 std::string App::prefsKey() const {
@@ -1186,6 +1208,7 @@ void App::autosavePrefs(bool flush) {
     std::string err;
     if (!saveUiPrefs(err)) {
         SDL_Log("%s", err.c_str());
+        status_ = "Your settings and layout couldn't be saved. " + err; // never log-only: a save lands or the user is told
         prefsSavedKey_ = std::move(key); // (no retry every frame; the next change tries again)
         layoutSavedKey_ = std::move(lkey);
         prefsSaveAt_ = 0.0;
@@ -1954,7 +1977,7 @@ void drawInterfaceSection(App& app) {
     for (int i = 0; i < kLanguageCount; ++i) {
         const Language lang = Language(i);
         ImGui::SameLine();
-        // Four names don't fit a narrow tray in one row: a button that would run past the edge starts the next one.
+        // The names don't fit a narrow tray in one row: a button that would run past the edge starts the next one.
         const float width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x +
                             ImGui::CalcTextSize(languageName(lang)).x;
         if (ImGui::GetContentRegionAvail().x < width) ImGui::NewLine();
@@ -2422,6 +2445,24 @@ void App::drawLookSection() {
                      "does, lower fades them into the panels (#98). Ctrl+click to type.",
                      "Preferences > Interface > Look");
     }
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Pop-up colours"));
+    ImGui::SameLine();
+    if (ImGui::RadioButton(tr("By role##look.popup_colors"), l.rolePopups)) {
+        l.rolePopups = true;
+        lookDirty_ = true;
+    }
+    ui::HelpText("Pop-up colours: by role", nullptr,
+                 "Pop-ups show what they are with a strip, an edge and an icon in one colour: tips and help blue, the "
+                 "welcome and the quick tour teal, What's New orange, warnings amber, deletes red. The default.",
+                 "Preferences > Interface > Look");
+    ImGui::SameLine();
+    if (ImGui::RadioButton(tr("Plain##look.popup_colors"), !l.rolePopups)) {
+        l.rolePopups = false;
+        lookDirty_ = true;
+    }
+    ui::HelpText("Pop-up colours: plain", nullptr, "Pop-ups in the panels' own colours, as before 0.12.15.",
+                 "Preferences > Interface > Look");
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(tr("Layout"));
     ImGui::SameLine();

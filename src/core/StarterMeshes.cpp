@@ -25,6 +25,7 @@ namespace sf::assets {
 SF_STARTER(starterHumanHead)
 SF_STARTER(starterBust)
 SF_STARTER(starterFullBody)
+SF_STARTER(starterHumanMale)
 SF_STARTER(starterHand)
 SF_STARTER(starterFoot)
 SF_STARTER(starterEar)
@@ -79,6 +80,10 @@ const std::vector<StarterMesh>& starterMeshes() {
          false, SF_DATA(starterHumanHead)},
         {"bust", "Bust", "Head, neck, shoulders and upper chest.", 2, true, false, SF_DATA(starterBust)},
         {"full-body", "Full Body", "A full human figure in A-pose, 167 cm tall.", 1, true, true, SF_DATA(starterFullBody)},
+        {"human-male", "Human (male, A-pose)",
+         "An athletic adult man in A-pose, 180 cm, with UVs: loops round the eyes, mouth and joints; the muscle "
+         "definition is a sculpt layer you can turn down. Ready to sculpt.",
+         1, true, true, SF_DATA(starterHumanMale)}, // the project carries level 1 + the layer; one more on open
         {"hand", "Hand", "A left hand, raised with the palm to the front.", 2, false, false, SF_DATA(starterHand)},
         {"foot", "Foot", "A left foot and ankle.", 2, false, false, SF_DATA(starterFoot)},
         {"ear", "Ear", "A left ear with a little of the head round it, facing the front.", 2, false, false,
@@ -212,7 +217,7 @@ void registerStarterMeshCommands(CommandRegistry& registry) {
                   "New scene from a starter mesh: an all-quad base mesh to sculpt on (centimetres, standing on the "
                   "ground), opened with subdivision levels so you can step down to the base cage. Names: " +
                       names + ".",
-                  {{"name", T::String, "Which starter mesh, e.g. human-head, bust, full-body, creature-head.", true},
+                  {{"name", T::String, "Which starter mesh, e.g. human-head, bust, human-male, full-body, creature-head.", true},
                    {"levels", T::Number, "Subdivision levels to add (0-4; default: the mesh's own, 1 or 2).", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const std::string want = argString(a, "name");

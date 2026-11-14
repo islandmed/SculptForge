@@ -151,6 +151,9 @@ on_main() {
 push_main() {
     gitp push -q origin HEAD:main || die "push to main refused" "git pull --rebase origin main, check the result, run again"
 }
+# min_assets: the fewest assets a finished release has. A stable release has about 46; a beta 28 (no store or package
+# extras; 0.12.14-beta.1 stopped at the stable floor of 30, so its APKs went on by hand).
+min_assets() { if [ -n "$PRE" ]; then echo 26; else echo 30; fi; }
 release_ready() {
     gh release view "$T" -R "$RELEASE_REPO" --json assets -q '.assets[].name' > "$work/assets" 2>/dev/null ||
         die "no GitHub release $T yet" "run the earlier steps: $(resume tag)"
@@ -160,6 +163,9 @@ release_ready() {
         grep -qx SHA256SUMS.txt.sig "$work/assets" || die "release $T has no SHA256SUMS.txt.sig: apps can't update to it in one click" "check the UPDATE_SIGNING_KEY secret, then re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     fi
     # install/install.sh and install.ps1 (served from raw main) fetch from releases/latest: every name must be here (#159).
+    # Not for a beta: it is never releases/latest of the public repository, and its files carry the base version's names
+    # (0.12.13-beta.1 stopped here, so its APKs had to go on by hand).
+    [ -z "$PRE" ] || return 0
     local out
     out=$(python3 tools/release/check_install_assets.py --version "$V" --assets "$work/assets" 2>&1) ||
         die "$out" "fix the asset names in install/ (site lane, merges at once) or re-run the Release workflow if an upload is missing"
@@ -540,8 +546,10 @@ step_bump() {
     preflight bump
     local out
     # A beta's #testers checklist comes from the fragments, so it is written before they go (step status names it).
+    # Outside the checkout: the bump runs in the batch checkout, the promote (status) in the main checkout.
     if [ -n "$PRE" ] && ls changes/*.md 2>/dev/null | grep -v '/README.md$' >/dev/null; then
-        python3 tools/release/assemble_notes.py "$BASE" --testers >"release-testers-$V.md"
+        mkdir -p "$(dirname "$(testers_file)")"
+        python3 tools/release/assemble_notes.py "$BASE" --testers >"$(testers_file)"
     fi
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
     out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
@@ -862,7 +870,7 @@ step_release() {
     release_ready
     local n
     n=$(wc -l < "$work/assets")
-    [ "$n" -ge 30 ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
+    [ "$n" -ge "$(min_assets)" ] || die "release $T has only $n assets" "re-run the Release workflow: gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
     ok "$n assets, SHA256SUMS.txt included"
     release_body_headline
     release_apk
@@ -968,6 +976,14 @@ release_card() {
     if [ ! -f "$src" ]; then
         printf '   WARNING: no release card for %s (%s missing): the Discord post goes out without it; launch.py card %s builds it\n' "$V" "$src" "$V"
         return 0
+    fi
+    # owner 11-12 16:45: every announcement image is NEW; the CMO's used-images log refuses a picture that went out for another release
+    # (only an explicit REFUSED stops the card; a missing or crashing checker never blocks a release)
+    if [ -f "$HOME/Work/.sf/social/usedimg.py" ] && ! out=$(python3 "$HOME/Work/.sf/social/usedimg.py" check "$src" --ctx "release:$V" 2>&1); then
+        case $out in REFUSED*)
+            printf '   WARNING: the release card is a picture already used (the Discord post goes out without it):\n      %s\n' "$out"
+            return 0 ;;
+        esac
     fi
     mkdir -p "${dst%/*}" && cp "$src" "$dst" && lockretry git add "$dst" || { printf '   WARNING: could not stage the release card %s\n' "$dst"; return 0; }
     if out=$(python3 tools/check_marks_media.py 2>&1); then
@@ -1158,14 +1174,17 @@ step_social() {
     python3 "$ls" "$V" website/latest.json || true
 }
 
+# A beta's #testers checklist (step bump writes it, step status names it): one place both checkouts see.
+testers_file() { echo "${SF_TESTERS_DIR:-$HOME/Work/.sf/state/release-testers}/release-testers-$V.md"; }
+
 step_status() {
     if [ -n "$PRE" ]; then
         echo "   Beta:     https://github.com/$INSIDERS_REPO/releases/tag/$T (members only; nothing public)"
         echo "   Discord:  release.yml posted it in #members (DISCORD_MEMBERS_WEBHOOK)"
         echo "   Members:  onboarding adds each paying member's confirmed GitHub username to team ${INSIDERS_REPO%%/*}/insiders"
         echo "             (read on $INSIDERS_REPO only; ~/Work/.sf/members/onboard.py status)"
-        if [ -f "release-testers-$V.md" ]; then
-            echo "   Testers:  $PWD/release-testers-$V.md (read it, then post it in #members)"
+        if [ -f "$(testers_file)" ]; then
+            echo "   Testers:  $(testers_file) (read it, then post it in #members)"
         else
             echo "   Testers:  no checklist (the note fragments had no testers: lines)"
         fi

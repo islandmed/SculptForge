@@ -399,6 +399,7 @@ constexpr Entry kSpanish[] = {
     {"Join the Discord", "Únete al Discord"},
     {"Join the community on Discord", "Únete a la comunidad en Discord"},
     {"Report a problem", "Informar de un problema"},
+    {"Copy log to clipboard", "Copiar el registro al portapapeles"},
     {"Open log folder", "Abrir la carpeta de registros"},
     {"Record a performance trace", "Grabar una traza de rendimiento"},
     {"Fixes & suggestions", "Correcciones y sugerencias"},
@@ -837,6 +838,12 @@ constexpr Entry kSpanish[] = {
     {"Face landmark steps", "Pasos de los puntos de la cara"},
     {"Subtle", "Sutil"},
     {"Outline opacity", "Opacidad de los contornos"},
+    {"Pop-up colours", "Colores de ventanas emergentes"},
+    {"By role", "Por rol"},
+    {"Pop-up colours: by role", "Colores de ventanas emergentes: por rol"},
+    {"Pop-up colours: plain", "Colores de ventanas emergentes: simple"},
+    {"Pop-ups in the panels' own colours, as before 0.12.15.", "Ventanas emergentes en los colores propios de los paneles, como antes de 0.12.15."},
+    {"Pop-ups show what they are with a strip, an edge and an icon in one colour: tips and help blue, the welcome and the quick tour teal, What's New orange, warnings amber, deletes red. The default.", "Las ventanas emergentes muestran qué son con una franja, un borde y un icono de un mismo color: consejos y ayuda en azul, la bienvenida y el recorrido rápido en verde azulado, Novedades en naranja, advertencias en ámbar, eliminaciones en rojo. El predeterminado."},
     {"Viewport cursor", "Cursor del visor"},
     {"Crosshair", "Cruz"},
     {"Arrow", "Flecha"},
@@ -1530,6 +1537,9 @@ constexpr Entry kSpanish[] = {
     {"Open the SculptForge website and user guide in your browser.",
      "Abre el sitio web y la guía de usuario de SculptForge en tu navegador."},
     {"Open the issue tracker in your browser.", "Abre el gestor de incidencias en tu navegador."},
+    {"Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+     "attached or found.",
+     "Copia las últimas 60 líneas de sculptforge.log, para pegarlas en un informe de problema cuando no se puede adjuntar o encontrar un archivo."},
     {"Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
      "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.",
      "Abre la carpeta con sculptforge.log: lo que hizo SculptForge y, tras un cierre inesperado, qué falló. "

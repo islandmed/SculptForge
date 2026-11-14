@@ -1434,12 +1434,16 @@ void spreadVertexArray(MultiresStack& s, int c, const std::vector<T>& w, const s
     }
 }
 
-// Colours (vertex paint, the paint base) go up as a delta: what was added at the current level (new - old) is
-// interpolated to the levels above and added to the colour they already hold, so detail painted at a high level,
-// then a stroke at a low one, keeps the detail under the blended stroke instead of being overwritten by the
-// interpolated low-level colour. A level with no colours of its own gets the interpolated colour.
+// Colours (vertex paint, the paint base) go up from the current level `c` without touching what the levels above
+// hold beyond the stroke's reach. A stroke laid ONE colour (`target`, from paintVertex): at each changed vertex the
+// amount it took is recovered (t = the change projected on target - old) and interpolated up, and every vertex above
+// becomes lerp(its own colour, target, t): detail the stroke did not reach is bit for bit what it was, and no
+// channel lands outside [its old value, the target's]. (The old rule added the low level's difference, new - old, to
+// the colour above: on detail that was not the low level's colour the difference darkened it to black and left a pale
+// halo around it.) Several colours (a gradient, a mixed batch): the difference is added instead. A level with no
+// colours of its own gets the interpolated colour.
 void spreadColorDelta(MultiresStack& s, int c, const std::vector<glm::vec3>& w, const std::vector<glm::vec3>& r,
-                      std::vector<glm::vec3>& (*get)(Mesh&)) {
+                      std::vector<glm::vec3>& (*get)(Mesh&), const Mesh::PaintTarget& target) {
     const int n = int(s.levels.size());
     const glm::vec3 white(1.0f);
     if (w.empty() && r.empty()) return;
@@ -1450,9 +1454,38 @@ void spreadColorDelta(MultiresStack& s, int c, const std::vector<glm::vec3>& w, 
     std::vector<uint8_t> changed;
     if (!changedVertices(w, r, white, changed)) return;
     spreadVertexDown(s, c, w, changed, white, get);
-    std::vector<glm::vec3> delta(w.size()), fineDelta;
-    for (size_t v = 0; v < w.size(); ++v)
-        if (changed[v]) delta[v] = w[v] - r[v];
+    // The lerp rule holds only when the hint explains the whole change (a tool that wrote colours itself did not go
+    // through paintVertex): every changed vertex lies on its old -> target line, going toward it (a stroke) or away
+    // from it (the undo of one: old = lerp(new, target, t), taken back from the detail above exactly).
+    enum Mode { Add, Toward, Away } mode = Add;
+    std::vector<float> amount;
+    if (target.state == 1) {
+        for (Mode m : {Toward, Away}) {
+            amount.assign(w.size(), 0.0f);
+            bool ok = true;
+            for (size_t v = 0; v < w.size() && ok; ++v) {
+                if (!changed[v]) continue;
+                const glm::vec3 from = m == Toward ? r[v] : w[v], to = m == Toward ? w[v] : r[v];
+                const glm::vec3 toTarget = target.color - from, d = to - from;
+                const float len2 = glm::dot(toTarget, toTarget);
+                const float t = len2 > 1e-8f ? glm::dot(d, toTarget) / len2 : -1.0f;
+                const float tMax = m == Toward ? 1.0f + 1e-4f : 1.0f - 1e-3f; // Away divides by 1 - t
+                ok = t >= 0.0f && t <= tMax && glm::length(d - t * toTarget) <= 1e-4f;
+                amount[v] = t;
+            }
+            if (ok) {
+                mode = m;
+                break;
+            }
+        }
+    }
+    // The field that travels up: the stroke's amount t (lerp) or the colour difference (add).
+    std::vector<glm::vec3> delta(w.size(), glm::vec3(0.0f)), fineDelta;
+    for (size_t v = 0; v < w.size(); ++v) {
+        if (!changed[v]) continue;
+        if (mode != Add) delta[v].x = glm::min(amount[v], 1.0f);
+        else delta[v] = w[v] - r[v];
+    }
     std::vector<uint8_t> flags = changed, next, reached;
     const std::vector<glm::vec3>* coarse = &w; // the level below's colours, as they are now
     for (int j = c + 1; j < n; ++j) {
@@ -1464,8 +1497,13 @@ void spreadColorDelta(MultiresStack& s, int c, const std::vector<glm::vec3>& w, 
             // No colours stored here yet: interpolate the level below's.
             prolongVertices(tp, *coarse, f, white, nullptr, next);
         } else {
-            for (uint32_t v = 0; v < tp.fineVertices; ++v)
-                if (reached[v]) f[v] = glm::clamp(f[v] + fineDelta[v], 0.0f, 1.0f);
+            for (uint32_t v = 0; v < tp.fineVertices; ++v) {
+                if (!reached[v]) continue;
+                const float t = glm::clamp(fineDelta[v].x, 0.0f, 1.0f);
+                if (mode == Toward) f[v] = glm::mix(f[v], target.color, t);
+                else if (mode == Away) f[v] = t < 0.999f ? glm::clamp((f[v] - t * target.color) / (1.0f - t), 0.0f, 1.0f) : f[v];
+                else f[v] = glm::clamp(f[v] + fineDelta[v], 0.0f, 1.0f);
+            }
             next = reached;
         }
         flags.swap(next);
@@ -1866,7 +1904,10 @@ bool subdivCommit(Mesh& w) {
         w.multires.reset(); // the topology changed under the stack: the levels no longer apply
         return false;
     }
-    if (!levelsDiffer(w, r0)) return true;
+    if (!levelsDiffer(w, r0)) {
+        w.paintTarget.settled = true;
+        return true;
+    }
     MultiresStack& s = mutableStack(w);
     const int n = int(s.levels.size());
 
@@ -1914,9 +1955,10 @@ bool subdivCommit(Mesh& w) {
     spreadShape(s, c, w, *r);
     spreadVertexArray(s, c, w.mask, r->mask, 0.0f, [](Mesh& m) -> std::vector<float>& { return m.mask; });
     if (w.paintLayers.empty()) {
-        spreadColorDelta(s, c, w.colors, r->colors, [](Mesh& m) -> std::vector<glm::vec3>& { return m.colors; });
+        spreadColorDelta(s, c, w.colors, r->colors, [](Mesh& m) -> std::vector<glm::vec3>& { return m.colors; }, w.paintTarget);
     } else {
-        spreadColorDelta(s, c, w.paintBase, r->paintBase, [](Mesh& m) -> std::vector<glm::vec3>& { return m.paintBase; });
+        spreadColorDelta(s, c, w.paintBase, r->paintBase, [](Mesh& m) -> std::vector<glm::vec3>& { return m.paintBase; },
+                         w.paintTarget);
         for (size_t i = 0; i < w.paintLayers.size(); ++i) {
             spreadLayerDelta(s, c, i, w.paintLayers[i], r->paintLayers[i]);
         }
@@ -1938,6 +1980,7 @@ bool subdivCommit(Mesh& w) {
     }
 
     s.levels[size_t(c)].data = levelData(w, s.levels[size_t(c)]);
+    w.paintTarget.settled = true;
     return true;
 }
 

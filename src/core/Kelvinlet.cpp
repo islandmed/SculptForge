@@ -670,6 +670,7 @@ void Sculptor::kelvinletStep(Mesh& mesh, BVH& bvh, BrushType type, const Kelvinl
     dabVerts_.clear();
     dabLeaves_.clear();
     for (const SymCopy& m : copies(sym)) {
+        if (kelvinNearMask(mesh, bvh, m.point(step.center), step.radius)) continue;
         KelvinletStep ms = step;
         ms.center = m.point(step.center);
         ms.delta = m.dir(step.delta);

@@ -691,6 +691,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.discord");
     menuAction(*this, "help.report");
     menuAction(*this, "help.log");
+    menuAction(*this, "help.log_copy"); // (Android keeps the folder out of the Files app: testers paste the log instead)
     menuAction(*this, "help.perf_trace");
     menuAction(*this, "help.feedback");
     menuAction(*this, "help.benchmark");

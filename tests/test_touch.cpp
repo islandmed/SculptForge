@@ -105,3 +105,21 @@ TEST(palm_guard_follows_the_pen) {
     g.pen(true, 700.0);
     CHECK(g.active(701.0));
 }
+
+TEST(touch_retain_drops_fingers_whose_lift_was_lost) {
+    TouchGesture g;
+    g.down(1, {10, 10});
+    g.down(2, {50, 10});
+    CHECK(g.gesture() && g.fingers() == 2);
+    g.up(2);
+    CHECK(g.gesture() && g.fingers() == 1); // (still a gesture until all lift)
+    g.retain({}); // SDL has no finger down: the first one's lift was lost
+    CHECK(g.fingers() == 0 && !g.gesture());
+    g.down(3, {20, 20}); // the next touch is a plain press again
+    CHECK(!g.gesture());
+    g.down(4, {30, 20});
+    g.retain({3, 4, 9}); // fingers SDL has down stay, unknown ids are not invented
+    CHECK(g.fingers() == 2 && g.gesture());
+    g.retain({4});
+    CHECK(g.fingers() == 1 && g.gesture());
+}

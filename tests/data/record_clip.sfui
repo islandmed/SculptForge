@@ -1,0 +1,4 @@
+# --ui-test x.sfui --record out.mp4 (bug before/after clips): a tiny script, checked by tests/e2e/record_clip.py.
+run new_sphere subdivisions=3
+wait 0.5
+shot clip

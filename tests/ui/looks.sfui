@@ -118,6 +118,17 @@ expect_value look_outlines == 1
 expect_value look_outline_opacity == 100
 hover "Clay##brush.clay"
 shot outlines-subtle
+
+# Pop-up colours (popup-guide-color): by role is the default; plain draws the pop-ups as before; it follows the look.
+expect_value look_popup_colors == 1
+expect_value style_popup_role_edge == 1
+run ui_look popup_colors=plain
+wait 0.2
+expect_value look_popup_colors == 0
+expect_value style_popup_role_edge == 0
+run ui_look popup_colors=role
+wait 0.2
+expect_value style_popup_role_edge == 1
 run_fails ui_look outlines=loud
 run_fails ui_look scheme=solarized
 run_fails ui_look look=neon

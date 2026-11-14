@@ -95,10 +95,16 @@ void App::initProject() {
     prefDir_ = userDataDir();
     setProjectAutosaveFolder(prefDir_); // (its autosave may name a streamed level's file by path: core/Project.h)
     if (prefDir_.empty()) return;
-    std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+    std::string prefsText;
+    bool readable = false;
+    { // (closed before anything is written: on Windows a file held open can't be replaced, "Access is denied")
+        std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+        readable = bool(f);
+        if (f) prefsText.assign(std::istreambuf_iterator<char>(f), {});
+    }
     Json prefs;
     std::string err;
-    const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
+    const bool hadPrefs = readable && Json::parse(prefsText, prefs, err);
     if (hadPrefs) {
         // An install from before SculptForge-style keys were the default, that never stored its key style: it had
         // the Classic sculpting keys, and keeps them (initActions applies the style).
@@ -297,7 +303,10 @@ void App::saveProjectPrefs() {
     for (const glm::vec3& c : recentColors_) colours.push(vec3Json(c));
     prefs.set("recent_colors", std::move(colours));
     std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
-    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) SDL_Log("%s", err.c_str());
+    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) {
+        SDL_Log("%s", err.c_str());
+        status_ = "Recent projects couldn't be saved. " + err;
+    }
 }
 
 void App::rememberPaintColor(const glm::vec3& linear) {
@@ -818,7 +827,11 @@ void App::drawProjectPopups() {
         openUnsavedPopup_ = false;
     }
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Danger);
+    const bool unsavedOpen = ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (unsavedOpen) {
+        ui::RoleStrip(theme::Role::Danger);
         const std::string name = doc_.path.empty() ? std::string("Untitled") : utf8(fsPath(doc_.path).filename());
         ImGui::Text(tr("Save changes to %s before continuing?"), name.c_str());
         ImGui::TextDisabled("%s", tr("Your changes will be lost if you don't save them."));
@@ -861,7 +874,11 @@ void App::drawProjectPopups() {
     }
     drawUpdateBanner();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool restoreOpen = ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (restoreOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextUnformatted(tr("SculptForge did not close normally last time."));
         ImGui::TextUnformatted(tr("Restore the autosaved work?"));
         if (crashlog::previousCrashed()) {
@@ -1000,7 +1017,11 @@ void App::drawUpdateBanner() {
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-    if (ImGui::Begin("##update_banner", nullptr, flags)) {
+    ui::PushRole(theme::Role::New);
+    const bool began = ImGui::Begin("##update_banner", nullptr, flags);
+    ui::PopRole();
+    if (began) {
+        ui::RoleStrip(theme::Role::New);
         // Above the floating panels (a Preferences window open over the canvas's top would hide its buttons), but
         // never over a modal dialog.
         if (!ImGui::GetTopMostPopupModal()) ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());

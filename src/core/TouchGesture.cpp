@@ -57,6 +57,13 @@ void TouchGesture::up(uint64_t id) {
     if (fingers_.empty()) gesture_ = false;
 }
 
+void TouchGesture::retain(const std::vector<uint64_t>& live) {
+    fingers_.erase(std::remove_if(fingers_.begin(), fingers_.end(),
+                                  [&](const Finger& f) { return std::find(live.begin(), live.end(), f.id) == live.end(); }),
+                   fingers_.end());
+    if (fingers_.empty()) gesture_ = false;
+}
+
 void TouchGesture::clear() {
     fingers_.clear();
     gesture_ = false;

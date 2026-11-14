@@ -784,18 +784,12 @@ void App::registerShellActions() {
          [this] { return layout_.paletteBarVisible; }, nullptr});
     add({"ui.tray.left", "Left tray", ICON_LC_PANEL_LEFT, "Open or close the left tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.leftTrayOpen = !layout_.leftTrayOpen;
-             noteLayoutChanged();
-         },
+         [this] { setTrayOpen(false, !trayShown(false)); },
          [this] { return layout_.leftTrayOpen; }, nullptr});
     add({"ui.tray.right", "Right tray", ICON_LC_PANEL_RIGHT, "Open or close the right tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.rightTrayOpen = !layout_.rightTrayOpen;
-             noteLayoutChanged();
-         },
-         [this] { return layout_.rightTrayOpen; }, nullptr});
+         [this] { setTrayOpen(true, !trayShown(true)); },
+         [this] { return layout_.rightTrayOpen && (!shell_.narrow || layout_.rightTrayPeek); }, nullptr});
     static const char* const kPresetHelp[] = {
         "Standard layout: Tool palette in the right tray, shelves around the canvas.",
         "Sculpt layout: both trays closed for the largest canvas.",
@@ -835,6 +829,7 @@ void App::registerShellActions() {
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
                     {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
                     {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
+                    {"popup_colors", ParamSpec::Type::String, "Pop-up colours: role (the default) or plain.", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or classic (default: the look's, else unchanged).", false},
                     {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -862,6 +857,11 @@ void App::registerShellActions() {
                        }
                        if (a.contains("outline_opacity"))
                            l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
+                       if (a.contains("popup_colors")) {
+                           const std::string pc = argString(a, "popup_colors");
+                           if (pc != "role" && pc != "plain") return {false, "popup_colors must be role or plain"};
+                           l.rolePopups = pc == "role";
+                       }
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
                            if (k != "sculptforge" && k != "classic") return {false, "layout must be sculptforge or classic"};
@@ -905,7 +905,29 @@ void App::registerShellActions() {
 // Layout
 // ---------------------------------------------------------------------------
 
+App::SafeInsets App::safeInsets() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_;
+    SafeInsets in;
+    in.t = topInset();
+    SDL_Rect safe{};
+    int w = 0, h = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    if (SDL_GetWindowSafeArea(window_, &safe) && safe.w > 0 && safe.h > 0) {
+        in.l = float(std::max(safe.x, 0));
+        in.r = float(std::max(w - safe.x - safe.w, 0));
+        in.b = float(std::max(h - safe.y - safe.h, 0));
+    }
+    return in;
+}
+
+CanvasRect App::safeRect() const {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const SafeInsets in = safeInsets();
+    return {in.l, in.t, std::max(screen.x - in.l - in.r, 1.0f), std::max(screen.y - in.t - in.b, 1.0f)};
+}
+
 float App::topInset() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_.t;
     // Laptop camera notches cover the top of a window that fills the screen (MacBooks since 2021).
     if (uiPrefs_.cameraNotch == 2 || hideUi_ || !options_.uiTest.empty() || !options_.recordPath.empty()) return 0.0f;
     // macOS (and any platform that knows) reports the safe area itself.
@@ -928,6 +950,50 @@ float App::topInset() const {
     const bool notched = band > bounds.h * 0.02f && band < bounds.h * 0.06f;
     if (uiPrefs_.cameraNotch == 1) return notched ? band : 32.0f * uiScale_;
     return appleLaptop && notched && coversDisplay ? band : 0.0f;
+}
+
+// The camera starts at Camera's defaults, made for a wide window: on a phone held upright the 3D view between the
+// shelves is narrower than the model, which then filled it edge to edge (Hameron, Pixel, 11-12: "nothing visible").
+// Once the first frame knows the view's shape the starting model is framed into it, when the default view would cut it
+// off (a wide desktop window keeps the view it always had). Turning the phone frames it again while nobody moved
+// the camera.
+void App::fitStartView(bool resized) {
+    if (resized) {
+        if (!autoFramed_ || camera_.distance != autoFramedDistance_ || camera_.target != autoFramedTarget_) return;
+    } else {
+        const Camera def;
+        if (camera_.distance != def.distance || camera_.target != def.target || camera_.shift != def.shift) return;
+    }
+    const AABB b = sceneBounds();
+    if (!b.valid()) return;
+    const glm::vec3 e = b.extent();
+    const float half = 0.5f * std::max(e.x, e.y);
+    const float halfH = camera_.distance * std::tan(camera_.fovY * 0.5f);
+    const float halfW = halfH * std::max(camera_.aspect, 1e-3f);
+    if (!resized && half * 1.05f <= std::min(halfH, halfW)) { // fits as it is: left alone, but watched for a turn
+        autoFramed_ = true;
+        autoFramedDistance_ = camera_.distance;
+        autoFramedTarget_ = camera_.target;
+        return;
+    }
+    frameView(b);
+    autoFramed_ = true;
+    autoFramedDistance_ = camera_.distance;
+    autoFramedTarget_ = camera_.target;
+}
+
+void App::logWindowGeometry() const {
+    int w = 0, h = 0, pw = 0, ph = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+    SDL_Rect safe{};
+    SDL_GetWindowSafeArea(window_, &safe);
+    const CanvasRect c = canvasRect();
+    SDL_Log("window %dx%d (%dx%d px, density %.2f, display scale %.2f), safe area %d,%d %dx%d, UI scale %.2f, canvas %.0f,%.0f %.0fx%.0f, "
+            "palm guard %s",
+            w, h, pw, ph, double(SDL_GetWindowPixelDensity(window_)), double(SDL_GetWindowDisplayScale(window_)), safe.x, safe.y,
+            safe.w, safe.h, double(uiScale_), double(c.x), double(c.y), double(c.w), double(c.h),
+            uiPrefs_.tablet.palmRejection ? "on" : "off");
 }
 
 ShellGeometry App::shellGeometry() const {
@@ -1042,7 +1108,34 @@ void App::applyPreset(int preset) {
 
 bool App::paletteInShownTray(const std::string& id) const {
     return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) ||
-           (!shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+           ((!shell_.narrow || (layout_.rightTrayPeek && !layout_.leftTrayOpen)) &&
+            std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+}
+
+// Open as the layout has it; on a narrow window, as drawn (the right tray is hidden there until asked for).
+bool App::trayShown(bool right) const {
+    if (!shell_.narrow) return right ? layout_.rightTrayOpen : layout_.leftTrayOpen;
+    return (right ? shell_.rightTray : shell_.leftTray).w > 0.0f;
+}
+
+// Opens or closes a tray: one tap on its divider, its action, or a palette's header icon. A narrow window (a tablet:
+// 760-1000 logical px, upright 450-800) holds one tray at a time and the right one only once asked for, so opening one
+// there closes the other, and what the tap changes is what is drawn, not the stored "open" the wide layout keeps.
+void App::setTrayOpen(bool right, bool open) {
+    if (shell_.narrow) {
+        if (right) {
+            layout_.rightTrayPeek = open;
+            if (open) layout_.rightTrayOpen = true, layout_.leftTrayOpen = false;
+            else layout_.rightTrayOpen = false;
+        } else {
+            layout_.leftTrayOpen = open;
+            if (open) layout_.rightTrayPeek = false;
+        }
+    } else {
+        (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = open;
+        layout_.rightTrayPeek = false;
+    }
+    noteLayoutChanged();
 }
 
 void App::removePaletteFromTrays(const std::string& id) {
@@ -1059,7 +1152,7 @@ void App::autoCollapseTray(bool right, const std::string& keep) {
 void App::movePaletteToTray(const std::string& id, bool right) {
     removePaletteFromTrays(id);
     (right ? layout_.rightTray : layout_.leftTray).push_back(id);
-    (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = true;
+    setTrayOpen(right, true);
     collapsedPalettes_.erase(std::remove(collapsedPalettes_.begin(), collapsedPalettes_.end(), id), collapsedPalettes_.end());
     autoCollapseTray(right, id);
     if (dropdown_ == id) {
@@ -1480,6 +1573,7 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.rightTray = from.rightTray;
     l.leftTrayOpen = from.leftTrayOpen;
     l.rightTrayOpen = from.rightTrayOpen;
+    l.rightTrayPeek = from.rightTrayPeek;
     l.leftTrayWidth = from.leftTrayWidth;
     l.rightTrayWidth = from.rightTrayWidth;
     l.openSubpalettes = from.openSubpalettes;
@@ -2499,7 +2593,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         ImGui::End();
         return;
     }
-    const bool open = right ? layout_.rightTrayOpen && !shell_.narrow : layout_.leftTrayOpen;
+    const bool open = trayShown(right);
     ImGui::InvisibleButton(right ? "##rightdivider" : "##leftdivider", ImVec2(r.w, r.h));
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     ImGuiIO& io = ImGui::GetIO();
@@ -2513,12 +2607,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         noteLayoutChanged();
     }
     if (ImGui::IsItemDeactivated() && io.MouseDragMaxDistanceSqr[0] < 9.0f * s * s) {
-        if (right && shell_.narrow) {
-            status_ = "The window is too narrow for the tray - palettes open as drop-downs";
-        } else {
-            (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = !open;
-            noteLayoutChanged();
-        }
+        setTrayOpen(right, !open);
     }
     ui::HelpText(right ? "Right tray" : "Left tray", nullptr,
                  "Click to open or close the tray, drag to resize it. Palettes go in trays from their header icon.",
@@ -2789,6 +2878,13 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
         drawVoxelResolution(true);
         ImGui::PopStyleVar();
+    } else if (item == "widget.guide_strength" || item == "widget.target_quads" || item == "widget.level") {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
+        if (item == "widget.guide_strength") drawGuideStrength(true);
+        else if (item == "widget.target_quads") drawTargetQuads(true);
+        else drawLevelSlider(true);
+        ImGui::PopStyleVar();
     } else if (item == "widget.points") {
         size_t total = 0;
         uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ uint64_t(doc_.activePart) ^
@@ -2915,19 +3011,33 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ui::HelpText("Add a brush", nullptr, "Put another brush (built-in or one of yours) on this shelf.", "Bottom shelf");
     } else if (item.rfind("brush.recipe.", 0) == 0 || item.rfind("recipe:", 0) == 0) {
         const std::string name = item.substr(item[0] == 'r' ? 7 : 13); // custom brush, by name
-        int found = -1;
-        for (int i = 0; i < int(doc_.brushes.size()); ++i)
-            if (doc_.brushes[size_t(i)].name == name) found = i;
-        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored or copied file returns it)
+        // The slot's brush: by the stable id it learned (a renamed brush, a file moved to another folder), else by name.
+        const auto slotId = layout_.brushIds.find(name);
+        const std::string wantId = slotId != layout_.brushIds.end() ? slotId->second : std::string();
+        int found = findBrushForSlot(doc_, name, wantId);
+        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored, moved or copied file returns it)
             double& tried = shelfBrushTried_[name];
             if (ImGui::GetTime() - tried > 3.0) {
+                const bool first = tried == 0.0;
                 tried = ImGui::GetTime();
                 std::string note;
-                found = recoverBrush(doc_, name, note);
+                found = relinkBrush(doc_, name, wantId, note);
                 if (found >= 0) status_ = note;
+                else if (first) SDL_Log("%s", describeMissingSlot(doc_, name, wantId).c_str());
             }
         } else {
             shelfBrushTried_.erase(name);
+        }
+        if (found >= 0) {
+            const BrushRecipe& have = doc_.brushes[size_t(found)];
+            if (have.name != name) { // renamed or case-changed: the slot follows its brush (never cleared for a name it can't find)
+                for (auto* list : {&layout_.topShelf, &layout_.leftShelf, &layout_.rightShelf, &layout_.bottomShelf})
+                    for (std::string& other : *list)
+                        if (other == item) other = item.substr(0, item.size() - name.size()) + have.name;
+                layout_.brushIds.erase(name);
+                shelfBrushTried_.erase(name);
+            }
+            if (!have.id.empty()) layout_.brushIds[have.name] = have.id; // learn it (a slot from an older version gets its id here)
         }
         const ImVec2 size(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         const bool clicked = ImGui::InvisibleButton((name + "##" + item).c_str(), size);

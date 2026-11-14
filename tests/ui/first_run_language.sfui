@@ -12,7 +12,7 @@ first_run_language os=en_US.UTF-8
 expect_value language_bar_open == 0
 expect_no_text "Idioma"
 
-# The welcome's language row: all four names in their own script; one click switches the whole interface, live.
+# The welcome's language row: all five names in their own script; one click switches the whole interface, live.
 key f3
 type "##Command palette" "welcome"
 key enter
@@ -22,6 +22,7 @@ expect "English##welcome.language.en"
 expect "Español##welcome.language.es"
 expect "繁體中文##welcome.language.zh-TW"
 expect "简体中文##welcome.language.zh-CN"
+expect "日本語##welcome.language.ja"
 shot first-run-language-row
 click "Español##welcome.language.es"
 wait 0.3
@@ -36,6 +37,10 @@ click "简体中文##welcome.language.zh-CN"
 wait 0.3
 expect_text "语言："
 shot first-run-language-zh-cn
+click "日本語##welcome.language.ja"
+wait 0.3
+expect_text "言語:"
+shot first-run-language-ja
 click "English##welcome.language.en"
 wait 0.3
 expect_text "Language:"
@@ -73,6 +78,21 @@ expect_text "SculptForge 的界面语言是 简体中文。"
 shot first-run-language-bar-zh-cn
 click "知道了##languagebar"
 expect_value language_bar_open == 0
+# ja-JP is Japanese: the bar in Japanese and in English.
+first_run_language os=ja-JP
+wait 0.3
+expect_value language_bar_open == 1
+expect_text "SculptForgeは日本語で表示されています。"
+expect_text "SculptForge is in 日本語."
+shot first-run-language-bar-ja
+click "了解##languagebar"
+expect_value language_bar_open == 0
+click "環境設定##palette.preferences"
+click "English##language.en"
+expect "Preferences##palette.preferences"
+key escape
+first_run_language os=zh-SG
+wait 0.3
 click "偏好设置##palette.preferences"
 click "English##language.en"
 expect "Preferences##palette.preferences"

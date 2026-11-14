@@ -30,6 +30,9 @@ public:
     // says how. Unknown ids and non-finite positions are ignored.
     bool move(uint64_t id, glm::vec2 p, TwoFingerStep& step);
     void up(uint64_t id);
+    // Only the fingers in `live` stay down: a finger whose lift never arrived (a window that lost focus, a rotation,
+    // split screen) would keep every later touch a gesture. All lifted: the gesture is over.
+    void retain(const std::vector<uint64_t>& live);
     void clear();
     int fingers() const { return int(fingers_.size()); }
     // Two or more fingers have been down at once since the first one landed (until all are lifted): the touch is a

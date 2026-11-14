@@ -48,7 +48,7 @@ struct ShellGeometry {
     CanvasRect leftDivider, rightDivider; // w 0 when the shelves are hidden
     CanvasRect leftTray, rightTray;     // w 0 when closed
     CanvasRect canvas;                  // the 3D view
-    bool narrow = false;                // < 1280 logical px: right tray collapsed, smaller tiles
+    bool narrow = false;                // < 1280 logical px: one tray at a time, smaller tiles
     bool shelves = true;                // shelves and trays shown (Tab hides them)
     float scale = 1.0f;
 };
@@ -58,6 +58,9 @@ namespace shell {
 constexpr float kTitleH = 24, kPaletteBarH = 22, kTopShelfH = 64, kLeftShelfW = 88, kLeftShelfNarrowW = 72;
 constexpr float kRightShelfW = 52, kDividerW = 8, kTrayMinW = 240, kTrayMaxW = 480;
 constexpr float kConsoleMinH = 100, kConsoleMaxH = 400, kNarrowWidth = 1280, kWideWidth = 1920;
+// A tray on a window narrower than kNarrowWidth is at most 40 % of it and never narrower than this (a phone held upright
+// is 360 logical px at 300 %: the tray, then the 3D view beside it).
+constexpr float kPhoneTrayMinW = 180;
 
 // The bottom shelf for a Shelf tiles setting (UiLayout::shelfTiles): its height and its brush tiles' height and
 // width range (tiles shrink to the minimum, the same for every size, before the shelf scrolls), logical px.

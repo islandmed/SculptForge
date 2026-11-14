@@ -376,7 +376,8 @@ std::vector<std::string> mcpCategories(std::string_view name, const std::vector<
     if (files) c.push_back("files");
     // Looking (the viewport as an image, the camera) reads the scene; stroke_screen edits it.
     const bool info = name == "mesh_info" || name.ends_with("_info") || name.ends_with("_list") || name == "brush_library" ||
-                      name == "viewport_image" || name == "view_turntable" || name == "view_set";
+                      name == "viewport_image" || name == "view_turntable" || name == "view_set" ||
+                      name == "view_closeup";
     if (c.empty()) c.push_back(info ? "info" : "edit");
     return c;
 }

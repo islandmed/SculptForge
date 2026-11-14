@@ -6,6 +6,162 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Pop-up colours** (Preferences > Interface > Look): pop-ups get a colour by role (a strip across the top, an edge,
+  a tinted title bar and an icon after the title, on a surface one step lighter than the panels): tips and help blue,
+  the welcome and the quick tour teal, What's New, the new-look card and the membership cards the SculptForge orange
+  in every look, licence and merge confirmations amber, deletes and discards red. The colours follow every look and
+  scheme (Classic, Forge Terminal, Phosphor, Blueprint, Match my Omarchy theme, light themes too), and each one is
+  checked for AA contrast on its pop-up. **Plain** draws pop-ups as before; nothing moves either way. The User Guide
+  (in the app and on the website) colours its callouts the same way, each with an icon and its label (Tip teal, Note
+  blue, Not yet and Warning amber, Important red), and gives each part of the guide its own accent: the contents, the
+  headings, See also and the previous / next cards.
+
+### Changed
+- **Subdivide** writes a line to the log (triangles before and after, and how long it took), so a report that ends in
+  a refused Subdivide shows what the presses before it made.
+
+### Fixed
+- On Windows, saving could fail with "Access is denied" and your settings, shelf layout, brush edits or recent
+  projects were silently lost on the next start (reports from noved_ and rand_gogh on Discord). Start-up no longer
+  keeps the settings file open while it saves it, and every save that replaces a file now waits and retries for about
+  a second when the file is busy (a virus scanner, a sync client) or marked read-only, and finally writes over it
+  directly. If a save still can't land, the status bar says which file.
+- **A thin shell no longer shows dark specks while you orbit.** Make Shell on a dense model and a thin Thickness:
+  while the view moved (Fast Navigation) or the model drew its lighter preview, the two faces of the shell were
+  treated as one surface, so the inner face's dark side showed through as specks, or the shell collapsed to a single
+  sheet; they cleared up at rest. A thin shell now keeps its faces apart in the moving preview and draws in full where
+  the lighter preview would merge them. A user report.
+
+## [0.12.15] - 2026-11-13
+
+### Changed
+- The crash log now notes a session that was ended from outside (Force Quit, the out-of-memory killer, a closed
+  session) and records the terminal, quit and CPU-limit signals; a closed pipe can no longer end the app.
+
+### Fixed
+- **Android tablets** (reported on 0.12.14-beta.2): the Right Tray never opened on a tablet window under 1280 logical
+  px (a 2000x1200 screen at UI scale 2.62 is 763), and neither tray opened upright. A narrow window now holds one tray
+  at a time (at most 40 % of its width); a tap on a tray's handle opens it (closing the other) and a second tap closes
+  it. A timeline track narrower than its margins no longer loops forever. Wider windows and the mouse behave as
+  before.
+- **Image to 3D / Text to 3D from an AI tool, the console or a script** no longer froze the whole window for the 30
+  seconds to several minutes a hosted model takes, with no sign of progress (it looked like a crash, and
+  force-quitting left no trace). The call now runs in the background with live status; the result opens when it
+  arrives, and if the scene changed meanwhile nothing is replaced.
+- **Free Hugging Face models** that are down, asleep or not answering no longer wait up to 15 minutes: after 4 minutes
+  queued (or 7 minutes running) it says which model isn't answering and the next free Hunyuan3D model runs instead,
+  with a note.
+- Support, the website and other links opened from SculptForge on Linux (the AppImage on Omarchy) no longer start a
+  pile of crashing Chromium windows. The browser now starts in the environment SculptForge was launched with, without
+  the AppImage's own library paths, once per click (the same link twice within 2 seconds opens once), and also for the
+  folders the app opens in your file manager.
+
+## [0.12.14] - 2026-11-13
+
+### Fixed
+- **Android**: the welcome window on a phone held sideways ran off the bottom of the screen with **Close** below the
+  fold, and a finger could only drag the window, not scroll it, so only the small X in its title bar closed it
+  (Hameron on Discord). It is now a sheet inside the screen's safe area (camera cut-out, bars, gesture area) with a
+  finger-sized **Close** pinned at the bottom, content that scrolls with a swipe (a swipe that starts on a button
+  scrolls, it doesn't press it), and Back closes it, the membership card, What's New and the quick tour.
+- **Help > Copy log to clipboard** was only in the command search (F3); it is now in the Help menu too, where an
+  Android tester who can't open the app's folder looks for it.
+- A bottom-shelf slot for one of your brushes still showed "missing" after a restart when the brush's name held one of
+  the old words SculptForge renamed in 2026 (rand_gogh on Discord; the 0.12.13 fix covered renames and moves, not
+  this). The shelf, the brush's key and its saved id now keep a brush's name exactly as you typed it, and a slot that
+  an earlier version already changed finds its brush again by itself. If a slot still finds nothing, the log now says
+  which name and id it looked for and the closest brush names.
+
+### Changed
+- **Android**: a mesh is drawn through the extension's multi-draw only when the driver lists the extensions that
+  define it (otherwise one core draw call per range, and never a missing entry point), and the log records the first
+  GL error a view draw raises and the first frames' triangle counts, for the empty 3D view some Mali tablets show (not
+  confirmed fixed: testers).
+- **Android**: the welcome's phone sheet needs a touch screen (a short desktop window with a mouse keeps its movable
+  window).
+- The view-draw GL error log (0.12.14 beta 2) stops after the first 300 frames on every draw path; the direct window
+  draw makes no GL error query after that.
+
+### Added
+- **Tooling**: the UI test runner's step dispatch is a verb table and a switch (a 121-link `else if` chain hit MSVC's
+  block-nesting limit, C1061, on the Windows build), and `scripts/check_else_if_chains.py` fails any `else if` chain
+  of 100 or more under src/.
+
+## [0.12.13] - 2026-11-12
+
+### Added
+- **Help > Copy log to clipboard**: copies the last 60 lines of the log as text, to paste into a problem report where
+  the file can't be found or attached (Android hides its app folder from the Files app).
+- **Human (male, A-pose)** starter mesh (File > New from Starter Mesh, Library > Tool > Starter meshes,
+  `new_starter_mesh name=human-male`): an athletic adult man in A-pose, 180 cm, all quads (13 378 at the base cage)
+  with edge loops round the eyes, mouth, shoulders, elbows, knees, fingers and toes, UVs, exactly symmetric, opened
+  with two subdivision levels; the muscle definition (pec shelf, abs, obliques, deltoids, quads, calves) is a sculpt
+  layer called Definition you can turn down. Built from the CC0 MakeHuman base mesh and its shape targets by
+  tools/starter, the definition sculpted with our own brushes (not sculpted from scratch); docs/starter-meshes.md has
+  the recipe and provenance.
+- **Japanese interface** (日本語): menus, palettes, shelves, tooltips, Preferences, first-run and messages (3,200 texts),
+  with the kana and kanji drawn from a bundled Noto Sans CJK JP subset (+170 KB). Brush, tool and product names stay
+  in English. Computers whose language is Japanese start in it (OS-locale pick on the first start). Machine-translated
+  and cross-checked; native review wanted.
+- Japanese and Chinese text wraps at line ends without a closing mark (、。」) starting a line, an opening mark (「（)
+  ending one, or a Latin name such as "Forge Spheres" cut in the middle.
+- **Fine detail for AI agents (MCP)**: the server's instructions and the creature-head recipe walk an agent through
+  block-out, secondary forms at about 1M triangles and detail at 3-6M, with brush sizes for each stage.
+  **detail_pass** (pores, skin, wrinkles, scales, scars over a region or the whole Part; seeded, one undo step)
+  refuses a mesh too coarse for the detail and says how far to subdivide. Detail presets (Detail Crease, Detail
+  Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar) work as brush names in stroke and stroke_screen
+  without changing the user's alpha. **view_closeup** renders one spot up close along the surface, lit low, and
+  reports the triangles there and the finest detail the mesh holds (read-only; in live mode the user's view doesn't
+  move). Both servers, local only.
+- **`--ui-test x.sfui --record out.mp4`**: a UI test script also writes every frame to a small mp4 (crf 23, `--fps`
+  and `--size` honoured; needs ffmpeg), for before and after clips of a bug. `--ui-record` keeps the real-time
+  launch-clip mode.
+- Windows laptops with two graphics chips (Intel and NVIDIA or AMD) now start SculptForge on the faster one without a
+  setting; **Preferences > Performance > Graphics card** and Windows' own graphics settings still decide if you pick
+  one.
+- **Shelf sliders** (masterfull95 on Discord): in Customize Shelves, Ctrl+Alt+drag on Guide Strength and Target Quads
+  (Tool > Remesh) or Level (Tool > Geometry) drops the slider onto a shelf; it works there and is kept across
+  restarts.
+
+### Changed
+- **Tool > Geometry > Micro Detail**: before Add Micro, the slider reads **New Micro 2 (83M)**: what Add Micro would
+  make, not a level the mesh already has.
+- A Japanese Get started page (sculptforge.app/getting-started-ja.html: download, switching the interface to 日本語, the
+  first sculpt, basic keys, community) and a languages line under the download buttons.
+
+### Fixed
+- **Android**: a mesh shader variant the graphics driver refuses to build no longer leaves the model undrawn without a
+  word: the app logs it once and draws with the next simpler variant, and the log now lists the GL vendor, shader
+  language and limits (reports of a missing 3D model on two phones had no log to go on).
+- **Android**: the welcome window fits a phone screen (its X and Close button were off the screen on a Pixel), no side
+  panel opens on a screen as narrow as a phone held upright (one opened by dragging an edge took the whole screen and
+  could not be closed again), the starting model is framed into the 3D view on a phone held upright (it filled the
+  narrow view edge to edge) and again when the phone is turned, the launcher icon is the same cube on its dark tile,
+  shaped by the launcher (it sat inside a white circle), and a touch whose lift was lost (switching apps, rotating,
+  split screen) no longer leaves later touches ignored.
+- **The Clay preview drew too much while you sculpted** (below the default Intensity, up to 1.4x the final pull): the
+  stroke changed when the result caught up. The live preview now uses the same pull and plane as the final result.
+  Clay Block's preview now follows its square tip and pull too, so it changes less when the result catches up.
+- **Masks on Micro levels**: Move, the elastic Kelvin brushes and Detail Clone deformed the base mesh under a Micro
+  level, which did not see the mask painted on the Micro level, so masked areas (a sphere's eyes) still moved. Masked
+  areas now stay exactly where they are, with the soft edge of the painted mask, and a partial mask scales the move. A
+  Move that reaches a mask moves the surface along its normals for that stroke (as Move along normals does); the
+  Kelvin brushes and Detail Clone do nothing near a mask on a Micro level (a hint in the status line says so; they
+  work as before elsewhere). A mask set on the Part itself (not painted on the Micro level) also protects the Micro
+  detail. Reported by a user.
+- **Vertex paint across subdivision levels**: a low-opacity stroke at a low level darkened the fine detail painted on
+  a higher level to black and left a pale halo around it, because the low level's colour difference was added on top
+  of detail that was not that colour. The stroke now goes up as the same blend (old colour toward the stroke colour at
+  the stroke's amount), so detail it does not reach is unchanged and no channel ends outside the old and stroke
+  colours.
+- A bottom-shelf slot for one of your brushes no longer shows "missing" while the brush file is still on disk
+  (rand_gogh on Discord). Each brush file now carries a hidden id, and the slot follows that id, so renaming the
+  brush, moving its file into a folder inside the brush library, or a change of upper/lower case in its name no longer
+  breaks the slot. Brush files from older versions get their id the first time the library loads (the file is saved
+  again, with a copy in backups/). A brush you really deleted still shows "missing" and the slot stays until you
+  remove it.
+
 ## [0.12.12] - 2026-11-12
 
 ### Added

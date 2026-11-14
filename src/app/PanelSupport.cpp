@@ -10,9 +10,11 @@
 #include "app/Config.h"
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
+#include "app/Ui.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <cmath>
@@ -274,8 +276,44 @@ void App::drawLanguageBar(const CanvasRect& c) {
     if (!open) languageBar_ = false;
 }
 
+// The current window moved inside `c` (a window placed by its centre can have its top or right edge off a small
+// screen, where its close button can't be reached). Call after Begin; a window larger than `c` keeps its top left.
+void App::keepWindowInView(const CanvasRect& c) {
+    const ImVec2 pos = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
+    const ImVec2 to(std::clamp(pos.x, c.x, std::max(c.x, c.x + c.w - size.x)),
+                    std::clamp(pos.y, c.y, std::max(c.y, c.y + c.h - size.y)));
+    if (to.x != pos.x || to.y != pos.y) ImGui::SetWindowPos(to);
+}
+
+// Android's Back (Hameron, Pixel, 11-13: the welcome could only be closed by the small X): the topmost of the cards and
+// windows that open by themselves closes; with none open it is the system's Back (the app goes to the background).
+bool App::androidBackWanted() const {
+    return supportCardOpen() || whatsNewOpen() || quickTourOpen_ || showWelcome_ || languageBar_;
+}
+
+bool App::androidBack() {
+    if (supportCardOpen()) closeSupportCard();
+    else if (whatsNewOpen()) closeWhatsNew();
+    else if (quickTourOpen_) closeQuickTour();
+    else if (showWelcome_) showWelcome_ = false;
+    else if (languageBar_) languageBar_ = false;
+    else return false;
+    redrawIn(0.0);
+    return true;
+}
+
 void App::drawSupportUi() {
     tickBigMeshTip(); // (here, not in tickProject: this runs every frame, UI tests included)
+#ifdef __ANDROID__
+    { // Back reaches the app as a key only while something is open to close; otherwise it is the system's (leave the app)
+        static int trapping = -1;
+        const int want = androidBackWanted() ? 1 : 0;
+        if (want != trapping) {
+            SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, want ? "1" : "0");
+            trapping = want;
+        }
+    }
+#endif
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
     // The small membership card (PanelSupportCard.cpp): the sculpting moment, and the card once the frame is calm.
@@ -284,12 +322,68 @@ void App::drawSupportUi() {
     drawMemberCard();
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
-        ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        // Never wider or taller than the room: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the
+        // screen, its X and Close with it. Between a phone's two shelves the 3D view is too narrow, so there it takes the
+        // whole screen below the status bar, and the text and rows shrink to fit (`fit`); a window taller than that scrolls.
+        // A phone (a touch screen, short side under 600 dp, either way up) gets a sheet: it never moves, its Close row stays at the bottom and
+        // its content scrolls with a drag (a finger can't scroll a window that is only dragged to move: landscape at 300 %,
+        // 594 px of it, Close with it, were below the screen). It stays inside the safe area (cut-out, bars, gesture area).
+        const CanvasRect safe = safeRect();
+        const float margin = 16.0f * uiScale_;
+        // (Only where a finger can be the pointer: Android, a touch screen, a UI test. A short desktop window with a mouse
+        // keeps its movable window.)
+        bool touchScreen = !options_.uiTest.empty();
+#ifdef __ANDROID__
+        touchScreen = true;
+#else
+        if (!touchScreen) {
+            int touchDevices = 0;
+            if (SDL_TouchID* ids = SDL_GetTouchDevices(&touchDevices)) {
+                for (int i = 0; i < touchDevices; ++i)
+                    touchScreen |= SDL_GetTouchDeviceType(ids[i]) == SDL_TOUCH_DEVICE_DIRECT;
+                SDL_free(ids);
+            }
+        }
+#endif
+        const bool sheet = touchScreen && std::min(safe.w, safe.h) < 600.0f * uiScale_;
+        CanvasRect room = safe;
+        if (!sheet && c.w >= 500.0f * uiScale_ + margin) { // (the 3D view between the shelves, inside the safe area)
+            const float x0 = std::max(c.x, safe.x), y0 = std::max(c.y, safe.y);
+            room = {x0, y0, std::max(std::min(c.x + c.w, safe.x + safe.w) - x0, 1.0f), std::max(std::min(c.y + c.h, safe.y + safe.h) - y0, 1.0f)};
+        }
+        const bool narrow = room.w - margin < 500.0f * uiScale_;
+        // (Paddings and spacing don't shrink with the text, so the rows need a tenth more room than the ratio.)
+        float fit = narrow ? std::clamp((room.w - margin) / (500.0f * uiScale_) * 0.9f, 0.35f, 1.0f) : 1.0f;
+        if (sheet) fit = std::min(fit, std::clamp((room.h - margin) / (420.0f * uiScale_), 0.6f, 1.0f)); // (landscape: shorter text)
+        const float s = uiScale_ * fit; // (this window's own scale, below the outer one)
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const float btnH = (sheet ? 44.0f : 0.0f) * s; // (a finger's size for the row at the bottom)
+        const float footerH = (btnH > 0.0f ? btnH : ImGui::GetFrameHeight() * fit) + st.ItemSpacing.y * 5.0f + 1.0f;
+        const float width = narrow ? room.w - margin : std::min(room.w - margin, 500.0f * uiScale_ * (fit < 1.0f ? fit / 0.9f : 1.0f));
+        if (sheet) ImGui::SetNextWindowPos(ImVec2(room.x + room.w * 0.5f, room.y + room.h * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        else ImGui::SetNextWindowPos(ImVec2(room.x + room.w * 0.5f, room.y + room.h * 0.3f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         // Height 0 every frame: the window fits its content, so the featured creator card arriving after the first frame
-        // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold.
-        ImGui::SetNextWindowSize(ImVec2(500.0f * s, 0.0f), ImGuiCond_Always);
-        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-        if (ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags)) {
+        // (it loads from the kept feed) doesn't push the Support button and the icon row below the fold. (A sheet is as tall
+        // as its content last frame, or the room.)
+        const float sheetH = welcomeBodyH_ > 0.0f ? std::min(room.h - margin, ImGui::GetFontSize() + 4.0f * st.FramePadding.y + 2.0f * st.WindowPadding.y + welcomeBodyH_ + footerH + 2.0f)
+                                                  : room.h - margin;
+        ImGui::SetNextWindowSize(ImVec2(width, sheet ? std::max(sheetH, 100.0f) : 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(room.h - margin, 100.0f)));
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
+        if (sheet) flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+        ui::PushRole(theme::Role::Learn);
+        const bool welcomeOpen = ImGui::Begin(tr("Welcome to SculptForge##welcome"), &showWelcome_, flags);
+        ui::PopRole();
+        ui::RoleStrip(theme::Role::Learn);
+        keepWindowInView(room); // (title bar and X inside the view, however the window was placed)
+        {
+            const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+            const float pad = ImGui::GetStyle().FramePadding.y, fs = ImGui::GetFontSize();
+            welcomeXRect_ = ImVec4(wp.x + ws.x - pad - fs, wp.y + pad, wp.x + ws.x - pad, wp.y + pad + fs); // (ImGui's close button)
+        }
+        if (fit < 1.0f) ImGui::SetWindowFontScale(fit);
+        if (welcomeOpen) {
+            if (sheet) ImGui::BeginChild("##welcome.body", ImVec2(0.0f, -footerH), ImGuiChildFlags_None, ImGuiWindowFlags_None);
             // The interface language: one click, live (a hook for the mission headline above it, queue item 44).
             drawLanguageRow();
             ImGui::Spacing();
@@ -390,10 +484,29 @@ void App::drawSupportUi() {
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::TextDisabled("%s", tr("Free for everyone. Members get betas and a vote on what's next."));
+            if (sheet) {
+                welcomeBodyH_ = ImGui::GetCursorPosY();
+                ImGuiWindow* body = ImGui::GetCurrentWindow();
+                welcomeScrollMax_ = body->ScrollMax.y;
+                // A finger drags the content: the press that began on a button turns into a scroll, not a click.
+                ImGuiIO& io = ImGui::GetIO();
+                if (body->ScrollMax.y > 0.0f && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && io.MouseSource == ImGuiMouseSource_TouchScreen &&
+                    io.MouseDown[0] && ImGui::IsMouseDragging(0, 10.0f * uiScale_)) {
+                    ImGui::ClearActiveID();
+                    ImGui::SetScrollY(body, std::clamp(body->Scroll.y - io.MouseDelta.y, 0.0f, body->ScrollMax.y));
+                }
+                welcomeScrollY_ = body->Scroll.y;
+                ImGui::EndChild();
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+            } else {
+                welcomeScrollMax_ = welcomeScrollY_ = 0.0f;
+            }
             // The guide, the community (Discord, GitHub, X, Bluesky, Instagram, Facebook) and, on the right, the memberships.
             const float rightW = ImGui::CalcTextSize(tr("Support SculptForge")).x + ImGui::CalcTextSize(tr("Close")).x +
                                  4.0f * ImGui::GetStyle().FramePadding.x + ImGui::GetStyle().ItemSpacing.x;
-            if (ImGui::Button(tr("User Guide##welcome"))) {
+            if (ImGui::Button(tr("User Guide##welcome"), ImVec2(0.0f, btnH))) {
                 guide_.open();
                 showWelcome_ = false;
             }
@@ -403,9 +516,10 @@ void App::drawSupportUi() {
             ImGui::SameLine(0.0f, 14.0f * s);
             drawSocialRow("welcome", ImVec2(ImGui::GetCursorScreenPos().x, guideMid)); // centred on the button
             ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - rightW));
-            if (ImGui::Button(tr("Support SculptForge##welcome"))) showSupportCard(SupportCardReason::Manual); // the memberships
+            if (ImGui::Button(tr("Support SculptForge##welcome"), ImVec2(0.0f, btnH))) showSupportCard(SupportCardReason::Manual); // the memberships
             ImGui::SameLine();
-            if (ImGui::Button(tr("Close##welcome"))) showWelcome_ = false;
+            if (ImGui::Button(tr("Close##welcome"), ImVec2(0.0f, btnH))) showWelcome_ = false;
+            welcomeCloseRect_ = ImVec4(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y, ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y);
         }
         ImGui::End();
     }
@@ -414,11 +528,15 @@ void App::drawSupportUi() {
     if (newLookCard_ && !showWelcome_ && !supportCardOpen() && !whatsNew_ && !showWhatsNew_) {
         // Once, after updating from before 0.10.7 (PanelProject.cpp): the new default look, never forced.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
-        ImGui::SetNextWindowSize(ImVec2(420.0f * s, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(std::min(420.0f * s, c.w - 16.0f * s), 0.0f), ImGuiCond_Always);
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
         bool open = true;
-        if (ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags)) {
+        ui::PushRole(theme::Role::New);
+        const bool began = ImGui::Begin(tr("SculptForge has a new look##newlook"), &open, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::New);
             ImGui::TextWrapped("%s", tr("Neutral grey panels with one orange accent, and the SculptForge layout: menus by task, a "
                                "status bar and a one-row tool shelf. Your layout stays as it is unless you try it."));
             ImGui::Spacing();
@@ -438,7 +556,11 @@ void App::drawSupportUi() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize |
                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
         bool open = true;
-        if (ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags)) {
+        ui::PushRole(theme::Role::Info);
+        const bool began = ImGui::Begin(tr("Big meshes are faster now##bigmesh"), &open, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Info);
             ImGui::TextWrapped("%s", tr("On a dense scan with micro levels, big brushes now keep up with the pen and the view turns "
                                "smoothly right after a stroke."));
             ImGui::Spacing();

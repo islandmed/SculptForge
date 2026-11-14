@@ -150,7 +150,9 @@ grep -q '^## \[9.0.0\]' CHANGELOG.md && fail "beta bump made a CHANGELOG [9.0.0]
 grep -q 'Beta test feature' CHANGELOG.md || fail "beta bump: the fragment's entry is not in CHANGELOG [Unreleased]"
 grep -q '^## Version 9.0.0$' docs/guide/whats-new.md || fail "beta bump: no What's New 9.0.0"
 [ ! -e changes/beta-test.md ] || fail "beta bump: the fragment is still there"
-grep -q 'open the beta test feature' release-testers-9.0.0-beta.1.md || fail "beta bump: no testers checklist"
+tf=$HOME/Work/.sf/state/release-testers/release-testers-9.0.0-beta.1.md # outside the checkout: the promote runs elsewhere
+grep -q 'open the beta test feature' "$tf" || fail "beta bump: no testers checklist"
+[ ! -e release-testers-9.0.0-beta.1.md ] || fail "beta bump wrote the testers checklist into the checkout"
 [ "$(git rev-parse HEAD)" = "$(git -C "$S/origin.git" rev-parse main)" ] || fail "beta bump: main not pushed"
 grep -qx 'env SF_GUIDE_VERSION 9.0.0' tests/ui/whats_new.sfui && grep -qx 'expect_text "Version 9.0.0"' tests/ui/whats_new.sfui ||
     fail "beta bump didn't pin tests/ui/whats_new.sfui to 9.0.0"
@@ -170,7 +172,7 @@ grep -q 'already says' "$S/out.log" || fail "beta bump is not idempotent: $(cat 
 git diff --quiet "$start" HEAD -- website/latest.json website/index.html || fail "the beta touched the update feed or the home page"
 scripts/release.sh 9.0.0-beta.1 --only preview >/dev/null 2>&1 && fail "a beta still has a preview (public feed) step"
 quiet scripts/release.sh 9.0.0-beta.1 --only status
-grep -q 'release-testers-9.0.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
+grep -qF "Testers:  $tf" "$S/out.log" || fail "beta status names no testers checklist: $(cat "$S/out.log")"
 grep -q 'sculptforge/sculptforge-insiders/releases/tag/v9.0.0-beta.1' "$S/out.log" || fail "beta status doesn't name the members' repository"
 grep -q 'scripts/release.sh 9.0.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
 git tag v9.0.0-beta.1 "$(git rev-parse HEAD)" # what step tag would have pushed

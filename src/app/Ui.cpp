@@ -951,11 +951,13 @@ void DrawHelp(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(lookColor(IM_COL32(0x18, 0x18, 0x1a, 0xff), theme::shellBg), std::clamp(prefs.helpOpacity, 0.3f, 1.0f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(color::accent, 0.6f));
+    // Help is the info role (Theme.h): its blue edge and strip, or the accent edge with Pop-up colours off.
+    ImGui::PushStyleColor(ImGuiCol_Border, theme::rolePopups ? theme::edge(theme::Role::Info) : rgba(color::accent, 0.6f));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize;
     if (ImGui::Begin("##sf_help", nullptr, flags)) {
+        RoleStrip(theme::Role::Info);
         ImDrawList* dl = ImGui::GetWindowDrawList();
         // Title row: icon + title (SemiBold), keycaps on the right.
         const float keysW = r.shortcut.empty() ? 0.0f : KeycapsWidth(r.shortcut);
@@ -1046,5 +1048,67 @@ void DrawHelp(App& app) {
 }
 
 const std::string& HelpShown() { return g_shown; }
+
+namespace {
+int g_roleColors = 0; // what the last PushRole pushed
+} // namespace
+
+void PushRole(theme::Role role) {
+    g_roleColors = 0;
+    if (!theme::rolePopups) return;
+    const ImVec4 e = theme::edge(role), lift = theme::panelBg;
+    auto mix = [](const ImVec4& a, const ImVec4& b, float t) {
+        return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, 1.0f);
+    };
+    // One step lighter than the panels, so it sits on the UI, with a wash of the role; its buttons and fields lift
+    // with it, so they keep their step above it.
+    const ImVec4 white(1, 1, 1, 1);
+    const float step = theme::popupLift;
+    const ImVec4 surface = mix(mix(lift, white, step), e, 0.05f);
+    const ImVec4 title = ImGui::GetStyleColorVec4(ImGuiCol_TitleBg), border = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, surface);
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, mix(border, e, 0.85f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, mix(title, e, 0.20f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, mix(title, e, 0.26f));
+    const ImGuiCol lifted[] = {ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive, ImGuiCol_FrameBg,
+                               ImGuiCol_FrameBgHovered};
+    for (ImGuiCol c : lifted) ImGui::PushStyleColor(c, mix(ImGui::GetStyleColorVec4(c), white, step));
+    g_roleColors = 5 + int(std::size(lifted));
+}
+
+void PopRole() {
+    if (g_roleColors) ImGui::PopStyleColor(g_roleColors);
+    g_roleColors = 0;
+}
+
+void RoleStrip(theme::Role role) {
+    if (!theme::rolePopups) return;
+    ImGuiWindow* w = ImGui::GetCurrentWindow();
+    if (!w || w->SkipItems) return;
+    ImDrawList* dl = w->DrawList;
+    const float s = std::max(1.0f, ImGui::GetStyle().FramePadding.y / 3.0f); // the UI scale (FramePadding is 3 at 100 %)
+    const ImRect r = w->Rect();
+    const ImU32 edge = theme::u32(theme::edge(role));
+    dl->PushClipRect(r.Min, r.Max, false);
+    const float strip = std::max(3.0f, std::round(4.0f * s));
+    dl->PushClipRect(r.Min, ImVec2(r.Max.x, r.Min.y + strip), true); // the top of the window's own rounded shape
+    dl->AddRectFilled(r.Min, r.Max, edge, w->WindowRounding);
+    dl->PopClipRect();
+    if (!(w->Flags & ImGuiWindowFlags_NoTitleBar)) {
+        // The role's icon just after the title, while it clears the close button.
+        const ImRect bar = w->TitleBarRect();
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const char* end = ImGui::FindRenderedTextEnd(w->Name);
+        const float titleW = ImGui::CalcTextSize(w->Name, end).x;
+        const char* icon = theme::roleIcon(role);
+        const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+        const float x = std::floor(bar.Min.x + st.FramePadding.x + titleW + st.ItemInnerSpacing.x * 2.0f);
+        const float closeW = w->HasCloseButton ? ImGui::GetFrameHeight() : 0.0f;
+        if (x + iconSize.x < bar.Max.x - st.FramePadding.x - closeW)
+            dl->AddText(ImVec2(x, std::floor(bar.GetCenter().y - iconSize.y * 0.5f)), theme::u32(theme::ink(role)), icon);
+    }
+    dl->PopClipRect();
+}
 
 } // namespace sf::ui

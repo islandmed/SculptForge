@@ -73,6 +73,7 @@ vec3 decodeNormal(uint a) {
 uniform vec4 uGhostA[64];    // centre, radius
 uniform vec4 uGhostB[64];    // area normal, strength x pressure
 uniform vec4 uGhostC[64];    // area centre, weight
+uniform vec4 uGhostD[64];    // Clay Block: the square tip's top edge (0: round)
 uniform int uGhostGroups;    // runs of dabs (one per mirror), each with a sphere holding its dabs
 uniform vec4 uGhostBound[8];
 uniform ivec2 uGhostRange[8]; // [first, end) of each run
@@ -91,6 +92,8 @@ vec3 ghostFalloff(float d, float r) {
     return vec3(t * t * (3.0 - 2.0 * t), 6.0 * t * (1.0 - t) * dt, (6.0 - 12.0 * t) * dt * dt + 6.0 * t * (1.0 - t) * ddt);
 }
 vec3 onPlane(vec3 v, vec3 n) { return v - n * dot(v, n); }
+// How far a Clay / Clay Block dab pulls (sf::clayPull, core/Sculpt.h): all the way from Intensity 0.5 up, less below.
+float clayPull(float s) { return s >= 0.5 ? 1.0 : 2.0 * max(s, 0.0); }
 // Moves x as the dabs [first, end) would, and follows what the moves do to the surface seen as a height field
 // over the vertex's tangent plane (normal n): the height's gradient g (in that plane) and its Laplacian lap
 // (forward differentiation of each kernel's height change; lateral moves don't count). The shading normal is
@@ -102,7 +105,7 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
         vec3 c = uGhostA[i].xyz;
         float r = uGhostA[i].w;
         float dist = length((kind == 10 ? ghostStart : x) - c);
-        if (dist >= r) continue;
+        if (dist >= (kind == 4 ? 1.3 * r : r)) continue; // (Clay Block's square corners reach 1.3 radii)
         float w = uGhostC[i].w;
         vec3 F = ghostFalloff(dist, r) * w; // f, f', f'' in the distance
         float f = F.x;
@@ -123,12 +126,25 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
             g += radial * (k * a * F.y);
             lap += k * a * radialLap;
         } else if (kind == 3 || kind == 4) { // Clay, Clay Block: everything below a plane pulled up to it
-            float h = dot(x - (ac + an * (sgn * r * (kind == 3 ? 0.05 : 0.08) * s)), an);
+            float standoff = r * (kind == 3 ? 0.05 : 0.08) * s, lift = standoff, pull = clayPull(s);
+            if (kind == 3) { // (PlaneKernel::clayPlaneAt: the plane reaches the cursor, the pull shrinks by how much higher that is)
+                lift = max(standoff, sgn * dot(c - ac, an));
+                if (lift > 1e-12) pull *= standoff / lift;
+            }
+            float h = dot(x - (ac + an * (sgn * lift)), an);
             if (sgn * h < 0.0) {
-                vec3 W = F; // the pull's profile and its derivatives
+                vec3 W = F * pull; // the pull's profile and its derivatives
                 if (kind == 4) {
-                    float e = clamp((1.0 - dist / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
-                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * w;
+                    // (the round tip, its edge measured in the brush's plane, the corners in space: Ghost.cpp)
+                    float lat = length(onPlane(x - c, an));
+                    vec3 tipUp = onPlane(uGhostD[i].xyz, an);
+                    if (dot(tipUp, tipUp) > 1e-12) {
+                        tipUp = normalize(tipUp);
+                        lat = max(abs(dot(x - c, tipUp)), abs(dot(x - c, cross(tipUp, an))));
+                    }
+                    float e = clamp((1.0 - lat / r) / 0.35, 0.0, 1.0), de = e > 0.0 && e < 1.0 ? -1.0 / (0.35 * r) : 0.0;
+                    float corner = clamp((1.3 - dist / r) / 0.3, 0.0, 1.0);
+                    W = vec3(e * e * (3.0 - 2.0 * e), 6.0 * e * (1.0 - e) * de, (6.0 - 12.0 * e) * de * de) * (w * pull * corner);
                 }
                 x -= an * (h * W.x);
                 lap -= cn * (2.0 * W.y * dot(radial, dh) + W.x * cn * lap + h * (W.z + W.y * inv));
@@ -1027,6 +1043,15 @@ void Renderer::keepPrograms(bool keep) {
 }
 
 bool Renderer::init(std::string& error) {
+    {   // (the lines a graphics-driver report needs: who made it, which shader language, the limits the renderer leans on)
+        GLint samples = 0, texels = 0, vecs = 0;
+        gl::GetIntegerv(GL_MAX_SAMPLES, &samples);
+        gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+        gl::GetIntegerv(0x8DFD /* GL_MAX_FRAGMENT_UNIFORM_VECTORS */, &vecs);
+        const auto str = [](GLenum n) { const GLubyte* v = gl::GetString(n); return v ? reinterpret_cast<const char*>(v) : "?"; };
+        SDL_Log("GL vendor %s, GLSL %s, max samples %d, texture buffer %d texels, fragment uniforms %d", str(0x1F00),
+                str(0x8B8C), samples, texels, vecs);
+    }
     for (int f : {0, kPaint}) // the common ones up front, so a broken driver fails here rather than mid-session
         if (!meshProgram(f)) {
             error = programError_;
@@ -1082,6 +1107,11 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
+    const auto simpler = [&]() -> const MeshProgram* {
+        const int next = simplerMeshFeatures(features);
+        return next == features ? nullptr : meshProgram(next);
+    };
+    if (p.failed) return simpler(); // (not every frame again)
     std::string prefix = "#version 330 core\n";
     if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
@@ -1094,7 +1124,13 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
-    if (!p.id) return nullptr;
+    if (!p.id) {
+        // A mesh variant the driver won't build (a mobile GLSL compiler's limit, say) used to leave the mesh undrawn
+        // with nothing in the log; now it says so once and the next simpler variant draws.
+        p.failed = true;
+        SDL_Log("Mesh shader variant %d failed to build, drawing with a simpler one: %.400s", features, programError_.c_str());
+        return simpler();
+    }
     auto at = [&](const char* name) { return gl::GetUniformLocation(p.id, name); };
     p.view = at("uView");
     p.proj = at("uProj");
@@ -1129,6 +1165,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.ghostA = at("uGhostA");
     p.ghostB = at("uGhostB");
     p.ghostC = at("uGhostC");
+    p.ghostD = at("uGhostD");
     p.ghostBound = at("uGhostBound");
     p.ghostKind = at("uGhostKind");
     p.ghostFocal = at("uGhostFocal");
@@ -2906,6 +2943,34 @@ bool Renderer::viewTarget(int width, int height, int samples) {
     return true;
 }
 
+
+// What a report needs when the view stays empty on a phone (Mali-G72 tablet, 81.9k triangles in the bar and nothing drawn,
+// 11-13): the first GL error a view draw raised (each code once; the draw's errors are otherwise cleared unlogged), and a line
+// for each of the first frames: the target, the triangles asked for, the draw calls' count.
+static void logViewFrame(const char* what, int width, int height, int samples, float scale, size_t triangles, bool fbo) {
+    static int frames = 0;
+    static unsigned seen = 0;
+    if (frames >= 300) { // (the first seconds only: after that the target's draws clear their errors unlogged, as before)
+        if (fbo)
+            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
+            }
+        return;
+    }
+    for (int i = 0; i < 16; ++i) {
+        const GLenum e = gl::GetError();
+        if (e == GL_NO_ERROR) break;
+        const unsigned bit = 1u << (e & 15u);
+        if (!(seen & bit)) {
+            seen |= bit;
+            SDL_Log("GL error 0x%04x after drawing the view (%s; logged once per code)", unsigned(e), what);
+        }
+    }
+    if (frames < 4 || frames == 60) // (a few at the start, one a second later)
+        SDL_Log("View frame %d: %dx%d, %d samples, scale %.2f, %zu triangles drawn%s", frames, width, height, samples, double(scale), triangles,
+                fbo ? " (through the view target)" : "");
+    ++frames;
+}
+
 int Renderer::drawView(const Camera& camera, int width, int height, const RenderSettings& settings, const Viewport& viewport,
                        int samples) {
     GLint maxSamples = 1;
@@ -2929,8 +2994,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
         if (s > 1 || viewTarget(sw, sh, 1)) {
             gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
             draw(camera, sw, sh, settings, small);
-            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-            }
+            logViewFrame("scaled view", sw, sh, s, scale, lastDrawn_, true);
             gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
             gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
             gl::BlitFramebuffer(0, 0, sw, sh, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -2961,12 +3025,12 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (samples <= 1 && !(screen && viewTarget(width, height, 1))) {
         gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
         draw(camera, width, height, settings, viewport);
+        logViewFrame("window", width, height, 1, 1.0f, lastDrawn_, false);
         return 1;
     }
     gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
     draw(camera, width, height, settings, viewport);
-    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-    }
+    logViewFrame("view target", width, height, samples, 1.0f, lastDrawn_, true);
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
     gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -4015,7 +4079,7 @@ void Renderer::setGhost(uint32_t id, const GhostStroke& ghost) {
 }
 
 void Renderer::setGhostUniforms(const MeshProgram& p) {
-    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs];
+    glm::vec4 a[GhostStroke::kMaxDabs], b[GhostStroke::kMaxDabs], c[GhostStroke::kMaxDabs], u[GhostStroke::kMaxDabs];
     glm::vec4 bound[GhostStroke::kMaxMirrors];
     GLint range[GhostStroke::kMaxMirrors * 2];
     int groups = 0;
@@ -4025,6 +4089,7 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
         a[i] = glm::vec4(d.center, d.radius);
         b[i] = glm::vec4(d.normal, d.strength);
         c[i] = glm::vec4(d.areaCenter, d.weight);
+        u[i] = glm::vec4(d.up, 0.0f);
         const bool next = i == 0 || d.mirror != ghost_.dabs[i - 1].mirror;
         if (next) {
             if (groups == int(GhostStroke::kMaxMirrors)) break;
@@ -4048,6 +4113,7 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
     gl::Uniform4fv(p.ghostA, GLsizei(n), glm::value_ptr(a[0]));
     gl::Uniform4fv(p.ghostB, GLsizei(n), glm::value_ptr(b[0]));
     gl::Uniform4fv(p.ghostC, GLsizei(n), glm::value_ptr(c[0]));
+    gl::Uniform4fv(p.ghostD, GLsizei(n), glm::value_ptr(u[0]));
     gl::Uniform2i(p.ghostKind, GLint(ghost_.kind), ghost_.invert ? 1 : 0);
     gl::Uniform1f(p.ghostFocal, ghost_.focal);
     gl::Uniform1f(p.ghostEdge, ghost_.edge);

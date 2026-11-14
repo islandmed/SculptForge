@@ -1123,7 +1123,13 @@ void App::drawPartPopups() {
         openPartConfirm_ = false;
     }
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(popup.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    // Deleting is the one that can't be undone; merging asks to be sure.
+    const theme::Role role = partConfirm_.command == "part_delete" ? theme::Role::Danger : theme::Role::Warning;
+    ui::PushRole(role);
+    const bool began = ImGui::BeginPopupModal(popup.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (!began) return;
+    ui::RoleStrip(role);
     ImGui::TextUnformatted(partConfirm_.message.c_str());
     ImGui::Spacing();
     const float w = 110.0f * uiScale_;

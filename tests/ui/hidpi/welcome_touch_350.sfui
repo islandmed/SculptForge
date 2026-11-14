@@ -1,0 +1,55 @@
+# The same on a 1440x3120 phone (about 560 dpi, UI scale 350 %); see welcome_touch.sfui.
+# CMake runs this at 1440x3120 and 3120x1440.
+ui_scale 350
+safe_area 118 118 118 63
+run new_sphere subdivisions=3
+snapshot
+
+# Open it the way the first start does, and find both controls whole and reachable.
+key f3
+type "##Command palette" "welcome"
+key enter
+wait_idle 10
+expect_value welcome_open == 1
+expect_value welcome_outside_px == 0
+expect_value welcome_x_hidden_px == 0
+shot welcome-touch-open
+# The Close button is part of the window that scrolls: it must be on screen without a scroll (a finger can't scroll it).
+expect_value welcome_close_hidden_px == 0
+expect_value dirty == 0
+
+# One tap on Close.
+touch_tap "Close##welcome"
+expect_value welcome_open == 0
+expect_value dirty == 0
+
+# One tap on the X.
+key f3
+type "##Command palette" "welcome"
+key enter
+wait_idle 10
+expect_value welcome_open == 1
+touch_tap_welcome_x
+expect_value welcome_open == 0
+expect_value dirty == 0
+
+# Android's Back.
+key f3
+type "##Command palette" "welcome"
+key enter
+wait_idle 10
+expect_value welcome_open == 1
+android_back
+expect_value welcome_open == 0
+
+# Nothing blocks the canvas afterwards: one finger sculpts.
+key f
+camera 0 0
+# (the command palette that opened the window leaves the pointer over its own spot: rest it on the canvas first)
+mouse_move 0.5 0.5
+wait_idle 5
+expect_value can_undo == 0
+touch_stroke 0.35 0.45 0.65 0.55
+wait_idle 10
+expect_value can_undo == 1
+shot welcome-touch-closed

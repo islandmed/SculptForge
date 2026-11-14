@@ -1,0 +1,86 @@
+# Android tablets (a member on a Mali-G72 tablet, 0.12.14-beta.2: "I still can't open the Right Tray"; their window: 2000x1200 at UI scale
+# 2.62 = 763 logical px; upright, neither tray opened): with fingers only (no hover, no right click, no keys) each tray opens
+# with one tap on its edge handle and closes with one, and the canvas still takes a stroke after.
+# Landscape tablets under 1280 logical px (2000x1200 at 2.62, 1920x1200 at 2.0, 2560x1600 at 2.67).
+run new_sphere subdivisions=3
+snapshot
+
+# --- 960 logical px (narrow): one tray at a time, each by a tap ---
+logical_width 960
+wait_idle 30
+expect_value shell_narrow == 1
+expect_value left_tray_shown == 0
+expect_value right_tray_shown == 0
+shot narrow-960-start
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+expect_value left_tray_shown == 0
+expect_value canvas_width > 100
+shot narrow-960-right
+touch_stroke 0.5 0.45 0.6 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 0
+shot narrow-960-left
+# The other one's handle swaps them, still one tap.
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+expect_value left_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 0
+expect_value canvas_width > 100
+
+# --- 763 logical px (narrow): one tray at a time, each by a tap ---
+logical_width 763
+wait_idle 30
+expect_value shell_narrow == 1
+expect_value left_tray_shown == 0
+expect_value right_tray_shown == 0
+shot narrow-763-start
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+expect_value left_tray_shown == 0
+expect_value canvas_width > 100
+shot narrow-763-right
+touch_stroke 0.5 0.45 0.6 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 0
+shot narrow-763-left
+# The other one's handle swaps them, still one tap.
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+expect_value left_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 0
+expect_value canvas_width > 100

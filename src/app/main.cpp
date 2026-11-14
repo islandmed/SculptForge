@@ -33,6 +33,16 @@
 #include <unistd.h> // execv (--cli)
 #endif
 
+#if defined(_WIN32)
+// Hybrid-graphics laptops (Intel + NVIDIA / AMD): the drivers read these exports when the program loads and then run
+// OpenGL on the discrete card, with no Settings > Graphics entry needed. Preferences > Performance > Graphics card
+// (app/Calibration.cpp: applyCachedGpuChoice) still sets the per-app Windows preference on top of them.
+extern "C" {
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 namespace {
 
 void usage() {
@@ -55,7 +65,8 @@ void usage() {
         "  --facegroups             Render with face group colours\n"
         "  --hide-mesh              Render only the Gaussian splats\n"
         "  --demo NAME              Play a scripted demo (sculpt, image-to-3d, brush-lab, game-ready, splats)\n"
-        "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit\n"
+        "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit; with --ui-test, a small\n"
+        "                           clip of every frame of the test (bug before/after clips; --fps sets the rate)\n"
         "  --demo-asset FILE        Image or model the demo opens\n"
         "  --demo-output FILE       Save the demo's result (e.g. creature.glb)\n"
         "  --fps N                  Recording frame rate (default 30)\n"
@@ -301,6 +312,11 @@ static int runMain(int argc, char** argv) {
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
+        if (!options.recordPath.empty() && options.uiRecordPath.empty()) { // --ui-test x.sfui --record out.mp4: a bug clip
+            options.uiRecordPath = std::move(options.recordPath);
+            options.recordPath.clear();
+            options.uiRecordClip = true;
+        }
         isolateSettings();
     }
     if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window

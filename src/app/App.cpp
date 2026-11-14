@@ -1,5 +1,6 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <csignal>
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
 #include "app/BooleanPreview.h"
@@ -94,6 +95,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char fontCjkSc[];
 extern const unsigned long long fontCjkSc_size;
+extern const unsigned char fontCjkJp[];
+extern const unsigned long long fontCjkJp_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[];
@@ -336,6 +339,9 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
+#ifdef __ANDROID__
+    logWindowGeometry();
+#endif
     timer.step("ImGui, settings, fonts");
     splashCheckpoint();
     if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
@@ -638,8 +644,9 @@ int App::runUiTest(int w, int h, int fps) {
         }
         const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
                                 std::to_string(h) + " -r " + std::to_string(fps) +
-                                " -i - -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart " +
-                                shellQuote(options_.uiRecordPath);
+                                " -i - -c:v libx264 " +
+                                (options_.uiRecordClip ? "-preset veryfast -crf 23" : "-preset slow -crf 16") +
+                                " -pix_fmt yuv420p -movflags +faststart " + shellQuote(options_.uiRecordPath);
 #if defined(_WIN32)
         video = _popen(cmd.c_str(), "wb");
 #else
@@ -649,9 +656,13 @@ int App::runUiTest(int w, int h, int fps) {
             SDL_Log("Cannot start ffmpeg");
             return 1;
         }
+#if !defined(_WIN32)
+        std::signal(SIGPIPE, SIG_IGN); // ffmpeg missing or dead: the write fails (logged below) instead of killing the app
+#endif
     }
     const auto recordStart = std::chrono::steady_clock::now();
     int lateFrames = 0;
+    bool videoBroken = false;
     while (frames < fps * 60 * 30) {
         if (timed && (frames == 1 || frames == 5 || frames == 20)) {
             std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
@@ -745,11 +756,16 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         if (video) {
-            fwrite(rgba.data(), 1, rgba.size(), video);
-            const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                               std::chrono::duration<double>(double(frames) * double(dt)));
-            if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
-            else ++lateFrames;
+            if (fwrite(rgba.data(), 1, rgba.size(), video) != rgba.size() && !videoBroken) {
+                videoBroken = true; // (ffmpeg's own error is on stderr above; the verdict below fails the run)
+                SDL_Log("Recording stopped at frame %d: ffmpeg is not taking frames (is it installed? see its message above)", frames);
+            }
+            if (!options_.uiRecordClip) { // (a bug clip runs as fast as the frames come, not paced to the clock)
+                const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                                   std::chrono::duration<double>(double(frames) * double(dt)));
+                if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
+                else ++lateFrames;
+            }
         }
         if (shot.empty()) continue;
         Image img;
@@ -780,8 +796,8 @@ int App::runUiTest(int w, int h, int fps) {
         const double length = double(frames) * double(dt);
         SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
                 length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
-                status == 0 ? "" : " (ffmpeg failed)");
-        if (status != 0) return 1;
+                status == 0 && !videoBroken ? "" : " (ffmpeg failed)");
+        if (status != 0 || videoBroken) return 1;
     }
     demo_->printProfile();
     const std::string known = xfailLine(options_.uiTest);
@@ -1005,7 +1021,7 @@ void wakeMainLoop() {
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
     return running(pendingBrush_) || running(localProbe_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
-           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
+           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ || generateCommand_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
 }
@@ -1248,6 +1264,8 @@ int App::run() {
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
                 if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
+            if (const char* v = std::getenv("SF_MEASURE_STRENGTH")) // e.g. 0.35: the Intensity (the preview's pull depends on it)
+                strength_ = std::clamp(float(std::atof(v)), 0.0f, 1.0f);
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -1412,6 +1430,10 @@ int App::run() {
         if (measuring) cpuFrameStart = processCpuSeconds();
         tickKeySequence(dt);
         updateCameraAspect();
+        if (!startFrameChecked_) { // (the first frame that knows the 3D view's shape)
+            startFrameChecked_ = true;
+            fitStartView(false);
+        }
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
@@ -1609,15 +1631,16 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
-// Noto Sans CJK TC and SC (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
+// Noto Sans CJK TC, SC and JP (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
 // into the font added just before: in Traditional Chinese all of TC, in Simplified Chinese all of SC (mainland glyph
-// shapes). Otherwise only the languages' own names (繁體中文, 简体中文: the Preferences buttons) are merged, so the
-// atlas stays Latin-sized.
+// shapes), in Japanese all of JP. Otherwise only the languages' own names (繁體中文, 简体中文, 日本語: the Preferences
+// buttons) are merged, so the atlas stays Latin-sized.
 void App::mergeCjkFont(float px) {
     // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
     static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
     static const ImWchar kTraditionalName[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
     static const ImWchar kSimplifiedName[] = {0x4E2D, 0x4E2D, 0x4F53, 0x4F53, 0x6587, 0x6587, 0x7B80, 0x7B80, 0};  // 中体文简
+    static const ImWchar kJapaneseName[] = {0x65E5, 0x65E5, 0x672C, 0x672C, 0x8A9E, 0x8A9E, 0};                     // 日本語
     auto merge = [px](const unsigned char* data, unsigned long long size, const ImWchar* ranges) {
         ImFontConfig cjk;
         cjk.MergeMode = true;
@@ -1628,9 +1651,12 @@ void App::mergeCjkFont(float px) {
     // The interface's own face first: a codepoint both have (中文) keeps the glyph merged first.
     const bool traditional = fontsLanguage_ == Language::TraditionalChinese;
     const bool simplified = fontsLanguage_ == Language::SimplifiedChinese;
+    const bool japanese = fontsLanguage_ == Language::Japanese;
+    if (japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kCjkRanges);
     if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
     merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
     if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
+    if (!japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kJapaneseName);
     glyphs::merge(px); // what people typed that the bundled fonts lack, from the system's fonts (UserGlyphs.h)
 }
 
@@ -1640,7 +1666,8 @@ void App::buildUiFonts(float scale) {
     fontsLanguage_ = language();
     { // the bundled fonts a typed character is looked for in first: the interface's Chinese face, then Inter
         const bool tc = fontsLanguage_ == Language::TraditionalChinese;
-        const glyphs::Embedded embedded[] = {{tc ? assets::fontCjk : assets::fontCjkSc, size_t(tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
+        const bool jp = fontsLanguage_ == Language::Japanese;
+        const glyphs::Embedded embedded[] = {{jp ? assets::fontCjkJp : tc ? assets::fontCjk : assets::fontCjkSc, size_t(jp ? assets::fontCjkJp_size : tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
                                              {tc ? assets::fontCjkSc : assets::fontCjk, size_t(tc ? assets::fontCjkSc_size : assets::fontCjk_size)},
                                              {assets::fontRegular, size_t(assets::fontRegular_size)}};
         glyphs::install(embedded, 3, !options_.uiTest.empty());
@@ -1767,6 +1794,10 @@ void App::handleEvent(const SDL_Event& event) {
 }
 
 void App::dispatchEvent(const SDL_Event& event) {
+    if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && event.key.key == SDLK_AC_BACK) { // Android's Back
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
+        return;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;
@@ -1803,6 +1834,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_DID_ENTER_BACKGROUND:
         // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
         // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        touchReset();
         autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
         autosaveRevision_ = ~uint64_t(0);
         tickProject(0.0f);
@@ -1820,6 +1852,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        touchReset(); // (a lift in another window never reaches us)
         keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
         actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
@@ -1827,6 +1860,17 @@ void App::dispatchEvent(const SDL_Event& event) {
         spaceHeld_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        if (e.window.windowID == SDL_GetWindowID(window_)) {
+            touchReset();
+            logWindowGeometry();
+            updateCameraAspect(); // (the turned view's shape, before the model is framed into it)
+            fitStartView(true);
+        }
+        break;
+#endif
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestUiScale();
@@ -3069,6 +3113,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
+    const size_t trisBefore = name == "subdivide" ? doc_.mesh.triangleCount() : 0;
     // OBJ and PLY have no units: read them in the Preferences > Interface > OBJ/PLY in unit unless the call says.
     Args withUnit;
     if ((name == "open" || name == "open_obj" || name == "part_append") && !args.contains("unit")) {
@@ -3082,8 +3127,11 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
     // synchronous command, as its next steps read the UVs at once.
+    // Image / text to 3D waits on a hosted model (seconds to minutes): the same, the window never freezes.
+    const bool generates = (name == "image_to_3d" || name == "text_to_3d") && macros_.runDepth == 0 && commands_.find(name);
     CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args)
-                                                                 : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
+                      : generates                               ? startGenerateCommand(name, args)
+                                                                : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
     if (perftrace::on()) { // a command that held up the frames (remesh, Add Level, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
@@ -3112,6 +3160,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name == "save_obj" && !doc_.mesh.layers.empty())
         status_ += " (OBJ stores the current blend; export GLB to keep layers as blend shapes)";
     if (!r.ok) SDL_Log("%s failed: %s", name.c_str(), r.message.c_str());
+    if (r.ok && name == "subdivide") // (a log that ends in a refusal shows what the presses before it made, and what they took)
+        SDL_Log("subdivide: %zu -> %zu triangles, %.0f ms", trisBefore, doc_.mesh.triangleCount(),
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count());
     if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "new_starter_mesh" ||
                  name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
@@ -4538,7 +4589,11 @@ void App::drawImageTo3D() {
         openHunyuanNotice_ = false;
     }
     ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
-    if (ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool licenceOpen = ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (licenceOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextWrapped("%s", tr(ai::kHunyuanLicenceNote));
         ImGui::TextDisabled("%s", tr("This stays in the Model tooltip."));
         if (ImGui::Button(tr("OK"), ImVec2(-1, 0))) ImGui::CloseCurrentPopup();

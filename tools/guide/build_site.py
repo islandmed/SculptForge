@@ -27,7 +27,11 @@ SITE = "https://sculptforge.app/"
 # Chapters that were renamed: the old page stays as a small redirect so links from elsewhere keep working.
 REDIRECTS: dict[str, str] = {}
 CALLOUTS = {"tip": "Tip", "note": "Note", "experienced": "Experienced sculptor?", "not-yet": "Not yet", "warning": "Warning",
-            "important": "Important", "short": "In short"}
+            "important": "Important", "short": "In short", "new": "New"}
+# The contents' groups (index.md "## ..."): each gives its chapters an accent colour (style.css [data-section]), so the
+# guide's parts don't read as one flat tone. A group not listed gets the brand orange.
+SECTIONS = {"Getting started": "start", "Sculpting": "sculpt", "AI and capture": "ai", "Files and pipelines": "files",
+            "Reference": "ref", "Getting help": "help"}
 
 # ---------------------------------------------------------------------------
 # Site header nav and footer social row: the hand-written pages carry the same markup; motion.js moves everything but
@@ -874,7 +878,10 @@ def readme_news(page: "WhatsNewPage") -> str:
     text = re.sub(r"<[^>]+>", "", inline((v["tagline"] or f"Version {v['version']}").rstrip("."), []))
     card = next((c for c in v["cards"] if c.get("link") or c["action"].startswith("guide:")), None)
     target = (card.get("link") or card["action"][len("guide:"):]) if card else f"whats-new.html#{v['anchor']}"
-    return (f'  <strong>New in {html.escape(v["version"])}:</strong> {text[:1].lower() + text[1:]} '
+    first = text.split(" ", 1)[0]
+    if not any(ch.isupper() for ch in first[1:]):  # "The user guide" -> "the user guide"; a name like SculptForge stays
+        text = text[:1].lower() + text[1:]
+    return (f'  <strong>New in {html.escape(v["version"])}:</strong> {text} '
             f'(<a href="https://sculptforge.app/guide/{target}">how it works</a>)')
 
 
@@ -937,6 +944,7 @@ def load_book():
 
 def page_html(page: Page, index: Page, chapters, position: int) -> str:
     current = page.name
+    section = next((SECTIONS.get(g, "brand") for g, ch in chapters if ch.name == current), "brand")
     toc = ['<nav class="toc" aria-label="User guide">',
            f'<a class="toc-home{" current" if current == "index.md" else ""}" href="index.html">Contents</a>']
     group = None
@@ -944,7 +952,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
         if g != group:
             if group is not None:
                 toc.append("</ul>")
-            toc.append(f'<p class="toc-group">{html.escape(g)}</p><ul>')
+            toc.append(f'<p class="toc-group" data-section="{SECTIONS.get(g, "brand")}">{html.escape(g)}</p><ul>')
             group = g
         is_cur = ch.name == current
         href = ch.name[:-3] + ".html"
@@ -1007,7 +1015,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v={len(chapters)}" defer></script>
 </head>
-<body class="guide-page" data-prev="{names[k - 1][:-3] + '.html' if k > 0 else ''}" data-next="{names[k + 1][:-3] + '.html' if k + 1 < len(names) else ''}">
+<body class="guide-page" data-section="{section}" data-prev="{names[k - 1][:-3] + '.html' if k > 0 else ''}" data-next="{names[k + 1][:-3] + '.html' if k + 1 < len(names) else ''}">
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">

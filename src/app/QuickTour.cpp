@@ -9,6 +9,7 @@
 #include "app/App.h"
 #include "app/Support.h"
 #include "app/Theme.h"
+#include "app/Ui.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
@@ -143,7 +144,11 @@ void App::drawQuickTour() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-        if (ImGui::Begin("##quicktour_offer", nullptr, flags)) {
+        ui::PushRole(theme::Role::Learn);
+        const bool began = ImGui::Begin("##quicktour_offer", nullptr, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Learn);
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(tr("New to SculptForge? A two-minute tour shows where everything is."));
             ImGui::SameLine();
@@ -169,7 +174,11 @@ void App::drawQuickTour() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-        if (ImGui::Begin("##quicktour_aside", nullptr, flags)) {
+        ui::PushRole(theme::Role::Learn);
+        const bool began = ImGui::Begin("##quicktour_aside", nullptr, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Learn);
             ImGui::AlignTextToFramePadding();
             ImGui::Text(tr("Quick tour %d / %d: %s"), i + 1, kSlideCount, slide.title);
             ImGui::SameLine();
@@ -192,7 +201,11 @@ void App::drawQuickTour() {
     ImGui::SetNextWindowSize(ImVec2(w, 0.0f), ImGuiCond_Always);
     bool open = true;
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-    if (ImGui::Begin(tr("New to SculptForge? A quick tour##quicktour"), &open, flags)) {
+    ui::PushRole(theme::Role::Learn);
+    const bool began = ImGui::Begin(tr("New to SculptForge? A quick tour##quicktour"), &open, flags);
+    ui::PopRole();
+    if (began) {
+        ui::RoleStrip(theme::Role::Learn);
         // The picture: a screenshot of the part of SculptForge the slide is about, in a band of one height.
         const float iw = ImGui::GetContentRegionAvail().x, band = std::floor(std::min(iw * 0.577f, 360.0f * s));
         const ImVec2 at = ImGui::GetCursorScreenPos();

@@ -428,3 +428,63 @@ TEST(ui_json_layout_and_saved_layout) {
         CHECK(layoutsFromUiJson(fresh).saved.isNull());
     }
 }
+
+// A phone held upright at 300 % UI scale is 360 logical px wide: the tray there is 40 % of the window (Hameron, Pixel, 11-12:
+// an open tray plus the two shelves left the 3D view nothing), one at a time. A tablet upright or at 260 % (a member,
+// 0.12.14-beta.2: "I still can't open the Right Tray", 2000x1200 at 2.62 = 763 logical px) opens either tray by a tap.
+TEST(shell_narrow_windows_open_one_tray_at_a_time) {
+    UiLayout l = standardLayout();
+    l.leftTrayOpen = true;
+    l.rightTrayOpen = true;
+    const float s = 3.0f;
+    ShellGeometry g = computeShell(l, 1080.0f, 2400.0f, s); // 360 logical
+    CHECK(g.narrow && g.leftTray.w > 0.0f && near(g.rightTray.w, 0.0f)); // the left one wins; the right is not asked for
+    CHECK(near(g.leftTray.w, 180.0f * s));
+    CHECK(g.canvas.w > 0.0f && g.leftDivider.w > 0.0f); // (a sliver of view, the handle to close it: a phone is not the target)
+    l.leftTrayOpen = false;
+    g = computeShell(l, 1080.0f, 2400.0f, s);
+    CHECK(near(g.rightTray.w, 0.0f)); // open in the layout, hidden until asked for
+    l.rightTrayPeek = true;
+    g = computeShell(l, 1080.0f, 2400.0f, s);
+    CHECK(near(g.rightTray.w, 180.0f * s) && g.rightTray.x + g.rightTray.w <= 1080.0f);
+    CHECK(g.rightDivider.w > 0.0f && g.canvas.w > 0.0f);
+    // The tablet: 2000x1200 at 2.62 (763 logical px): both trays open in turn at their 300 px.
+    const float ts = 2.62f;
+    l.rightTrayPeek = false;
+    l.leftTrayOpen = true;
+    g = computeShell(l, 2000.0f, 1200.0f, ts);
+    CHECK(g.narrow && near(g.leftTray.w, 300.0f * ts) && near(g.rightTray.w, 0.0f));
+    l.leftTrayOpen = false;
+    l.rightTrayPeek = true;
+    g = computeShell(l, 2000.0f, 1200.0f, ts);
+    CHECK(near(g.rightTray.w, 300.0f * ts) && near(g.leftTray.w, 0.0f));
+    CHECK(g.canvas.w > 200.0f * ts);
+    // Upright (1200x2000 at 2.62: 458 logical px): 40 % of the window.
+    g = computeShell(l, 1200.0f, 2000.0f, ts);
+    CHECK(near(g.rightTray.w, 480.0f) && g.canvas.w > 100.0f * ts);
+    // A wide window is as it was: both open, no peek needed.
+    l.rightTrayPeek = false;
+    l.leftTrayOpen = true;
+    g = computeShell(l, 2560.0f, 1600.0f, 1.5f);
+    CHECK(!g.narrow && g.leftTray.w > 0.0f && g.rightTray.w > 0.0f);
+}
+
+// A shelf slot's brush id (custom brush slots find their brush by it) survives the layout file; hand-edited junk is dropped.
+TEST(shell_layout_keeps_brush_slot_ids) {
+    UiLayout l = standardLayout();
+    l.bottomShelf.push_back("brush.recipe.Finish - Classic");
+    l.brushIds["Finish - Classic"] = "00ff00ff00ff00ff";
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.brushIds.size() == 1 && back.brushIds["Finish - Classic"] == "00ff00ff00ff00ff");
+    CHECK(std::find(back.bottomShelf.begin(), back.bottomShelf.end(), "brush.recipe.Finish - Classic") != back.bottomShelf.end());
+    Json j = toJson(l);
+    Json ids = Json::object();
+    ids.set("A", 5.0);
+    ids.set("B", std::string());
+    ids.set("C", std::string(200, 'x'));
+    j.set("brushIds", ids);
+    CHECK(fromJson(j, back, err) && back.brushIds.empty());
+    CHECK(toJson(standardLayout()).has("brushIds") == false);
+}

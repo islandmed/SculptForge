@@ -8,6 +8,10 @@
 ^README\.md$
 ^THIRD_PARTY_NOTICES\.md$
 ^docs/brand\.md$
+# README and its linked pages (README stays short; the details live here), and the art tools/readme_art.sh renders.
+^docs/(building|controls|features|pipelines|project-layout)\.md$
+^docs/images/readme/
+^tools/readme_art\.sh$
 ^tools/brand/
 ^tools/guide/build_site\.py$
 ^tools/marks_media_[a-z]+\.(json|txt)$

@@ -119,6 +119,86 @@ sf_imgui_patch("    if (!new_font_cfg.FontDataOwnedByAtlas)
     }
 " "    // SculptForge: FontDataOwnedByAtlas = false data is the caller's, alive while the atlas is (no copy).
 ")
+# Wrapping Japanese and Chinese: a run without spaces is cut wherever the line ends, which could start a line with 、。」 or
+# end one with 「（, or cut "Forge Spheres" in the middle of a Latin name inside a Japanese sentence. Where a word too long
+# for the line is cut: a closing mark takes the character before it down to the next line (line-start prohibition), an
+# opening mark goes down with what follows (line-end prohibition), and a run of Latin letters right after CJK text moves
+# down whole. English text (no non-ASCII character before the run) wraps exactly as before. Checked by the shots of
+# tests/ui/language_ja.sfui (wrapped help text in a narrow tray).
+sf_imgui_patch("// Simple word-wrapping for English, not full-featured. Please submit failing cases!" "// SculptForge: line-break rules for CJK (cmake/Dependencies.cmake).
+static bool SfNoLineStart(unsigned int c)
+{
+    switch (c)
+    {
+    case 0x3001: case 0x3002: case 0xFF0C: case 0xFF0E: case 0x30FB: case 0xFF1A: case 0xFF1B: case 0xFF01: case 0xFF1F:
+    case 0xFF09: case 0x3015: case 0xFF3D: case 0xFF5D: case 0x3009: case 0x300B: case 0x300D: case 0x300F: case 0x3011:
+    case 0x30FC: case 0x3005: case 0x301C: case 0x2026: case 0x2025: case 0x309B: case 0x309C: case 0x30FD: case 0x30FE:
+    case 0x309D: case 0x309E: case 0x3041: case 0x3043: case 0x3045: case 0x3047: case 0x3049: case 0x3063: case 0x3083:
+    case 0x3085: case 0x3087: case 0x308E: case 0x30A1: case 0x30A3: case 0x30A5: case 0x30A7: case 0x30A9: case 0x30C3:
+    case 0x30E3: case 0x30E5: case 0x30E7: case 0x30EE: case 0x30F5: case 0x30F6: return true;
+    default: return false;
+    }
+}
+static bool SfNoLineEnd(unsigned int c)
+{
+    switch (c)
+    {
+    case 0xFF08: case 0x3014: case 0xFF3B: case 0xFF5B: case 0x3008: case 0x300A: case 0x300C: case 0x300E: case 0x3010: return true;
+    default: return false;
+    }
+}
+static bool SfAsciiAlnum(unsigned int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+// Simple word-wrapping for English, not full-featured. Please submit failing cases!")
+sf_imgui_patch("    const char* word_end = text;
+    const char* prev_word_end = NULL;
+    bool inside_word = true;
+
+    const char* s = text;
+    IM_ASSERT(text_end != NULL);
+    while (s < text_end)
+    {
+        unsigned int c = (unsigned int)*s;" "    const char* word_end = text;
+    const char* prev_word_end = NULL;
+    bool inside_word = true;
+    const char* sf_prev = NULL;            // SculptForge: the character before s, and the Latin run that ends there
+    unsigned int sf_prev_c = 0;
+    const char* sf_run = NULL;             // (a run of ASCII letters and digits that follows non-ASCII text)
+
+    const char* s = text;
+    IM_ASSERT(text_end != NULL);
+    while (s < text_end)
+    {
+        unsigned int c = (unsigned int)*s;")
+sf_imgui_patch("            // Words that cannot possibly fit within an entire line will be cut anywhere.
+            if (word_width < wrap_width)
+                s = prev_word_end ? prev_word_end : word_end;
+            break;
+        }
+
+        s = next_s;" "            // Words that cannot possibly fit within an entire line will be cut anywhere.
+            if (word_width < wrap_width)
+                s = prev_word_end ? prev_word_end : word_end;
+            else if (sf_prev && sf_prev > text)
+            {
+                if (SfNoLineStart(c) || SfNoLineEnd(sf_prev_c))
+                    s = sf_prev;
+                else if (SfAsciiAlnum(c) && sf_run && sf_run > text)
+                    s = sf_run;
+            }
+            break;
+        }
+
+        if (SfAsciiAlnum(c))
+        {
+            if (!(sf_prev && SfAsciiAlnum(sf_prev_c)))
+                sf_run = (sf_prev && sf_prev_c >= 0x80) ? s : NULL;
+        }
+        else
+            sf_run = NULL;
+        sf_prev = s;
+        sf_prev_c = c;
+        s = next_s;")
 file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new "${SF_IMGUI_DRAW}")
 configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp COPYONLY)
 

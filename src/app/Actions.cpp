@@ -268,7 +268,7 @@ void ActionRegistry::removePrefix(std::string_view prefix) {
 const Action* ActionRegistry::find(std::string_view id) const {
     for (const auto& a : actions_)
         if (a.id == id) return &a;
-    if (legacy::isOld(id)) return find(legacy::modernize(id)); // an id an older version saved
+    if (const std::string now = legacy::modernizeId(id); now != id) return find(now); // an id an older version saved
     return nullptr;
 }
 
@@ -524,7 +524,7 @@ void ActionRegistry::overridesFromJson(const Json& j) {
     if (!j.isObject()) return;
     for (const auto& [id, chord] : j.members())
         if (chord.isString()) {
-            overrides_.emplace_back(legacy::modernize(id), chord.asString());
+            overrides_.emplace_back(legacy::modernizeId(id), chord.asString());
         }
 }
 

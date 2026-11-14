@@ -1,0 +1,39 @@
+# Japanese (日本語): the picker shows the name in its own script, one click switches the whole interface live, the kana and
+# kanji draw from the bundled Noto Sans CJK JP subset (the shots show no "?" boxes), the "##" ids stay so the same clicks
+# work, and brush names stay in English. CMake runs it at 1440 and 2880 px wide.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "日本語##language.ja"
+click "日本語##language.ja"
+expect_text "言語"
+expect "環境設定##palette.preferences"
+expect_value glyphs_missing == 0
+shot ja-preferences
+click "入力##preferences.input"
+expect_value glyphs_missing == 0
+shot ja-preferences-input   # wrapped help text: no 、。」 at a line start, no Latin name cut in two
+key escape
+
+expect "ファイル##palette.file"
+expect "ツール##palette.tool"
+expect "Clay Block##brush.clayblock"
+expect_value glyphs_missing == 0
+shot ja-tool-panel
+click "ジオメトリ##tool.geometry"
+expect_value glyphs_missing == 0
+shot ja-geometry
+click "ジオメトリ##tool.geometry"
+
+# Back to English unchanged; the other CJK languages still draw (the JP subset merges only the name 日本語 there).
+click "環境設定##palette.preferences"
+click "インターフェース##preferences.interface"
+click "简体中文##language.zh-CN"
+expect_text "语言"
+expect "日本語##language.ja"
+expect_value glyphs_missing == 0
+click "English##language.en"
+expect "Preferences##palette.preferences"
+expect_no_text "言語"
+key escape

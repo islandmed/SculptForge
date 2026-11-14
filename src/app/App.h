@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ai/AiCommands.h"
 #include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
 #include "ai/Consent.h"
@@ -122,6 +123,7 @@ struct AppOptions {
     std::string demo;       // scripted demo to play (see Demo.h)
     std::string recordPath; // record the session to this .mp4 (needs ffmpeg) and exit
     std::string uiRecordPath; // --ui-test: also record every frame, paced to real time, to this .mp4 (launch clips)
+    bool uiRecordClip = false; // --ui-test --record: a small unpaced bug clip (crf 23, veryfast) instead of a launch clip
     std::string demoAsset;  // file the demo opens (image or model)
     std::string demoOutput; // where the demo saves its result (optional)
     int fps = 30;
@@ -555,6 +557,7 @@ private:
     float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
+    void keepWindowInView(const CanvasRect& c); // after Begin: the window inside the view (PanelSupport.cpp)
     void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
@@ -1213,6 +1216,7 @@ private:
     glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point
     float kelvinPending_ = 0.0f;   // Twist / Scale: the turn or scale still to apply
     float kelvinAmount_ = 1.0f;
+    bool kelvinMaskHinted_ = false;     // this stroke's "nothing near a mask" hint was shown
     bool kelvinMovedThisFrame_ = false; // kelvinTo moved it since the last kelvinCatchUp
     static void SDLCALL onVdmChosen(void* userdata, const char* const* files, int filter);
     static void SDLCALL onVdmExportChosen(void* userdata, const char* const* files, int filter);
@@ -1358,13 +1362,27 @@ private:
     void pollAutoUv();
     // A command that runs on a worker (uv_auto): it returned at once and its result comes later. The console, the AI
     // link and UI tests wait for it before their next statement, then take its result (once).
-    bool commandRunning() const { return autoUv_ && autoUv_->command; }
+    bool commandRunning() const { return (autoUv_ && autoUv_->command) || generateCommand_; }
     bool takeCommandResult(CommandResult& out) {
         if (!commandResult_) return false;
         out = *std::exchange(commandResult_, std::nullopt);
         return true;
     }
     std::optional<CommandResult> commandResult_;
+    // image_to_3d / text_to_3d from a command (console, script, AI tool): the service call waits on a worker (minutes at
+    // worst, the window stays alive and shows its status), the result lands in pollGenerateCommand (PanelGenerate3D.cpp).
+    struct GenerateCommandJob {
+        std::string name;
+        Args args;
+        ai::GenerateJob job;
+        std::shared_ptr<ai::GenerationProgress> progress;
+        std::future<ai::GeneratorResult> done;
+        std::chrono::steady_clock::time_point start;
+        uint64_t revision = 0; // the scene it will replace: if it changed meanwhile, nothing is replaced
+    };
+    std::unique_ptr<GenerateCommandJob> generateCommand_;
+    CommandResult startGenerateCommand(const std::string& name, const Args& args);
+    void pollGenerateCommand();
     struct AutoUvJob {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
@@ -1566,6 +1584,13 @@ private:
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
+    // Customize Shelves, Ctrl+Alt: sliders that can be picked up and dropped on a shelf (PanelRetopo.cpp); compact: the shelf's copy,
+    // the slider alone at the width set before. The Guide Strength, Target Quads and Level sliders draw through these.
+    bool beginShelfGrab();
+    void endShelfGrab(const char* buttonId, const char* item, const char* title);
+    void drawGuideStrength(bool compact = false);
+    void drawTargetQuads(bool compact = false);
+    void drawLevelSlider(bool compact = false); // PanelGeometry.cpp
     void drawVoxelResolution(bool compact = false); // the slider (2/3 of its travel for 32-512) and the estimate line; compact: the shelf's, the slider alone at the width set before
     void drawVoxelHighResConfirm();
     struct VoxelEstimateCache {
@@ -2091,6 +2116,20 @@ private:
 
     // ---- Shell (A): layout, shelves, palettes, trays, theme ----
     float topInset() const;  // window px kept clear at the top (camera notch)
+    // Window px the system covers (camera cut-out, bars, gesture area; SDL's safe area). UI tests: `safe_area` sets them.
+    struct SafeInsets {
+        float l = 0.0f, t = 0.0f, r = 0.0f, b = 0.0f;
+    };
+    SafeInsets safeInsets() const;
+    CanvasRect safeRect() const; // the window inside those insets
+    bool safeInsetsTest_ = false;
+    SafeInsets safeInsetsTestValue_;
+    // Android's Back (SDLK_AC_BACK): closes the topmost card or window and answers true; false: nothing open, the system's
+    // Back (leave the app) goes on. androidBackWanted() is the same question, for SDL's trap-the-button hint.
+    bool androidBack();
+    bool androidBackWanted() const;
+    ImVec4 welcomeCloseRect_{}, welcomeXRect_{}; // the welcome's Close button and title-bar X as last drawn (UI tests)
+    float welcomeScrollY_ = 0.0f, welcomeScrollMax_ = 0.0f, welcomeBodyH_ = 0.0f; // its scrolling part on a phone (PanelSupport.cpp)
     bool hideBrushCursor_ = false; // demos: camera moves while the cursor is off screen
     float fpsShown_ = -1.0f; // title-strip frame rate, refreshed twice a second
     double fpsShownAt_ = 0.0;
@@ -2148,6 +2187,8 @@ private:
     bool paletteHeader(const char* id, bool inTray, bool right); // false: collapsed
     void drawPaletteBody(const std::string& id);
     void movePaletteToTray(const std::string& id, bool right);
+    void setTrayOpen(bool right, bool open);
+    bool trayShown(bool right) const;
     void removePaletteFromTrays(const std::string& id);
     // In a tray that is drawn: below 1280 px the right tray isn't, and its palettes open as drop-downs instead.
     bool paletteInShownTray(const std::string& id) const;
@@ -3276,6 +3317,13 @@ private:
     bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
     void touchTick();                          // once a frame: a held press that waited long enough goes through
     void touchFlushPress();
+    void fitStartView(bool resized); // the starting model fits a narrow view (Shell.cpp)
+    bool startFrameChecked_ = false;
+    bool autoFramed_ = false;              // the camera is still where fitStartView left it
+    glm::vec3 autoFramedTarget_{0.0f};
+    float autoFramedDistance_ = 0.0f;
+    void logWindowGeometry() const;            // one log line: window, pixels, density, safe area, UI scale (Android bug reports)
+    void touchReset();                         // every finger forgotten (focus lost, a resize): no gesture stays stuck
     void touchApply(const TwoFingerStep& step);
     TouchGesture touch_;
     bool touchNavigates_ = false;   // this touch began over the 3D view

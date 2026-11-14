@@ -21,7 +21,7 @@ void readStrings(const Json& j, std::vector<std::string>& out) {
     out.clear();
     for (size_t i = 0; i < j.size(); ++i)
         if (j[i].isString() && !j[i].asString().empty()) {
-            out.push_back(legacy::modernize(j[i].asString()));
+            out.push_back(legacy::modernizeId(j[i].asString())); // (a custom brush's name is the user's text)
         }
 }
 
@@ -100,6 +100,11 @@ Json toJson(const UiLayout& l) {
     j.set("libraryTab", l.libraryTab);
     j.set("libraryBottom", l.libraryBottom);
     j.set("shelfTiles", double(l.shelfTiles));
+    if (!l.brushIds.empty()) {
+        Json ids = Json::object();
+        for (const auto& [name, id] : l.brushIds) ids.set(name, id);
+        j.set("brushIds", ids);
+    }
     return j;
 }
 
@@ -207,6 +212,10 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     if (j["libraryTab"].isString()) out.libraryTab = j["libraryTab"].asString();
     flag("libraryBottom", out.libraryBottom);
     out.shelfTiles = std::clamp(int(j["shelfTiles"].asNumber(out.shelfTiles)), 0, 2);
+    if (j["brushIds"].isObject()) // a hand-edited file: short names and ids only, at most 256
+        for (const auto& [name, id] : j["brushIds"].members())
+            if (id.isString() && !id.asString().empty() && id.asString().size() <= 64 && name.size() <= 64 && out.brushIds.size() < 256)
+                out.brushIds[name] = id.asString();
     l = std::move(out);
     return true;
 }

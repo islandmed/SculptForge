@@ -5,6 +5,86 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.12.16
+
+```features
+date: unreleased
+highlight: Pop-ups and the guide in colour by role
+```
+
+- **Pop-up colours**: pop-ups now stand out from the panels, each kind in its own colour with an icon: tips blue, the
+  welcome and the quick tour teal, What's New orange, warnings amber, deletes red. **Preferences > Interface > Look >
+  Pop-up colours > Plain** keeps the old look. The User Guide's tips, notes and warnings get the same colours and
+  icons, and each part of the guide has its own accent.
+- **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
+  names the file instead of staying quiet.
+
+## Version 0.12.15
+
+```features
+date: 2026-11-13
+tagline: Android tablet trays open again, and links on Linux open one browser window.
+highlight: On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle
+highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
+highlight: Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes
+```
+
+- **Trays on tablets**: the Right Tray and the Left Tray open with one tap on their edge handle on tablets, held
+  either way up.
+- **Image to 3D no longer freezes the window** when an AI tool (or the console or a script) runs it: it works in the
+  background, shows its progress in the status line, and the model replaces the scene when it arrives.
+
+## Version 0.12.14
+
+```features
+date: 2026-11-13
+tagline: Shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways.
+highlight: A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name
+highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
+highlight: On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu
+```
+
+- **Welcome on a phone**: held sideways, the welcome window fits the screen, keeps **Close** at its bottom and scrolls
+  with a swipe. Android's Back button closes it (and the other cards that open by themselves).
+- **Help > Copy log to clipboard** is in the Help menu now (it was only in the command search), for reports from a
+  phone where the app's folder can't be opened.
+
+## Version 0.12.13
+
+```features
+date: 2026-11-12
+tagline: SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail.
+highlight: SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome
+highlight: A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh
+highlight: AI agents connected over MCP reach fine detail such as pores and wrinkles
+highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
+highlight: Windows laptops with two graphics chips start on the faster one, and the Clay live preview matches the final stroke
+highlight: A sculpt-ready human base mesh
+highlight: Japanese interface
+highlight: AI agents sculpt down to pores and wrinkles
+```
+
+- **Human (male, A-pose)** starter mesh: an athletic adult man, 180 cm, clean quads with edge loops at the eyes, mouth
+  and joints, UVs, ready to sculpt (**File > New from Starter Mesh**). Built from the CC0 MakeHuman base mesh and
+  shape targets.
+- **Japanese**: the whole interface in Japanese, from **Edit > Preferences > Interface > Language**; computers set to
+  Japanese start in it. A first translation: **native review wanted**, tell us what reads wrong in #testers or an
+  issue.
+- **AI agents reach fine detail**: an AI tool connected over MCP now gets a step-by-step route to finished detail (how
+  dense the mesh must be at each stage, brush sizes), **detail_pass** for pores, skin, wrinkles, scales and scars over
+  a region in one undo step, detail presets for strokes (Detail Crease, Detail Wrinkle, Detail Pores...) and
+  **view_closeup** to look at one spot up close.
+- **Clay:** the live stroke preview now matches the final result (it was drawn too strong).
+- **Masks on Micro levels** now hold: Move no longer pushes masked areas, and the Kelvin brushes and Detail Clone
+  leave a masked Micro level alone where the mask is.
+- **Paint across subdivision levels**: a paint stroke on a lower level blends into the finer detail above it at the
+  stroke's strength. Fine dots and edges the stroke did not touch keep their exact colour (no more black dots or pale
+  halos).
+- **A brush on your shelf stays on your shelf**: rename the brush, sort its file into a folder, or change its name in
+  the file, and the shelf slot still finds it.
+- **Customize Shelves**: Guide Strength, Target Quads (Remesh) and Level (Geometry) can be dragged onto a shelf with
+  Ctrl+Alt+drag, like Voxel Resolution.
+
 ## Version 0.12.12
 
 ```features

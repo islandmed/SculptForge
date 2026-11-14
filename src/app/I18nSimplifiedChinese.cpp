@@ -369,6 +369,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Join the Discord", "加入 Discord"},
     {"Join the community on Discord", "加入 Discord 社区"},
     {"Report a problem", "报告问题"},
+    {"Copy log to clipboard", "复制日志到剪贴板"},
     {"Open log folder", "打开日志文件夹"},
     {"Fixes & suggestions", "修正与建议"},
     {"Benchmark (proof mode)", "性能基准测试（证明模式）"},
@@ -690,6 +691,12 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Face landmark steps", "脸部特征点步骤"},
     {"Subtle", "细微"},
     {"Outline opacity", "轮廓线不透明度"},
+    {"Pop-up colours", "弹窗颜色"},
+    {"By role", "按角色"},
+    {"Pop-up colours: by role", "弹窗颜色: 按角色"},
+    {"Pop-up colours: plain", "弹窗颜色: 普通"},
+    {"Pop-ups in the panels' own colours, as before 0.12.15.", "弹窗使用面板自身的颜色，与 0.12.15 之前相同。"},
+    {"Pop-ups show what they are with a strip, an edge and an icon in one colour: tips and help blue, the welcome and the quick tour teal, What's New orange, warnings amber, deletes red. The default.", "弹窗用同一颜色的色条、边缘和图标显示自己是什么: 提示和帮助为蓝色，欢迎和快速导览为青绿色，新功能为橙色，警告为琥珀色，删除为红色。默认。"},
     {"Viewport cursor", "视口光标"},
     {"Crosshair", "十字线"},
     {"Arrow", "箭头"},
@@ -1313,6 +1320,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"The welcome note shown the first time SculptForge starts.", "第一次启动 SculptForge 时显示的欢迎消息。"},
     {"Open the SculptForge website and user guide in your browser.", "在浏览器中打开 SculptForge 网站与使用指南。"},
     {"Open the issue tracker in your browser.", "在浏览器中打开问题追踪系统。"},
+    {"Copies the last 60 lines of sculptforge.log, so you can paste them into a problem report where a file can't be "
+     "attached or found.",
+     "复制 sculptforge.log 的最后 60 行，方便在无法附加或找不到文件时粘贴到问题报告中。"},
     {"Open the folder with sculptforge.log: what SculptForge did and, after a crash, what crashed. "
      "sculptforge-previous.log beside it is the last session's. Attach both to a problem report.",
      "打开含 sculptforge.log 的文件夹：记录 SculptForge 做了什么，崩溃后则记录是什么崩溃。旁边的"

@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.12 LANGUAGES C CXX)
+project(SculptForge VERSION 0.12.16 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
 # "beta.1" while this is a beta of that version (title bar and About: "0.11.0 Beta 1"), "" for a stable release.
 # scripts/release.sh sets it; release.yml checks the tag against both (v0.11.0-beta.1).
-set(SCULPTFORGE_PRERELEASE "")
+set(SCULPTFORGE_PRERELEASE "beta.1")
 include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -109,6 +109,7 @@ add_library(sculptforge_core STATIC
   src/core/BrushPacks.cpp
   src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
+  src/core/FileReplace.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/Image.cpp
@@ -180,7 +181,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
+  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
@@ -240,6 +241,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedStarterMeshes.cpp sf::assets
   starterHumanHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-head.sfproj.z
   starterBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/bust.sfproj.z
   starterFullBody ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/full-body.sfproj.z
+  starterHumanMale ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-male.sfproj.z
   starterHand ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/hand.sfproj.z
   starterFoot ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/foot.sfproj.z
   starterEar ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/ear.sfproj.z
@@ -387,9 +389,9 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 # App code the tests also run (layout, looks, translations, Library, brush previews, camera, clusters): one static
 # library both link, so an edit to one of these files compiles once, not once per program.
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
-  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
+  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/OpenUrl.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/I18nJapanese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -420,6 +422,7 @@ if(SCULPTFORGE_BUILD_APP)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
     fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
+    fontCjkJp ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansJP-UI.otf # Japanese (the same tool)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the cube app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
     splashWordmark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-wordmark.png # the start-up splash: wordmark and brand bust
@@ -968,6 +971,9 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
       add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
       set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
+      # A members' beta through the whole release step (floor, sums, install check, APKs): tests/release_beta_path_test.sh.
+      add_test(NAME release_beta_path COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_path_test.sh)
+      set_tests_properties(release_beta_path PROPERTIES TIMEOUT 60)
     endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
@@ -1027,6 +1033,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME native_dialogs COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py
                                          ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME native_dialogs_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py --self-test)
+    # MSVC stops at about 128 nested blocks (C1061) and every `else if` nests one: a chain of 100 under src/ fails on Linux
+    # first (0.12.13: UiTest.cpp's step dispatch broke the Windows stage twice). Use a table or a switch.
+    add_test(NAME else_if_chains COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py
+                                         ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME else_if_chains_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py --self-test)
   endif()
 
   # The phone link's relay (services/link-worker, a Cloudflare Worker) under plain Node, when Node 20+ is installed.
@@ -1102,6 +1113,12 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(e2e_quit_clean PROPERTIES LABELS "ui;e2e" TIMEOUT 600 ENVIRONMENT
         "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
     endif()
+    # --ui-test x.sfui --record out.mp4: the before/after clips of bug fixes (needs ffmpeg + ffprobe, else the test skips: exit 77).
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME e2e_record_clip COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/record_clip.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/record_clip.sfui ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/e2e_record_clip)
+      set_tests_properties(e2e_record_clip PROPERTIES LABELS "ui;e2e" TIMEOUT 300 SKIP_RETURN_CODE 77)
+    endif()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
       if(TEST ${t})
@@ -1113,9 +1130,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
     # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
     # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    if(TEST ui_micro_levels)
-      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
-    endif()
+    # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage).
+    foreach(t ui_micro_levels ui_micro_mask_kelvin)
+      if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
+      endif()
+    endforeach()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
@@ -1137,6 +1157,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
     sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
     sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
+    # Guide Strength, Target Quads and Level dropped on a shelf (tests/ui/shelf_slider_drop.sfui), and plain slider drags (slider_drag).
+    sculptforge_ui_test(shelf_slider_drop_1440 shelf_slider_drop --size 1440x900)
+    sculptforge_ui_test(shelf_slider_drop_2880 shelf_slider_drop --size 2880x1800)
     # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
     sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
@@ -1161,6 +1184,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
+    # A shelf slot follows its brush through a rename (tests/ui/shelf_slot_rename.sfui).
+    sculptforge_ui_test(shelf_slot_rename_1440 shelf_slot_rename --size 1440x900)
+    sculptforge_ui_test(shelf_slot_rename_2880 shelf_slot_rename --size 2880x1800)
     # Revert to Saved Layout / Reset Layout from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
     # at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
@@ -1211,6 +1237,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A free Space that returns no model / switched Text to 3D off (tests/ui/generate_space_refused.sfui).
     sculptforge_ui_test(generate_space_refused_1440 generate_space_refused --size 1440x900)
     sculptforge_ui_test(generate_space_refused_2880 generate_space_refused --size 2880x1800)
+    # image_to_3d / text_to_3d from a command run on a worker (tests/ui/generate_command_background.sfui).
+    sculptforge_ui_test(generate_command_background_1440 generate_command_background --size 1440x900)
+    sculptforge_ui_test(generate_command_background_2880 generate_command_background --size 2880x1800)
     sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
@@ -1276,6 +1305,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
     sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
     sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)
+    # Japanese (日本語): the picker, the kana and kanji from the JP font subset, menus and panels at 1440 and 2880 px.
+    sculptforge_ui_test(language_ja_1440 language_ja --size 1440x900)
+    sculptforge_ui_test(language_ja_2880 language_ja --size 2880x1800)
     sculptforge_ui_test(save_visible_parts_1440 sizes/save_visible_parts --size 1440x900)
     sculptforge_ui_test(save_visible_parts_2880 sizes/save_visible_parts --size 2880x1800)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
@@ -1320,7 +1352,24 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     # Trays and columns never scroll sideways at auto scale on a 1920x1200 screen (dm4nd on Discord).
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
+    # The welcome window on a 1080x2400 phone at 300 %: inside the view, its X and Close reachable (Hameron, Pixel).
+    sculptforge_ui_test(welcome_phone hidpi/welcome_phone --size 1080x2400)
+    # The welcome with a finger only (touch taps, Android's Back, safe-area insets), both ways up, two phone densities, and a
+    # swipe that scrolls it in landscape: its X and Close whole and one tap closes (Hameron, Pixel, 11-13).
+    sculptforge_ui_test(welcome_touch_portrait hidpi/welcome_touch --size 1080x2400)
+    sculptforge_ui_test(welcome_touch_landscape hidpi/welcome_touch --size 2400x1080)
+    sculptforge_ui_test(welcome_touch_350_portrait hidpi/welcome_touch_350 --size 1440x3120)
+    sculptforge_ui_test(welcome_touch_350_landscape hidpi/welcome_touch_350 --size 3120x1440)
+    sculptforge_ui_test(welcome_touch_scroll hidpi/welcome_touch_scroll --size 2400x1080)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    # Android tablets (Mali-G72): each tray opens and closes with one finger tap, wide, landscape and upright.
+    sculptforge_ui_test(android_trays_wide_1920 hidpi/android_trays_wide --size 1920x1200)
+    sculptforge_ui_test(android_trays_wide_2560 hidpi/android_trays_wide --size 2560x1600)
+    sculptforge_ui_test(android_trays_narrow_1920 hidpi/android_trays_narrow --size 1920x1200)
+    sculptforge_ui_test(android_trays_narrow_2000 hidpi/android_trays_narrow --size 2000x1200)
+    sculptforge_ui_test(android_trays_narrow_2560 hidpi/android_trays_narrow --size 2560x1600)
+    sculptforge_ui_test(android_trays_portrait_1200 hidpi/android_trays_portrait --size 1200x1920)
+    sculptforge_ui_test(android_trays_portrait_1600 hidpi/android_trays_portrait --size 1600x2560)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
     # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one
     # process, the longest test of every app T0, so it runs as four shards side by side (SF_MODE_MATRIX_SHARD), first.

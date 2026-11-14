@@ -4,24 +4,39 @@
 #
 # Rebuilds assets/starter/*.sfproj.z (the starter meshes, core/StarterMeshes.h) from scratch:
 #   tools/starter/build.sh <sculptforge-cli>
-# Downloads the MakeHuman hm08 base mesh (CC0) at a pinned commit and checks its SHA-256 first
-# (docs/starter-meshes.md), builds the OBJ cages, saves each as a project and compresses it.
+# Downloads the MakeHuman hm08 base mesh and the shape targets the Human (male) uses (all CC0) at a pinned
+# commit and checks their SHA-256 first (docs/starter-meshes.md, makehuman-targets.sha256), builds the OBJ
+# cages, saves each as a project and compresses it.
 set -eu
 CLI=${1:?usage: tools/starter/build.sh <sculptforge-cli>}
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${STARTER_WORK:-$ROOT/build/starter-meshes}
 MH_COMMIT=a8bc2d54ff0ac92e78ff71431b1023eda42bf482
+MH_RAW=https://raw.githubusercontent.com/makehumancommunity/makehuman/$MH_COMMIT/makehuman/data
 MH_SHA256=8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c
-mkdir -p "$WORK/makehuman" "$WORK/obj"
+mkdir -p "$WORK/makehuman/targets" "$WORK/obj"
 BASE="$WORK/makehuman/base.obj"
 if [ ! -f "$BASE" ]; then
-  curl -fsSL -o "$BASE" "https://raw.githubusercontent.com/makehumancommunity/makehuman/$MH_COMMIT/makehuman/data/3dobjs/base.obj"
+  curl -fsSL -o "$BASE" "$MH_RAW/3dobjs/base.obj"
 fi
 echo "$MH_SHA256  $BASE" | sha256sum -c -
-python3 -I "$ROOT/tools/starter/build_starter_meshes.py" "$BASE" "$WORK/obj"
+grep -v '^#' "$ROOT/tools/starter/makehuman-targets.sha256" | while read -r sha path; do
+  f="$WORK/makehuman/targets/$(basename "$path")"
+  [ -f "$f" ] || curl -fsSL -o "$f" "$MH_RAW/targets/$path"
+  echo "$sha  $f" | sha256sum -c - >/dev/null || { echo "checksum mismatch: $path"; exit 1; }
+done
+python3 -I "$ROOT/tools/starter/build_starter_meshes.py" "$BASE" "$WORK/obj" "$WORK/makehuman/targets"
 for obj in "$WORK"/obj/*.obj; do
   id=$(basename "$obj" .obj)
-  "$CLI" -q -c "open_obj path=$obj; save_project path=$WORK/obj/$id.sfproj"
+  if [ "$id" = human-male ]; then
+    # The Human (male)'s definition pass: our brushes on subdivision level 1, in a sculpt layer (human_male_sculpt.py).
+    python3 -I "$ROOT/tools/starter/human_male_sculpt.py" "$obj" "$WORK/obj/human-male.landmarks.json" "$WORK/obj/human-male.strokes"
+    { echo "open_obj path=$obj"; echo "subdiv_divide"; echo "layer_add name=Definition"; cat "$WORK/obj/human-male.strokes"
+      echo "subdiv_level level=1"; echo "save_project path=$WORK/obj/$id.sfproj"; } > "$WORK/obj/human-male.cmds"
+    "$CLI" -q -f "$WORK/obj/human-male.cmds"
+  else
+    "$CLI" -q -c "open_obj path=$obj; save_project path=$WORK/obj/$id.sfproj"
+  fi
   python3 -I -c 'import sys, zlib; open(sys.argv[2], "wb").write(zlib.compress(open(sys.argv[1], "rb").read(), 9))' \
     "$WORK/obj/$id.sfproj" "$ROOT/assets/starter/$id.sfproj.z"
 done

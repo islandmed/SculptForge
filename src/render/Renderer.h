@@ -168,6 +168,14 @@ public:
     // The warm UI test server (app/UiServe.h): shaders linked once and kept for the next Renderer in the same GL
     // context (and the driver check init makes); false frees them.
     static void keepPrograms(bool keep);
+    // The next simpler mesh shader variant (the same feature bits meshProgram takes) for a driver that rejects one:
+    // drops the fanciest bit left, in the order ghost, PBR, normal map, texture, per-triangle data, flat. Returns
+    // `features` unchanged when nothing more can go (then the mesh isn't drawn, and the log says why).
+    static int simplerMeshFeatures(int features) {
+        for (int bit : {kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
+            if (features & bit) return features & ~bit;
+        return features;
+    }
     // Makes `scene` what draw() shows, in order: uploads whatever each visible
     // mesh marked dirty and clears its dirty state (a new slot uploads
     // everything), and frees the slots of ids no longer listed.
@@ -581,13 +589,14 @@ private:
     // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat, kPbr), compiled on first use.
     struct MeshProgram {
         GLuint id = 0;
+        bool failed = false; // the driver rejected this variant (logged once): draws use a simpler one
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
               lightLevels = -1, alpha = -1, microWire = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
-        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
+        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostD = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;

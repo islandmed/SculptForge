@@ -96,7 +96,7 @@ int spikyRims(const Mesh& mesh, int stride, const char* id, int level) {
 
 TEST(starter_meshes_set_and_budget) {
     const auto& all = starterMeshes();
-    CHECK(all.size() == 14);
+    CHECK(all.size() == 15);
     size_t total = 0;
     std::set<std::string> ids;
     for (const StarterMesh& m : all) {
@@ -172,6 +172,25 @@ TEST(starter_meshes_topology_symmetry_and_placement) {
         const float longest = std::max({size.x, size.y, size.z});
         CHECK(longest > 2.0f && longest < 200.0f);
         CHECK(d.path.empty());
+    }
+}
+
+TEST(starter_meshes_human_male) {
+    // The figure: 180 cm, UVs kept through the project and its subdivision levels, the arms in the frontal plane,
+    // the muscle definition in a sculpt layer the artist can turn down (the project ships level 1 + that layer).
+    const StarterMesh* m = findStarterMesh("human-male");
+    CHECK(m != nullptr);
+    for (int level : {0, m->levels}) {
+        Document d = load(*m, level);
+        CHECK(d.parts.size() == 1 && d.parts[0].name == "Human (male, A-pose)");
+        CHECK(d.mesh.hasUvs());
+        CHECK(subdivLevelCount(d.mesh) == level + 2);
+        CHECK(d.mesh.layers.size() == 1 && d.mesh.layers[0].name == "Definition");
+        AABB box;
+        for (const glm::vec3& p : d.mesh.positions) box.expand(p);
+        CHECK(std::abs(box.max.y - 180.0f) < 0.5f);
+        CHECK(box.max.x - box.min.x > 105.0f);  // A-pose: the hands well out from the body (119 cm)
+        CHECK(box.max.z - box.min.z < 40.0f);   // nothing reaching forward: the arms in the frontal plane
     }
 }
 

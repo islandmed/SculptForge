@@ -629,7 +629,7 @@ void App::drawTimelineUi() {
     const float laneTop = y;
     size_t span = n > 1 ? n - 1 : 1; // steps the track shows: the active branch, or a longer other branch
     for (const Timeline::Branch& b : branches) span = std::max(span, b.from + b.length);
-    const float step = (x1 - x0) / float(span);
+    const float step = std::max(x1 - x0, 1.0f) / float(span); // (a track narrower than its margins: tick stride was 0, an endless loop)
     auto xOf = [&](double i) { return x0 + float(i) * step; };
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     uint32_t hovered = Timeline::kNone;

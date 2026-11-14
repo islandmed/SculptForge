@@ -63,6 +63,29 @@ inline ImVec4 gapBg = rgb(0x0d0d0d);
 inline ImVec4 tileBorder = rgb(0x2b2b2b);
 inline ImVec4 focusBorder = rgb(0xf0882e);
 
+// Pop-ups by role (owner 11-13: the guide and the pop-ups "all look the same color" as the interface). Each kind of
+// pop-up sits on a lifted surface with an edge and a strip across its top in its role's colour; its icon and words say
+// the same thing, so colour is never the only cue. The guide's callouts use the same roles (website/style.css --role-*).
+enum class Role {
+    Info,    // tips and help: the big-mesh tip, Ctrl-hover help
+    Learn,   // learning: the welcome, the quick tour
+    New,     // What's New, the new-look card, the membership cards: the SculptForge orange in every look
+    Warning, // licences, things to check before going on
+    Danger,  // confirmations that delete or discard
+    Count
+};
+// Set by applyLook for the current look: `edge` for strips and borders (3:1 on the pop-up), `ink` for text and icons
+// (4.5:1, WCAG AA), `popupBg` the surface they are measured on.
+inline ImVec4 roleEdge[int(Role::Count)] = {rgb(0x4d9de0), rgb(0x2fb5a5), rgb(0xf0882e), rgb(0xe0a830), rgb(0xe5604a)};
+inline ImVec4 roleInk[int(Role::Count)] = {rgb(0x8cc4f2), rgb(0x6fdccd), rgb(0xffb06a), rgb(0xf3c95f), rgb(0xf39a89)};
+inline ImVec4 popupBg = rgb(0x232323);
+inline float popupLift = 0.05f; // how far a role pop-up's surface (and its buttons) step towards white; light looks: 0.5
+// Preferences > Interface > Look > Pop-up colours: off draws every pop-up as before (panel grey, no strip).
+inline bool rolePopups = true;
+inline const ImVec4& edge(Role r) { return roleEdge[int(r)]; }
+inline const ImVec4& ink(Role r) { return roleInk[int(r)]; }
+const char* roleIcon(Role r); // Lucide: lightbulb, graduation cap, sparkles, triangle alert, octagon alert
+
 inline ImU32 u32(const ImVec4& c, float alpha = 1.0f) { return ImGui::ColorConvertFloat4ToU32(ImVec4(c.x, c.y, c.z, c.w * alpha)); }
 
 // How the current look draws the shell, beyond its colours (set by applyLook).
@@ -112,6 +135,7 @@ struct LookSettings {
     // under the pointer). Never the accent on hover.
     int outlines = 1;
     float outlineOpacity = 1.0f; // #98: how strong the borders are, 0-1, on top of Outlines (100%: as the setting draws them)
+    bool rolePopups = true;      // Pop-up colours: by role (0.12.15's default), or plain as before (theme::rolePopups)
 };
 
 // Sets the look's colour tokens, LookStyle and ImGui style (unscaled, like applyStyle). `status` gets a message
