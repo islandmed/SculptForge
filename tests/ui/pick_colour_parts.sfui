@@ -35,4 +35,5 @@ key c
 expect_value brush_color_g == 255
 expect_status Nothing to pick
 wait 0.3
+expect_text then press C
 shot nothing_to_pick

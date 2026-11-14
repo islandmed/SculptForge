@@ -471,14 +471,14 @@ void App::finishPaintStroke(UndoRecord& record) {
 void App::pickColorUnderCursor() {
     doc_.syncBvh();
     if (!canvasRect().contains(mouseX_, mouseY_)) {
-        status_ = "Nothing to pick: point at a Part in the 3D view, then press C";
+        toastInViewport("Nothing to pick: point at a Part in the 3D view, then press C");
         return;
     }
     const PartColorPick pick = pickPartColor(
         doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, mouseX_, mouseY_,
         renderSettings_.baseColor);
     if (pick.part < 0) {
-        status_ = pick.message;
+        toastInViewport(pick.message);
         return;
     }
     const Mesh& mesh = doc_.partMesh(pick.part);
