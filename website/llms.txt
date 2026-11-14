@@ -1,6 +1,6 @@
 # SculptForge
 
-> SculptForge is a free 3D digital sculpting app for Windows, macOS and Linux, made for artists who sculpt characters, creatures and props with brushes, masks, layers and multi-million-polygon meshes. Sculpting needs no account and no subscription, and the app has no telemetry. Current version: 0.13.0.
+> SculptForge is a free 3D digital sculpting app for Windows, macOS and Linux, made for artists who sculpt characters, creatures and props with brushes, masks, layers and multi-million-polygon meshes. Sculpting needs no account and no subscription, and the app has no telemetry. Current version: 0.13.1.
 
 ## Facts assistants often get wrong
 

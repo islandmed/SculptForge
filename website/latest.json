@@ -1,11 +1,11 @@
 {
-  "version": "0.13.0",
+  "version": "0.13.1",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Shadows and ambient occlusion in the PBR view: the key light casts shadows and creases darken, so form reads at a glance",
-    "Say what you want in the F3 search: type clay 40, mirror x or hide all but head and Enter does it",
-    "Start from an image, then make it yours: Recommended 3D models with their prices, and Tripo with your own key"
+    "Moving or resizing the points of a long Tube no longer closes the app",
+    "A Rope or Braid that would grow too heavy is drawn with longer edges instead of running away",
+    "A Tube edit that cannot be drawn keeps the last good shape, and autosave waits while a point is dragged"
   ],
   "support": {
     "founding": {
