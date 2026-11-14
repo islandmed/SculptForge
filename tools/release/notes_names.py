@@ -48,16 +48,17 @@ def readme_line(version, root=ROOT):
 
 
 def names(text):
-    """Issue refs and capitalised words that don't start the text or a sentence/clause."""
+    """Issue refs and capitalised words, but for the one word that starts the text or a sentence. Only that first word:
+    "Voxel Remesh keeps..." still names Remesh, and a name after a colon counts (0.13.2: a stale headline that began
+    "Voxel Remesh ...: Clay strokes ..." passed the first version of this check)."""
     refs = set(re.findall(r"#\d+", text))
     words = set()
     for m in re.finditer(r"(?<![A-Za-z0-9])[A-Z][A-Za-z0-9+]*(?:[- ][A-Z][A-Za-z0-9+]*)*", text):
         before = text[: m.start()].rstrip()
-        if not before or before[-1] in ".:!?*\"(":
-            continue
-        for w in re.split(r"[- ]", m.group(0)):
-            if w and w not in ALLOWED:
-                words.add(w)
+        parts = [w for w in re.split(r"[- ]", m.group(0)) if w]
+        if not before or before[-1] in ".!?*\"(":
+            parts = parts[1:]
+        words.update(w for w in parts if w not in ALLOWED)
     return refs, words
 
 
@@ -122,8 +123,11 @@ def self_test():
         assert problems("9.0.1", [("x", "Fixes #193 and the Tube crash")], root), "an issue of another version passed"
         assert not problems("9.0.1", [("x", "Moving the points of a long Tube no longer closes the app (#215)")], root)
         # sentence starts and the allowed words are not names
-        assert not problems("9.0.1", [("x", "Long Tubes edit. Windows and SculptForge: Moving points")], root)
+        assert not problems("9.0.1", [("x", "Long Tubes edit. Windows and SculptForge: moving points")], root)
         assert not problems("9.0.1", [("x", "Recommended 3D models and the Tube")], root), "a capital inside 3D counted"
+        # the 0.13.2 case: a stale headline whose names start the line or follow a colon
+        bad = problems("9.0.1", [("x", "Voxel Remesh keeps your sculpt smooth: Clay strokes no longer come out grainy")], root)
+        assert any('"Remesh"' in p for p in bad) and any('"Clay"' in p for p in bad), bad
         # no notes for the version yet: no verdict
         assert problems("9.9.9", [("x", "Voxel Remesh")], root) == []
     print("notes_names: ok")
