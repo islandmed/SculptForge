@@ -19,7 +19,6 @@ struct GeneratorResult {
     std::string error;
     std::string note; // shown with the result, e.g. which model ran instead of the chosen one
     std::string privateDir; // set: outputPath is inside it; the caller deletes the folder after import (ai/Hyper3D.h)
-    bool transient = false; // failed for a reason that another provider (or another try) may not share: unreachable, timed out, busy
 };
 
 std::string defaultGeneratorCommand(const std::string& cliPath);

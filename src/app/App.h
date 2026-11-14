@@ -781,7 +781,7 @@ private:
     float projectDepth_ = 0.02f;
     bool projectInvert_ = false;
     char generatorCommand_[1024] = "";
-    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "", tripoKey_[256] = "";
+    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "";
     // ComfyUI: "Test connection" result, bundled workflows, the chosen file's problem (UI format...)
     char comfyUrl_[256] = "";
     struct ComfyCheck {
@@ -848,8 +848,6 @@ private:
     void useAsSculptingBase();
     void pollSculptingBase();
     void drawGeneratedCandidates();
-    void drawRecommendedModels();     // PanelGenerate3D.cpp: the "Recommended" list (price, note, key link, free Space health)
-    std::string hfOffReason() const;  // PanelGenerate3D.cpp: why the free model that would run is switched off ("" = it can run)
     void drawSculptingBase();
 
     glm::vec3 lastDabHit_{0.0f};

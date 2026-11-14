@@ -213,7 +213,6 @@ test_connect_ai             ai
 test_ai_*                   ai
 test_comfyui                ai
 test_hyper3d                ai
-test_tripo_stability        ai
 test_rodin_fal              ai
 test_phone_link             ai
 test_discord_presence       ai

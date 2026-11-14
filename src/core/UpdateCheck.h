@@ -28,14 +28,6 @@ struct SupportFeed {
     int memberRequests = -1;           // features in this release that members asked for
 };
 
-// How the free Hugging Face Spaces behind Generate 3D are doing (the feed's optional "ai3d" block, ai/SpaceHealth.h):
-// {"ai3d": {"spaces": {"trellis-2": {"state": "off", "note": "Switched off by its author"}}}}. A script checks the
-// Spaces and writes it; the app only reads what the update check already fetched (no extra request). state is "up",
-// "slow" or "off"; anything else is dropped. id: letters, digits, '.', '-' (40 at most); note printable text (96 bytes).
-struct SpaceHealthFeed {
-    std::string id, state, note;
-};
-
 struct UpdateInfo {
     std::string version;                 // "0.6.0"
     std::string downloadUrl;             // the download page
@@ -48,7 +40,6 @@ struct UpdateInfo {
     // '-' (32 at most), title printable text (48 bytes at most).
     std::string challengeId, challengeTitle;
     SupportFeed support;
-    std::vector<SpaceHealthFeed> spaceHealth; // at most 16
 };
 
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas

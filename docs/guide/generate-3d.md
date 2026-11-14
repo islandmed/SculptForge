@@ -49,7 +49,7 @@ you haven't touched (the starting sphere) is replaced by it.
    - free models**.
 3. Set the service's options (model, token or key, see below).
 4. Set **Candidates** (1 to 3): how many shapes to make at once. Free and local services start at 3. Paid
-   services (fal.ai, Meshy, Hyper3D, Tripo) start at 1, because each candidate is one generation billed to your key;
+   services (fal.ai, Meshy, Hyper3D) start at 1, because each candidate is one generation billed to your key;
    above 1 the window says how many are billed.
 5. Leave **Remove flat background** on (the default) to drop the flat plane a picture's background often
    becomes: a thin wall behind or a ground under the subject that covers most of the model's bounds. A relief
@@ -102,7 +102,7 @@ Undo goes back to the model as generated.
 
 1. On the **From text** tab, type one object into the box, for example "a stylised dragon head with curled
    horns" or "a cartoon fox sitting".
-2. Pick **Hugging Face - free models**, **fal.ai**, **Meshy**, **Hyper3D**, **Tripo** or **ComfyUI - your server**. Text to 3D does
+2. Pick **Hugging Face - free models**, **fal.ai**, **Meshy** or **ComfyUI - your server**. Text to 3D does
    not work with **My generator command** or **Offline blockout**.
 3. Click **Generate 3D model**.
 
@@ -114,7 +114,6 @@ Which model runs depends on the service:
 | fal.ai | Rodin 2.5 (Hyper3D) when it is the chosen **Model** (Rodin 2.5 or Rodin 2.5 Fast), otherwise Hunyuan3D 3.1 Rapid (Tencent) |
 | Meshy | Meshy's own text-to-3D model |
 | Hyper3D Rodin (direct) | Rodin Gen-2.5 at the chosen **Tier** |
-| Tripo (direct) | Tripo v3.1 (or v3.0), shape only |
 | ComfyUI | The text workflow you choose (the bundled `text-to-3d` uses FLUX.1 schnell and Hunyuan3D 2.1) |
 
 ## Services
@@ -159,17 +158,6 @@ it to refill, or pick another model.
 > in the European Union, the United Kingdom or South Korea. If you work there, choose TRELLIS.2 (free token),
 > Stable Fast 3D or a paid service. Each model has its own licence; read it before using results commercially.
 
-### Recommended models
-
-Start from an image, then make it yours: a generated model is a starting point, and it lands as a clean base ready
-for your brushes. The top of the Generate 3D window lists the models worth starting with, each with what one generation costs, a line
-on what it is good at, and a **Get a key** button that opens the provider's own key page: **Tripo v3.1** (about
-$0.20 a picture, $0.10 a description: fast and good all-round), TRELLIS.2, Hunyuan3D 3.1 and Rodin 2.5 through fal.ai, and the free
-Hugging Face models. Click one to choose it. All of it is optional and off with **Edit > Preferences > AI > Enable AI features**. The prices are the providers' list prices, read from their public pricing pages (the window shows the date) and can change;
-every paid generation is billed to your own account with the provider. A free model whose Space is switched off or
-slow to start says so there and is greyed out in the **Model** list, and Generate runs the first free model that is up.
-When a paid service can't be reached, the free models take over if you have allowed them (see below).
-
 ### fal.ai, Meshy and Hyper3D (paid)
 
 - **fal.ai**: choose a **Model** (TRELLIS.2, Hunyuan3D 3.1 Pro, Hunyuan3D 3.1 Rapid, Meshy 6, Rodin 2.5 or
@@ -184,11 +172,6 @@ When a paid service can't be reached, the free models take over if you have allo
   stays off until you add a key. Your image or description goes to Hyper3D (api.hyper3d.com) and nowhere else,
   and SculptForge asks for the shape only (GLB, no materials). Basic API access (Creator plans) covers Extreme
   Low and Low; the other tiers need Full access.
-
-- **Tripo (direct)**: Tripo v3.1 on Tripo's own service, from an image or a description, asked for the shape only
-  (the cheaper tier). Paste your key from developers.tripo3d.ai into **API key**, then **Save settings**: the key goes
-  into the system keychain. It stays off until you add a key, and your image or description goes to Tripo
-  (openapi.tripo3d.ai) and nowhere else.
 
 Generations are billed to your account with that service. Errors such as "The API key was rejected", "Out of
 credits on this account" or "Rate limited" come from the service.
@@ -346,7 +329,7 @@ Without `service=`, commands use the settings you saved in the app. See
   (not for use in the EU, UK or South Korea); Stable Fast 3D uses the Stability AI Community License (free
   under US $1M annual revenue). Read the licence before commercial use.
 - With ComfyUI, the picture goes only to the server address you entered.
-- Before the first request to a hosted service (each Hugging Face Space family, fal.ai, Meshy, Hyper3D, Tripo, or a
+- Before the first request to a hosted service (each Hugging Face Space family, fal.ai, Meshy, Hyper3D, or a
   ComfyUI on another computer), the panel says what is sent, where, and who pays, and nothing goes until you press
   **Allow**. See [What leaves your computer](interface.md#what-leaves-your-computer).
 

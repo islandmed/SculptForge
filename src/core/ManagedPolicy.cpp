@@ -135,7 +135,7 @@ const std::vector<std::string>& aiProviderIds() {
         // Brush Lab (ai/Providers.h)
         "free", "anthropic", "openai", "ollama", "lmstudio", "vllm", "llamacpp", "litellm", "openrouter", "openai-compatible",
         // Generate 3D (ai/ImageTo3DService.h)
-        "huggingface", "fal", "meshy", "hyper3d", "tripo", "comfyui", "command"};
+        "huggingface", "fal", "meshy", "hyper3d", "comfyui", "command"};
     return ids;
 }
 

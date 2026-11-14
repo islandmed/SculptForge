@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // First-use notice for every third-party AI host. Before the first request to a service on someone else's computer
-// (Pollinations, each Hugging Face Space family, fal.ai, Meshy, Hyper3D, Tripo, any remote OpenAI-compatible server, a remote
+// (Pollinations, each Hugging Face Space family, fal.ai, Meshy, Hyper3D, any remote OpenAI-compatible server, a remote
 // ComfyUI) the panel says what is sent, to which host and who pays, and nothing is sent until the artist presses Allow.
 // Allow is remembered per service (ai.json "sendAllowed"); Preferences > AI lists each one with Revoke. This computer
 // (localhost, 127.x, ::1) needs no notice. A studio's policy (core/ManagedPolicy.h) that lists a provider in
@@ -35,7 +35,7 @@ bool localUrl(const std::string& url);
 SendTarget brushTarget(const AiSettings& settings);
 // What Generate 3D would send (TEXT: a description instead of an image). Offline blockout and your own command are local.
 SendTarget generateTarget(const AiSettings& settings, bool text);
-// A paid Generate 3D service (fal.ai, Meshy, Hyper3D, Tripo) with no key: it refuses on its own before sending anything, so
+// A paid Generate 3D service (fal.ai, Meshy, Hyper3D) with no key: it refuses on its own before sending anything, so
 // "add your key" comes first and the notice after.
 bool generateKeyMissing(const AiSettings& settings);
 // ComfyUI's address check (local unless the artist points it at another computer).

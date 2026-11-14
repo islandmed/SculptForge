@@ -10,10 +10,6 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
-#include "ai/ImageTo3DService.h"
-#include "ai/SpaceHealth.h"
-#include "ai/Tripo.h"
-#include "app/NativeDialog.h"
 
 #include "core/AuditLog.h"
 #include "core/MeshPreview.h"
@@ -32,9 +28,7 @@ constexpr int kPreviewSize = 160;
 constexpr float kSameOutline = 0.02f; // silhouettes closer than this are the same shape
 
 // Services billed per generation on the user's key: one candidate unless the user asks for more.
-bool paidService(const std::string& id) {
-    return id == "fal" || id == "meshy" || id == "hyper3d" || id == "tripo";
-}
+bool paidService(const std::string& id) { return id == "fal" || id == "meshy" || id == "hyper3d"; }
 // Services on the user's own machine or server: one generation at a time (a local GPU runs one model at once).
 bool localService(const std::string& id) { return id == "comfyui" || id == "command"; }
 
@@ -72,84 +66,6 @@ int App::candidateCountForService() const {
     return std::clamp(paidService(svc) ? paidCandidateCount_ : candidateCount_, 1, 3);
 }
 
-std::string App::hfOffReason() const {
-    if (aiSettings_.generatorService != "huggingface") return {};
-    const ai::HfPreset& preset = ai::resolveHfPreset(aiSettings_, textMode_);
-    const ai::health::Entry e = ai::health::of(preset.id);
-    return e.state == ai::health::State::Off ? std::string(tr(ai::health::label(e.state))) + (e.note.empty() ? "" : ": " + e.note)
-                                             : std::string();
-}
-
-void App::drawRecommendedModels() {
-    if (!ImGui::TreeNodeEx(tr("Recommended models"), 0)) return; // (closed: the list is tall; one click opens it, and it stays open)
-    const float scale = uiScale_;
-    ImGui::TextDisabled("%s", tr("Start from an image, then make it yours."));
-    int index = 0;
-    for (const ai::RecommendedModel& m : ai::recommendedModels()) {
-        if (textMode_ && !m.text) continue;
-        ImGui::PushID(index++);
-        const std::string svc = m.service, model = m.model;
-        const bool free = svc == "huggingface";
-        const bool current = aiSettings_.generatorService == svc &&
-                             (model.empty() || (svc == "fal" ? std::string(falModel_) == model
-                                                : svc == "tripo" ? ai::tripo::resolvedModel(aiSettings_.tripoModel) == model
-                                                                 : aiSettings_.hfModel == model));
-        const std::string price = std::string(m.price) == "Free" ? tr("Free") : m.price;
-        std::string health;
-        if (free) {
-            const ai::health::Entry e = ai::health::of(model);
-            if (e.state != ai::health::State::Up)
-                health = std::string(tr(ai::health::label(e.state))) + (e.note.empty() ? "" : ": " + e.note);
-        }
-        const std::string line = health.empty() ? std::string(tr(m.note)) : health; // a free Space's health replaces the note
-        const ImVec2 start = ImGui::GetCursorScreenPos();
-        const float x0 = ImGui::GetCursorPosX(), width = ImGui::GetContentRegionAvail().x;
-        const float wrap = std::max(width - 8 * scale, 40.0f * scale);
-        const float lineH = ImGui::GetTextLineHeightWithSpacing();
-        const float height = lineH + ImGui::CalcTextSize(line.c_str(), nullptr, false, wrap).y + 2 * scale;
-        // One selectable covers the row; the label and the price sit on its first line, the note under them.
-        if (ImGui::Selectable("##rec", current, 0, ImVec2(width, height))) {
-            aiSettings_.generatorService = svc;
-            if (svc == "fal") std::snprintf(falModel_, sizeof falModel_, "%s", m.model);
-            else if (svc == "tripo") aiSettings_.tripoModel = m.model;
-            else if (free) {
-                aiSettings_.hfModel = m.model;
-                aiSettings_.hfModelChosen = true;
-            }
-        }
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-            std::string tip = std::string(tr(m.note)) +
-                              (free ? "" : std::string("\n") + tr("Billed to your own account, at the provider's list price (it can change)."));
-            if (!health.empty()) tip += "\n" + health;
-            ImGui::SetTooltip("%s", tip.c_str());
-        }
-        const ImVec2 after = ImGui::GetCursorScreenPos();
-        ImGui::SetCursorScreenPos(ImVec2(start.x + 4 * scale, start.y));
-        ImGui::TextUnformatted(m.label);
-        ImGui::SameLine(x0 + width - ImGui::CalcTextSize(price.c_str()).x - 4 * scale);
-        ImGui::TextDisabled("%s", price.c_str());
-        ImGui::SetCursorScreenPos(ImVec2(start.x + 4 * scale, start.y + lineH));
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap);
-        if (!health.empty()) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1.0f));
-        else ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextUnformatted(line.c_str());
-        ImGui::PopStyleColor();
-        ImGui::PopTextWrapPos();
-        ImGui::SetCursorScreenPos(after);
-        ImGui::Dummy(ImVec2(0, 0)); // (an item after moving the cursor: ImGui's boundary check)
-        if (*m.keyUrl) {
-            const bool missing = svc == "tripo" ? aiSettings_.resolvedTripoKey().empty() && !tripoKey_[0]
-                                 : svc == "fal" ? aiSettings_.resolvedFalKey().empty() && !falKey_[0]
-                                                : aiSettings_.resolvedHfToken().empty() && !hfToken_[0];
-            if (missing && ImGui::SmallButton(tr(free ? "Get a free token" : "Get a key"))) sf::dialogs::openUrl(m.keyUrl);
-        }
-        ImGui::Dummy(ImVec2(0, 4 * scale)); // (a gap, so a row's button reads as its own and not the next row's)
-        ImGui::PopID();
-    }
-    ImGui::TextDisabled(tr("List prices as of %s; they may change."), ai::kPricesChecked);
-    ImGui::TreePop();
-}
-
 std::string App::textOffKey() const {
     if (!textMode_ || aiSettings_.generatorService != "huggingface") return {};
     return ai::resolveHfPreset(aiSettings_, true).id;
@@ -164,7 +80,6 @@ void App::startGenerator() {
     aiSettings_.falModel = falModel_;
     aiSettings_.meshyKey = meshyKey_;
     aiSettings_.hyper3dKey = hyper3dKey_;
-    aiSettings_.tripoKey = tripoKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     if (!ai::generateKeyMissing(aiSettings_) &&

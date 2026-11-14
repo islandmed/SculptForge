@@ -5,7 +5,6 @@
 #include "ai/Hyper3D.h"
 #include "ai/ImageTo3DService.h"
 #include "ai/Providers.h"
-#include "ai/Tripo.h"
 #include "core/ManagedPolicy.h"
 #include "core/NetworkPolicy.h"
 
@@ -125,7 +124,6 @@ SendTarget generateTarget(const AiSettings& s, bool text) {
     if (svc == "meshy") return hostTarget(s.meshyEndpoint, "Meshy", what, "You: billed per generation to your Meshy key", "meshy");
     if (svc == "hyper3d")
         return hostTarget(hyper3d::kApiBase, "Hyper3D Rodin", what, "You: billed per generation to your Hyper3D key", "hyper3d");
-    if (svc == "tripo") return hostTarget(tripo::kApiBase, "Tripo", what, "You: billed per generation to your Tripo key", "tripo");
     if (svc == "comfyui") {
         SendTarget t = comfyTarget(s.comfyUrl);
         t.what = what;
@@ -137,7 +135,7 @@ SendTarget generateTarget(const AiSettings& s, bool text) {
 bool generateKeyMissing(const AiSettings& s) {
     const std::string& svc = s.generatorService;
     return (svc == "fal" && s.resolvedFalKey().empty()) || (svc == "meshy" && s.resolvedMeshyKey().empty()) ||
-           (svc == "hyper3d" && s.resolvedHyper3dKey().empty()) || (svc == "tripo" && s.resolvedTripoKey().empty());
+           (svc == "hyper3d" && s.resolvedHyper3dKey().empty());
 }
 
 SendTarget comfyTarget(const std::string& url) {
@@ -157,7 +155,7 @@ std::vector<SendTarget> knownTargets(const AiSettings& s) {
         if (*p.endpoint && !p.local) add(brushTarget(withPreset(s, p.id)));
     add(brushTarget(s)); // a custom server
     for (const HfFamily& f : kHfFamilies) add(hfFamilyTarget(f));
-    for (const char* svc : {"fal", "meshy", "hyper3d", "tripo", "comfyui"}) {
+    for (const char* svc : {"fal", "meshy", "hyper3d", "comfyui"}) {
         AiSettings g = s;
         g.generatorService = svc;
         add(generateTarget(g, false));
