@@ -731,3 +731,61 @@ TEST(dyntopo_stress_random_sessions) {
         CHECK(m.colors == start.colors && m.mask == start.mask && m.facegroups == start.facegroups && m.hidden == start.hidden);
     }
 }
+
+// A first Dynamic stroke on a dense Part with a big brush used to look at the whole brush disc every dab (100-380 ms a dab
+// on 800k triangles, a stalled first stroke): the work per dab is bounded, in the triangles it looks at and the
+// operations it does, whatever the brush size, and the surface is coarsened over the dabs that follow.
+TEST(dyntopo_dab_work_is_bounded_on_a_dense_part_under_a_big_brush) {
+    Document d = sphereDoc(6); // 81,920 triangles, edges ~0.02
+    d.sculptor.dyntopo.detail = 0.23f;
+    const Mesh before = d.mesh;
+    CHECK(d.sculptor.beginStroke(d.mesh, "Clay Block"));
+    DynamicTopology& dt = d.sculptor.dynamicTopology();
+    dt.maxRegionTriangles = 24000; // (an 800k Part under a big brush is held to 100k triangles: this one's disc is cut the same way)
+    dt.stats = {};
+    size_t last = d.mesh.triangleCount();
+    size_t shrinking = 0;
+    const int dabs = 12;
+    for (int sym = 0; sym < 2; ++sym) {
+        for (int i = 0; i < dabs; ++i) {
+            CHECK(dabToward(d, glm::vec3(0.12f * float(i), 0.2f, 3.0f), 0.9f, BrushType::ClayBlock, Symmetry{sym == 1, false, false}));
+            shrinking += d.mesh.triangleCount() < last ? 1 : 0;
+            last = d.mesh.triangleCount();
+        }
+        if (sym == 0) {
+            d.undo.push(d.sculptor.endStroke());
+            CHECK(d.sculptor.beginStroke(d.mesh, "Clay Block"));
+        }
+    }
+    CHECK(dt.stats.limited > 0);
+    CHECK(dt.stats.maxRegion <= dt.maxRegionTriangles * 3 / 2);
+    CHECK(dt.stats.maxOps <= 6500);
+    CHECK(shrinking >= size_t(dabs)); // (the detail comes over the dabs: most of them coarsen)
+    CHECK(d.mesh.triangleCount() < before.triangleCount() * 9 / 10);
+    CHECK(invalid(d.mesh, true).empty());
+    CHECK(bvhMatches(d.mesh, d.bvh));
+    UndoRecord r = d.sculptor.endStroke();
+    // The stroke's undo holds the slots it changed, not the Part.
+    CHECK(r.topology != nullptr);
+    CHECK(r.topology->triangleSlots.size() < before.triangleCount() / 2);
+    d.undo.push(std::move(r));
+    while (d.undo.canUndo()) d.undo.undo(d.mesh, d.bvh);
+    CHECK(d.mesh.triangles == before.triangles);
+    CHECK(d.mesh.positions == before.positions);
+}
+
+// Large triangles under a small brush: refined over the dabs, a bounded amount each.
+TEST(dyntopo_dab_work_is_bounded_on_large_triangles_under_a_small_brush) {
+    Document d = sphereDoc(2); // 320 triangles, edges ~0.5
+    d.sculptor.dyntopo.detail = 0.23f;
+    CHECK(d.sculptor.beginStroke(d.mesh, "Clay Block"));
+    DynamicTopology& dt = d.sculptor.dynamicTopology();
+    dt.stats = {};
+    for (int i = 0; i < 20; ++i)
+        CHECK(dabToward(d, glm::vec3(0.02f * float(i), 0.2f, 3.0f), 0.04f, BrushType::ClayBlock, Symmetry{false, false, false}));
+    CHECK(dt.stats.maxOps <= 6500);
+    CHECK(d.mesh.triangleCount() > 1000); // (refined: the first dabs cannot do it all at once, the stroke does)
+    CHECK(invalid(d.mesh, true).empty());
+    CHECK(bvhMatches(d.mesh, d.bvh));
+    d.undo.push(d.sculptor.endStroke());
+}

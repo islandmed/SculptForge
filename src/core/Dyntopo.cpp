@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Dyntopo.h"
 
+#include "core/ThreadPool.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -665,13 +667,22 @@ void DynamicTopology::matchMirrors(const std::vector<uint32_t>& verts) {
         }
         return best;
     };
+    // Each vertex's partner is worked out in parallel (the grid is only read), then taken in order, so the pairs are
+    // those the one-by-one search finds.
+    std::vector<uint32_t> partner(verts.size());
     for (size_t k = 0; k < mirrorSigns_.size(); ++k) {
         const SymCopy& s = mirrorSigns_[k];
-        for (uint32_t v : verts) {
-            if (mirrorOf(k, v) != kNone) continue; // (its partner found it first)
-            const uint32_t w = nearest(s.point(m.positions[v]));
-            if (w == kNone || nearest(s.inversePoint(m.positions[w])) != v) continue;
-            setMirror(k, v, w);
+        poolFor(verts.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = verts[i];
+                const uint32_t w = nearest(s.point(m.positions[v]));
+                partner[i] = w != kNone && nearest(s.inversePoint(m.positions[w])) == v ? w : kNone;
+            }
+        });
+        for (size_t i = 0; i < verts.size(); ++i) {
+            const uint32_t v = verts[i];
+            if (mirrorOf(k, v) != kNone || partner[i] == kNone) continue; // (its partner found it first)
+            setMirror(k, v, partner[i]);
         }
     }
 }
@@ -1274,7 +1285,8 @@ void DynamicTopology::gatherRegion() {
     };
     // With a margin around each image of the brush: the mirror images of the corners found under one must be
     // among those found under the others, though the sides never match exactly.
-    const float reach = radius_ * 1.25f + target_ * 2.0f;
+    // (With the region cut the margin is the mesh's own size: the target edge of a big brush would bring the disc back.)
+    const float reach = radius_ * 1.25f + (cut_ ? std::min(target_, 4.0f * meshEdge_) : target_) * 2.0f;
     bvh_->queryTriangles(*mesh_, center_, reach, tris);
     addCorners(tris);
     for (const SymCopy& s : mirrorSigns_) {
@@ -1296,6 +1308,41 @@ void DynamicTopology::gatherRegion() {
     }
     eps_ = std::max(typical * 0.3f, 1e-7f);
     matchMirrors(verts);
+}
+
+// A dab remeshes at most maxRegionTriangles triangles, the ones nearest its centre: radius_ shrinks to hold them.
+// Finding the region, pairing its mirror images and building the edge heaps cost time in proportion to it, and a
+// dab does at most maxOps_ operations whatever its size, so a big brush over a dense Part (803k triangles under a
+// brush as big as the head: 100-380 ms a dab, a stalled first stroke) spent most of every dab looking at triangles
+// it would not touch. The rest of the brush's disc is remeshed by the dabs that follow, as the brush moves and
+// as the operations the cap leaves undone come round again; the brush itself still moves the whole disc.
+void DynamicTopology::limitRegion() {
+    bvh_->queryTriangles(*mesh_, center_, radius_, regionTris_);
+    const auto& p = mesh_->positions;
+    // The mesh's own edge length under the brush (a sample): the margins below are in it, not in the target edge, which
+    // a big brush makes many triangles long.
+    float edge = 0.0f;
+    size_t sampled = 0;
+    for (size_t i = 0; i < regionTris_.size(); i += regionTris_.size() / 64 + 1, ++sampled) {
+        const glm::uvec3& tri = mesh_->triangles[regionTris_[i]];
+        edge += glm::distance(p[tri.x], p[tri.y]);
+    }
+    meshEdge_ = edge / float(std::max<size_t>(sampled, 1));
+    cut_ = false;
+    if (regionTris_.size() <= maxRegionTriangles) return;
+    cut_ = true;
+    std::vector<float>& d2 = capDist_;
+    d2.clear();
+    d2.reserve(regionTris_.size());
+    for (uint32_t t : regionTris_) {
+        const glm::uvec3& tri = mesh_->triangles[t];
+        const glm::vec3 c = (p[tri.x] + p[tri.y] + p[tri.z]) * (1.0f / 3.0f) - center_;
+        d2.push_back(glm::dot(c, c));
+    }
+    std::nth_element(d2.begin(), d2.begin() + std::ptrdiff_t(maxRegionTriangles), d2.end());
+    const float nearest = std::sqrt(d2[maxRegionTriangles]) + 2.0f * meshEdge_; // (a triangle or two past the last centre kept)
+    radius_ = std::min(radius_, nearest);
+    ++stats.limited;
 }
 
 bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength,
@@ -1344,17 +1391,32 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     }
     ops_ = 0;
     maxOps_ = 6000; // (bounds a dab's time: a big brush over fine triangles coarsens them over several dabs)
+    limitRegion(); // (and so does the region it looks at: the work follows what it does, not the brush size)
 
+    auto lap = std::chrono::steady_clock::now();
+    auto phase = [&](double& into) {
+        const auto now = std::chrono::steady_clock::now();
+        into += std::chrono::duration<double, std::milli>(now - lap).count();
+        lap = now;
+    };
     gatherRegion();
+    phase(stats.gatherMs);
     if (regionTris_.empty()) return false;
+    stats.maxRegion = std::max(stats.maxRegion, regionTris_.size());
     splitPass();
     bvh.refitChanged(mesh);
+    phase(stats.splitMs);
     queryRegion();
+    phase(stats.gatherMs);
     collapsePass();
+    phase(stats.collapseMs);
     flipPass();
+    phase(stats.flipMs);
     relaxPass();
     const bool changed = !changedV_.empty() || !changedT_.empty();
     compact();
+    stats.maxOps = std::max(stats.maxOps, ops_);
+    phase(stats.relaxMs);
 
     // Rings and normals of everything that changed, the BVH's boxes, and what the renderer must patch.
     const uint32_t nv = uint32_t(mesh.vertexCount());
@@ -1387,6 +1449,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     bvh.refitChanged(mesh);
     mesh.changedTriangles.insert(mesh.changedTriangles.end(), changedT_.begin(), changedT_.end());
     changedT_.clear();
+    phase(stats.finishMs);
     lastMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
     return changed;
 }
