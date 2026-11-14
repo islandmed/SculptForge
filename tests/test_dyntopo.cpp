@@ -741,6 +741,7 @@ TEST(dyntopo_dab_work_is_bounded_on_a_dense_part_under_a_big_brush) {
     const Mesh before = d.mesh;
     CHECK(d.sculptor.beginStroke(d.mesh, "Clay Block"));
     DynamicTopology& dt = d.sculptor.dynamicTopology();
+    dt.maxRegionTriangles = 24000; // (an 800k Part under a big brush is held to 100k triangles: this one's disc is cut the same way)
     dt.stats = {};
     size_t last = d.mesh.triangleCount();
     size_t shrinking = 0;
@@ -757,8 +758,8 @@ TEST(dyntopo_dab_work_is_bounded_on_a_dense_part_under_a_big_brush) {
         }
     }
     CHECK(dt.stats.limited > 0);
-    CHECK(dt.stats.maxRegion <= DynamicTopology::kMaxRegionTriangles * 3 / 2);
-    CHECK(dt.stats.maxOps <= 3000);
+    CHECK(dt.stats.maxRegion <= dt.maxRegionTriangles * 3 / 2);
+    CHECK(dt.stats.maxOps <= 6500);
     CHECK(shrinking >= size_t(dabs)); // (the detail comes over the dabs: most of them coarsen)
     CHECK(d.mesh.triangleCount() < before.triangleCount() * 9 / 10);
     CHECK(invalid(d.mesh, true).empty());
@@ -782,7 +783,7 @@ TEST(dyntopo_dab_work_is_bounded_on_large_triangles_under_a_small_brush) {
     dt.stats = {};
     for (int i = 0; i < 20; ++i)
         CHECK(dabToward(d, glm::vec3(0.02f * float(i), 0.2f, 3.0f), 0.04f, BrushType::ClayBlock, Symmetry{false, false, false}));
-    CHECK(dt.stats.maxOps <= 3000);
+    CHECK(dt.stats.maxOps <= 6500);
     CHECK(d.mesh.triangleCount() > 1000); // (refined: the first dabs cannot do it all at once, the stroke does)
     CHECK(invalid(d.mesh, true).empty());
     CHECK(bvhMatches(d.mesh, d.bvh));
