@@ -99,13 +99,19 @@ struct TopologyUndo {
 
 struct DyntopoStats {
     size_t splits = 0, collapses = 0, flips = 0;
+    size_t maxRegion = 0, maxOps = 0; // the most triangles one remesh looked at, and the most operations it did
+    size_t limited = 0;  // remeshes whose region was cut to kMaxRegionTriangles
     size_t unpaired = 0; // operations whose mirror image wasn't found (an asymmetric mesh, or one edited without symmetry)
+    // Where remesh()'s milliseconds went, summed over remeshes: finding the region, each pass, rings + normals + BVH.
+    double gatherMs = 0.0, splitMs = 0.0, collapseMs = 0.0, flipMs = 0.0, relaxMs = 0.0, finishMs = 0.0;
 };
 
 // Remeshes the surface under brush dabs (see the top of this file). One per Sculptor; a stroke's first remesh
 // starts recording, finish() ends the stroke.
 class DynamicTopology {
 public:
+    // The most triangles one dab looks at (see limitRegion).
+    static constexpr size_t kMaxRegionTriangles = 24000;
     // Remeshes within `radius` of `center` and of its symmetric copies (`mirrors` as Sculptor::copies makes them:
     // mirror images and radial turns, the identity first) towards edges of `edgeLength`. Returns false when
     // nothing changed.
@@ -192,6 +198,7 @@ private:
     void flip(uint32_t a, uint32_t b, uint32_t c, uint32_t d);
     void relaxPass();
     void pushEdgesAround(uint32_t v, bool longer);
+    void limitRegion();
     void gatherRegion();
     void queryRegion();
 
@@ -215,6 +222,8 @@ private:
     std::vector<uint64_t> gridKeys_; // matchMirrors' search grid
     std::vector<uint32_t> gridHead_, gridNext_;
     std::vector<uint32_t> seen_, regionVerts_; // gatherRegion: vertices listed this remesh (seen_ == mirrorStamp_)
+    std::vector<float> capDist_;
+    float meshEdge_ = 0.0f; // the mesh's edge length under the brush (limitRegion)
     std::vector<uint8_t> deadV_, deadT_;
     std::vector<uint32_t> freeV_, freeT_;
     std::vector<uint32_t> changedV_, changedT_, regionTris_, slivers_;

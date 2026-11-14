@@ -1,0 +1,22 @@
+# A first Dynamic stroke on a dense Part with a big brush (a remeshed head, Detail 23): it coarsens the surface under the
+# brush every dab, in clusters all over the brush's disc, and used to send the whole Part to the GPU every frame (and,
+# in a big scene, rebuild its coarse levels each time): the stroke stalled for seconds. The stroke's remeshed clusters go
+# up as patches, and the Part is sent whole once at most (at the release, when the patches outnumber a fresh layout's).
+run new_bench_sphere millions=0.5
+wait 0.5
+expect_value triangles > 400000
+run dyntopo enabled=true detail=23 freeze_levels=true
+click "Clay Block##brush.clayblock"
+brush_size 120
+remember triangles before
+remember part_full_uploads uploads
+stroke 0.35 0.4 0.6 0.5
+wait 0.3
+expect_value triangles < $before
+expect_value part_full_uploads <= $uploads+2
+expect_value render_patch_errors == 0
+stroke 0.4 0.6 0.65 0.55
+wait 0.3
+expect_value part_full_uploads <= $uploads+4
+expect_value render_patch_errors == 0
+shot first_stroke

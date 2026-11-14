@@ -824,6 +824,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   # Remesh timings per path and stage at the UI defaults (tests/tools/remesh_bench.cpp).
   add_executable(sf_remesh_bench tests/tools/remesh_bench.cpp)
   target_link_libraries(sf_remesh_bench PRIVATE sculptforge_core)
+  # One Clay Block stroke with dynamic topology on a dense Part: per-dab and stroke-end ms (tests/tools/dyntopo_bench.cpp).
+  add_executable(sf_dyntopo_bench tests/tools/dyntopo_bench.cpp)
+  target_link_libraries(sf_dyntopo_bench PRIVATE sculptforge_core)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)

@@ -2113,8 +2113,10 @@ bool Renderer::notePatches(MeshSlot& s, const Mesh& mesh) {
             for (uint32_t i = 0; i < s.order.clusterTriangles(c); i += UploadOrder::kChunkTriangles)
                 s.chunkCluster[s.order.triangle(c, i) >> UploadOrder::kChunkShift] = c;
     }
-    // More than this many and a full upload (a fresh layout) is cheaper to keep drawing.
-    const size_t limit = std::max<size_t>(64, nc / 4);
+    // More than this many and a full upload (a fresh layout) is cheaper to keep drawing. Not while a stroke remeshes
+    // (dynamic topology): a big brush over a dense Part changes clusters all over its disc every dab, and a full upload
+    // each frame (with its layout, bounds and, at the next sync, coarse levels made again) was the first stroke's stall.
+    const size_t limit = stroking_ ? std::max<size_t>(256, nc * 3 / 4) : std::max<size_t>(64, nc / 4);
     for (uint32_t t : mesh.changedTriangles) {
         uint32_t* slotOfPatch;
         uint32_t key;
@@ -2428,7 +2430,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // The GPU keeps the vertices in the slot's cluster layout (core/UploadOrder.h), so a dab re-sends a few
     // short ranges holding what it changed, gathered from the mesh arrays.
     bool indicesDone = false;
-    if (full) ++fullUploads_;
+    if (full) ++fullUploads_, ++s.fullUploads;
     if (full) {
         // The index buffer is written while the layout is made (mapped: the build's threads write each
         // cluster's drawn triangles straight into it).
@@ -2542,7 +2544,8 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
             }
         }
     }
-    if (coarseLod_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
+    // (Not while a stroke runs: a remeshing stroke's full uploads would each rebuild them, and they are for the view moving.)
+    if (coarseLod_ && !stroking_ && !s.coarseTried && !s.outOfMemory && s.drawnTriangles > (lodBudget_ ? lodBudget_ : triangleBudget(RenderSettings())))
         buildCoarse(s, mesh);
     if (s.coarse && !s.coarsePending.empty() && !s.coarseEdited && !stroking_) updateCoarse(s, mesh); // (the stroke is over)
     s.coarseEdited = false;
