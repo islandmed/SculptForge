@@ -1,6 +1,7 @@
 # Voxel Remesh up to 4096: two thirds of the Resolution slider for 32-512, the estimated
 # triangles under it, a one-time confirmation above 512 (again after going back to 512 or less), and a refusal
-# with what it needs when the remesh won't fit in the free memory.
+# with what it needs when the remesh won't fit in the free memory (past RAM + swap: refused with the numbers; between
+# free memory and RAM + swap: a "may use swap" dialog, Cancel by default).
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=4
 run transform scale=1,0.04,0.04
@@ -66,6 +67,98 @@ expect_value voxel_highres_confirm == 1
 expect_no_text fast computer
 click "Cancel##voxelhighres"
 
+# More than is free but within RAM + the most swap (a computer with 10 MB free of 4 GB RAM and 2 GB of swap): a different dialog,
+# Cancel by default, asked every time. Proceed anyway autosaves, then remeshes with the usual progress.
+env SF_AVAILABLE_MEMORY_MB 10
+env SF_TOTAL_MEMORY_MB 4096
+env SF_SWAP_MAX_MB 2048
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+expect_value voxel_highres_confirm == 0
+expect_text "It may use swap and be slow"
+shot voxel_swap_confirm
+click "Cancel##voxelswap"
+expect_value voxel_swap_confirm == 0
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+click "Proceed anyway##voxelswap"
+expect_value voxel_swap_confirm == 0
+wait_idle 120
+expect_status Remeshed
+expect_value triangles > 20000
+key ctrl+z
+expect_value triangles == $before
+# Nothing is remembered: the next one asks again.
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+click "Cancel##voxelswap"
+# ONE estimate and ONE dialog at every Resolution, 512 and below too (the older "Not enough free memory" one is gone for remesh).
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 256
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+expect_value voxel_highres_confirm == 0
+expect_value memory_confirm_open == 0
+expect_text "It may use swap and be slow"
+click "Cancel##voxelswap"
+expect_value triangles == $before
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 512
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+expect_value voxel_highres_confirm == 0
+expect_value memory_confirm_open == 0
+expect_text "It may use swap and be slow"
+click "Cancel##voxelswap"
+expect_value triangles == $before
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 600
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+expect_value voxel_highres_confirm == 0
+expect_value memory_confirm_open == 0
+expect_text "It may use swap and be slow"
+click "Cancel##voxelswap"
+expect_value triangles == $before
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 1024
+key enter
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 1
+expect_value voxel_highres_confirm == 0
+expect_value memory_confirm_open == 0
+expect_text "It may use swap and be slow"
+click "Cancel##voxelswap"
+expect_value triangles == $before
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 600
+key enter
+# The computer can't hold it even with swap: no dialog, the numbers and what to do.
+env SF_TOTAL_MEMORY_MB 20
+env SF_SWAP_MAX_MB 0
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_swap_confirm == 0
+expect_value voxel_remesh_running == 0
+expect_status "even with swap"
+env SF_AVAILABLE_MEMORY_MB 0
+env SF_TOTAL_MEMORY_MB 0
+env SF_SWAP_MAX_MB auto
+
 # A heavy result (most of the free memory): the dialog also says sculpting it needs a fast computer.
 env SF_AVAILABLE_MEMORY_MB 1900
 hold ctrl
@@ -79,9 +172,19 @@ expect_text fast computer
 shot voxel_highres_confirm_heavy
 click "Cancel##voxelhighres"
 
-# Won't fit in the free memory: no dialog, no remesh, the status and the red estimate say what it needs.
-env SF_AVAILABLE_MEMORY_MB 200
+# Won't fit even with swap: no dialog, no remesh, the status and the red estimate say what it needs and, when a lower
+# Resolution would fit, which one.
+env SF_AVAILABLE_MEMORY_MB 800
+env SF_TOTAL_MEMORY_MB 900
+env SF_SWAP_MAX_MB 0
 expect_value voxel_resolution == 4096
+click "Voxel Remesh##geometry.remesh"
+expect_value voxel_highres_confirm == 0
+expect_value voxel_swap_confirm == 0
+expect_status "(that fits)"
+expect_value triangles == $before
+env SF_AVAILABLE_MEMORY_MB 200
+env SF_TOTAL_MEMORY_MB 300
 click "Voxel Remesh##geometry.remesh"
 expect_value voxel_highres_confirm == 0
 expect_value voxel_remesh_running == 0
@@ -90,3 +193,5 @@ expect_status Lower the Resolution
 expect_value triangles == $before
 shot voxel_highres_refused
 env SF_AVAILABLE_MEMORY_MB 0
+env SF_TOTAL_MEMORY_MB 0
+env SF_SWAP_MAX_MB auto
