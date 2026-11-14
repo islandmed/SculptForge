@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/GL.h"
 
+#include <algorithm>
+
 #ifdef SF_GLES
 #include <SDL3/SDL_log.h>
 
@@ -10,6 +12,20 @@
 #endif
 
 namespace gl {
+
+namespace {
+uint32_t g_testTexelLimit = 0;
+}
+
+void setTestTexelLimit(uint32_t texels) { g_testTexelLimit = texels; }
+
+GLint maxTextureBufferTexels() {
+    GLint texels = 0;
+    GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+    return g_testTexelLimit ? std::min(texels, GLint(g_testTexelLimit)) : texels;
+}
+
+uint32_t bufferChunkTexels(uint32_t natural) { return g_testTexelLimit ? std::min(natural, g_testTexelLimit) : natural; }
 
 #define SF_GL_DEFINE(ret, name, ...) PFN_##name name = nullptr;
 SF_GL_FUNCTIONS(SF_GL_DEFINE)

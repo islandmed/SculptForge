@@ -455,6 +455,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Demo.cpp
     src/app/UiTest.cpp
     src/app/UiTestModes.cpp
+    src/app/UiTestRender.cpp
     src/app/NativeDialog.cpp
     src/app/UiServe.cpp
     src/app/Ui.cpp
@@ -1114,6 +1115,18 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(e2e_quit_clean PROPERTIES LABELS "ui;e2e" TIMEOUT 600 ENVIRONMENT
         "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
     endif()
+    # The render matrix (tests/render_matrix, docs/testing-flow.md): the model is drawn in every shading mode on every mesh path,
+    # the over-the-GPU-limit ones included. Label t0: it is in the T0 set whenever the app or its renderer changes.
+    sculptforge_ui_test(render_matrix ../render_matrix/matrix)
+    set_tests_properties(ui_render_matrix PROPERTIES LABELS "ui;t0" TIMEOUT 180)
+    # Nightly, on the PC's real GPU: the benchmark scenes (a plain mesh and a micro level) drawn in every shading mode, failing when the
+    # model is not in the picture (SF_BENCH_RENDER_CHECK, src/app/Bench.cpp). The same cells as the matrix, at size.
+    add_test(NAME render_check_gpu COMMAND sculptforge --bench --bench-view --bench-sizes 1 --bench-no-project
+             --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu.md)
+    add_test(NAME render_check_gpu_micro COMMAND sculptforge --bench --bench-view --bench-micro --bench-sizes 2 --bench-no-project
+             --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu_micro.md)
+    set_tests_properties(render_check_gpu render_check_gpu_micro PROPERTIES LABELS "nightly" TIMEOUT 900 RUN_SERIAL TRUE
+                         ENVIRONMENT "SF_BENCH_RENDER_CHECK=1")
     # --ui-test x.sfui --record out.mp4: the before/after clips of bug fixes (needs ffmpeg + ffprobe, else the test skips: exit 77).
     if(NOT WIN32 AND Python3_Interpreter_FOUND)
       add_test(NAME e2e_record_clip COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/record_clip.py

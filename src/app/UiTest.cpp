@@ -1688,6 +1688,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "dialogs_requested") return double(dialogs::requested());
     if (name == "dialog_kind") return double(int(dialogs::lastKind()));
+    if (name == "render_coverage") return queryRender(name, known); // (UiTestRender.cpp)
     return queryModes(name, known); // latched, sculpted ... (UiTestModes.cpp); sets known
 }
 

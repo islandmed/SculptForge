@@ -1053,7 +1053,7 @@ bool Renderer::init(std::string& error) {
     {   // (the lines a graphics-driver report needs: who made it, which shader language, the limits the renderer leans on)
         GLint samples = 0, texels = 0, vecs = 0;
         gl::GetIntegerv(GL_MAX_SAMPLES, &samples);
-        gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+        gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels); // (the driver's own, not a test's lowered one)
         gl::GetIntegerv(0x8DFD /* GL_MAX_FRAGMENT_UNIFORM_VECTORS */, &vecs);
         const auto str = [](GLenum n) { const GLubyte* v = gl::GetString(n); return v ? reinterpret_cast<const char*>(v) : "?"; };
         SDL_Log("GL vendor %s, GLSL %s, max samples %d, texture buffer %d texels, fragment uniforms %d", str(0x1F00),
@@ -1445,8 +1445,7 @@ void Renderer::shutdown() {
 void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
     if (version == splatVersion_) return;
     splatVersion_ = version;
-    GLint maxTexels = 0;
-    gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &maxTexels);
+    const GLint maxTexels = gl::maxTextureBufferTexels();
     const size_t n = std::min(c.size(), size_t(std::max(maxTexels, 0)) / 4);
     std::vector<glm::vec4> texels(n * 4);
     splatCenters_.resize(n);
@@ -1891,8 +1890,7 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
     }
 
     // The drawn triangles in draw order (the clusters' order), for the per-triangle data.
-    GLint maxTexels = 0;
-    gl::GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &maxTexels);
+    const GLint maxTexels = gl::maxTextureBufferTexels();
     const bool textured = wantUvs && mesh.hasUvs() && drawn * 3 <= size_t(std::max(maxTexels, 0));
     std::vector<uint32_t> drawnTris(groups || textured ? drawn : 0);
     if (!drawnTris.empty()) poolFor(nc, [&](size_t c0, size_t c1) {

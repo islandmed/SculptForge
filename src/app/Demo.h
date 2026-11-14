@@ -131,6 +131,10 @@ private:
     bool parseModeStep(int line, const std::vector<std::string>& words, std::string& error, bool& handled);
     bool parseDragItemTo(int line, const std::vector<std::string>& words, std::string& error);
     double queryModes(const std::string& name, bool& known) const;
+    // The render matrix (UiTestRender.cpp): gl_limits, render_cell and their value.
+    bool parseRenderStep(int line, const std::vector<std::string>& words, std::string& error);
+    double queryRender(const std::string& name, bool& known) const;
+    double lastRenderCoverage_ = 0.0;
     int openEdges() const;
     bool buildModeMatrix(int line, const std::vector<std::string>& only, std::string& error);
     bool buildMonkey(int line, uint64_t seed, int count, std::string& error);

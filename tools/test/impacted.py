@@ -59,6 +59,7 @@ HAND_MAP = [
     ("src/app/*.cpp", "i18n_coverage"), ("src/*", "native_dialogs else_if_chains"),
     ("scripts/check_else_if_chains.py", "else_if_chains else_if_chains_self_test"), ("tools/i18n/*", "i18n_coverage"),
     ("tools/test/*", "test_impact test_affected test_areas"),
+    ("tests/render_matrix/*", "ui_render_matrix"),
     ("tests/ui/data/*", ""),  # step 3 handles these
 ]
 # Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip. stale_tree
@@ -66,7 +67,7 @@ HAND_MAP = [
 # CMake edit made the run full.
 ALWAYS = ["marks", "stale_tree"]
 # The app's own sanity set, whenever the app program changed.
-SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke",
+SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke", "ui_render_matrix",
          "ui_mode_matrix_0of4", "ui_mode_matrix_1of4", "ui_mode_matrix_2of4", "ui_mode_matrix_3of4", "ui_monkey"]  # (every mode can be left; seeded user-action fuzz: UiTestModes.cpp)
 # The per-push tier's smoke (--tier push, docs/testing-flow.md "Tiers"): the app starts, opens a model and sculpts on the
 # real frame loop, undo / redo, a project saved and opened. The mode matrix, the monkey and the co-changed tests wait for

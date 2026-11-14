@@ -234,4 +234,11 @@ using ProcLoader = GenericProc (*)(const char* name);
 // Returns the name of the first missing function, or nullptr on success.
 const char* load(ProcLoader loader);
 
+// The buffer-texture limit the renderer reads (GL_MAX_TEXTURE_BUFFER_SIZE, in texels) and the most texels one buffer of the
+// micro renderer holds (`natural`, 2^26): the driver's, or less while a UI test script has lowered it (`gl_limits`, tests only,
+// no setting or environment reaches it), so the path a mesh past a small GPU's limits takes runs on CI's.
+GLint maxTextureBufferTexels();
+uint32_t bufferChunkTexels(uint32_t natural);
+void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+
 } // namespace gl
