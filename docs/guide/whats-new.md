@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.3
+
+```features
+date: unreleased
+tagline: Dynamic first strokes no longer freeze, and C picks colour from any Part.
+highlight: Dynamic on a dense Part with a big brush no longer freezes the first stroke
+highlight: Pick colour (C) picks from any Part under the pointer, and says why when it can't
+highlight: A right drag that turned the view no longer opens the Quick Menu when you let go
+```
+
 ## Version 0.13.2
 
 ```features
