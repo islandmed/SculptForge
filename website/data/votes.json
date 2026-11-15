@@ -93,6 +93,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "multi-image-projection",
+     "anchor": "vote-multi-image-projection",
+     "title": "Multi-image projection",
+     "line": "Place several reference images and project their depth and colour onto any surface, building on Stencil.",
+     "where": "Brush > Stencil",
+     "votes": 0,
+     "status": "open",
+     "shipped": ""
     }
    ]
   },
@@ -864,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-13T18:38:12Z"
+ "updated": "2026-11-15T00:38:18Z"
 }
