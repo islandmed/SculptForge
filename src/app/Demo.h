@@ -256,6 +256,9 @@ private:
     // sdl_pen_mouse / pen_lost). A Huion-style driver also sends mouse events of its own (pen_stream huion).
     bool sdlPenMouse_ = true;
     bool huionStream_ = false;
+    bool mouseSteps_ = true; // (mouse_steps off: motion events without xrel / yrel)
+    bool lateRight_ = false, driverRightHeld_ = false; // (right_late)
+    int driverRight_ = 0; // pen_stream right_after / right_first: the driver clicks the right mouse button for a pen button, after / before the pen's event
     // pen_rest on: the pen lies still in range and, as a real one does, sends a hair of tilt and sub-pixel motion
     // every frame (phoenix 11-05) until pen_rest off.
     bool penResting_ = false;

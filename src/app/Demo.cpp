@@ -314,8 +314,8 @@ void Demo::mouseMotion(float x, float y, SDL_MouseID which) {
     e.motion.which = which;
     e.motion.x = x;
     e.motion.y = y;
-    e.motion.xrel = x - mouse_.x;
-    e.motion.yrel = y - mouse_.y;
+    e.motion.xrel = mouseSteps_ || which == SDL_PEN_MOUSEID ? x - mouse_.x : 0.0f;
+    e.motion.yrel = mouseSteps_ || which == SDL_PEN_MOUSEID ? y - mouse_.y : 0.0f;
     e.motion.state = buttonDown_ ? SDL_BUTTON_LMASK : 0;
     mouse_ = ImVec2(x, y);
     app_.handleEvent(e);

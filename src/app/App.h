@@ -3185,6 +3185,7 @@ private:
     } radialEdit_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits
+        bool down = false;    // the right button is held (a second press for it is the driver's echo, not a click)
         float x = 0.0f, y = 0.0f;
         float dx = 0.0f, dy = 0.0f; // the motion since the press
     } rightClick_;
