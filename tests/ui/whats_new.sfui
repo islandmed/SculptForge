@@ -61,7 +61,7 @@ expect_text "Version 0.13.2"
 expect_text "Turning the view with a pen's side button starts where the pen is, and the pen no longer gets stuck."
 expect_text "Version 0.13.1"
 expect_text "Long Tubes edit without crashing, and heavy Ropes and Braids stay in check."
-expect_value whats_new_contents == 5   # 3 versions in full, then 0.12.0 to 0.12.2 and 0.11.x (the chapter starts at 0.11.0)
+expect_value whats_new_contents == 6   # 3 versions in full, then the groups of older versions (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide
 
