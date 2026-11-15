@@ -1,0 +1,8 @@
+---
+whats_new: **Right-drag to turn the view**: a right drag (or a pen's side button set to Right click) that turned the view never opens the Quick Menu when you let go, whatever the mouse, pen or driver reports.
+fixed: **Quick Menu after a right drag** (thanks @ebarranco): a right-button drag, or a pen side button set to Right click, opened the Quick Menu when it ended even though the view had turned. The drag was told apart from a click only by the steps the pointer reports; a pointer or pen driver that reports positions without steps never counted as moving. A drag now counts when the pointer is more than a few pixels from where it was pressed, by steps or by position, and a pen coming into range in the middle of a press starts the click again from its own position. A right click that stays within a few pixels still opens the menu.
+testers:
+  - Linux, Wacom pen with a side button set to Right click (Preferences > Tablet): hold the button above the canvas and move the pen; the view turns and no menu opens on release. A tap of the button opens the Quick Menu.
+  - Any mouse: right-drag turns the view (no menu); a right click without moving opens it. Preferences > Hotkeys: "Right click opens the Quick Menu" takes a key like the other toggles.
+---
+Tests: tests/ui/right_click_drag.sfui (mouse, pen side button, a driver's own right clicks beside it, 2x screen, a pointer without steps, the Hotkeys row). Test script verbs added: mouse_steps, pen_stream right_after|right_first|right_late. The Hotkeys row already took a key (a toggle with no default key shows "-"); a test now holds that.

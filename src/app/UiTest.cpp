@@ -319,8 +319,12 @@
 //                            touching pen on Windows, #95; the app makes its own)
 //   pen_lost                 SDL drops the pen while it touches (WM_POINTERCAPTURECHANGED): it leaves proximity
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
-//   pen_stream ink|huion     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
-//                            beside the pen's, a press at each touch whose release never comes
+//   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
+//                            warped or relative pointer)
+//   pen_stream ink|huion|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
+//                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
+//                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
+//                            (right_late: with the pen's first motion after it)
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
@@ -1842,7 +1846,7 @@ enum class StepVerb { None,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
-    PenStream, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
+    PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, Shot,
 };
@@ -1949,7 +1953,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_pressure", StepVerb::PenPressure},
         {"sdl_pen_mouse", StepVerb::SdlPenMouse},
         {"pen_lost", StepVerb::PenLost},
-        {"pen_stream", StepVerb::PenStream},
+        {"pen_stream", StepVerb::PenStream}, {"mouse_steps", StepVerb::MouseSteps},
         {"window_focus", StepVerb::WindowFocus},
         {"mouse_leave", StepVerb::MouseLeave},
         {"wheel", StepVerb::Wheel},
@@ -4068,9 +4072,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.05f);
         break;
     }
+    case StepVerb::MouseSteps: { // mouse_steps on|off
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off"] { mouseSteps_ = on; });
+        break;
+    }
     case StepVerb::PenStream: {
         if (!need(1)) return false;
-        run([this, huion = w[1] == "huion"] { huionStream_ = huion; });
+        run([this, mode = w[1]] {
+            huionStream_ = mode == "huion";
+            driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
+        });
         break;
     }
     case StepVerb::WindowFocus: {
@@ -4547,6 +4559,11 @@ void Demo::penMove(float x, float y) {
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
     if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
+    if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
+        lateRight_ = false;
+        mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
+        driverRightHeld_ = true;
+    }
 }
 
 void Demo::penRestNoise() {
@@ -4655,7 +4672,18 @@ void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     e.pbutton.y = at ? at->y : penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
+    if (driverRight_ == 2 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
     app_.handleEvent(e);
+    if (driverRight_ == 1 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
+    if (driverRight_ == 3 && button >= 1 && button < 5) { // its press comes with the pen's first motion, its release with the pen's
+        if (down) lateRight_ = true;
+        else if (!lateRight_) mouseButton(false, SDL_BUTTON_RIGHT, kDriverMouse);
+        else lateRight_ = false; // (never pressed: a tap)
+        if (!down && driverRightHeld_) {
+            driverRightHeld_ = false;
+            mouseButton(false, SDL_BUTTON_RIGHT, kDriverMouse);
+        }
+    }
     // SDL 3.4 also clicks a mouse button for it (1: right, 2: middle ...); the app must ignore that.
     static const int kMouse[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE, SDL_BUTTON_X1, SDL_BUTTON_X2};
     if (sdlPenMouse_ && button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);

@@ -2082,6 +2082,9 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     const SDL_Keymod nav = inputMods(false); // (navigation ignores the stroke popup's latched Smooth / Mask / Select)
     // A pen button is already driving the view: touching down with the tip keeps navigating.
     if (penNavButton_ && (drag_ == Drag::Orbit || drag_ == Drag::Pan)) return;
+    // The right button is already down and dragging the view: a driver's second press for the same button (beside a pen's
+    // side button) is not a new click, which would arm the menu again in the middle of the drag.
+    if (button == SDL_BUTTON_RIGHT && rightClick_.down && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) return;
     dragFromPen_ = lastInputPen_;
     doc_.syncBvh();
     if (button == SDL_BUTTON_LEFT && erasing() && eraserAction() != PenAction::Invert && eraserAction() != PenAction::Smooth) {
@@ -2094,6 +2097,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     // only once it moves past the slop.
     rightClick_.pending = button == SDL_BUTTON_RIGHT && uiPrefs_.rightClickQuickMenu &&
                           !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
+    rightClick_.down = button == SDL_BUTTON_RIGHT;
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
@@ -2271,7 +2275,12 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dy = y - mouseY_;
         // The pen's first position after coming into range, or after the mouse moved the cursor, is a jump from
         // wherever the cursor was, not a motion: it must not throw a drag (the view) across the screen.
-        if (penJump_ || !lastInputPen_) dx = dy = 0.0f;
+        if (penJump_ || !lastInputPen_) {
+            dx = dy = 0.0f;
+            rightClick_.x = x; // a right click waiting starts over from here: the jump is no drag
+            rightClick_.y = y;
+            rightClick_.dx = rightClick_.dy = 0.0f;
+        }
         penJump_ = false;
     }
     mouseX_ = x;
@@ -2282,10 +2291,19 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         // drag goes on by everything since the press, so it loses nothing.
         rightClick_.dx += dx;
         rightClick_.dy += dy;
-        if (std::hypot(rightClick_.dx, rightClick_.dy) <= kRightClickSlop) return;
+        // The distance from the press counts too: input that moves with no steps of its own (a warped or relative
+        // pointer, a pen's position only) was a click however far it went, and the menu opened after every drag.
+        const float px = x - rightClick_.x, py = y - rightClick_.y;
+        const float steps = std::hypot(rightClick_.dx, rightClick_.dy), away = std::hypot(px, py);
+        if (std::max(steps, away) <= kRightClickSlop) return;
         rightClick_.pending = false;
-        dx = rightClick_.dx;
-        dy = rightClick_.dy;
+        if (steps >= away) {
+            dx = rightClick_.dx;
+            dy = rightClick_.dy;
+        } else {
+            dx = px;
+            dy = py;
+        }
     }
     // start a pan with Alt, then let go of Alt while still dragging to zoom.
     if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods(false) & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
@@ -2453,7 +2471,7 @@ float App::rollSweep(float x, float y, float dx, float dy) const {
 void App::onMouseUp() {
     rollPending_ = false;
     rollSideways_ = false;
-    rightClick_.pending = false;
+    rightClick_.pending = rightClick_.down = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;
     orbitPivotPicked_ = false;

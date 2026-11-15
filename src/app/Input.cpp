@@ -932,7 +932,7 @@ void App::openQuickMenu() {
 
 void App::rightClickRelease() {
     const bool click = rightClick_.pending;
-    rightClick_.pending = false;
+    rightClick_.pending = rightClick_.down = false;
     if (zsMenu_.armed) { // on a Forge Sphere: its menu instead (PanelForge Spheres.cpp)
         zsMenu_.armed = false;
         zsMenu_.open = click;

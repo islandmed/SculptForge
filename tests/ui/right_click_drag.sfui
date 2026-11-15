@@ -1,0 +1,134 @@
+# A right drag that turned the view never opens the Quick Menu when it ends (ebarranco, #member-bug-reports): with the
+# mouse and with a pen's side button set to Right click, on a 1x and a 2x (HiDPI) screen, fast and slow, a long drag and
+# a short one; a right click that stays under the slop still opens it. And the "Right click opens the Quick Menu" row in
+# Preferences > Hotkeys takes a key like any other toggle.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+camera 0 0
+remember camera_yaw y0
+remember camera_pitch p0
+expect_value right_click_menu == 1
+
+# --- Mouse ---
+# A short drag (about 12 px: past the slop, so the view turns) opens nothing.
+button_drag right 0.12 0.3 0.12 0.32
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+camera 0 0
+# A slow drag: 1 px steps over two seconds still turns the view and opens nothing.
+button_drag right 0.12 0.3 0.12 0.5 2.0
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+camera 0 0
+# A drag that comes back to where it started (the view turned on the way): still no menu.
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key escape
+
+# A pointer that reports its position only (no motion steps of its own): the drag still turns the view and ends with no menu.
+mouse_steps off
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.5 0.5
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key escape
+mouse_steps on
+
+# --- The pen's side button (Right click): tablets report hover motion in small steps ---
+camera 0 0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.5 0.505 0.3
+pen_hover 0.5 0.51 0.3
+pen_hover 0.5 0.55 0.5
+expect_value camera_pitch != $p0
+pen_button 1 up
+expect_value quickmenu_open == 0
+expect_value pen_nav_button == 0
+# Out and back: the view turned, so the release is not a click.
+camera 0 0
+pen_button 1 down
+pen_hover 0.6 0.6 0.5
+pen_hover 0.5 0.5 0.5
+pen_button 1 up
+expect_value quickmenu_open == 0
+# A tap opens it.
+camera 0 0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_button 1 up
+expect_value quickmenu_open == 1
+expect_value camera_yaw == $y0
+key escape
+pen_out
+
+# --- A driver that also clicks the right mouse button for the pen's side button, before or after the pen's own event ---
+pen_stream right_after
+camera 0 0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.5 0.6 0.5
+pen_button 1 up
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_button 1 up
+expect_value quickmenu_open == 1
+key escape
+pen_stream right_first
+camera 0 0
+pen_button 1 down
+pen_hover 0.5 0.6 0.5
+pen_button 1 up
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+pen_stream right_late
+camera 0 0
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.5 0.6 0.5
+pen_hover 0.5 0.6 0.2
+pen_button 1 up
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+pen_stream ink
+pen_out
+
+# --- The same on a HiDPI screen (2x), with a driver that sends mouse events of its own beside the pen's ---
+pixel_density 200
+camera 0 0
+pen_stream huion
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.5 0.6 0.5
+pen_button 1 up
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+pen_out
+pen_stream ink
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.5 0.5
+expect_value quickmenu_open == 0
+expect_value camera_pitch != $p0
+camera 0 0
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key escape
+
+# --- The Hotkeys row takes a key ---
+click "Preferences##palette.preferences"
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Right click opens"
+wait 0.5
+click "-##hk.input.right_click_menu"
+key f9
+expect_shortcut input.right_click_menu F9
+key escape
+key f9
+expect_value right_click_menu == 0
+key f9
+expect_value right_click_menu == 1
