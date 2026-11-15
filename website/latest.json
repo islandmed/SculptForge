@@ -1,11 +1,11 @@
 {
-  "version": "0.13.2",
+  "version": "0.13.3",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Turning the view with a pen's side button starts where the pen is, with no jump of the model",
-    "A side button let go, or a window change mid-drag, no longer leaves the pen stuck",
-    "After lifting the pen out of range or switching windows, the next stroke sculpts as it should"
+    "Dynamic on a dense Part with a big brush no longer freezes the first stroke",
+    "Pick colour (C) picks from any Part under the pointer, and says why when it can't",
+    "A right drag that turned the view no longer opens the Quick Menu when you let go"
   ],
   "support": {
     "founding": {
