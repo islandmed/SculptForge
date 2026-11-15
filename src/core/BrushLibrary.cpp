@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushLibrary.h"
+#include "core/FileReplace.h"
 
 #include "core/Commands.h"
 #include "core/Document.h"
@@ -195,14 +196,7 @@ bool writeBrushFile(const std::string& path, const BrushRecipe& recipe, bool gal
         }
     }
     backupBrushFile(path); // the file being replaced, one generation back
-    std::error_code ec;
-    fs::rename(tmp, target, ec);
-    if (ec) {
-        error = "Cannot write " + path + ": " + ec.message();
-        fs::remove(tmp, ec);
-        return false;
-    }
-    return true;
+    return replaceFile(tmp, target, error);
 }
 
 // Where a new brush called `name` goes in the user library: its safe file name,

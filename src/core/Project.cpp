@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
+#include "core/FileReplace.h"
 #include "core/LegacyNames.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
@@ -1136,14 +1137,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
     // Write next to the target and rename, so a failed save never destroys the previous file.
     const std::string tmp = path + ".tmp";
     if (!writeStoredZip(tmp, w.entries, 64, error)) return false;
-    std::error_code ec;
-    std::filesystem::rename(fsPath(tmp), fsPath(path), ec);
-    if (ec) {
-        std::filesystem::remove(fsPath(tmp), ec);
-        error = "Cannot write " + path;
-        return false;
-    }
-    return true;
+    return replaceFile(fsPath(tmp), fsPath(path), error);
 }
 
 namespace {
