@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.2:</strong> turning the view with a pen&#x27;s side button starts where the pen is, and the pen no longer gets stuck (<a href="https://sculptforge.app/guide/whats-new.html#version-0132">how it works</a>)
+  <strong>New in 0.13.3:</strong> dynamic first strokes no longer freeze, and C picks colour from any Part (<a href="https://sculptforge.app/guide/whats-new.html#version-0133">how it works</a>)
 </p>
 
 <p align="center">

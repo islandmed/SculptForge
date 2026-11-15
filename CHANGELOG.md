@@ -6,6 +6,29 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-11-15
+
+### Fixed
+- **Dynamic first stroke** on a dense Part (hundreds of thousands of triangles, a big brush, Detail toward large
+  polygons) stalled the app for seconds, up to 20 s on a 9M-triangle scene (macOS wait cursor). Each dab looked at
+  every triangle under the brush (100-380 ms a dab at 800k) and the first stroke sent the whole Part to the GPU every
+  frame, rebuilding the coarse levels each time. A dab now looks at no more than the 100,000 triangles nearest its
+  centre (a brush covering more is remeshed over the nearest, the rest follows as it moves), finds mirror partners on
+  all threads, a remeshing stroke sends its changed clusters as patches, and the coarse levels are made once, after
+  the stroke. Where face groups, borders or masks make most collapse candidates fail (a tester's 803k Part froze the
+  app in the collapse pass), the candidates a pass tries per dab are bounded too. A Dynamic dab slower than 150 ms is
+  logged (Help > Copy log). Reported by a tester on macOS.
+- **Pick colour (C)** picked only from the selected Part, so over any other Part it did nothing or took the wrong
+  colour. It now picks the colour of the nearest visible Part under the pointer (its texture or Vertex Paint; a Part
+  without paint gives the colour it is shown in), and the status bar says why when there is nothing to pick (off the
+  model, over a hidden Part). Thanks to phoenix for the report.
+- **Quick Menu after a right drag** (thanks ebarranco on Discord): a right-button drag, or a pen side button set to
+  Right click, opened the Quick Menu when it ended even though the view had turned. The drag was told apart from a
+  click only by the steps the pointer reports; a pointer or pen driver that reports positions without steps never
+  counted as moving. A drag now counts when the pointer is more than a few pixels from where it was pressed, by steps
+  or by position, and a pen coming into range in the middle of a press starts the click again from its own position. A
+  right click that stays within a few pixels still opens the menu.
+
 ## [0.13.2] - 2026-11-14
 
 ### Fixed

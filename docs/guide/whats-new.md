@@ -8,12 +8,19 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.3
 
 ```features
-date: unreleased
+date: 2026-11-15
 tagline: Dynamic first strokes no longer freeze, and C picks colour from any Part.
 highlight: Dynamic on a dense Part with a big brush no longer freezes the first stroke
 highlight: Pick colour (C) picks from any Part under the pointer, and says why when it can't
 highlight: A right drag that turned the view no longer opens the Quick Menu when you let go
 ```
+
+- **Dynamic** on a dense Part with a big brush no longer freezes the first stroke: the surface under the brush is
+  remeshed a bounded amount per dab and the view keeps drawing.
+- **Pick colour (C)** now picks from any Part under the pointer, not only the selected one, and says why when it
+  can't.
+- **Right-drag to turn the view**: a right drag (or a pen's side button set to Right click) that turned the view never
+  opens the Quick Menu when you let go, whatever the mouse, pen or driver reports.
 
 ## Version 0.13.2
 
