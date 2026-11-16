@@ -624,6 +624,10 @@ private:
     void memberMoment(MemberMoment m);          // a good moment happened: the card follows if it may (Support.h)
     void tickMemberCard(float dt);              // the sculpting time, and the card once the frame is calm
     void drawMemberCard();
+    bool appealPending_ = false, appealOpen_ = false; // the appeal card (Support.h appealDue): due at startup / showing
+    bool appealUpdateCheckOff() const;          // update checks off: a package manager's build, the policy, the env var
+    void launchAppeal();                        // startup: due -> pending (and the small card's update moment steps aside)
+    void drawAppealCard();                      // PanelSupportCard.cpp
     void memberCardChoice(MemberCardChoice c);
     void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
     void memberSignInFinished(bool member);     // the card's sign-in ended (startMemberSignIn's onDone)

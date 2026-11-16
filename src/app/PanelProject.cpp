@@ -129,6 +129,7 @@ void App::initProject() {
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
         bigMeshTipDone_ = prefs["big_mesh_tip_done"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
+        if (prefs["appeal_version"].isString()) supportCardPrefs_.appealVersion = prefs["appeal_version"].asString().substr(0, 40);
         supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
         if (prefs["member_card_challenge"].isString())
             supportCardPrefs_.challengeSeen = prefs["member_card_challenge"].asString().substr(0, 32);
@@ -217,6 +218,7 @@ void App::initProject() {
         !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
         startUpdateCheck(false);
 #endif
+    launchAppeal(); // (after the update policy: a studio's update lock counts)
 
     // An autosave newer than the last clean exit means the previous session ended unexpectedly.
     std::error_code ec;
@@ -261,6 +263,7 @@ void App::saveProjectPrefs() {
     prefs.set("supporter", supportCardPrefs_.supporter); // the membership cards (Support.h)
     prefs.set("big_mesh_tip_done", bigMeshTipDone_); // the one big-mesh tip (BigMeshTip.h)
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
+    if (!supportCardPrefs_.appealVersion.empty()) prefs.set("appeal_version", supportCardPrefs_.appealVersion);
     prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
     if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
     {

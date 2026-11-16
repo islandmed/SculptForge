@@ -24,6 +24,28 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
+TEST(appeal_card_is_once_per_version_and_never_for_members) {
+    SupportCardPrefs p;
+    p.starts = 2;
+    const auto due = [&](const SupportCardPrefs& q, const char* v = "0.13.4", bool member = false, bool studio = false,
+                         bool updatesOff = false, bool test = false) { return appealDue(q, v, member, studio, updatesOff, test); };
+    CHECK(due(p));
+    SupportCardPrefs first = p;
+    first.starts = 1; // the first start belongs to the tour
+    CHECK(!due(first));
+    CHECK(!due(p, "0.13.4", true));                       // a signed-in member
+    CHECK(!due(p, "0.13.4", false, true));                // a Studio build
+    CHECK(!due(p, "0.13.4", false, false, true));         // update checks off (policy, package build, SF_NO_UPDATE_CHECK)
+    CHECK(!due(p, "0.13.4", false, false, false, true));  // tests, renders, CI
+    CHECK(!due(p, ""));
+    SupportCardPrefs member = p;
+    member.supporter = true;
+    CHECK(!due(member));
+    p.appealVersion = "0.13.4"; // shown in this version (Not now, the button or a crash): not again, but in the next
+    CHECK(!due(p));
+    CHECK(due(p, "0.13.5"));
+}
+
 TEST(support_page_url_carries_the_entry_point) {
     // The in-app asks tag the membership page so the funnel shows which one a visit came from (no new request: it is the
     // URL the browser opens).

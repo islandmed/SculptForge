@@ -321,6 +321,7 @@ void App::drawSupportUi() {
     // (Here, not in tickProject: this runs every frame, UI tests included.)
     tickMemberCard(ImGui::GetIO().DeltaTime);
     drawMemberCard();
+    drawAppealCard();
     if (showWelcome_) {
         // Not modal: the app works around it, and it doesn't come back once closed.
         // Never wider or taller than the room: on a phone (Android, Discord 11-12) a fixed 500 dp-ish window ran off the

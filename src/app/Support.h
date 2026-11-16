@@ -184,8 +184,19 @@ struct SupportCardPrefs {
     double sculptSeconds = 0.0;  // stroke time, every session
     int saves = 0;               // project saves
     unsigned milestonesShown = 0; // bits: 1 starts, 2 sculpting hours, 4 saves
+    std::string appealVersion;   // the app version the appeal card last showed in (once per version)
     SupportFeed feed;            // the last update check's "support" block (the card's honest line)
 };
+
+// The appeal card: one short note at startup, once per app version, from the second start on. Never for a member or a
+// Studio build, with update checks off (a package manager's build, the policy, SF_NO_UPDATE_CHECK) or in tests and
+// renders. Its version is recorded as it shows, so "Not now", the button or a crash all end it for that version.
+inline constexpr int kAppealFromStart = 2;
+inline bool appealDue(const SupportCardPrefs& p, std::string_view version, bool signedInMember, bool studio,
+                      bool updateCheckOff, bool testMode) {
+    if (testMode || studio || signedInMember || p.supporter || updateCheckOff || version.empty()) return false;
+    return p.starts >= kAppealFromStart && p.appealVersion != version;
+}
 
 enum class SupportCardReason { None, FirstRun, Manual };
 

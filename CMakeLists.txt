@@ -1333,6 +1333,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Help > Support (the welcome screen) and the full membership card at 1440 px: the perk lines fit (100 % and 200 %).
     sculptforge_ui_test(support_1440 support --size 1440x900)
     sculptforge_ui_test(support_2880 support --size 2880x1620) # the welcome and About at 200 %: the icon rows keep their line
+    # The appeal card at 1440 and 2880 px (the READY shots).
+    sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
+    sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
