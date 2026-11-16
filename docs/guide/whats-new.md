@@ -8,12 +8,19 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.4
 
 ```features
-date: unreleased
+date: 2026-11-15
 tagline: Saves on Windows retry instead of failing, and a short note from the members.
 highlight: On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar
 highlight: A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it
 highlight: Membership links in the app carry a small source tag, so we can see which one helps
 ```
+
+- **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
+  names the file instead of staying quiet.
+- **Membership links say where they came from**: the in-app links to the membership page now carry a small source tag
+  in the address, so we can see which one helps.
+- **A short note from the members**: once per version, from your second start, a small card says SculptForge runs on
+  its members; Not now closes it. Members never see it.
 
 ## Version 0.13.3
 

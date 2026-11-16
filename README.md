@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.3:</strong> dynamic first strokes no longer freeze, and C picks colour from any Part (<a href="https://sculptforge.app/guide/whats-new.html#version-0133">how it works</a>)
+  <strong>New in 0.13.4:</strong> saves on Windows retry instead of failing, and a short note from the members (<a href="https://sculptforge.app/guide/whats-new.html#version-0134">how it works</a>)
 </p>
 
 <p align="center">

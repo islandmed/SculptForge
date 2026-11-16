@@ -6,6 +6,26 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-11-15
+
+### Added
+- **Appeal card**: a short, once-per-version note asks people who enjoy SculptForge to become members; "Not now"
+  closes it. It shows at startup from the second start on, never to members or Studio builds, with update checks off,
+  or in tests and renders; no counters or telemetry. Its link is tagged utm_campaign=in-app-appeal.
+
+### Changed
+- In-app membership links (Help > Support SculptForge, the top-bar heart, the update notice, the membership card, the
+  quick tour, What's New, About) open the membership page with
+  `?utm_source=app&utm_medium=in-app&utm_campaign=<where>`. Only the address the browser opens changes: no new
+  request, counter or prompt.
+
+### Fixed
+- On Windows, saving could fail with "Access is denied" and your settings, shelf layout, brush edits or recent
+  projects were silently lost on the next start (reports from noved_ and rand_gogh on Discord). Start-up no longer
+  keeps the settings file open while it saves it, and every save that replaces a file now waits and retries for about
+  a second when the file is busy (a virus scanner, a sync client) or marked read-only, and finally writes over it
+  directly. If a save still can't land, the status bar says which file.
+
 ## [0.13.3] - 2026-11-15
 
 ### Fixed
