@@ -82,6 +82,8 @@
 //                            repository never holds them, docs/legal/trademarks.md)
 //   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
 //   member_card appeal starts=N      the appeal card's startup check (once per version, from the 2nd start)
+//   member_card update_appeal starts=N   the same start after an update: the update moment, then the appeal check
+//   member_card restart              the next start: the update moment (owed since the appeal) and the appeal check again
 //   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
 //                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
@@ -1329,6 +1331,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // The small membership card (Support.h): open (1), the sign-in running from it, member builds signed in.
     if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "appeal_open") return app_.appealOpen_ ? 1.0 : 0.0;
+    if (name == "update_card_owed") return app_.supportCardPrefs_.updateOwed ? 1.0 : 0.0;
     if (name == "appeal_pending") return app_.appealPending_ ? 1.0 : 0.0;
     if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
@@ -3590,7 +3593,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         static const std::pair<const char*, MemberMoment> kMoments[] = {
             {"sculpted", MemberMoment::Sculpted}, {"render", MemberMoment::SavedRender},
             {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None},
-            {"milestone", MemberMoment::None}, {"appeal", MemberMoment::None}};
+            {"milestone", MemberMoment::None}, {"appeal", MemberMoment::None}, {"restart", MemberMoment::None},
+            {"update_appeal", MemberMoment::None}};
         MemberMoment moment = MemberMoment::None;
         bool known = false;
         for (const auto& [n, m] : kMoments)
@@ -3599,7 +3603,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "member_card: unknown moment '" + w[1] + "'";
             return false;
         }
-        const bool milestone = w[1] == "milestone", appeal = w[1] == "appeal"; // (appeal: the startup check, at `starts=N`)
+        const bool milestone = w[1] == "milestone", appeal = w[1] == "appeal", restart = w[1] == "restart", updateAppeal = w[1] == "update_appeal"; // (appeal: the startup check, at `starts=N`; restart: the next start)
         double days = -1.0, sculpt = -1.0, hours = -1.0;
         int starts = -1, saves = -1;
         for (size_t i = 2; i < w.size(); ++i) {
@@ -3613,7 +3617,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return false;
             }
         }
-        run([this, moment, days, sculpt, milestone, appeal, hours, starts, saves] {
+        run([this, moment, days, sculpt, milestone, appeal, restart, updateAppeal, hours, starts, saves] {
             app_.memberCardTestMode_ = true;
             if (days >= 0.0) app_.memberClockOffset_ = int64_t(days * 86400.0);
             if (sculpt >= 0.0) app_.sessionSculptSeconds_ = sculpt;
@@ -3621,7 +3625,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (starts >= 0) app_.supportCardPrefs_.starts = starts;
             if (saves >= 0) app_.supportCardPrefs_.saves = saves;
             if (moment == MemberMoment::Challenge) app_.challengeTitle_ = "Creatures";
-            if (appeal) app_.launchAppeal();
+            if (restart) { // the next start: the appeal card is gone (its version is recorded), the update moment and the appeal check run again
+                app_.appealOpen_ = app_.appealPending_ = false;
+                app_.memberCard_ = MemberMoment::None;
+                app_.updatedThisStart_ = false;
+                app_.startupUpdateMoment();
+                app_.launchAppeal();
+            } else if (updateAppeal) { // a start after an update with the appeal due: the update moment, then the appeal (as at startup)
+                app_.memberMoment(MemberMoment::Updated);
+                app_.launchAppeal();
+            } else if (appeal) app_.launchAppeal();
             else if (milestone) app_.memberMilestoneCheck();
             else app_.memberMoment(moment);
         });

@@ -626,6 +626,8 @@ private:
     void drawMemberCard();
     bool appealPending_ = false, appealOpen_ = false; // the appeal card (Support.h appealDue): due at startup / showing
     bool appealUpdateCheckOff() const;          // update checks off: a package manager's build, the policy, the env var
+    bool appealOwesUpdate_ = false;             // the pending appeal pre-empted an update moment (kept in updateOwed once it shows)
+    void startupUpdateMoment();                 // startup: the update card's moment (a new version, or owed since the appeal)
     void launchAppeal();                        // startup: due -> pending (and the small card's update moment steps aside)
     void drawAppealCard();                      // PanelSupportCard.cpp
     void memberCardChoice(MemberCardChoice c);

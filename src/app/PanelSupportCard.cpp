@@ -587,13 +587,17 @@ void App::tickMemberCard(float dt) {
     }
     if (appealPending_ || appealOpen_) { // the appeal goes first; the small card waits for its own moment
         if (appealPending_) {
-            if (stroking) appealPending_ = false; // (startup only: never mid-work)
+            if (stroking) { // (startup only: never mid-work; the version isn't recorded, it comes back next start)
+                appealPending_ = false;
+                if (std::exchange(appealOwesUpdate_, false)) memberMoment(MemberMoment::Updated);
+            }
             else if (memberCardMayOpen(stroking, backgroundBusy(), supportCard_ || showWelcome_ || quickTourOpen_ || whatsNew_ ||
                                                                        showWhatsNew_ || ImGui::GetTopMostPopupModal() != nullptr)) {
                 appealPending_ = false;
                 appealOpen_ = true;
                 supportCardPrefs_.appealVersion = appVersionLabel();
                 supportCardPrefs_.shownAt = memberClock(); // (no small card for the week after it)
+                if (std::exchange(appealOwesUpdate_, false)) supportCardPrefs_.updateOwed = true; // (the update card is next start's)
                 saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back)
                 redrawIn(0.0);
             }
@@ -605,6 +609,7 @@ void App::tickMemberCard(float dt) {
                            ImGui::GetTopMostPopupModal() != nullptr;
     if (!memberCardMayOpen(stroking, backgroundBusy(), otherCard)) return; // (it waits)
     memberCard_ = std::exchange(memberMomentPending_, MemberMoment::None);
+    if (memberCard_ == MemberMoment::Updated) supportCardPrefs_.updateOwed = false;
     supportCardPrefs_.shownAt = memberClock();
     // A milestone shows once, with its true number now; the feed's honest lines take turns, card by card.
     supportCardPrefs_.milestonesShown |= milestoneBit(memberCard_);
@@ -623,11 +628,18 @@ bool App::appealUpdateCheckOff() const {
 #endif
 }
 
+void App::startupUpdateMoment() {
+    // A member or a Studio build never gets the card, so nothing stays owed to it.
+    if (supportCardPrefs_.supporter || memberSignedIn() || studioMembership()) supportCardPrefs_.updateOwed = false;
+    if (updatedThisStart_ || supportCardPrefs_.updateOwed) memberMoment(MemberMoment::Updated);
+}
+
 void App::launchAppeal() {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
     if (!appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
     appealPending_ = true;
-    memberMomentPending_ = MemberMoment::None; // (an update's small card steps aside)
+    appealOwesUpdate_ = memberMomentPending_ == MemberMoment::Updated;
+    memberMomentPending_ = MemberMoment::None; // (an update's small card steps aside, and comes at the next start)
     redrawIn(0.0);
 }
 

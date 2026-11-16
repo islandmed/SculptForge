@@ -129,6 +129,7 @@ void App::initProject() {
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
         bigMeshTipDone_ = prefs["big_mesh_tip_done"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
+        supportCardPrefs_.updateOwed = prefs["update_card_owed"].asBool(false);
         if (prefs["appeal_version"].isString()) supportCardPrefs_.appealVersion = prefs["appeal_version"].asString().substr(0, 40);
         supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
         if (prefs["member_card_challenge"].isString())
@@ -205,7 +206,7 @@ void App::initProject() {
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
     // The full membership card on the first start (Support.h); after an update, the small card's moment; then a
     // milestone due (the starts are counted above).
-    if (updatedThisStart_) memberMoment(MemberMoment::Updated);
+    startupUpdateMoment();
     launchSupportCard(!hadPrefs,
                       std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count(),
                       supportCardTestMode());
@@ -264,6 +265,7 @@ void App::saveProjectPrefs() {
     prefs.set("big_mesh_tip_done", bigMeshTipDone_); // the one big-mesh tip (BigMeshTip.h)
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
     if (!supportCardPrefs_.appealVersion.empty()) prefs.set("appeal_version", supportCardPrefs_.appealVersion);
+    if (supportCardPrefs_.updateOwed) prefs.set("update_card_owed", true);
     prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
     if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
     {

@@ -1,0 +1,28 @@
+# The appeal takes the update card's place on its start; the update card then comes at the next start (not swallowed by the
+# week gap), and the appeal does not come again in the same version (Support.h updateOwed, PanelSupportCard.cpp).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+member_card update_appeal days=0 starts=2
+expect_value member_card_pending == 0
+expect_value appeal_pending == 1
+wait_idle
+wait 0.3
+expect_value appeal_open == 1
+expect_value update_card_owed == 1
+expect_value member_card_open == 0
+click "Not now##appeal.not_now"
+# The next start: the update card, not the appeal.
+member_card restart
+wait_idle
+wait 0.3
+expect_value appeal_open == 0
+expect_value appeal_pending == 0
+expect_value member_card_open == 1
+expect_text is here. Members get new versions early
+expect_value update_card_owed == 0
+click "Not now##member_card.not_now"
+# And not a third time.
+member_card restart
+wait 0.3
+expect_value member_card_open == 0
+expect_value member_card_pending == 0

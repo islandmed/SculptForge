@@ -185,6 +185,7 @@ struct SupportCardPrefs {
     int saves = 0;               // project saves
     unsigned milestonesShown = 0; // bits: 1 starts, 2 sculpting hours, 4 saves
     std::string appealVersion;   // the app version the appeal card last showed in (once per version)
+    bool updateOwed = false;     // the appeal took the update card's place: that small card shows at the next start
     SupportFeed feed;            // the last update check's "support" block (the card's honest line)
 };
 
@@ -222,6 +223,7 @@ inline bool memberMomentAllowed(const SupportCardPrefs& p, bool signedInMember, 
     if (p.notNow >= kMemberCardUpdatesOnlyAfter && m != MemberMoment::Updated) return false;
     // (a clock set back past a snooze, or a snooze longer than it can be, ends it: a damaged value can't hide it for good)
     if (p.hiddenUntil > now && p.hiddenUntil - now <= kMemberCardNoSignInSeconds) return false;
+    if (m == MemberMoment::Updated && p.updateOwed) return true; // (the appeal's own shownAt must not swallow it)
     const int64_t since = now - p.shownAt, interval = memberCardInterval(p.notNow);
     return p.shownAt <= 0 || since >= interval || since <= -interval;
 }

@@ -46,6 +46,20 @@ TEST(appeal_card_is_once_per_version_and_never_for_members) {
     CHECK(due(p, "0.13.5"));
 }
 
+TEST(update_card_owed_after_the_appeal_skips_the_week_gap) {
+    SupportCardPrefs p;
+    p.shownAt = 1000; // the appeal just showed
+    const int64_t now = 1000 + 60;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated)); // normally the week gap holds it
+    p.updateOwed = true;
+    CHECK(memberMomentAllowed(p, false, now, false, MemberMoment::Updated));  // owed: it shows at the next start
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Sculpted)); // only the update card
+    CHECK(!memberMomentAllowed(p, true, now, false, MemberMoment::Updated));  // a member never
+    CHECK(!memberMomentAllowed(p, false, now, true, MemberMoment::Updated));  // tests never
+    p.supporter = true;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated));
+}
+
 TEST(support_page_url_carries_the_entry_point) {
     // The in-app asks tag the membership page so the funnel shows which one a visit came from (no new request: it is the
     // URL the browser opens).
