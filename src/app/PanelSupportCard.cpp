@@ -11,6 +11,7 @@
 // links in Support.h in the browser, except "I'm already a member", which is the member builds' GitHub sign-in.
 #include "app/App.h"
 #include "app/NativeDialog.h"
+#include "app/BrandMark.h"
 #include "app/CardPaint.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -552,7 +553,7 @@ int64_t App::memberClock() const { return int64_t(std::time(nullptr)) + memberCl
 
 void App::memberMoment(MemberMoment m) {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
-    if (m == MemberMoment::None || memberCard_ != MemberMoment::None || memberVerifying_) return;
+    if (m == MemberMoment::None || memberCard_ != MemberMoment::None || memberVerifying_ || appealPending_ || appealOpen_) return;
     if (studioMembership() || !memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode, m)) return;
     memberMomentPending_ = m; // (the latest moment's words)
     redrawIn(0.0);
@@ -584,11 +585,31 @@ void App::tickMemberCard(float dt) {
         milestoneCheckedAt_ = ImGui::GetTime();
         memberMilestoneCheck();
     }
+    if (appealPending_ || appealOpen_) { // the appeal goes first; the small card waits for its own moment
+        if (appealPending_) {
+            if (stroking) { // (startup only: never mid-work; the version isn't recorded, it comes back next start)
+                appealPending_ = false;
+                if (std::exchange(appealOwesUpdate_, false)) memberMoment(MemberMoment::Updated);
+            }
+            else if (memberCardMayOpen(stroking, backgroundBusy(), supportCard_ || showWelcome_ || quickTourOpen_ || whatsNew_ ||
+                                                                       showWhatsNew_ || ImGui::GetTopMostPopupModal() != nullptr)) {
+                appealPending_ = false;
+                appealOpen_ = true;
+                supportCardPrefs_.appealVersion = appVersionLabel();
+                supportCardPrefs_.shownAt = memberClock(); // (no small card for the week after it)
+                if (std::exchange(appealOwesUpdate_, false)) supportCardPrefs_.updateOwed = true; // (the update card is next start's)
+                saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back)
+                redrawIn(0.0);
+            }
+        }
+        return;
+    }
     if (memberMomentPending_ == MemberMoment::None) return;
     const bool otherCard = supportCard_ || showWelcome_ || quickTourOpen_ || whatsNew_ || showWhatsNew_ ||
                            ImGui::GetTopMostPopupModal() != nullptr;
     if (!memberCardMayOpen(stroking, backgroundBusy(), otherCard)) return; // (it waits)
     memberCard_ = std::exchange(memberMomentPending_, MemberMoment::None);
+    if (memberCard_ == MemberMoment::Updated) supportCardPrefs_.updateOwed = false;
     supportCardPrefs_.shownAt = memberClock();
     // A milestone shows once, with its true number now; the feed's honest lines take turns, card by card.
     supportCardPrefs_.milestonesShown |= milestoneBit(memberCard_);
@@ -596,6 +617,29 @@ void App::tickMemberCard(float dt) {
     memberCardFeedLine_ = supportFeedLine(supportCardPrefs_.feed, supportCardPrefs_.shownCount);
     supportCardPrefs_.shownCount = std::min(supportCardPrefs_.shownCount + 1, 1000000);
     saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back at once)
+    redrawIn(0.0);
+}
+
+bool App::appealUpdateCheckOff() const {
+#if SF_UPDATE_CHECK
+    return !checkUpdates_ || std::getenv("SF_NO_UPDATE_CHECK") != nullptr;
+#else
+    return true;
+#endif
+}
+
+void App::startupUpdateMoment() {
+    // A member or a Studio build never gets the card, so nothing stays owed to it.
+    if (supportCardPrefs_.supporter || memberSignedIn() || studioMembership()) supportCardPrefs_.updateOwed = false;
+    if (updatedThisStart_ || supportCardPrefs_.updateOwed) memberMoment(MemberMoment::Updated);
+}
+
+void App::launchAppeal() {
+    const bool testMode = supportCardTestMode() && !memberCardTestMode_;
+    if (!appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
+    appealPending_ = true;
+    appealOwesUpdate_ = memberMomentPending_ == MemberMoment::Updated;
+    memberMomentPending_ = MemberMoment::None; // (an update's small card steps aside, and comes at the next start)
     redrawIn(0.0);
 }
 
@@ -714,7 +758,7 @@ void App::drawMemberCard() {
                 ImGui::PopStyleColor(4);
             }
             if (become) {
-                openSupportPage(); // both choices (monthly, yearly) on the membership page
+                openSupportPage("support-card"); // both choices (monthly, yearly) on the membership page
                 memberCardChoice(MemberCardChoice::Become);
             } else if (notNow) {
                 memberCardChoice(MemberCardChoice::NotNow);
@@ -723,6 +767,49 @@ void App::drawMemberCard() {
                 verifyMember();
             }
         }
+    }
+    ImGui::End();
+}
+
+// The appeal card: the app's own mark, one headline, one line, "Become a member" and "Not now". Bottom centre like the
+// small card; never modal, never takes focus.
+void App::drawAppealCard() {
+    if (!appealOpen_) return;
+    const float s = uiScale_;
+    const CanvasRect c = canvasRect();
+    ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::SetNextWindowSize(ImVec2(std::min(560.0f * s, c.w - 32.0f * s), 0.0f), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * s, 14.0f * s));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f * s);
+    ui::PushRole(theme::Role::New);
+    ImGui::PushStyleColor(ImGuiCol_Border, theme::rolePopups ? theme::edge(theme::Role::New) : theme::accent);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    const bool began = ImGui::Begin("##appeal_card", nullptr, flags);
+    ImGui::PopStyleColor();
+    ui::PopRole();
+    ImGui::PopStyleVar(2);
+    if (began) {
+        brand::bustItem(64.0f * s);
+        ImGui::SameLine(0.0f, 14.0f * s);
+        ImGui::BeginGroup();
+        if (ImFont* bold = boldFont()) ImGui::PushFont(bold);
+        ImGui::TextWrapped("%s", tr("SculptForge runs on its members"));
+        if (boldFont()) ImGui::PopFont();
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
+        ImGui::TextWrapped("%s", tr("It's free for everyone. If it helps your work, $5 a month keeps new versions coming every few days."));
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Button, theme::accent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
+        const bool become = ImGui::Button(tr("Become a member##appeal.become"));
+        ImGui::PopStyleColor(3);
+        ImGui::SameLine();
+        const bool notNow = ImGui::Button(tr("Not now##appeal.not_now"));
+        ImGui::EndGroup();
+        if (become) openSupportPage("in-app-appeal");
+        if (become || notNow) appealOpen_ = false; // (its version was recorded as it showed: once per version)
     }
     ImGui::End();
 }
@@ -749,7 +836,7 @@ bool App::drawSupportHeart(ImVec2 at, float size, ImDrawList* dl) {
                      "SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
                      "Top bar");
         if (clicked) {
-            if (const Action* a = actions_.find("help.support"); a && a->run) a->run();
+            openSupportPage("topbar-heart");
         }
     }
     return true;

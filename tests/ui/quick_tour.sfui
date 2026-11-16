@@ -175,6 +175,7 @@ shot tour-10
 remember support_requests s0
 click "See memberships##quicktour"
 expect_value support_requests == $s0+1
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=quick-tour
 click "Maybe later##quicktour"
 expect_value quick_tour_open == 0
 

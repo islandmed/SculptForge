@@ -42,7 +42,7 @@ expect_value member_card_open == 1
 # Become a member opens the membership page (both choices); the card goes, back in a week.
 click "Become a member##member_card.become"
 expect_value support_requests == 2
-expect_status https://sculptforge.app/support.html
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=support-card
 expect_value member_card_open == 0
 # Once per session: more sculpting brings nothing more.
 member_card none sculpt_seconds=5000

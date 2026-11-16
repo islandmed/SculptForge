@@ -10,7 +10,7 @@ click "Help##palette.help"
 expect "Support SculptForge...##help.support"
 click "Support SculptForge...##help.support"
 expect_value support_requests == 1
-expect_status sculptforge.app/support.html
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=help-menu
 
 # Help > Join the Discord... (the official community invite; nothing else changes).
 click "Help##palette.help"

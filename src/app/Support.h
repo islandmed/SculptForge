@@ -24,6 +24,12 @@ namespace sf {
 
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
+// The membership page as an in-app ask opens it: ?utm_source=app&utm_medium=in-app&utm_campaign=<source> (lowercase letters,
+// digits and dashes only; one source per entry point) so the funnel shows which ask a visit came from. Just the URL the
+// browser opens: no request, no counter.
+inline std::string supportPageUrl(std::string_view source) {
+    return std::string(kSupportUrl) + "?utm_source=app&utm_medium=in-app&utm_campaign=" + std::string(source);
+}
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // The community places the Welcome dialog's icon row opens (in this order, like the strip in assets/branding/social); the same
 // accounts as the website's footer. Opened on a click only; the app makes no request to any of them.
@@ -178,8 +184,20 @@ struct SupportCardPrefs {
     double sculptSeconds = 0.0;  // stroke time, every session
     int saves = 0;               // project saves
     unsigned milestonesShown = 0; // bits: 1 starts, 2 sculpting hours, 4 saves
+    std::string appealVersion;   // the app version the appeal card last showed in (once per version)
+    bool updateOwed = false;     // the appeal took the update card's place: that small card shows at the next start
     SupportFeed feed;            // the last update check's "support" block (the card's honest line)
 };
+
+// The appeal card: one short note at startup, once per app version, from the second start on. Never for a member or a
+// Studio build, with update checks off (a package manager's build, the policy, SF_NO_UPDATE_CHECK) or in tests and
+// renders. Its version is recorded as it shows, so "Not now", the button or a crash all end it for that version.
+inline constexpr int kAppealFromStart = 2;
+inline bool appealDue(const SupportCardPrefs& p, std::string_view version, bool signedInMember, bool studio,
+                      bool updateCheckOff, bool testMode) {
+    if (testMode || studio || signedInMember || p.supporter || updateCheckOff || version.empty()) return false;
+    return p.starts >= kAppealFromStart && p.appealVersion != version;
+}
 
 enum class SupportCardReason { None, FirstRun, Manual };
 
@@ -205,6 +223,7 @@ inline bool memberMomentAllowed(const SupportCardPrefs& p, bool signedInMember, 
     if (p.notNow >= kMemberCardUpdatesOnlyAfter && m != MemberMoment::Updated) return false;
     // (a clock set back past a snooze, or a snooze longer than it can be, ends it: a damaged value can't hide it for good)
     if (p.hiddenUntil > now && p.hiddenUntil - now <= kMemberCardNoSignInSeconds) return false;
+    if (m == MemberMoment::Updated && p.updateOwed) return true; // (the appeal's own shownAt must not swallow it)
     const int64_t since = now - p.shownAt, interval = memberCardInterval(p.notNow);
     return p.shownAt <= 0 || since >= interval || since <= -interval;
 }

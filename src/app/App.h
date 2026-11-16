@@ -551,7 +551,7 @@ private:
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
-    void openSupportPage();
+    void openSupportPage(const char* source); // source: the entry point, the link's utm_campaign (supportPageUrl)
     void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
     void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
     float socialRowWidth() const;          // its width
@@ -624,6 +624,12 @@ private:
     void memberMoment(MemberMoment m);          // a good moment happened: the card follows if it may (Support.h)
     void tickMemberCard(float dt);              // the sculpting time, and the card once the frame is calm
     void drawMemberCard();
+    bool appealPending_ = false, appealOpen_ = false; // the appeal card (Support.h appealDue): due at startup / showing
+    bool appealUpdateCheckOff() const;          // update checks off: a package manager's build, the policy, the env var
+    bool appealOwesUpdate_ = false;             // the pending appeal pre-empted an update moment (kept in updateOwed once it shows)
+    void startupUpdateMoment();                 // startup: the update card's moment (a new version, or owed since the appeal)
+    void launchAppeal();                        // startup: due -> pending (and the small card's update moment steps aside)
+    void drawAppealCard();                      // PanelSupportCard.cpp
     void memberCardChoice(MemberCardChoice c);
     void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
     void memberSignInFinished(bool member);     // the card's sign-in ended (startMemberSignIn's onDone)

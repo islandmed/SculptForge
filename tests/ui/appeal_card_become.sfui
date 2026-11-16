@@ -1,0 +1,12 @@
+# The appeal card's button opens the membership page tagged in-app-appeal and closes the card (tests/ui/appeal_card.sfui).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+member_card appeal starts=2
+wait_idle
+wait 0.3
+expect_value appeal_open == 1
+click "Become a member##appeal.become"
+expect_value support_requests == 1
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=in-app-appeal
+wait 0.3
+expect_value appeal_open == 0

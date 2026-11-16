@@ -24,6 +24,55 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
+TEST(appeal_card_is_once_per_version_and_never_for_members) {
+    SupportCardPrefs p;
+    p.starts = 2;
+    const auto due = [&](const SupportCardPrefs& q, const char* v = "0.13.4", bool member = false, bool studio = false,
+                         bool updatesOff = false, bool test = false) { return appealDue(q, v, member, studio, updatesOff, test); };
+    CHECK(due(p));
+    SupportCardPrefs first = p;
+    first.starts = 1; // the first start belongs to the tour
+    CHECK(!due(first));
+    CHECK(!due(p, "0.13.4", true));                       // a signed-in member
+    CHECK(!due(p, "0.13.4", false, true));                // a Studio build
+    CHECK(!due(p, "0.13.4", false, false, true));         // update checks off (policy, package build, SF_NO_UPDATE_CHECK)
+    CHECK(!due(p, "0.13.4", false, false, false, true));  // tests, renders, CI
+    CHECK(!due(p, ""));
+    SupportCardPrefs member = p;
+    member.supporter = true;
+    CHECK(!due(member));
+    p.appealVersion = "0.13.4"; // shown in this version (Not now, the button or a crash): not again, but in the next
+    CHECK(!due(p));
+    CHECK(due(p, "0.13.5"));
+}
+
+TEST(update_card_owed_after_the_appeal_skips_the_week_gap) {
+    SupportCardPrefs p;
+    p.shownAt = 1000; // the appeal just showed
+    const int64_t now = 1000 + 60;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated)); // normally the week gap holds it
+    p.updateOwed = true;
+    CHECK(memberMomentAllowed(p, false, now, false, MemberMoment::Updated));  // owed: it shows at the next start
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Sculpted)); // only the update card
+    CHECK(!memberMomentAllowed(p, true, now, false, MemberMoment::Updated));  // a member never
+    CHECK(!memberMomentAllowed(p, false, now, true, MemberMoment::Updated));  // tests never
+    p.supporter = true;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated));
+}
+
+TEST(support_page_url_carries_the_entry_point) {
+    // The in-app asks tag the membership page so the funnel shows which one a visit came from (no new request: it is the
+    // URL the browser opens).
+    CHECK(supportPageUrl("help-menu") ==
+          "https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=help-menu");
+    for (const char* src : {"help-menu", "topbar-heart", "update-banner", "support-card", "quick-tour", "whats-new", "about"}) {
+        const std::string url = supportPageUrl(src);
+        CHECK(url.rfind(kSupportUrl, 0) == 0);
+        CHECK(url.find(std::string("utm_campaign=") + src) != std::string::npos);
+        for (char c : std::string(src)) CHECK((c >= 'a' && c <= 'z') || c == '-'); // the funnel's tag shape
+    }
+}
+
 TEST(supporters_names_are_sanitised) {
     // Control characters, escapes and invisible formatting go; the rest stays as plain text.
     CHECK(sanitizeSupporterName("Bob\x1b[31m\x07") == "Bob[31m");

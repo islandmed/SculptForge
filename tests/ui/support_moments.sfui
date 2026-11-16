@@ -12,7 +12,7 @@ expect "Support SculptForge##topbar.heart"
 expect_not "Member##topbar.member"
 click "Support SculptForge##topbar.heart"
 expect_value support_requests == 1
-expect_status https://sculptforge.app/support.html
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=topbar-heart
 
 # A test-mode start counts nothing: no milestone.
 member_card milestone days=0

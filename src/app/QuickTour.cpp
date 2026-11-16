@@ -239,7 +239,7 @@ void App::drawQuickTour() {
         const ImVec4 accent = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
         if (last) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
-            if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage();
+            if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage("quick-tour");
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens sculptforge.app/support.html in your browser."));
             ImGui::SameLine();
