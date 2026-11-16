@@ -3,10 +3,13 @@
 #include "core/Ink.h"
 
 #include "core/Micro.h"
+#include "core/ThreadPool.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <atomic>
+#include <mutex>
 #include <unordered_map>
 
 namespace sf {
@@ -80,11 +83,16 @@ void inkStrokeBounds(const InkStroke& s, float& lo, float& hi) {
 // --- InkLayer ---
 
 struct InkLayer::Impl {
+    struct Seg {
+        InkPoint a, b;
+        AABB box; // the capsule's
+    };
     struct Entry {
         InkStroke s;
         uint64_t order = 0;
         AABB box;
         float lo = 0.0f, hi = 0.0f;
+        std::vector<Seg> segs;
     };
     struct Run {
         uint32_t begin = 0, end = 0; // into ids
@@ -93,9 +101,20 @@ struct InkLayer::Impl {
     struct Tile {
         std::vector<uint32_t> ids; // by order
         std::vector<Run> runs;
-        std::vector<std::vector<float>> ck; // runs + 1: the relief at the start of each run, then the result
-        std::vector<glm::vec3> pos;
+        std::vector<std::vector<float>> ck; // per run: the relief after it (before run 0: zero); the last = the result
+        uint32_t count = 0;                 // samples
+        AABB box;
         float lo = 0.0f, hi = 0.0f;
+        const std::vector<float>& result() const { return ck.back(); }
+    };
+    // Per thread: the tile's sample positions (recomputed: cheaper than keeping 12 bytes a point) and the segments
+    // of the stroke at hand that reach the tile.
+    struct Scratch {
+        std::vector<glm::vec3> pos;
+        std::vector<const Seg*> segs;
+        std::vector<float> zero;
+        uint32_t tile = ~0u;
+        uint64_t layer = 0; // whose tile `pos` holds
     };
 
     InkSurface& surf;
@@ -104,12 +123,79 @@ struct InkLayer::Impl {
     std::vector<uint64_t> gens;
     uint32_t nextId = 1;
     uint64_t nextOrder = 1;
-    std::vector<uint32_t> scratch;
+    std::mutex statsLock;
 
-    explicit Impl(InkSurface& s) : surf(s), tiles(s.tileCount()), gens(s.tileCount(), 0) {}
+    const uint64_t serial;
+
+    static uint64_t newSerial() {
+        static std::atomic<uint64_t> next{1};
+        return next++;
+    }
+    explicit Impl(InkSurface& s) : surf(s), tiles(s.tileCount()), gens(s.tileCount(), 0), serial(newSerial()) {}
+
+    static Scratch& scratch() {
+        thread_local Scratch s;
+        return s;
+    }
+    static void prepare(Entry& e) {
+        e.segs.clear();
+        const auto add = [&](const InkPoint& a, const InkPoint& b) {
+            Seg g{a, b, {}};
+            const float w = std::max(a.width, b.width);
+            g.box.expand(a.p), g.box.expand(b.p);
+            g.box.min -= glm::vec3(w), g.box.max += glm::vec3(w);
+            e.segs.push_back(g);
+        };
+        if (e.s.path.size() == 1) add(e.s.path[0], e.s.path[0]);
+        for (size_t k = 1; k < e.s.path.size(); ++k) add(e.s.path[k - 1], e.s.path[k]);
+        e.box = inkStrokeBox(e.s);
+        inkStrokeBounds(e.s, e.lo, e.hi);
+    }
+    static bool overlaps(const AABB& a, const AABB& b) {
+        return a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y && a.min.z <= b.max.z &&
+               b.min.z <= a.max.z;
+    }
+    static bool inBox(const AABB& b, const glm::vec3& p) {
+        return p.x >= b.min.x && p.x <= b.max.x && p.y >= b.min.y && p.y <= b.max.y && p.z >= b.min.z && p.z <= b.max.z;
+    }
+    // The contribution of the gathered segments at x (a stroke = its strongest segment there).
+    static bool contributionOf(const std::vector<const Seg*>& segs, InkProfile profile, const glm::vec3& x, float& c) {
+        bool inside = false;
+        c = 0.0f;
+        for (const Seg* g : segs) {
+            if (!inBox(g->box, x)) continue;
+            const glm::vec3 ba = g->b.p - g->a.p;
+            const float l2 = glm::dot(ba, ba);
+            const float t = l2 > 1e-24f ? std::clamp(glm::dot(x - g->a.p, ba) / l2, 0.0f, 1.0f) : 0.0f;
+            const float w = g->a.width + (g->b.width - g->a.width) * t;
+            if (w <= 0.0f) continue;
+            const glm::vec3 o = x - (g->a.p + ba * t);
+            const float d2 = glm::dot(o, o);
+            if (d2 >= w * w) continue;
+            const float v = (g->a.height + (g->b.height - g->a.height) * t) * inkProfile(profile, std::sqrt(d2) / w);
+            if (!inside || std::abs(v) > std::abs(c)) c = v;
+            inside = true;
+        }
+        return inside;
+    }
 
     const Entry& entry(uint32_t id) const { return strokes.at(id); }
 
+    // The scratch holds tile ti's positions afterwards.
+    const std::vector<glm::vec3>& positions(uint32_t ti) {
+        Scratch& s = scratch();
+        if (s.tile != ti || s.layer != serial) surf.samples(ti, s.pos), s.tile = ti, s.layer = serial;
+        return s.pos;
+    }
+    // Gathers e's segments reaching tile t; false when none does.
+    bool gather(const Tile& t, const Entry& e) {
+        Scratch& s = scratch();
+        s.segs.clear();
+        if (!overlaps(t.box, e.box)) return false;
+        for (const Seg& g : e.segs)
+            if (overlaps(t.box, g.box)) s.segs.push_back(&g);
+        return !s.segs.empty();
+    }
     void partition(Tile& t) {
         t.runs.clear();
         for (uint32_t k = 0; k < t.ids.size(); ++k) {
@@ -117,24 +203,43 @@ struct InkLayer::Impl {
             if (t.runs.empty() || t.runs.back().op != op) t.runs.push_back({k, k + 1, op});
             else t.runs.back().end = k + 1;
         }
-        t.ck.resize(t.runs.size() + 1);
-        for (auto& c : t.ck) c.resize(t.pos.size());
+        t.ck.resize(std::max<size_t>(t.runs.size(), 1));
+        for (auto& c : t.ck) c.resize(t.count);
     }
-    void foldRun(Tile& t, size_t r, InkStats* st) {
+    const std::vector<float>& start(Tile& t, size_t r) {
+        if (r > 0) return t.ck[r - 1];
+        Scratch& s = scratch();
+        s.zero.assign(t.count, 0.0f);
+        return s.zero;
+    }
+    void foldRun(uint32_t ti, Tile& t, size_t r, InkStats& st) {
         const Run& run = t.runs[r];
-        std::vector<float>& out = t.ck[r + 1];
-        out = t.ck[r];
+        const std::vector<glm::vec3>& pos = positions(ti);
+        std::vector<float>& out = t.ck[r];
+        out = start(t, r);
         for (uint32_t k = run.begin; k < run.end; ++k) {
             const Entry& e = entry(t.ids[k]);
-            for (size_t i = 0; i < t.pos.size(); ++i) {
+            if (!gather(t, e)) continue;
+            const auto& segs = scratch().segs;
+            for (uint32_t i = 0; i < t.count; ++i) {
                 float c;
-                if (contribution(e.s, t.pos[i], c)) out[i] = apply(run.op, out[i], c, e.s.opacity);
+                if (inBox(e.box, pos[i]) && contributionOf(segs, e.s.profile, pos[i], c)) out[i] = apply(run.op, out[i], c, e.s.opacity);
             }
-            if (st) st->evaluated += t.pos.size();
+            st.evaluated += t.count;
         }
     }
-    void foldFrom(Tile& t, size_t r, InkStats* st) {
-        for (size_t k = r; k < t.runs.size(); ++k) foldRun(t, k, st);
+    void foldFrom(uint32_t ti, Tile& t, size_t r, InkStats& st) {
+        for (size_t k = r; k < t.runs.size(); ++k) foldRun(ti, t, k, st);
+    }
+    void addContribution(uint32_t ti, const Tile& t, const Entry& e, float sign, std::vector<float>& out, InkStats& st) {
+        if (!gather(t, e)) return;
+        const std::vector<glm::vec3>& pos = positions(ti);
+        const auto& segs = scratch().segs;
+        for (uint32_t i = 0; i < t.count; ++i) {
+            float c;
+            if (inBox(e.box, pos[i]) && contributionOf(segs, e.s.profile, pos[i], c)) out[i] += sign * e.s.opacity * c;
+        }
+        st.evaluated += t.count;
     }
     void composeBounds(Tile& t) {
         float lo = 0.0f, hi = 0.0f;
@@ -152,22 +257,24 @@ struct InkLayer::Impl {
         auto& t = tiles[ti];
         if (!t) {
             t = std::make_unique<Tile>();
-            surf.samples(ti, t->pos);
-            t->ck.assign(1, std::vector<float>(t->pos.size(), 0.0f));
+            const std::vector<glm::vec3>& pos = positions(ti);
+            t->count = uint32_t(pos.size());
+            for (const glm::vec3& p : pos) t->box.expand(p);
+            t->ck.assign(1, std::vector<float>(t->count, 0.0f));
         }
         return *t;
     }
-    void rebuildTile(Tile& t, InkStats* st) {
+    void rebuildTile(uint32_t ti, Tile& t, InkStats& st) {
         partition(t);
-        std::fill(t.ck[0].begin(), t.ck[0].end(), 0.0f);
-        foldFrom(t, 0, st);
+        if (t.runs.empty()) std::fill(t.ck[0].begin(), t.ck[0].end(), 0.0f);
+        foldFrom(ti, t, 0, st);
     }
-    void finish(uint32_t ti, InkStats* st) {
+    void finish(uint32_t ti, InkStats& st) {
         auto& t = tiles[ti];
         composeBounds(*t);
-        surf.write(ti, t->ck.back());
+        surf.write(ti, t->result());
         ++gens[ti];
-        if (st) ++st->tiles, st->samples += t->pos.size();
+        ++st.tiles, st.samples += t->count;
         if (t->ids.empty()) t.reset();
     }
     size_t runOf(const Tile& t, uint32_t k) const {
@@ -180,66 +287,48 @@ struct InkLayer::Impl {
                                          [&](uint32_t id, uint64_t o) { return entry(id).order < o; }) -
                         t.ids.begin());
     }
-    // Contribution of e at every sample of t, times its opacity, added (sign) to out.
-    void addContribution(const Tile& t, const Entry& e, float sign, std::vector<float>& out, InkStats* st) {
-        for (size_t i = 0; i < t.pos.size(); ++i) {
-            float c;
-            if (contribution(e.s, t.pos[i], c)) out[i] += sign * e.s.opacity * c;
-        }
-        if (st) st->evaluated += t.pos.size();
-    }
 
-    // Stroke `id` (entry already holding its new state; `old` its previous state or null for a new stroke) in tile ti.
-    void update(uint32_t ti, uint32_t id, const Entry* old, bool inOld, bool inNew, InkStats* st) {
+    // Stroke `id` (its entry holding the new state; `old` the previous one, or null for a new stroke) in tile ti.
+    void update(uint32_t ti, uint32_t id, const Entry* old, bool inNew, InkStats& st) {
         Tile& t = tileFor(ti);
         const Entry& now = entry(id);
-        const bool has = std::binary_search(t.ids.begin(), t.ids.end(), id, [&](uint32_t a, uint32_t b) {
-            return entry(a).order < entry(b).order;
-        });
-        (void)inOld;
+        const uint32_t k = position(t, now.order);
+        const bool has = k < t.ids.size() && t.ids[k] == id;
         if (has && inNew && old && old->s.op == now.s.op) { // changed in place
-            const uint32_t k = position(t, now.order);
             const size_t r = runOf(t, k);
             if (now.s.op == InkOp::Add) {
-                addContribution(t, *old, -1.0f, t.ck[r + 1], st);
-                addContribution(t, now, 1.0f, t.ck[r + 1], st);
-                foldFrom(t, r + 1, st);
+                addContribution(ti, t, *old, -1.0f, t.ck[r], st);
+                addContribution(ti, t, now, 1.0f, t.ck[r], st);
+                foldFrom(ti, t, r + 1, st);
             } else {
-                foldFrom(t, r, st);
+                foldFrom(ti, t, r, st);
             }
         } else if (!has && inNew) { // reaches this tile now
-            const uint32_t k = position(t, now.order);
             t.ids.insert(t.ids.begin() + k, id);
-            // joins the run before or after it when the operator matches, else the tile is folded again
-            size_t r = t.runs.size();
-            for (size_t q = 0; q < t.runs.size() && r == t.runs.size(); ++q) // (inside it, or touching it)
+            size_t r = t.runs.size(); // joins the run it lands in or touches when the operator matches
+            for (size_t q = 0; q < t.runs.size() && r == t.runs.size(); ++q)
                 if (t.runs[q].op == now.s.op && t.runs[q].begin <= k && k <= t.runs[q].end) r = q;
             if (r == t.runs.size()) {
-                rebuildTile(t, st);
+                rebuildTile(ti, t, st);
             } else {
-                for (size_t q = 0; q < t.runs.size(); ++q) {
-                    if (q == r) { t.runs[q].end++; continue; }
-                    if (t.runs[q].begin >= k && q > r) t.runs[q].begin++, t.runs[q].end++;
-                }
-                if (now.s.op == InkOp::Add) addContribution(t, now, 1.0f, t.ck[r + 1], st), foldFrom(t, r + 1, st);
-                else foldFrom(t, r, st);
+                t.runs[r].end++;
+                for (size_t q = r + 1; q < t.runs.size(); ++q) t.runs[q].begin++, t.runs[q].end++;
+                if (now.s.op == InkOp::Add) addContribution(ti, t, now, 1.0f, t.ck[r], st), foldFrom(ti, t, r + 1, st);
+                else foldFrom(ti, t, r, st);
             }
         } else if (has && !inNew) { // left this tile
-            const uint32_t k = position(t, now.order);
             const size_t r = runOf(t, k);
             t.ids.erase(t.ids.begin() + k);
             if (t.runs[r].end - t.runs[r].begin == 1 || !old || old->s.op != now.s.op) {
-                rebuildTile(t, st);
+                rebuildTile(ti, t, st);
             } else {
-                for (size_t q = 0; q < t.runs.size(); ++q) {
-                    if (q == r) { t.runs[q].end--; continue; }
-                    if (q > r) t.runs[q].begin--, t.runs[q].end--;
-                }
-                if (old->s.op == InkOp::Add) addContribution(t, *old, -1.0f, t.ck[r + 1], st), foldFrom(t, r + 1, st);
-                else foldFrom(t, r, st);
+                t.runs[r].end--;
+                for (size_t q = r + 1; q < t.runs.size(); ++q) t.runs[q].begin--, t.runs[q].end--;
+                if (old->s.op == InkOp::Add) addContribution(ti, t, *old, -1.0f, t.ck[r], st), foldFrom(ti, t, r + 1, st);
+                else foldFrom(ti, t, r, st);
             }
         } else if (has) { // operator changed
-            rebuildTile(t, st);
+            rebuildTile(ti, t, st);
         } else {
             if (t.ids.empty()) tiles[ti].reset();
             return;
@@ -247,20 +336,22 @@ struct InkLayer::Impl {
         finish(ti, st);
     }
 
-    void touch(uint32_t id, const Entry* old, InkStats* st) {
-        std::vector<uint32_t> before, after;
+    void touch(uint32_t id, const Entry* old, InkStats* stats) {
+        std::vector<uint32_t> before, after, all;
         if (old) surf.tilesIn(old->box, before);
         const auto it = strokes.find(id);
-        const bool alive = it != strokes.end() && !it->second.s.path.empty();
-        if (alive) surf.tilesIn(it->second.box, after);
+        if (it != strokes.end() && !it->second.s.path.empty()) surf.tilesIn(it->second.box, after);
         std::sort(before.begin(), before.end()), std::sort(after.begin(), after.end());
-        scratch.clear();
-        std::set_union(before.begin(), before.end(), after.begin(), after.end(), std::back_inserter(scratch));
-        for (uint32_t ti : scratch) {
-            const bool inNew = std::binary_search(after.begin(), after.end(), ti);
-            const bool inOld = std::binary_search(before.begin(), before.end(), ti);
-            update(ti, id, old, inOld, inNew, st);
-        }
+        std::set_union(before.begin(), before.end(), after.begin(), after.end(), std::back_inserter(all));
+        // tiles are independent: one per job (each writes its own tile and its own part of the surface)
+        poolFor(all.size(), [&](size_t b, size_t e) {
+            InkStats local;
+            for (size_t i = b; i < e; ++i) update(all[i], id, old, std::binary_search(after.begin(), after.end(), all[i]), local);
+            if (stats) {
+                std::lock_guard<std::mutex> lock(statsLock);
+                stats->tiles += local.tiles, stats->evaluated += local.evaluated, stats->samples += local.samples;
+            }
+        }, 8);
     }
 };
 
@@ -272,9 +363,8 @@ uint32_t InkLayer::add(InkStroke s, InkStats* stats) {
     else d_->nextId = std::max(d_->nextId, s.id + 1);
     Impl::Entry e;
     e.order = d_->nextOrder++;
-    e.box = inkStrokeBox(s);
-    inkStrokeBounds(s, e.lo, e.hi);
     e.s = std::move(s);
+    Impl::prepare(e);
     const uint32_t id = e.s.id;
     d_->strokes[id] = std::move(e);
     d_->touch(id, nullptr, stats);
@@ -286,8 +376,7 @@ bool InkLayer::edit(const InkStroke& s, InkStats* stats) {
     if (it == d_->strokes.end()) return false;
     const Impl::Entry old = it->second;
     it->second.s = s;
-    it->second.box = inkStrokeBox(s);
-    inkStrokeBounds(s, it->second.lo, it->second.hi);
+    Impl::prepare(it->second);
     d_->touch(s.id, &old, stats);
     return true;
 }
@@ -295,9 +384,10 @@ bool InkLayer::edit(const InkStroke& s, InkStats* stats) {
 bool InkLayer::remove(uint32_t id, InkStats* stats) {
     const auto it = d_->strokes.find(id);
     if (it == d_->strokes.end()) return false;
-    // leaves every tile it was in: an edit to an empty path, then dropped
+    // leaves every tile it was in (an edit to an empty path), then goes
     const Impl::Entry old = it->second;
     it->second.s.path.clear();
+    Impl::prepare(it->second);
     d_->touch(id, &old, stats);
     d_->strokes.erase(id);
     return true;
@@ -321,17 +411,27 @@ void InkLayer::rebuild(InkStats* stats) {
         d_->surf.tilesIn(d_->strokes[id].box, found);
         for (uint32_t ti : found) lists[ti].push_back(id);
     }
-    for (uint32_t ti = 0; ti < d_->tiles.size(); ++ti) {
-        if (lists[ti].empty() && !d_->tiles[ti]) continue;
-        Impl::Tile& t = d_->tileFor(ti);
-        t.ids = std::move(lists[ti]);
-        d_->rebuildTile(t, stats);
-        d_->finish(ti, stats);
-    }
+    std::vector<uint32_t> todo;
+    for (uint32_t ti = 0; ti < d_->tiles.size(); ++ti)
+        if (!lists[ti].empty() || d_->tiles[ti]) todo.push_back(ti);
+    poolFor(todo.size(), [&](size_t b, size_t e) {
+        InkStats local;
+        for (size_t i = b; i < e; ++i) {
+            const uint32_t ti = todo[i];
+            Impl::Tile& t = d_->tileFor(ti);
+            t.ids = std::move(lists[ti]);
+            d_->rebuildTile(ti, t, local);
+            d_->finish(ti, local);
+        }
+        if (stats) {
+            std::lock_guard<std::mutex> lock(d_->statsLock);
+            stats->tiles += local.tiles, stats->evaluated += local.evaluated, stats->samples += local.samples;
+        }
+    }, 8);
 }
 
 const std::vector<float>* InkLayer::relief(uint32_t tile) const {
-    return tile < d_->tiles.size() && d_->tiles[tile] ? &d_->tiles[tile]->ck.back() : nullptr;
+    return tile < d_->tiles.size() && d_->tiles[tile] ? &d_->tiles[tile]->result() : nullptr;
 }
 
 void InkLayer::bounds(uint32_t tile, float& lo, float& hi) const {
@@ -345,12 +445,13 @@ size_t InkLayer::bytes() const {
     size_t b = d_->gens.size() * sizeof(uint64_t) + d_->tiles.size() * sizeof(void*);
     for (const auto& t : d_->tiles) {
         if (!t) continue;
-        b += sizeof(*t) + t->ids.size() * 4 + t->runs.size() * sizeof(Impl::Run) + t->pos.size() * sizeof(glm::vec3);
-        for (const auto& c : t->ck) b += c.size() * sizeof(float);
+        b += sizeof(*t) + t->ids.capacity() * 4 + t->runs.capacity() * sizeof(Impl::Run);
+        for (const auto& c : t->ck) b += c.capacity() * sizeof(float);
     }
-    for (const auto& [id, e] : d_->strokes) b += sizeof(e) + e.s.path.size() * sizeof(InkPoint);
+    for (const auto& [id, e] : d_->strokes) b += sizeof(e) + e.s.path.capacity() * sizeof(InkPoint) + e.segs.capacity() * sizeof(Impl::Seg);
     return b;
 }
+
 
 // --- Micro surface ---
 
@@ -376,6 +477,7 @@ public:
         dim_ = glm::ivec3(glm::max(glm::ceil(ext), glm::vec3(1.0f)));
         cells_.resize(size_t(dim_.x) * dim_.y * dim_.z);
         for (uint32_t t = 0; t < nt; ++t) forCells(boxes_[t], [&](size_t c) { cells_[c].push_back(t); });
+        base_.resize(nt);
     }
     size_t tileCount() const override { return mm_.baseTriangles; }
     void tilesIn(const AABB& box, std::vector<uint32_t>& out) const override {
@@ -398,22 +500,27 @@ public:
                 out[MicroMesh::index(i, j, mm_.n)] = s;
             }
     }
-    void write(uint32_t tile, std::span<const float> relief) override {
+    void write(uint32_t tile, std::span<const float> relief) override { // (tiles in parallel: each its own grid)
         int16_t* d = mm_.disp.data() + size_t(tile) * mm_.samples;
-        auto [it, fresh] = base_.try_emplace(tile);
-        if (fresh) it->second.assign(d, d + mm_.samples);
+        auto& base = base_[tile];
+        if (!base) base = std::make_unique<std::vector<int16_t>>(d, d + mm_.samples);
         const float inv = 1.0f / mm_.step;
         int most = 0;
         for (uint32_t k = 0; k < mm_.samples; ++k) {
-            const long v = long(it->second[k]) + std::lround(relief[k] * inv);
+            const long v = long((*base)[k]) + std::lround(relief[k] * inv);
             d[k] = int16_t(std::clamp(v, -32767L, 32767L));
             most = std::max(most, std::abs(int(d[k])));
         }
+        std::lock_guard<std::mutex> lock(lock_);
         if (tile < mm_.triRange.size()) mm_.triRange[tile] = uint16_t(most), mm_.rangeMax = std::max<uint16_t>(mm_.rangeMax, uint16_t(most));
         mm_.markDirty(tile);
         ++mm_.revision;
     }
-    size_t bytes() const { return cells_.size() * sizeof(cells_[0]) + boxes_.size() * sizeof(AABB) + base_.size() * mm_.samples * 2; }
+    size_t bytes() const {
+        size_t b = cells_.size() * sizeof(cells_[0]) + boxes_.size() * sizeof(AABB) + base_.size() * sizeof(void*);
+        for (const auto& v : base_) b += v ? v->size() * 2 : 0;
+        return b;
+    }
 
 private:
     static bool overlaps(const AABB& a, const AABB& b) {
@@ -435,7 +542,8 @@ private:
     glm::vec3 origin_{0.0f};
     float cell_ = 1.0f;
     glm::ivec3 dim_{1};
-    std::unordered_map<uint32_t, std::vector<int16_t>> base_; // the sculpt's values under the ink, per inked tile
+    std::vector<std::unique_ptr<std::vector<int16_t>>> base_; // the sculpt's values under the ink, per inked tile
+    std::mutex lock_;                                          // the level's shared state (dirty bits, ranges)
 };
 
 // --- Sheet surface ---
