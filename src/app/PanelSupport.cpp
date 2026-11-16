@@ -46,14 +46,15 @@ const FoundingMembers& foundingMembers() {
     return f;
 }
 
-void App::openSupportPage() {
+void App::openSupportPage(const char* source) {
     ++supportPageRequests_;
+    const std::string url = supportPageUrl(source);
     if (!interactive()) { // UI tests, renders and demos never start a browser
-        status_ = std::string("Support SculptForge: ") + kSupportUrl;
+        status_ = "Support SculptForge: " + url;
         return;
     }
-    status_ = sf::dialogs::openUrl(kSupportUrl) ? std::string("Opened sculptforge.app/support.html in your browser")
-                                       : std::string("Couldn't open ") + kSupportUrl + ": " + SDL_GetError();
+    status_ = sf::dialogs::openUrl(url.c_str()) ? std::string("Opened sculptforge.app/support.html in your browser")
+                                       : "Couldn't open " + url + ": " + SDL_GetError();
 }
 
 void App::openDiscordPage() {
@@ -130,7 +131,7 @@ void App::drawSupportersSection() {
         ImGui::EndChild();
     }
     ImGui::TextWrapped("%s", kFreeReleaseNote);
-    if (ImGui::Button(tr("Support SculptForge##about"))) openSupportPage();
+    if (ImGui::Button(tr("Support SculptForge##about"))) openSupportPage("about");
 }
 
 void App::chooseNewLook(bool tryIt) {

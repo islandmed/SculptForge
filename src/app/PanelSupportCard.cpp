@@ -714,7 +714,7 @@ void App::drawMemberCard() {
                 ImGui::PopStyleColor(4);
             }
             if (become) {
-                openSupportPage(); // both choices (monthly, yearly) on the membership page
+                openSupportPage("support-card"); // both choices (monthly, yearly) on the membership page
                 memberCardChoice(MemberCardChoice::Become);
             } else if (notNow) {
                 memberCardChoice(MemberCardChoice::NotNow);
@@ -749,7 +749,7 @@ bool App::drawSupportHeart(ImVec2 at, float size, ImDrawList* dl) {
                      "SculptForge is free and open source. Members keep it free and growing (Help > Support SculptForge).",
                      "Top bar");
         if (clicked) {
-            if (const Action* a = actions_.find("help.support"); a && a->run) a->run();
+            openSupportPage("topbar-heart");
         }
     }
     return true;

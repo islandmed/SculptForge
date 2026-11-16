@@ -24,6 +24,19 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
+TEST(support_page_url_carries_the_entry_point) {
+    // The in-app asks tag the membership page so the funnel shows which one a visit came from (no new request: it is the
+    // URL the browser opens).
+    CHECK(supportPageUrl("help-menu") ==
+          "https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=help-menu");
+    for (const char* src : {"help-menu", "topbar-heart", "update-banner", "support-card", "quick-tour", "whats-new", "about"}) {
+        const std::string url = supportPageUrl(src);
+        CHECK(url.rfind(kSupportUrl, 0) == 0);
+        CHECK(url.find(std::string("utm_campaign=") + src) != std::string::npos);
+        for (char c : std::string(src)) CHECK((c >= 'a' && c <= 'z') || c == '-'); // the funnel's tag shape
+    }
+}
+
 TEST(supporters_names_are_sanitised) {
     // Control characters, escapes and invisible formatting go; the rest stays as plain text.
     CHECK(sanitizeSupporterName("Bob\x1b[31m\x07") == "Bob[31m");

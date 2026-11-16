@@ -24,6 +24,12 @@ namespace sf {
 
 inline constexpr const char* kSupportUrl = "https://sculptforge.app/support.html";
 // The official community Discord (a permanent invite; the same link as on the website and in the README).
+// The membership page as an in-app ask opens it: ?utm_source=app&utm_medium=in-app&utm_campaign=<source> (lowercase letters,
+// digits and dashes only; one source per entry point) so the funnel shows which ask a visit came from. Just the URL the
+// browser opens: no request, no counter.
+inline std::string supportPageUrl(std::string_view source) {
+    return std::string(kSupportUrl) + "?utm_source=app&utm_medium=in-app&utm_campaign=" + std::string(source);
+}
 inline constexpr const char* kDiscordUrl = "https://discord.gg/gWrYkEmQhH";
 // The community places the Welcome dialog's icon row opens (in this order, like the strip in assets/branding/social); the same
 // accounts as the website's footer. Opened on a click only; the app makes no request to any of them.

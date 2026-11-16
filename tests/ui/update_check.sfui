@@ -14,6 +14,8 @@ expect_text "Members get betas early."
 expect_text "Twice as fast"
 expect "Download"
 shot update-banner
+click "Become a member"
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=update-banner
 click "Skip this version"
 expect_not "Skip this version"
 

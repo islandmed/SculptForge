@@ -551,7 +551,7 @@ private:
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
-    void openSupportPage();
+    void openSupportPage(const char* source); // source: the entry point, the link's utm_campaign (supportPageUrl)
     void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
     void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
     float socialRowWidth() const;          // its width
