@@ -1,7 +1,7 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-15T23:37:07Z",
+ "updated": "2026-11-16T00:07:08Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
@@ -42,7 +42,7 @@
   },
   {
    "rank": 5,
-   "title": "(renamed by the team)",
+   "title": "Brushes that stamp a mesh, and chisel brushes",
    "votes": 0,
    "shipped": false,
    "renamed": true,
@@ -51,7 +51,7 @@
   },
   {
    "rank": 6,
-   "title": "(renamed by the team)",
+   "title": "Assign brushes to modifier keys (Shift / Ctrl)",
    "votes": 0,
    "shipped": false,
    "renamed": true,
