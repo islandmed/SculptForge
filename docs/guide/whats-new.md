@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.4
+
+```features
+date: unreleased
+tagline: Saves on Windows retry instead of failing, and a short note from the members.
+highlight: On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar
+highlight: A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it
+highlight: Membership links in the app carry a small source tag, so we can see which one helps
+```
+
 ## Version 0.13.3
 
 ```features
