@@ -161,6 +161,7 @@ add_library(sculptforge_core STATIC
   src/core/LayerStackIO.cpp
   src/core/MapExport.cpp
   src/core/Multires.cpp
+  src/core/Ink.cpp
   src/core/Micro.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
@@ -832,6 +833,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   # One Clay Block stroke with dynamic topology on a dense Part: per-dab and stroke-end ms (tests/tools/dyntopo_bench.cpp).
   add_executable(sf_dyntopo_bench tests/tools/dyntopo_bench.cpp)
   target_link_libraries(sf_dyntopo_bench PRIVATE sculptforge_core)
+  # Forge Ink on a Micro level (core-200m head in memory): edit ms vs the micro points touched (tests/tools/ink_micro_bench.cpp).
+  add_executable(sf_ink_micro_bench tests/tools/ink_micro_bench.cpp)
+  target_link_libraries(sf_ink_micro_bench PRIVATE sculptforge_core)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)

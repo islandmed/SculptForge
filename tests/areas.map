@@ -260,6 +260,7 @@ test_mesh_boolean           mesh
 test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
+test_ink                    sculpt
 test_micro                  mesh
 test_micro_mask_grab        mesh
 test_multires*              mesh
@@ -392,6 +393,7 @@ src/core/CloseHoles*               mesh
 src/core/Tube*                     mesh
 src/core/Parts*                    mesh
 src/core/Multires*                 mesh
+src/core/Ink*                      sculpt
 src/core/Micro*                    mesh
 src/core/Face*                     mesh
 src/core/ForgeSpheres*             mesh
