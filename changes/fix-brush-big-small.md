@@ -8,4 +8,4 @@ testers:
 Cause per symptom: the dab's area normal and centre were summed over the whole region, both sides of a form smaller than the brush (it cancelled
 to noise after a few strokes: normal turned away from the surface, plane through the middle of the form); every depth scaled with the brush's radius,
 so a brush 4x the Part moved it 4x as far per dab; Move added each mirror copy's move on vertices both held. Not changed: Front faces only still tears a
-little along the silhouette of a brush 2x or more the form (known, noted in REPORT.md).
+little along the silhouette of a brush 2x or more the form, and Clay Block 1-2x the form is rough as before.
