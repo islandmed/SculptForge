@@ -49,6 +49,12 @@ expect_value triangles == 1280
 python_startup
 expect_value triangles == 20480
 
+# A studio policy that says never: a ticked, trusted, unchanged script doesn't run at start-up either.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"python\":{\"scripts\":\"never\"}}"
+python_startup
+expect_value triangles == 20480
+run ui_policy json=""
+
 # Unticked: nothing runs.
 click "grow.py"
 python_startup
