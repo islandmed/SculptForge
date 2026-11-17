@@ -6,6 +6,64 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.7] - 2026-11-17
+
+### Added
+- **Alpha on the brush thumbnail** (#208): a brush's thumbnail in the shelf slots, the brush picker, the Library and
+  the Ctrl-held tile shows the brush's alpha pressed into the clay ball in its stroke type (Dots and Lazy Mouse an S
+  across the ball, Drag Stamp one stamp, Drag Dot one dab, Spray a scatter), with its Angle and Tile. Brushes that
+  differ only by alpha tell apart at a glance. It follows the brush's settings and the alpha file (an edited image
+  makes a new thumbnail), is made once and cached, and right-click > **Regenerate thumbnail** (shelf slot, picker,
+  Library) makes it again. Thanks @nagdav853.
+- "**Circle shape for Mask, Select and Cut** (#213, thanks @dCo3lh0): **Circle Mask** (Tool > Masking), **Select
+  Circle** (Tool > Visibility) and **Cut Circle** (Tool > Cut) sit beside the rectangle and lasso in Tool, the Ctrl
+  and Ctrl+Shift brush pickers and the stroke popup. Drag from the centre; the cursor sets the width and the height,
+  so it can be an ellipse. Shift while dragging keeps it a perfect circle (Select and Cut already hold Shift: let go
+  of it). Alt at the press draws Cut Circle from a corner; **Draw from corner** and **Keep round** in each panel set
+  both for every drag. Symmetry, Mask Strength, Front faces only, the Cut modes and Alt (unmask, hide inside) work as
+  for the lasso."
+- **Portable data folder** (requested by Lex): a `portable.txt` file (or a `data` folder) next to the program makes
+  SculptForge keep all its data in `<program folder>/data`, created on the first run; without it nothing changes. The
+  Windows portable .zip ships with `portable.txt`; on Linux (AppImage) and macOS an empty `portable.txt` next to the
+  AppImage or the .app does the same. The first run of a portable copy on a computer that has SculptForge settings
+  offers **Import my settings and brushes** (a copy; the installed copy is never written to). On a read-only stick the
+  status line says so once and the computer's own folder is used for that session. One-click updates of the portable
+  zip carry the `data` folder along; the install script's copy stays per-user.
+- **Python scripting in the app** (Edit > Preferences > Scripts, off by default): the console's Python mode and `.py`
+  script files (the Scripts folder, listed under File > Script, and Run script file) run Python with the same
+  `sculptforge` module as pipelines, against the open scene: `sf.document()`, `sf.run("command", ...)`, Parts, the
+  mesh and selection data, brushes. Each line or script is one undo step; errors stop the script, never the app.
+  Python is loaded only the first time a script runs, so it costs nothing at start-up or per frame. Nothing you open
+  can start a script, AI tools and macros can't run Python, and a studio policy can lock it off (`"python":
+  {"scripts": "never"}`). Requested by Tpqz_ on Discord and chris_gardner on Discord.
+- The Python module's mesh arrays work without NumPy: they are lists of rows when NumPy isn't installed.
+- **Exact values on every slider**: a double-click (Ctrl+click as before, a pen's double-tap too) on any slider or
+  drag number opens a typed field: Enter applies, Esc cancels and keeps the value from before the first click, Tab
+  goes on to the next field. The Level slider waits out the double-click before it switches, so a double-click
+  switches once, with the typed number. Before, only Ctrl+click typed on sliders and a double-click only on drag
+  numbers such as Part size. Requested by a member.
+- **Hold Space to reposition a selection** (#214, thanks to fxrtst on GitHub): while you drag out a Mask, Select or
+  Cut rectangle, line or lasso, holding Space slides the whole shape with the cursor instead of resizing it; let go
+  and the drag sizes it again. Works in the Classic and Streamlined layouts, with a mouse or a pen.
+
+### Changed
+- The app's Python is a trimmed CPython 3.13: no test suite, Tk/IDLE/turtle, ensurepip, venv, help() topic pages
+  (`pydoc_data`) or the interactive REPL editor (`_pyrepl`; the console has its own). Add packages to the Scripts
+  folder's site-packages.
+- The Scoop manifest keeps the portable .zip's `bin\data` folder (settings, brushes, library, layouts) across `scoop
+  update`, now that the portable .zip carries its data beside the program (#170).
+
+### Fixed
+- Right-click menus and drop-down lists stayed open when you left-clicked elsewhere in the panel they came from; a
+  click or pen tap outside now closes them, and one over the model starts no stroke (#210, reported by @Velisariy).
+- **My Panel** (reported by Hameron on Discord): holding Alt and dragging a button or a section onto My Panel only
+  worked when it was opened with its key. Opened from the Edit menu, the press closed the drop-down before the drop;
+  in a window of its own, the main window's drag never reached it. Both take the drop now (an own window adds at the
+  end of the panel).
+- Two-finger twist on a touch screen or trackpad rolled the view against the fingers and ignored the rotation lock
+  (Turntable, X axis, Z axis); it now follows the fingers and does nothing under a lock. New **Invert twist** option
+  (Preferences > Input, off by default), reported by ebarranco.
+
 ## [0.13.6] - 2026-11-17
 
 ### Added

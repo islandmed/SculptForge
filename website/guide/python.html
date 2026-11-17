@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python scripting - SculptForge User Guide</title>
+  <meta name="description" content="In short:">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
+  <link rel="canonical" href="https://sculptforge.app/guide/python.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Python scripting - SculptForge User Guide">
+  <meta property="og:description" content="In short:">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/guide/python.html">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=40">
+  <script src="../motion.js?v=15" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <script src="search-index.js?v=58" defer></script>
+</head>
+<body class="guide-page" data-section="files" data-prev="scripting.html" data-next="packs-and-macros.html">
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="../guide/index.html" aria-current="page">Guide</a>
+        <a href="../studios.html">For studios</a>
+        <a href="../why.html">About</a>
+        <a href="../labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="../support.html">Support</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap guide-layout">
+    <div class="guide-side">
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="guide-toc">
+        <span>Contents</span><span class="toc-current">Python scripting</span></button>
+      <div id="guide-toc" class="toc-panel">
+        <div class="guide-search" role="search">
+          <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
+          <div class="search-results" id="guide-results" hidden></div>
+        </div>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group" data-section="start">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li><li><a href="reference-images.html">Reference images</a></li></ul><p class="toc-group" data-section="sculpt">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html">Brush packs</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="linked-duplicates.html">Linked Duplicates</a></li><li><a href="garments.html">Garments: sewing patterns at real size</a></li><li><a href="forge-spheres.html">Forge Spheres</a></li><li><a href="tube.html">Tube: draw in 3D space</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="edges.html">Edges: selecting and creasing edges</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle, circle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group" data-section="ai">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group" data-section="files">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="python.html" class="current" aria-current="page">Python scripting</a><ul class="toc-sections"><li><a href="#scripts-are-trusted-code">Scripts are trusted code</a></li><li><a href="#the-consoles-python-mode">The console&#x27;s Python mode</a></li><li><a href="#script-files">Script files</a></li><li><a href="#the-api">The API</a></li><li><a href="#recipes">Recipes</a></li></ul></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li><li><a href="security.html">Security overview for IT reviews</a></li></ul><p class="toc-group" data-section="ref">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="discord.html">Show SculptForge on Discord</a></li><li><a href="forge-deck.html">Forge Deck (prototype)</a></li><li><a href="support.html">Support and membership</a></li></ul></nav>
+      </div>
+    </div>
+    <main class="guide-main" id="top">
+      <article class="guide-article">
+<h1 id="python-scripting">Python scripting</h1>
+<aside class="callout callout-short"><p><strong>In short:</strong></p><ul><li>Turn it on in <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Scripts</span><i>&#8250;</i><span>Enable Python scripts</span></span> (off until you do).</li><li>The console&#x27;s <strong>Python</strong> mode runs Python against the open scene; <code>.py</code> files in the Scripts folder are listed under <span class="path"><span>File</span><i>&#8250;</i><span>Script</span></span>.</li><li>Each line you enter, and each script you run, is one undo step.</li><li><strong>A Python script is a program. Only run scripts you trust.</strong></li></ul></aside>
+<p>SculptForge runs Python inside the app, with the same <code>sculptforge</code> module that studio pipelines import (see <a href="scripting.html#python">Scripting and automation</a>): every command, the Parts, the mesh data, selection sets and the brush library, plus loops, conditions and functions around them.</p>
+<h2 id="scripts-are-trusted-code">Scripts are trusted code<a class="anchor" href="#scripts-are-trusted-code" aria-label="Link to this section">#</a></h2>
+<p>A Python script can do anything a program on your computer can: read and write your files, reach the network, start other programs. SculptForge doesn&#x27;t limit it, the way your system&#x27;s own Python doesn&#x27;t. So:</p>
+<ul>
+<li>
+<strong>Only run scripts you trust</strong>, as you would only run programs you trust.
+</li>
+<li>
+Python is <strong>off</strong> until you turn it on in <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Scripts</span></span>. A studio can keep it off on every computer with its policy file (<code>&quot;python&quot;: {&quot;scripts&quot;: &quot;never&quot;}</code>, see <a href="studios.html">For studios</a>).
+</li>
+<li>
+A script runs <strong>only when you run it</strong>: a line in the console, a click in the Scripts list, or <strong>Run script file...</strong>. Nothing you open can start one: projects, models, packs, layouts, macros and presets carry no code that runs, and AI tools and macros have no command that runs Python.
+</li>
+<li>
+SculptForge opens no network port for scripting.
+</li>
+</ul>
+<p>To share tools with people you don&#x27;t know, make a <a href="packs-and-macros.html">plugin</a> instead: plugins run sandboxed, with no access to your files or the network.</p>
+<h2 id="the-consoles-python-mode">The console&#x27;s Python mode<a class="anchor" href="#the-consoles-python-mode" aria-label="Link to this section">#</a></h2>
+<p>Open the console (<kbd>`</kbd>) and click <strong>Python</strong> in its header. Two names are ready:</p>
+<div class="table-wrap"><table><thead><tr><th>Name</th><th>What it is</th></tr></thead><tbody><tr><td><code>sf</code></td><td>The <code>sculptforge</code> module</td></tr><tr><td><code>doc</code></td><td>The open scene (also <code>sf.document()</code>)</td></tr></tbody></table></div>
+<div class="code-block"><pre class="code"><code class="language-python">&gt;&gt;&gt; sf.run(&#x27;remesh&#x27;, resolution=200)          # a command on the open scene
+&gt;&gt;&gt; [p[&#x27;name&#x27;] for p in doc.parts]
+[&#x27;Head&#x27;, &#x27;Eyes&#x27;, &#x27;Teeth&#x27;]
+&gt;&gt;&gt; for i in range(2):
+...     sf.run(&#x27;subdivide&#x27;)
+...</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>A line that opens a block (<code>for</code>, <code>if</code>, <code>def</code>...) waits for the rest, shown with <code>...</code>; an empty line runs it. <kbd>Tab</kbd> completes names, <kbd>Up</kbd> and <kbd>Down</kbd> recall earlier lines. Commands a line runs appear in the console as script lines, as when you click their buttons. <code>print()</code> and errors show in the console; an error stops that line or script, never the app.</p>
+<p>Each line you enter is one undo step, however many commands it ran: <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the whole loop above.</p>
+<h2 id="script-files">Script files<a class="anchor" href="#script-files" aria-label="Link to this section">#</a></h2>
+<p>Put <code>.py</code> files in the <strong>Scripts</strong> folder (<span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Scripts</span><i>&#8250;</i><span>Open Scripts folder</span></span>, inside your SculptForge library folder, <code>Documents/SculptForge/Scripts</code>). They are listed under <span class="path"><span>File</span><i>&#8250;</i><span>Script</span></span>; click one to run it. Names that start with <code>_</code> (helper modules) aren&#x27;t listed. <strong>Run script file...</strong> runs a <code>.py</code> file from anywhere.</p>
+<p>A script runs as <code>__main__</code>, with <code>import sculptforge as sf</code>. Each run is one undo step. The Scripts folder is on the import path, so scripts can share helper modules.</p>
+<h2 id="the-api">The API<a class="anchor" href="#the-api" aria-label="Link to this section">#</a></h2>
+<p>Everything in <a href="scripting.html#python">the Python module</a> works in the app, plus:</p>
+<div class="table-wrap"><table><thead><tr><th>Function or property</th><th>What it does</th></tr></thead><tbody><tr><td><code>sf.document()</code></td><td>The open scene: the same object every time</td></tr><tr><td><code>sf.run(command, **params)</code></td><td>Runs a command on the open scene (<code>sf.run(doc, ...)</code> works too)</td></tr><tr><td><code>sf.Document()</code></td><td>A scene of your own, apart from the open one: load, change and export files without touching what you&#x27;re working on</td></tr></tbody></table></div>
+<p><code>doc.mask</code>, <code>doc.colors</code>, <code>doc.facegroups</code> and <code>doc.hidden</code> can be assigned (each assignment is undoable), and <code>doc.set_mesh(vertices, triangles)</code> replaces the active Part&#x27;s mesh as an undoable step.</p>
+<p><strong>NumPy.</strong> With NumPy installed, the mesh arrays are NumPy arrays, as in a pipeline. Without it they are lists: <code>doc.vertices</code> is a list of <code>(x, y, z)</code> tuples, and assignments take lists. To add NumPy or any other package, install it for the same Python version (shown in <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Scripts</span></span> once Python has run) into the Scripts folder&#x27;s <code>site-packages</code>:</p>
+<div class="code-block"><pre class="code"><code class="language-sh">python3.13 -m pip install --target &quot;Documents/SculptForge/Scripts/site-packages&quot; numpy</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p><strong>Threads.</strong> A script may start threads, but only the main thread may use the open scene: from another thread <code>sf.run</code> and the assignments raise an error. A script runs until it finishes, and the window waits for it.</p>
+<h2 id="recipes">Recipes<a class="anchor" href="#recipes" aria-label="Link to this section">#</a></h2>
+<h3 id="batch-export">Batch export<a class="anchor" href="#batch-export" aria-label="Link to this section">#</a></h3>
+<p>Every model in a folder, reduced and exported as glTF, without touching the open scene:</p>
+<div class="code-block"><pre class="code"><code class="language-python">import pathlib
+import sculptforge as sf
+
+src = pathlib.Path.home() / &quot;Models&quot; / &quot;raw&quot;
+out = src / &quot;glb&quot;
+out.mkdir(exist_ok=True)
+for path in sorted(src.glob(&quot;*.obj&quot;)):
+    d = sf.Document()                        # a scene of the script&#x27;s own
+    sf.run(d, &quot;open&quot;, path=path)
+    sf.run(d, &quot;decimate&quot;, ratio=0.25)
+    sf.run(d, &quot;export_glb&quot;, path=out / (path.stem + &quot;.glb&quot;))
+    print(&quot;exported&quot;, path.stem, len(d.triangles), &quot;triangles&quot;)</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<h3 id="rename-parts">Rename Parts<a class="anchor" href="#rename-parts" aria-label="Link to this section">#</a></h3>
+<p>Give every Part a prefix, for a naming convention:</p>
+<div class="code-block"><pre class="code"><code class="language-python">import sculptforge as sf
+
+doc = sf.document()
+for i, part in enumerate(doc.parts):
+    if not part[&quot;name&quot;].startswith(&quot;chr_&quot;):
+        sf.run(&quot;part_rename&quot;, index=i, to=&quot;chr_&quot; + part[&quot;name&quot;])</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>The whole rename is one undo step.</p>
+<h3 id="a-custom-brush-preset">A custom brush preset<a class="anchor" href="#a-custom-brush-preset" aria-label="Link to this section">#</a></h3>
+<p>Brushes are recipes (see <a href="brush-lab.html">Brush Lab</a>); <code>brush_create</code> makes one, or updates it by name, and makes it the active brush. In a script you can make a family of them:</p>
+<div class="code-block"><pre class="code"><code class="language-python">import sculptforge as sf
+
+for name, depth in [(&quot;Ridge Soft&quot;, 0.25), (&quot;Ridge Medium&quot;, 0.5), (&quot;Ridge Hard&quot;, 0.8)]:
+    sf.run(&quot;brush_create&quot;, name=name, direction=&quot;normal&quot;, depth=depth,
+           plane=&quot;clay&quot;, planeAmount=0.6, pinch=0.3, smooth=0.2, hardness=0.4)
+sf.run(&quot;brush_use&quot;, name=&quot;Ridge Medium&quot;)</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p><code>brush_install</code> keeps a brush in your library for the next session; <code>help brush_create</code> in the console lists every recipe parameter.</p>
+<p><em>Thanks to Tpqz_ and chris_gardner on Discord for the idea.</em></p>
+      </article>
+      <nav class="pager" aria-label="Previous and next chapter"><a class="prev" rel="prev" href="scripting.html"><span>Previous</span>Scripting and automation</a><a class="next" rel="next" href="packs-and-macros.html"><span>Next</span>Packs and macros</a></nav>
+      <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
+        Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/python.md">Edit this page on GitHub</a>.</p>
+    </main>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#scripts-are-trusted-code">Scripts are trusted code</a></li><li><a href="#the-consoles-python-mode">The console&#x27;s Python mode</a></li><li><a href="#script-files">Script files</a></li><li><a href="#the-api">The API</a></li><li><a href="#recipes">Recipes</a></li></ul></aside>
+  </div>
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors.<br>The SculptForge User Guide is part of
+          SculptForge, licensed under the <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="../performance/">Performance</a>
+        <a href="../labs/index.html">Labs</a>
+        <a href="index.html">User guide</a>
+        <a href="../supporters.html">Members</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
+        <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
+    </div>
+  </footer>
+</body>
+</html>

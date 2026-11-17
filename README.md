@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.6:</strong> insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run (<a href="https://sculptforge.app/guide/whats-new.html#version-0136">how it works</a>)
+  <strong>New in 0.13.7:</strong> circle shapes for Mask, Select and Cut, Space slides a selection, exact slider values, a portable copy and Python scripting (<a href="https://sculptforge.app/guide/whats-new.html#version-0137">how it works</a>)
 </p>
 
 <p align="center">

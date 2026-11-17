@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.7
 
 ```features
-date: unreleased
+date: 2026-11-17
 tagline: Circle shapes for Mask, Select and Cut, Space slides a selection, exact slider values, a portable copy and Python scripting.
 highlight: Circle and ellipse shapes for Mask, Select and Cut
 highlight: Hold Space to slide a selection while you draw it
@@ -16,6 +16,29 @@ highlight: Type an exact value on any slider
 highlight: A portable copy on a USB stick that carries your settings, brushes and library
 highlight: Python scripting in the app
 ```
+
+- **Brush thumbnails show the alpha**: a brush with an alpha shows it pressed into the ball in the brush's own stroke
+  type (Dots, Drag Stamp, Drag Dot, Spray), in the shelf slot, the picker and the Library; right-click > **Regenerate
+  thumbnail** makes it again.
+- "**Circle shapes**: Circle Mask, Select Circle and Cut Circle draw a circle or ellipse from its centre. Shift keeps
+  it round."
+- **Portable copy on a USB stick**: the Windows portable .zip now keeps everything in a `data` folder next to the
+  program (settings, brushes, library, layouts, hotkeys, My Panel, recent files, logs), so the folder carries your
+  workbench between PCs. Requested by Lex.
+- **Python scripting in the app**: turn it on in **Edit > Preferences > Scripts**, then the console's **Python** mode
+  runs Python against the open scene (loops, conditions, every command), and `.py` files in your Scripts folder are
+  listed under **File > Script**. Each line or script is one undo step. Scripts are programs: only run ones you trust.
+- **Type an exact value on any slider**: double-click (or Ctrl+click, or double-tap with a pen) any slider or drag
+  number in the panels, the top bar and Brush Lab, type the number and press Enter. Esc cancels, Tab goes to the next
+  field.
+- **Slide a selection while you draw it**: hold **Space** while dragging a Mask, Select or Cut rectangle or lasso to
+  move the whole shape; let go of Space to keep sizing.
+- **Menus close when you click away**: a left click or pen tap anywhere outside a right-click menu or drop-down list
+  closes it, in any panel, and a click on the model only closes it (no stroke).
+- **My Panel** takes an Alt+drag however it is open: from the **Edit** menu, in a tray, or in a window of its own
+  (before, only when opened with its key).
+- **Two-finger twist** now rolls the view with your fingers, is ignored under Turntable and the other rotation locks,
+  and **Preferences > Input > Invert twist** flips it.
 
 ## Version 0.13.6
 
