@@ -14,6 +14,7 @@
 
 #include <SDL3/SDL_log.h>
 
+#include <glm/gtc/packing.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
@@ -876,15 +877,45 @@ void main() {
 }
 )";
 
-// 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse).
+// 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse), with the view-dependent
+// colour of their spherical harmonics (the 3DGS basis, core/Splats.h evalSH) for the direction they are seen from.
 const char* kSplatVS = R"(#version 330 core
 layout(location = 0) in uint aIndex;
 uniform samplerBuffer uSplats;
+uniform samplerBuffer uSplatSH; // bands 1-3: coefficient-major rgb, packed 4 to a texel (half floats)
+uniform int uShDegree;          // 0: the plain colour only
+uniform int uShTexels;          // texels per splat in uSplatSH
+uniform mat3 uShFrame;          // world -> the cloud's own frame (the one its SH were captured in)
+uniform vec3 uEye;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec2 uViewport;
 uniform float uOpacity;
 out vec4 vColor;
+vec3 viewColor(vec3 base, vec3 centre) {
+    float f[48];
+    for (int i = 0; i < uShTexels; ++i) {
+        vec4 v = texelFetch(uSplatSH, int(aIndex) * uShTexels + i);
+        f[4 * i] = v.x; f[4 * i + 1] = v.y; f[4 * i + 2] = v.z; f[4 * i + 3] = v.w;
+    }
+    vec3 d = normalize(uShFrame * (centre - uEye));
+    float x = d.x, y = d.y, z = d.z, xx = x * x, yy = y * y, zz = z * z;
+    #define SH(j) vec3(f[3 * (j) - 3], f[3 * (j) - 2], f[3 * (j) - 1])
+    vec3 c = base + 0.4886025119029199 * (-y * SH(1) + z * SH(2) - x * SH(3));
+    if (uShDegree > 1) {
+        c += 1.0925484305920792 * x * y * SH(4) - 1.0925484305920792 * y * z * SH(5) +
+             0.31539156525252005 * (2.0 * zz - xx - yy) * SH(6) - 1.0925484305920792 * x * z * SH(7) +
+             0.5462742152960396 * (xx - yy) * SH(8);
+        if (uShDegree > 2)
+            c += -0.5900435899266435 * y * (3.0 * xx - yy) * SH(9) + 2.890611442640554 * x * y * z * SH(10) -
+                 0.4570457994644658 * y * (4.0 * zz - xx - yy) * SH(11) +
+                 0.3731763325901154 * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * SH(12) -
+                 0.4570457994644658 * x * (4.0 * zz - xx - yy) * SH(13) + 1.445305721320277 * z * (xx - yy) * SH(14) -
+                 0.5900435899266435 * x * (xx - 3.0 * yy) * SH(15);
+    }
+    #undef SH
+    return c;
+}
 out vec2 vOffset;
 const vec2 kCorners[4] = vec2[4](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));
 void main() {
@@ -892,7 +923,7 @@ void main() {
     vec4 t0 = texelFetch(uSplats, base);     // centre, opacity
     vec4 t1 = texelFetch(uSplats, base + 1); // covariance xx xy xz yy
     vec4 t2 = texelFetch(uSplats, base + 2); // covariance yz zz
-    vec4 t3 = texelFetch(uSplats, base + 3); // colour
+    vec4 t3 = texelFetch(uSplats, base + 3); // plain colour (unclamped)
     vec4 cam = uView * vec4(t0.xyz, 1.0);
     vec4 clip = uProj * cam;
     float depth = -cam.z;
@@ -917,7 +948,8 @@ void main() {
     vec2 px = corner.x * 3.0 * min(sqrt(l1), 1024.0) * axis1 + corner.y * 3.0 * min(sqrt(l2), 1024.0) * axis2;
     gl_Position = clip + vec4(px / uViewport * 2.0 * clip.w, 0.0, 0.0);
     vOffset = corner * 3.0;
-    vColor = vec4(t3.rgb, t0.w * uOpacity);
+    vec3 color = uShDegree > 0 ? viewColor(t3.rgb, t0.xyz) : t3.rgb;
+    vColor = vec4(clamp(color, 0.0, 1.0), t0.w * uOpacity);
 }
 )";
 
@@ -939,7 +971,7 @@ constexpr GLenum kTexture6 = 0x84C6; // kTexture6 (its tangents)
 constexpr GLenum kRgb = 0x1907, kRgb8 = 0x8051; // GL_RGB, GL_RGB8
 // PBR view: ORM 8, emissive 9, environment 10, BRDF table 11.
 constexpr GLenum kTexture8 = 0x84C8, kTexture9 = 0x84C9, kTexture10 = 0x84CA, kTexture11 = 0x84CB;
-constexpr GLenum kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
+constexpr GLenum kRgba16f = 0x881A, kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
 
 GLuint compile(GLenum type, const char* src, std::string& error, const char* prefix = nullptr) {
     GLuint s = gl::CreateShader(type);
@@ -1076,6 +1108,8 @@ bool Renderer::init(std::string& error) {
     gl::GenBuffers(1, &splatData_);
     gl::GenBuffers(1, &splatOrder_);
     gl::GenTextures(1, &splatTexture_);
+    gl::GenBuffers(1, &splatShData_);
+    gl::GenTextures(1, &splatShTexture_);
     gl::BindVertexArray(splatVao_);
     gl::BindBuffer(GL_ARRAY_BUFFER, splatOrder_);
     gl::EnableVertexAttribArray(0);
@@ -1427,6 +1461,8 @@ void Renderer::shutdown() {
     gl::DeleteBuffers(1, &splatData_);
     gl::DeleteBuffers(1, &splatOrder_);
     gl::DeleteTextures(1, &splatTexture_);
+    gl::DeleteBuffers(1, &splatShData_);
+    gl::DeleteTextures(1, &splatShTexture_);
     gl::DeleteVertexArrays(1, &splatVao_);
     if (viewFbo_) {
         gl::DeleteFramebuffers(1, &viewFbo_);
@@ -1442,9 +1478,10 @@ void Renderer::shutdown() {
     }
 }
 
-void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
-    if (version == splatVersion_) return;
+void Renderer::syncSplats(const SplatCloud& c, uint64_t version, bool viewColor) {
+    if (version == splatVersion_ && viewColor == splatShWanted_) return;
     splatVersion_ = version;
+    splatShWanted_ = viewColor;
     const GLint maxTexels = gl::maxTextureBufferTexels();
     const size_t n = std::min(c.size(), size_t(std::max(maxTexels, 0)) / 4);
     std::vector<glm::vec4> texels(n * 4);
@@ -1459,19 +1496,42 @@ void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
         texels[i * 4 + 0] = glm::vec4(p, c.opacities[i]);
         texels[i * 4 + 1] = glm::vec4(S[0][0], S[0][1], S[0][2], S[1][1]);
         texels[i * 4 + 2] = glm::vec4(S[1][2], S[2][2], 0.0f, 0.0f);
-        texels[i * 4 + 3] = glm::vec4(glm::clamp(c.color(i), glm::vec3(0.0f), glm::vec3(1.0f)), 1.0f);
+        texels[i * 4 + 3] = glm::vec4(c.color(i), 1.0f); // (clamped in the shader, after the view-dependent part)
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, splatData_);
     gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(texels.size() * sizeof(glm::vec4)), texels.data(), GL_STATIC_DRAW);
     gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
     gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, splatData_);
+    // Bands 1-3 as half floats, 4 to a texel: 96 bytes a splat at degree 3. A cloud whose SH don't fit the buffer
+    // limit shows its plain colour (never fewer splats).
+    const size_t perSplat = size_t(3 * (c.shCount() - 1)), shTexels = (perSplat + 3) / 4;
+    splatShDegree_ = 0;
+    if (viewColor && shTexels > 0 && n * shTexels <= size_t(std::max(maxTexels, 0))) {
+        std::vector<uint16_t> halves(n * shTexels * 4, 0);
+        const size_t K = size_t(c.shCount());
+        for (size_t i = 0; i < n; ++i)
+            for (size_t j = 1; j < K; ++j)
+                for (int ch = 0; ch < 3; ++ch)
+                    halves[i * shTexels * 4 + (j - 1) * 3 + size_t(ch)] = glm::packHalf1x16(c.sh[i * K + j][ch]);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, splatShData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(halves.size() * sizeof(uint16_t)), halves.data(), GL_STATIC_DRAW);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, kRgba16f, splatShData_);
+        splatShDegree_ = c.shDegree;
+        splatShTexels_ = int(shTexels);
+        splatShFrame_ = glm::transpose(glm::mat3_cast(c.transformRotation()));
+    } else {
+        gl::BindBuffer(GL_TEXTURE_BUFFER, splatShData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW); // (frees the last cloud's)
+    }
     gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     splatCount_ = GLsizei(n);
     lastSortView_ = glm::mat4(0.0f); // force a re-sort
 }
 
-void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity) {
+void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity,
+                          bool viewColor) {
     if (splatCount_ == 0) return;
     // Back-to-front order, re-sorted only when the camera moves (16-bit counting sort).
     if (view != lastSortView_) {
@@ -1505,6 +1565,17 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
     gl::Uniform2f(gl::GetUniformLocation(splatProgram_, "uViewport"), float(fbWidth), float(fbHeight));
     gl::Uniform1f(gl::GetUniformLocation(splatProgram_, "uOpacity"), opacity);
     gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplats"), 0);
+    const int shDegree = viewColor ? splatShDegree_ : 0;
+    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uShDegree"), shDegree);
+    if (shDegree > 0) {
+        gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplatSH"), 1);
+        gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uShTexels"), splatShTexels_);
+        gl::UniformMatrix3fv(gl::GetUniformLocation(splatProgram_, "uShFrame"), 1, GL_FALSE, glm::value_ptr(splatShFrame_));
+        const glm::vec3 eye(glm::inverse(view)[3]);
+        gl::Uniform3fv(gl::GetUniformLocation(splatProgram_, "uEye"), 1, glm::value_ptr(eye));
+        gl::ActiveTexture(GL_TEXTURE1);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+    }
     gl::ActiveTexture(GL_TEXTURE0);
     gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
     gl::Enable(GL_DEPTH_TEST);
@@ -1517,6 +1588,11 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
     gl::Disable(GL_BLEND);
     gl::DepthMask(GL_TRUE);
     gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+    if (shDegree > 0) {
+        gl::ActiveTexture(GL_TEXTURE1);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
 }
 
 namespace {
@@ -3391,7 +3467,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
         if (!references_.empty()) drawReferences(false, view, proj, camera.ortho, viewAspect);
-        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
+        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor);
         gl::UseProgram(0);
         return;
     }
@@ -3520,7 +3596,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::Disable(GL_BLEND);
     }
     gl::BindVertexArray(0);
-    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
+    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor);
     gl::UseProgram(0);
 }
 

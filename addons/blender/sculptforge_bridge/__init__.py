@@ -697,9 +697,8 @@ class SCULPTFORGE_OT_export_splats(bpy.types.Operator, ExportHelper):
     filter_glob: StringProperty(default="*.ply", options={"HIDDEN"})
     world_space: BoolProperty(
         name="Apply Object Transform",
-        description="Write the splats where the object puts them (move, rotate, scale). Off: as they are in the object. "
-                    "Turning splats keeps their plain colour only: view-dependent colour (spherical harmonics) "
-                    "would point the wrong way",
+        description="Write the splats where the object puts them (move, rotate, scale; their view-dependent colour "
+                    "turns with them). Off: as they are in the object",
         default=True)
 
     @classmethod
@@ -723,17 +722,15 @@ class SCULPTFORGE_OT_export_splats(bpy.types.Operator, ExportHelper):
         obj = objects[0]
         try:
             arrays = splat_arrays(obj.data)
-            kept = True
             if self.world_space:
-                arrays, kept = splat_io.baked(arrays, np.array(obj.matrix_world))
+                arrays = splat_io.baked(arrays, np.array(obj.matrix_world))
             if len(arrays) == 0:
                 raise ValueError("The splat object has no splats")
             splat_io.write_ply(self.filepath, arrays)
         except (ValueError, OSError) as e:
             self.report({"ERROR"}, str(e))
             return {"CANCELLED"}
-        note = "" if kept else " (turned: only the plain colour is kept, not the view-dependent colour)"
-        self.report({"INFO"}, "Saved %d splats to %s%s" % (len(arrays), self.filepath, note))
+        self.report({"INFO"}, "Saved %d splats to %s" % (len(arrays), self.filepath))
         return {"FINISHED"}
 
 

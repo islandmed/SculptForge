@@ -7,11 +7,13 @@
 //   gl_limits texels=N       the buffer-texture limit the renderer reads (and the most one micro buffer holds) is at most N
 //                            texels, as on a small GPU, so a mesh runs the path past the limits on any machine; 0: the driver's.
 //                            Tests only: no setting or environment reaches it.
-//   render_cell NAME mode=lit|pbr|flat|wire [min=F] [size=PX]
+//   render_cell NAME mode=lit|pbr|flat|wire [min=F] [size=PX] [splats=1]
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
 //                            failing cell is listed by NAME (the script's "mode x path") with its picture in --ui-out, and
-//                            the script goes on, so every empty cell of a run is named.
+//                            the script goes on, so every empty cell of a run is named. splats=1: the loaded splats alone (the
+//                            box is theirs); when they carry view-dependent colour (SH degree >= 1) it must show: drawn again
+//                            with their plain colour only, at least 10% of the box changes.
 // Value: render_coverage (the last cell's share, 0-1).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -38,7 +40,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
         return true;
     }
-    // render_cell NAME mode=... [min=F] [size=PX]
+    // render_cell NAME mode=... [min=F] [size=PX] [splats=1]
     if (w.size() < 3) {
         error = "'render_cell' needs NAME mode=lit|pbr|flat|wire";
         return false;
@@ -46,10 +48,12 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     std::string mode;
     double floor = kRenderCoverageFloor;
     int size = 256;
+    bool splats = false;
     for (size_t i = 2; i < w.size(); ++i) {
         if (w[i].rfind("mode=", 0) == 0) mode = w[i].substr(5);
         else if (w[i].rfind("min=", 0) == 0) floor = std::strtod(w[i].c_str() + 4, nullptr);
         else if (w[i].rfind("size=", 0) == 0) size = std::clamp(std::atoi(w[i].c_str() + 5), 64, 1024);
+        else if (w[i] == "splats=1") splats = true;
         else {
             error = "'render_cell': unknown argument '" + w[i] + "'";
             return false;
@@ -60,7 +64,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         return false;
     }
     const std::string name = w[1];
-    steps_.push_back([this, line, name, mode, floor, size](float t) {
+    steps_.push_back([this, line, name, mode, floor, size, splats](float t) {
         if (t == 0.0f) return false; // a settled frame
         App& app = app_;
         const RenderSettings saved = app.renderSettings_;
@@ -72,13 +76,17 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         s.backgroundColor = glm::vec3(0.06f, 0.30f, 0.12f); // (unlike any shaded surface's colour)
         s.dimInactive = false;
         s.fullDetail = true;
-        s.showMesh = true;
+        s.showMesh = !splats;
+        s.showSplats = true;
+        s.splatViewColor = true;
+        const bool forced = app.splatViewColorForced_;
+        app.splatViewColorForced_ = splats; // (the floor tier draws plain colour; CI's software GL is one)
         app.syncScene();
         Camera cam;
         cam.aspect = 1.0f;
         cam.yaw = glm::radians(30.0f);
         cam.pitch = glm::radians(20.0f);
-        const AABB bounds = app.sceneBounds();
+        const AABB bounds = splats ? app.doc_.splats.bounds(0.9f) : app.sceneBounds();
         if (bounds.valid()) cam.frame(bounds);
         Image img;
         img.width = img.height = size;
@@ -93,12 +101,30 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             ok = app.renderer_.renderToImage(cam, size, size, s, img.rgba, err);
             if (k >= 1 && !app.renderer_.environmentPending() && !(app.doc_.mesh.micro && app.doc_.mesh.micro->focus)) break;
         }
+        // The same view with the splats' plain colour only: the share of the box that changes.
+        double viewColorShare = -1.0;
+        if (ok && splats && app.doc_.splats.shDegree > 0) {
+            Image plain;
+            plain.width = plain.height = size;
+            s.splatViewColor = false;
+            ok = app.renderer_.renderToImage(cam, size, size, s, plain.rgba, err);
+            const RenderCoverage box = measureRenderCoverage(img, cam, bounds);
+            size_t changed = 0;
+            for (size_t p = 0; ok && p + 3 < img.rgba.size(); p += 4)
+                for (int ch = 0; ch < 3; ++ch)
+                    if (std::abs(int(img.rgba[p + size_t(ch)]) - int(plain.rgba[p + size_t(ch)])) > 6) {
+                        ++changed;
+                        break;
+                    }
+            viewColorShare = box.boxW * box.boxH > 0 ? double(changed) / double(box.boxW * box.boxH) : 0.0;
+        }
         app.renderSettings_ = saved;
+        app.splatViewColorForced_ = forced;
         app.syncScene();
         std::string why;
         RenderCoverage r;
         if (!ok) why = "the render failed: " + err;
-        else if (!bounds.valid()) why = "the scene has no model";
+        else if (!bounds.valid()) why = splats ? "no splats are loaded" : "the scene has no model";
         else {
             r = measureRenderCoverage(img, cam, bounds);
             lastRenderCoverage_ = r.coverage;
@@ -110,10 +136,16 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             } else if (r.colors < 6) {
                 std::snprintf(buf, sizeof buf, "the model is one flat colour (%d distinct colours in %.0f%% of its box)", r.colors, r.coverage * 100.0);
                 why = buf;
+            } else if (viewColorShare >= 0.0 && viewColorShare < 0.1) {
+                std::snprintf(buf, sizeof buf, "the view-dependent colour is not drawn: %.1f%% of the box changes without it, wanted 10%%",
+                              viewColorShare * 100.0);
+                why = buf;
             }
         }
         if (ok) lastRenderCoverage_ = r.coverage;
-        std::printf("render_cell %-40s coverage %5.1f%%, %d colours%s\n", name.c_str(), r.coverage * 100.0, r.colors, why.empty() ? "" : "  FAIL");
+        std::printf("render_cell %-40s coverage %5.1f%%, %d colours", name.c_str(), r.coverage * 100.0, r.colors);
+        if (viewColorShare >= 0.0) std::printf(", view colour %.1f%%", viewColorShare * 100.0);
+        std::printf("%s\n", why.empty() ? "" : "  FAIL");
         if (!why.empty()) {
             std::string path;
             if (!shotDir_.empty() && ok) {

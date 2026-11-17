@@ -37,6 +37,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -887,7 +888,7 @@ SplatCloud testCloud(int degree) {
 bool sameRotation(const glm::quat& a, const glm::quat& b, float tol) { return std::abs(std::abs(glm::dot(a, b)) - 1.0f) < tol; }
 
 TEST(splat_ply_and_dot_splat_roundtrip) {
-    for (int degree : {0, 1, 3}) {
+    for (int degree : {0, 1, 2, 3}) {
         SplatCloud c = testCloud(degree);
         const std::string path = tempPath("sculptforge_splats.ply");
         std::string err;
@@ -922,6 +923,75 @@ TEST(splat_ply_and_dot_splat_roundtrip) {
     }
     CHECK(close);
     std::filesystem::remove(path);
+}
+
+// View-dependent colour turns with the splats (owner 11-16): every band 1-3 of the 3DGS basis, any rotation.
+TEST(splat_sh_rotation) {
+    std::mt19937 rng(11);
+    std::uniform_real_distribution<float> u(-1.0f, 1.0f);
+    auto dir = [&] {
+        glm::vec3 d;
+        do d = glm::vec3(u(rng), u(rng), u(rng));
+        while (glm::length(d) < 0.2f);
+        return glm::normalize(d);
+    };
+    for (int degree : {1, 2, 3}) {
+        const int k = (degree + 1) * (degree + 1);
+        std::vector<glm::vec3> a(static_cast<size_t>(k));
+        for (glm::vec3& c : a) c = glm::vec3(u(rng), u(rng), u(rng));
+        float worst = 0.0f, worstBack = 0.0f;
+        for (int t = 0; t < 20; ++t) {
+            const glm::mat3 r = glm::mat3_cast(glm::angleAxis(3.0f * u(rng), dir()));
+            std::vector<glm::vec3> b = a;
+            ShRotation(r, degree).apply(b.data());
+            CHECK(b[0] == a[0]); // the plain colour never changes
+            for (int s = 0; s < 8; ++s) {
+                const glm::vec3 d = dir();
+                worst = std::max(worst, glm::distance(evalSH(b.data(), degree, r * d), evalSH(a.data(), degree, d)));
+            }
+            ShRotation(glm::transpose(r), degree).apply(b.data()); // R then R^-1: the coefficients come back
+            for (int c = 0; c < k; ++c) worstBack = std::max(worstBack, glm::distance(b[size_t(c)], a[size_t(c)]));
+        }
+        std::printf("  SH degree %d: view colour error %.2g, R then R^-1 %.2g\n", degree, double(worst), double(worstBack));
+        CHECK(worst < 1e-5f && worstBack < 1e-5f);
+    }
+    // Baking a turned placement keeps every band: each splat shows the same colour from the turned camera.
+    SplatCloud c = testCloud(3);
+    const glm::mat4 turn = glm::translate(glm::mat4(1.0f), glm::vec3(1, -2, 0.5f)) *
+                           glm::mat4_cast(glm::angleAxis(0.8f, glm::normalize(glm::vec3(0.3f, 1.0f, -0.5f)))) *
+                           glm::scale(glm::mat4(1.0f), glm::vec3(2.0f));
+    SplatCloud baked = c;
+    baked.transform = turn;
+    baked.bakeTransform();
+    CHECK(baked.shDegree == 3 && baked.sh.size() == c.sh.size());
+    const glm::vec3 eye(4.0f, 3.0f, -6.0f), localEye = glm::vec3(glm::inverse(turn) * glm::vec4(eye, 1.0f));
+    float worst = 0.0f;
+    for (size_t i = 0; i < c.size(); ++i) {
+        const glm::vec3 before = evalSH(&c.sh[i * 16], 3, glm::normalize(c.positions[i] - localEye));
+        const glm::vec3 after = evalSH(&baked.sh[i * 16], 3, glm::normalize(baked.positions[i] - eye));
+        worst = std::max(worst, glm::distance(before, after));
+    }
+    CHECK(worst < 1e-4f);
+    // A splat Part turned by R and back by R^-1 (two bakes) has its SH again.
+    SplatCloud there = baked;
+    there.transform = glm::inverse(turn);
+    there.bakeTransform();
+    float back = 0.0f;
+    for (size_t i = 0; i < c.sh.size(); ++i) back = std::max(back, glm::distance(there.sh[i], c.sh[i]));
+    CHECK(back < 1e-4f);
+
+    // Import -> export -> import: the SH floats of a .ply come back bit for bit (no transform: nothing to turn).
+    const std::string a = tempPath("sculptforge_sh_a.ply"), b = tempPath("sculptforge_sh_b.ply");
+    std::string err;
+    CHECK(saveSplatPly(a, c, err));
+    Mesh m;
+    SplatCloud first, second;
+    PlyContent content;
+    CHECK(loadPly(a, m, first, content, err) && first.shDegree == 3 && first.sh == c.sh);
+    CHECK(saveSplatPly(b, first, err));
+    CHECK(loadPly(b, m, second, content, err) && second.shDegree == 3 && second.sh == c.sh);
+    std::filesystem::remove(a);
+    std::filesystem::remove(b);
 }
 
 TEST(ply_mesh_and_point_cloud) {

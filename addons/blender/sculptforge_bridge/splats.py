@@ -196,20 +196,76 @@ def quaternion_multiply(a, b):
                      aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw], axis=-1)
 
 
+def sh_band(l, d):
+    """The 3DGS basis functions of band l (1-3) at unit directions d (M, 3): (M, 2l + 1), in the f_rest order."""
+    x, y, z = d[:, 0], d[:, 1], d[:, 2]
+    xx, yy, zz = x * x, y * y, z * z
+    if l == 1:
+        c = 0.4886025119029199
+        return np.stack([-c * y, c * z, -c * x], axis=1)
+    if l == 2:
+        return np.stack([1.0925484305920792 * x * y, -1.0925484305920792 * y * z, 0.31539156525252005 * (2 * zz - xx - yy),
+                         -1.0925484305920792 * x * z, 0.5462742152960396 * (xx - yy)], axis=1)
+    return np.stack([-0.5900435899266435 * y * (3 * xx - yy), 2.890611442640554 * x * y * z,
+                     -0.4570457994644658 * y * (4 * zz - xx - yy), 0.3731763325901154 * z * (2 * zz - 3 * xx - 3 * yy),
+                     -0.4570457994644658 * x * (4 * zz - xx - yy), 1.445305721320277 * z * (xx - yy),
+                     -0.5900435899266435 * x * (xx - 3 * yy)], axis=1)
+
+
+def eval_sh(sh, d):
+    """View-dependent colour (unclamped, 0.5 + the sum) of coefficients sh (N, K, 3) seen along unit directions d (N, 3)."""
+    c = 0.5 + SH_C0 * sh[:, 0, :]
+    at = 1
+    for l in range(1, degree_for_coefficients(sh.shape[1]) + 1):
+        c = c + np.einsum("nj,njc->nc", sh_band(l, d), sh[:, at:at + 2 * l + 1, :])
+        at += 2 * l + 1
+    return c
+
+
+def _fibonacci_sphere(m=32):
+    k = np.arange(m) + 0.5
+    z = 1.0 - 2.0 * k / m
+    r = np.sqrt(1.0 - z * z)
+    a = 2.399963229728653 * (k - 0.5)
+    return np.stack([r * np.cos(a), r * np.sin(a), z], axis=1)
+
+
+def rotated_sh(sh, rot):
+    """Coefficients sh (N, K, 3) of splats turned by the 3x3 rotation rot: what was seen from d is seen from rot @ d.
+    Per band, the exact matrix by least squares on 32 directions (a turned band-l function is a band-l function);
+    the same as SculptForge's ShRotation (core/Splats.cpp)."""
+    sh = np.asarray(sh, dtype=np.float64)
+    out = sh.copy()
+    dirs = _fibonacci_sphere()
+    back = dirs @ np.asarray(rot, dtype=np.float64)  # rot^T d, each row
+    at = 1
+    for l in range(1, degree_for_coefficients(sh.shape[1]) + 1):
+        n = 2 * l + 1
+        m = np.linalg.lstsq(sh_band(l, dirs), sh_band(l, back), rcond=None)[0]  # (n, n)
+        out[:, at:at + n, :] = np.einsum("ij,njc->nic", m, sh[:, at:at + n, :])
+        at += n
+    return out.astype(np.float32)
+
+
 def baked(a, matrix):
     """`a` placed by a 4x4 matrix (rows as Blender prints it): positions moved, rotations turned, scales scaled by
-    the matrix's uniform scale (the cube root of its determinant). Spherical harmonics above band 0 point the way
-    they were captured, so when the matrix turns the splats they are dropped (what is left is the plain colour);
-    returns (SplatArrays, whether view-dependent colour was kept)."""
+    the matrix's uniform scale (the cube root of its determinant), and the view-dependent colour (spherical harmonics
+    above band 0) turned with them."""
     m = np.asarray(matrix, dtype=np.float64)
     lin = m[:3, :3]
     scale = np.cbrt(abs(np.linalg.det(lin)))
     rot = lin / scale if scale > 1e-12 else np.eye(3)
     q = rotation_matrix_to_quaternion(rot)[0]
-    turned = abs(abs(q[0]) - 1.0) > 1e-6
     sh = a.sh
-    kept = True
-    if turned and sh.shape[1] > 1:
-        sh, kept = sh[:, :1, :], False
+    if abs(abs(q[0]) - 1.0) > 1e-7 and sh.shape[1] > 1:
+        sh = rotated_sh(sh, quaternion_to_matrix(q))
     return SplatArrays(a.positions.astype(np.float64) @ lin.T + m[:3, 3], quaternion_multiply(q, a.rotations),
-                       a.scales * scale, a.opacities, sh), kept
+                       a.scales * scale, a.opacities, sh)
+
+
+def quaternion_to_matrix(q):
+    """The 3x3 rotation of a unit quaternion (w, x, y, z)."""
+    w, x, y, z = q
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])

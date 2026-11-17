@@ -45,6 +45,7 @@ struct RenderSettings {
     bool showMesh = true;
     bool showSplats = true;
     float splatOpacity = 1.0f; // global fade for using a capture as reference
+    bool splatViewColor = true; // splats' view-dependent colour (SH degree >= 1); else their plain colour
     bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
@@ -194,8 +195,9 @@ public:
     bool outOfMemory(uint32_t id) const;
     // Full mesh uploads so far (a whole layout and every vertex): UI tests check that an undo sends only what it changed.
     uint64_t fullUploads() const { return fullUploads_; }
-    // Re-uploads the splats when `version` differs from the last upload.
-    void syncSplats(const SplatCloud& splats, uint64_t version);
+    // Re-uploads the splats when `version` (or `viewColor`) differs from the last upload. `viewColor` false: their SH
+    // bands 1-3 stay on the CPU (no GPU memory) and they draw in their plain colour.
+    void syncSplats(const SplatCloud& splats, uint64_t version, bool viewColor);
     using Viewport = RenderViewport;
     void draw(const Camera& camera, int fbWidth, int fbHeight, const RenderSettings& settings, const Viewport& viewport = {});
     // draw() for the app's window (whose framebuffer has no multisampling): through an offscreen target with
@@ -368,12 +370,16 @@ public:
 private:
     void drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
                        const RenderSettings& settings);
-    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity);
+    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity, bool viewColor);
 
     GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
     // Splats: per-splat data in a texture buffer, drawn as instanced quads in back-to-front order.
     GLuint splatVao_ = 0, splatData_ = 0, splatTexture_ = 0, splatOrder_ = 0;
     GLsizei splatCount_ = 0;
+    GLuint splatShData_ = 0, splatShTexture_ = 0; // bands 1-3 of the SH (none at degree 0)
+    int splatShDegree_ = 0, splatShTexels_ = 0;
+    bool splatShWanted_ = true;
+    glm::mat3 splatShFrame_{1.0f};
     uint64_t splatVersion_ = ~uint64_t(0);
     std::vector<glm::vec3> splatCenters_;
     std::vector<uint32_t> splatSorted_;

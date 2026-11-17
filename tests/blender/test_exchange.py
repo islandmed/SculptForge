@@ -247,8 +247,14 @@ def test_splat_bake():
     a = sample_splats(60, 2, 3)
     rot = rotation((0.3, 1.0, -0.5), 41.0)
     m = matrix(rot, (2.0, 2.0, 2.0), (1.0, -2.0, 0.5))
-    b, kept = splats.baked(a, m)
-    check(not kept and b.sh.shape[1] == 1, "turned splats keep their plain colour only")
+    b = splats.baked(a, m)
+    check(b.sh.shape == a.sh.shape, "turned splats keep every SH band")
+    # Each splat shows the same colour from the turned camera (direction d before is rot @ d after).
+    d = np.random.default_rng(5).normal(size=(len(a), 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    check(np.allclose(splats.eval_sh(b.sh, d @ rot.T), splats.eval_sh(a.sh, d), atol=1e-5), "baked SH: same colour, turned view")
+    back = splats.baked(b, matrix(rot.T, (0.5, 0.5, 0.5), (0, 0, 0)))
+    check(np.allclose(back.sh, a.sh, atol=1e-5), "turned by R then R^-1: the SH come back")
     check(np.allclose(b.positions, exchange.transform_points(m, a.positions), atol=1e-5), "baked positions")
     check(np.allclose(b.scales, a.scales * 2.0, atol=1e-6), "baked scale")
     # The covariance R S S^T R^T of a splat, before and after: the splat is the same ellipsoid, moved.
@@ -261,8 +267,8 @@ def test_splat_bake():
     for i in (0, 17, 59):
         want = (rot * 2.0) @ cov(a.rotations[i], a.scales[i]) @ (rot * 2.0).T
         check(np.allclose(cov(b.rotations[i], b.scales[i]), want, atol=1e-6), "baked splat %d is the moved ellipsoid" % i)
-    c, kept = splats.baked(a, matrix(np.eye(3), (1, 1, 1), (0, 0, 1)))
-    check(kept and c.sh.shape[1] == 9, "a plain move keeps view-dependent colour")
+    c = splats.baked(a, matrix(np.eye(3), (1, 1, 1), (0, 0, 1)))
+    check(c.sh.shape[1] == 9 and np.array_equal(c.sh, a.sh), "a plain move leaves the SH as they are")
 
 
 def test_splats_through_sculptforge(tmp, cli):
