@@ -62,6 +62,11 @@ HAND_MAP = [
     ("services/link-worker/*", "link_worker ui_phone_link"),
     ("tools/brush-gallery/*", "brush_gallery_index ui_brush_gallery"),
     ("tools/marks_*.txt", "marks"),
+    # Space is read in App.cpp's key handler (the camera #43, the QuickMenu, the selection slide #214) and by these scripts: a change
+    # to that handler or to the selection drag must run every test that presses Space (#210 and #214 both slipped past without them).
+    ("src/app/App.cpp", "ui_space_camera ui_classic_feel ui_right_click_drag ui_right_click_menu ui_paint_intensity ui_selection_space"),
+    ("src/app/Selection.cpp", "ui_selection_space ui_space_camera ui_mask_lasso ui_cut_tool"),
+    ("src/app/SpaceCamera.h", "ui_space_camera ui_classic_feel ui_right_click_drag ui_right_click_menu ui_paint_intensity ui_selection_space"),
     ("src/app/*.cpp", "i18n_coverage"), ("src/*", "native_dialogs else_if_chains"),
     ("scripts/check_else_if_chains.py", "else_if_chains else_if_chains_self_test"), ("tools/i18n/*", "i18n_coverage"),
     ("tools/test/*", "test_impact test_affected test_areas"),
