@@ -174,6 +174,9 @@ glm::vec3 facegroupColor(uint32_t id);
 class Renderer {
 public:
     bool init(std::string& error);
+    // Face group colours, the texture preview and baked normal maps need per-triangle data in the shaders (a geometry
+    // shader, gl_PrimitiveID); the OpenGL ES 3.0 tier (iPad, gl::es30Tier) draws without them, and the UI says so.
+    static bool perTriangleViews() { return !gl::es30Tier(); }
     void shutdown();
     // The warm UI test server (app/UiServe.h): shaders linked once and kept for the next Renderer in the same GL
     // context (and the driver check init makes); false frees them.

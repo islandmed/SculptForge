@@ -1138,6 +1138,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # the over-the-GPU-limit ones included. Label t0: it is in the T0 set whenever the app or its renderer changes.
     sculptforge_ui_test(render_matrix ../render_matrix/matrix)
     set_tests_properties(ui_render_matrix PROPERTIES LABELS "ui;t0" TIMEOUT 180)
+    # The same cells on the OpenGL ES 3.0 tier (iPad; gl::es30Tier, src/render/GL.cpp): buffer textures as 2D stand-ins, base
+    # vertex by attribute offsets, on whatever driver CI has. Its own process (the tier is chosen when GL loads, so never warm).
+    add_test(NAME ui_render_matrix_es30 COMMAND sculptforge --ui-test ${CMAKE_CURRENT_SOURCE_DIR}/tests/render_matrix/matrix.sfui
+             --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/render_matrix_es30)
+    set_tests_properties(ui_render_matrix_es30 PROPERTIES LABELS "ui;t0" TIMEOUT 180 ENVIRONMENT "SF_GLES_LEVEL=300")
     # Nightly, on the PC's real GPU: the benchmark scenes (a plain mesh and a micro level) drawn in every shading mode, failing when the
     # model is not in the picture (SF_BENCH_RENDER_CHECK, src/app/Bench.cpp). The same cells as the matrix, at size.
     add_test(NAME render_check_gpu COMMAND sculptforge --bench --bench-view --bench-sizes 1 --bench-no-project

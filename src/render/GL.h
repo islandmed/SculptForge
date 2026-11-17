@@ -241,4 +241,10 @@ GLint maxTextureBufferTexels();
 uint32_t bufferChunkTexels(uint32_t natural);
 void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
 
+// The OpenGL ES 3.0 tier (iPad, and ES drivers before 3.2): texture buffers stand in as 2D textures 4096 texels wide (the
+// shaders' texelFetch on them is rewritten), the base vertex of a draw re-points the vertex array's attributes, and what has
+// no stand-in (geometry shaders, gl_PrimitiveID: face group colours, the texture preview, the wireframe's fade) is left out
+// by the renderer. SF_GLES_LEVEL=300 runs this tier on any driver, desktop GL included (tests: tests/render_matrix). Set by load().
+bool es30Tier();
+
 } // namespace gl

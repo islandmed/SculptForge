@@ -1066,7 +1066,8 @@ bool Renderer::init(std::string& error) {
         }
     wireProgram_ = link(kWireVS, kWireFS, error);
     if (!wireProgram_) return false;
-    wireLineProgram_ = link(kWireVS, kWireLineFS, error, nullptr, kWireLineGS);
+    // (the ES 3.0 tier has no geometry shader: edge lists draw without the sub-pixel fade)
+    wireLineProgram_ = gl::es30Tier() ? link(kWireVS, kWireFS, error) : link(kWireVS, kWireLineFS, error, nullptr, kWireLineGS);
     if (!wireLineProgram_) return false;
     bgProgram_ = link(kBgVS, kBgFS, error);
     if (!bgProgram_) return false;
@@ -3941,13 +3942,17 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // The UV Editor's checker on the model.
     const bool checker = active && s.hasUvs && s.overlay && s.overlay->checker;
     // A painted texture shows through the textured program (vertex paint still multiplies it).
-    const bool textured = s.hasUvs && ((s.paintTexture && settings.showVertexPaint && settings.showTexture) || checker);
+    // (the ES 3.0 tier has neither the geometry shader nor gl_PrimitiveID: no texture preview, no face group colours; the
+    // View panel says so, Renderer::perTriangleViews)
+    const bool triangleViews = perTriangleViews();
+    const bool textured = triangleViews && s.hasUvs && ((s.paintTexture && settings.showVertexPaint && settings.showTexture) || checker);
     const bool pbr = settings.pbr() && envTexture_;
     // A baked normal map preview bends the shading normal (core/Bake.h), and in the PBR view the texture's
     // Normal / Height channels do (syncTexture's material normal, with tangents from syncNormalMap).
     const GLuint normalTex = s.normalTexture ? s.normalTexture : (pbr && textured ? s.matNormalTexture : 0);
-    const bool normalMapped = s.hasUvs && normalTex && s.hasTangents;
-    const int groups = active && s.overlayColors                 ? 3
+    const bool normalMapped = triangleViews && s.hasUvs && normalTex && s.hasTangents;
+    const int groups = !triangleViews                             ? 0
+                       : active && s.overlayColors                 ? 3
                        : active && settings.showFaceGroups && !s.overlayColors ? (s.hasGroups ? 1 : 2)
                                                                                : 0;
     // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
