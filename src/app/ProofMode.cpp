@@ -123,8 +123,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                               }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
         return {s};
     }
-    if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
-        const int millions = name == "core-100m" ? 100 : 200;
+    if (const int millions = coreSceneMillions(name)) { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
         const ProofMeshSize s{double(millions), std::to_string(millions) + "M micro", [millions](size_t) {
                                   std::string err;
                                   const std::string path = core200mScenePath(err, {}, millions); // (main wrote it first)

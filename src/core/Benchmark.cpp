@@ -254,6 +254,14 @@ Mesh makeCore200mMesh(size_t baseTriangles, int level) {
     return m;
 }
 
+int coreSceneMillions(const std::string& name) {
+    if (name.size() < 7 || name.rfind("core-", 0) != 0 || name.back() != 'm') return 0;
+    const std::string digits = name.substr(5, name.size() - 6);
+    if (digits.empty() || digits.size() > 4 || digits.find_first_not_of("0123456789") != std::string::npos) return 0;
+    const int n = std::atoi(digits.c_str());
+    return n >= 1 && n <= 4000 ? n : 0;
+}
+
 std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log, int millions) {
     namespace fs = std::filesystem;
     const fs::path dir = MicroStore::swapFolder();
