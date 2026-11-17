@@ -79,9 +79,7 @@ int MicroMesh::widen(float need) {
     rescaled = true;
     reach.all = true;
     if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
-    if (tiles) // Adaptive Detail tiles hold deltas in the same units
-        for (MicroTiles::Tile& t : tiles->pool)
-            for (int16_t& v : t.delta) v = int16_t(int(v) / div);
+    if (tiles) tiles->rescale(div); // (Adaptive Detail tiles hold deltas in the same units)
     ++revision;
     return div;
 }
@@ -1077,7 +1075,11 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
-    if (!tileKeys.empty() && !mm.tiles) mm.tiles = std::make_shared<MicroTiles>(), mm.tiles->resize(mm.baseTriangles);
+    if (!tileKeys.empty() && !mm.tiles) {
+        mm.tiles = std::make_shared<MicroTiles>();
+        mm.tiles->resize(mm.baseTriangles);
+        mm.tiles->residentBudget = MicroTiles::defaultResidentBudget();
+    }
     if (mm.focus) mm.focus->ensureFull(mm, tris, true); // (undo writes full tiles only)
     const size_t S = samples;
     // Values kept in another step size (the range grew since): convert to the current one.
@@ -1187,7 +1189,7 @@ void MicroUndo::swapWith(Mesh& m) {
                     continue;
                 }
                 bool born = false;
-                MicroTiles::Tile* t = undo ? tiles.find(key) : tiles.obtain(key, born);
+                MicroTiles::Tile* t = undo ? tiles.resident(key) : tiles.obtain(key, born);
                 if (!t) continue;
                 for (uint32_t p = 0; p < MicroTiles::kSamples; ++p) {
                     const float c = ratio == 1.0f ? float(change[k * MicroTiles::kSamples + p]) : float(change[k * MicroTiles::kSamples + p]) * ratio;
@@ -1196,6 +1198,7 @@ void MicroUndo::swapWith(Mesh& m) {
                 mm.markDirty(MicroTiles::keyTri(key));
             }
             tilesApplied = !tilesApplied;
+            tiles.trim(); // (back within the resident budget)
         }
     }
     for (uint32_t t : tris) mm.markDirty(t);

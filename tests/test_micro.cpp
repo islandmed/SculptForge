@@ -169,10 +169,11 @@ TEST(micro_draw_above_stored_level_is_seamless) {
 namespace {
 
 // The tile store attached to the level (what SF_MICRO_TILES=1 does at the first stroke).
-void attachTiles(Document& doc) {
+void attachTiles(Document& doc, size_t residentBudget = 0) {
     MicroMesh& mm = mutableMicro(doc.mesh);
     mm.tiles = std::make_shared<MicroTiles>();
     mm.tiles->resize(mm.baseTriangles);
+    mm.tiles->residentBudget = residentBudget;
 }
 
 // Base weights of the surface point hit from the front, and its base triangle.
@@ -190,7 +191,7 @@ uint32_t frontTriangle(const Document& doc, glm::vec3& w) {
 
 std::map<uint64_t, std::array<int16_t, MicroTiles::kSamples>> tileSnapshot(const MicroTiles& t) {
     std::map<uint64_t, std::array<int16_t, MicroTiles::kSamples>> out;
-    for (const auto& [key, slot] : t.slotOf) out[key] = t.pool[slot - 1].delta;
+    t.forEach([&](uint64_t key, const MicroTiles::Tile& tile) { out[key] = tile.delta; });
     return out;
 }
 
@@ -263,7 +264,9 @@ TEST(micro_tiles_shared_edges_are_bit_identical) {
     const MicroTiles& tiles = *mm.tiles;
     CHECK(tiles.alive() > 0);
     size_t checks = 0, edgeTiles = 0;
-    for (const auto& [key, slot] : tiles.slotOf) {
+    std::vector<uint64_t> keys;
+    tiles.forEach([&](uint64_t key, const MicroTiles::Tile&) { keys.push_back(key); });
+    for (const uint64_t key : keys) {
         const uint32_t t = MicroTiles::keyTri(key);
         const int depth = MicroTiles::keyDepth(key);
         const TileFrame f = TileFrame::of(depth, MicroTiles::keyPath(key));
@@ -317,6 +320,55 @@ TEST(micro_tiles_coarse_dab_leaves_fine_deltas) {
     CHECK(doc.undo.undo(doc.mesh, doc.bvh));
     CHECK(doc.mesh.micro->disp == rootBefore);
     CHECK(tileSnapshot(*doc.mesh.micro->tiles) == fine);
+}
+
+// A resident budget: at the end of a stroke the least recently used tiles beyond it are parked (packed), the surface
+// reads the same, a later stroke and undo bring them back, and nothing is lost.
+TEST(micro_tiles_park_beyond_the_budget_and_come_back) {
+    Document doc = microDoc(4);
+    attachTiles(doc, 20 * sizeof(MicroTiles::Tile)); // room for 20 resident tiles
+    doc.undo.push(fineStroke(doc));
+    const auto one = tileSnapshot(*doc.mesh.micro->tiles);
+    glm::vec3 w;
+    const uint32_t tri = frontTriangle(doc, w);
+    const float h1 = doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w);
+    {
+        const MicroTiles& t = *doc.mesh.micro->tiles;
+        CHECK(t.alive() == one.size());
+        CHECK(t.residentCount() <= 20);
+        CHECK(t.parkedCount() > 0 && t.parkedCount() + t.residentCount() == t.alive());
+        CHECK(t.parkedBytes() < t.parkedCount() * sizeof(MicroTiles::Tile)); // packed smaller than raw
+    }
+    // the codec round-trips every tile exactly
+    {
+        std::vector<uint8_t> packed;
+        MicroTiles::Tile back;
+        for (const auto& [key, delta] : one) {
+            MicroTiles::Tile t;
+            t.delta = delta;
+            packed.clear();
+            MicroTiles::packTile(t, packed);
+            CHECK(MicroTiles::unpackTile(packed.data(), packed.size(), back) && back.delta == delta);
+        }
+    }
+    // a second stroke a little aside: parked tiles under it come back and take the change; the far ones stay parked
+    Symmetry sym;
+    sym.x = false;
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+    for (int i = 0; i < 5; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.002f * float(i), 0, 1), 0.02f, 1.0f), sym);
+    UndoRecord r2 = doc.sculptor.endStroke();
+    CHECK(r2.micro != nullptr && !r2.micro->tileKeys.empty());
+    const float h2 = doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w);
+    CHECK(h2 > h1);
+    CHECK(doc.mesh.micro->tiles->residentCount() <= 20 || doc.mesh.micro->tiles->parkedCount() == 0);
+    doc.undo.push(std::move(r2));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == one); // (through parked and resident tiles alike)
+    CHECK(doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w) == h1);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->tiles->alive() == 0);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == one);
 }
 
 // Without the store (the default), nothing changes: no tiles appear and the step records none.

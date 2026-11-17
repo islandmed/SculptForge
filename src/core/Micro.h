@@ -363,6 +363,7 @@ private:
     // Adaptive Detail tiles of this stroke: those born in it (undo frees them) and the deltas of those it changed
     // that existed before (first touch), by key.
     std::vector<uint64_t> bornKeys_;
+    uint32_t strokeStamp_ = 0; // MicroTiles::useStamp when the stroke began (its tiles are the ones used since)
     std::unordered_set<uint64_t> bornSet_; // (the same keys: a later dab of the stroke finds them, not an old tile)
     std::unordered_map<uint64_t, std::vector<int16_t>> oldTiles_;
     // The dab's write at `depth` > 0 (true: written to tiles, the root untouched; false: not a tile brush, write the root).

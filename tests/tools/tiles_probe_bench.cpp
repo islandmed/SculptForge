@@ -25,16 +25,21 @@
 // mega-poly spike's wall, over every base triangle). Bars: RSS < 4 GB with 1B-equivalent spacing in brushed areas (depth
 // >= 2 on this root), re-resolve + upload of one dab < 16 ms, walk < 5 ms. The first bar missed names M2's priority.
 //
-//   sf_tiles_probe_bench [baseTriangles=195313] [level=5] [strokes=30] [zooms=1,4,16,64] [--px-rule=1.0] [--cover=D]
+//   sf_tiles_probe_bench [baseTriangles=195313] [level=5] [strokes=30] [zooms=1,4,16,64] [--px-rule=1.0] [--cover=D] [--cover-product=D]
 //
 // --cover=D (the critique's "live document growth" wall, 11-16): after the passes, EVERY tile of depth D over the whole
 // head is allocated (a finished pore pass everywhere), and the store's MB and RSS are printed: tiles win by sparsity,
 // not compression (fully covered they cost ~1.2x a dense grid of the same spacing), so this is the number a tile
 // budget (park / page out what the view doesn't show) has to be designed against.
+// --cover-product=D: the same coverage in the PRODUCT store (core/MicroTiles.h: per-triangle index + parking under a
+// resident budget, SF_MICRO_TILES_RESIDENT_MB or 512 MB here), each tile holding a pore-like delta (a span of 32
+// units: 5 bits a point packed), then trimmed: resident / parked MB, index MB, RSS, and the ms to read one parked
+// tile back. This is the measurement the budget design is judged by.
 #include "core/BVH.h"
 #include "core/Benchmark.h"
 #include "core/Micro.h"
 #include "core/MicroStore.h"
+#include "core/MicroTiles.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -591,11 +596,12 @@ int main(int argc, char** argv) {
     int level = 5, strokes = 30;
     std::vector<float> zooms = {1.0f, 4.0f, 16.0f, 64.0f};
     float pxRule = 1.0f;
-    int cover = 0;
+    int cover = 0, coverProduct = 0;
     int pos = 0;
     for (int i = 1; i < argc; ++i) {
         if (std::strncmp(argv[i], "--px-rule=", 10) == 0) pxRule = float(std::atof(argv[i] + 10));
         else if (std::strncmp(argv[i], "--cover=", 8) == 0) cover = std::atoi(argv[i] + 8);
+        else if (std::strncmp(argv[i], "--cover-product=", 16) == 0) coverProduct = std::atoi(argv[i] + 16);
         else if (pos == 0) baseTriangles = size_t(std::atol(argv[i])), ++pos;
         else if (pos == 1) level = std::atoi(argv[i]), ++pos;
         else if (pos == 2) strokes = std::atoi(argv[i]), ++pos;
@@ -765,6 +771,44 @@ int main(int argc, char** argv) {
                     cover, tilesPerTri, tiles, tiles - before, ms(t2) / 1000.0, poolMB, indexMB, double(residentBytes()) / 1e6, double(peakResidentBytes()) / 1e6,
                     double(mm.microTriangles()) * std::pow(4.0, cover) / 1e9, double(mm.microTriangles()) * std::pow(4.0, cover) * 0.5 * 2 / 1e6,
                     peakResidentBytes() < size_t(4000) * 1000000 ? "ok" : "MISSED");
+    }
+    if (coverProduct > 0) {
+        const auto t2 = Clock::now();
+        const size_t rss0 = residentBytes();
+        sf::MicroTiles store;
+        store.resize(mm.baseTriangles);
+        const char* mb = std::getenv("SF_MICRO_TILES_RESIDENT_MB");
+        store.residentBudget = size_t(mb ? std::atol(mb) : 512) << 20;
+        const uint32_t tilesPerTri = 1u << (2 * (coverProduct + 1));
+        uint32_t seed = 12345;
+        size_t made = 0;
+        for (uint32_t tri = 0; tri < mm.baseTriangles; ++tri) {
+            for (uint32_t path = 0; path < tilesPerTri; ++path) {
+                bool born = false;
+                sf::MicroTiles::Tile* t = store.obtain(sf::MicroTiles::key(tri, coverProduct, path), born);
+                for (int16_t& v : t->delta) seed = seed * 1664525u + 1013904223u, v = int16_t(seed >> 27); // 0..31
+                ++made;
+            }
+            if ((tri & 1023) == 1023) store.trim(0, 0); // (as strokes end: the budget is kept as it fills)
+        }
+        store.trim(0, 0);
+        const double fill = ms(t2);
+        // reading parked tiles back: 1000 of them, ms each
+        sf::MicroTiles::Tile scratch;
+        const auto t3 = Clock::now();
+        double sum = 0;
+        for (uint32_t k = 0; k < 1000; ++k) {
+            const uint32_t tri = (k * 7919u) % mm.baseTriangles;
+            if (const sf::MicroTiles::Tile* t = store.read(sf::MicroTiles::key(tri, coverProduct, k % tilesPerTri), scratch)) sum += t->delta[k % 153];
+        }
+        const double readMs = ms(t3);
+        const size_t rss = residentBytes();
+        std::printf("\nProduct store (core/MicroTiles.h), full coverage at depth %d, resident budget %zu MB: %zu tiles (%zu resident = %.0f MB, %zu parked = %.0f MB in the arena, %.1f B per parked tile), index + bookkeeping %.0f MB, store total %.0f MB, filled + trimmed in %.1f s; RSS +%.0f MB (now %.0f MB); 1000 parked reads %.2f ms (%.1f us each, checksum %.0f); bar < 4000 MB: %s.\n",
+                    coverProduct, store.residentBudget >> 20, store.alive(), store.residentCount(), double(store.residentBytes()) / 1e6, store.parkedCount(), double(store.parkedBytes()) / 1e6,
+                    store.parkedCount() ? double(store.parkedBytes()) / double(store.parkedCount()) : 0.0,
+                    double(store.bytes() - store.pool.capacity() * sizeof(sf::MicroTiles::Tile) - store.arena.capacity()) / 1e6, double(store.bytes()) / 1e6, fill / 1000.0,
+                    double(rss - rss0) / 1e6, double(rss) / 1e6, readMs, readMs, sum, peakResidentBytes() < size_t(4000) * 1000000 ? "ok" : "MISSED");
+        (void)made;
     }
     // 1B-equivalent spacing: the finest brushed cell as a uniform grid over the whole head.
     int deepest = 0;

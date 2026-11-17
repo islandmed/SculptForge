@@ -235,8 +235,12 @@ void MicroStroke::begin(Mesh& m) {
     bornSet_.clear();
     oldTiles_.clear();
     lastDepth = 0, lastTiles = 0;
-    if (MicroTiles::enabled() && !mm.tiles) mm.tiles = std::make_shared<MicroTiles>();
+    if (MicroTiles::enabled() && !mm.tiles) {
+        mm.tiles = std::make_shared<MicroTiles>();
+        mm.tiles->residentBudget = MicroTiles::defaultResidentBudget();
+    }
     if (mm.tiles && mm.tiles->maxDepth.size() != mm.baseTriangles) mm.tiles->resize(mm.baseTriangles);
+    strokeStamp_ = mm.tiles ? mm.tiles->useStamp + 1 : 0;
     mm.stroking = true;
     active_ = true;
 }
@@ -783,6 +787,7 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
         slots[k] = tiles.slot(t);
         if (born) bornNow[k] = 1;
         else if (!bornSet_.count(key) && !oldTiles_.count(key)) oldTiles_.emplace(key, std::vector<int16_t>(t->delta.begin(), t->delta.end()));
+        tiles.residentAbove(targets[k].tri, depth, targets[k].path); // (the kernel reads the deltas above: resident, not unpacked per point)
     }
     // 3. The kernel over the tiles in parallel (each writes its own; the deltas above it are read only). The surface
     // under a tile point is the root plus the deltas down to this tile's own, so a brush sees what it sculpts.
@@ -795,7 +800,7 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
         for (size_t k = b; k < e; ++k) {
             const Target& tg = targets[k];
             T.set(m, tg.tri, mm.n);
-            MicroTiles::Tile& tile = tiles.pool[slots[k]];
+            MicroTiles::Tile& tile = tiles.at(slots[k]);
             int range = 0;
             bool any = false;
             uint32_t p = 0;
@@ -1009,7 +1014,7 @@ void MicroStroke::restore(Mesh& m) {
         bornKeys_.clear();
         bornSet_.clear();
         for (auto& [key, old] : oldTiles_)
-            if (MicroTiles::Tile* t = mm.tiles->find(key)) std::copy(old.begin(), old.end(), t->delta.begin()), mm.markDirty(MicroTiles::keyTri(key));
+            if (MicroTiles::Tile* t = mm.tiles->resident(key)) std::copy(old.begin(), old.end(), t->delta.begin()), mm.markDirty(MicroTiles::keyTri(key));
     }
     poolFor(tiles_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
@@ -1028,8 +1033,9 @@ void MicroStroke::endTiles(MicroUndo& u, const MicroTiles& tiles) {
     constexpr uint32_t S = MicroTiles::kSamples, N = MicroTiles::kN;
     std::vector<int16_t> change;
     const std::array<int16_t, S> zeros{};
+    MicroTiles::Tile scratch;
     auto add = [&](uint64_t key, const int16_t* old, bool born) {
-        const MicroTiles::Tile* t = tiles.find(key);
+        const MicroTiles::Tile* t = tiles.read(key, scratch);
         if (!t) return;
         if (!born && std::equal(t->delta.begin(), t->delta.end(), old)) return;
         const size_t base = change.size();
@@ -1087,6 +1093,7 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     u->samples = mm.samples;
     for (uint32_t t : tiles_) tileOf_[t] = 0;
     if (tileChanges) endTiles(*u, *mm.tiles);
+    if (mm.tiles) mm.tiles->trim(); // (the stroke is over: the least recently used tiles park beyond the budget, this stroke's last)
     if (count) {
     // The journal: tiles in Morton order of their centres, each the stroke's change, packed.
     AABB box;
