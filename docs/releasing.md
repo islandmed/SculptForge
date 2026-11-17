@@ -162,6 +162,39 @@ secret, read only by the two signing steps, which run only when `SIGN` is true; 
 check_workflows.py. The intermediate artifacts are named `signing-*` (never `windows*`: job sums and verify take those
 for packages) and kept one day.
 
+## iPad / TestFlight
+
+The iPad app (docs/ipad.md) builds on every change in `.github/workflows/ios.yml`: the simulator job (build, core tests,
+screenshots) and the device job (an unsigned archive). Its **TestFlight upload** job is dormant until the App Store Connect
+key exists; then a maintainer starts it by hand: **Actions > iPad > Run workflow** (branch `main`), tick *Upload this build
+to TestFlight*, and approve the `testflight` environment when it asks. `scripts/ios-testflight.sh` archives with Xcode's
+cloud signing, exports with destination *upload* (no third-party tools) and uses the run number as the build number.
+
+**Owner steps, once** (account and payment steps are the owner's; agents never see, ask for, print or store the key or ids):
+
+1. **Apple Developer Program**, enrolled as an Organization (needs the D-U-N-S number).
+2. **The bundle id:** developer.apple.com > Certificates, Identifiers & Profiles > Identifiers > **+** > App IDs > App,
+   Description `SculptForge iPad`, Bundle ID **Explicit** `app.sculptforge.ipad`, no capabilities, Register.
+3. **The app record:** appstoreconnect.apple.com > Apps > **+** > New App: Platform **iOS**, Name `SculptForge` (if taken:
+   `SculptForge Sculpt`), Primary Language English (U.S.), Bundle ID `app.sculptforge.ipad`, SKU `sculptforge-ipad`,
+   User Access Full Access, Create.
+4. **The API key:** App Store Connect > Users and Access > Integrations > App Store Connect API > Team Keys > **+**: Name
+   `GitHub TestFlight`, Access **Admin** (Xcode's cloud signing creates the distribution certificate and profile with it),
+   Generate. Download the `.p8` (it can be downloaded only once) and note the **Key ID** and the **Issuer ID** above the list.
+5. **The team id:** developer.apple.com > Account > Membership details > **Team ID**.
+6. **GitHub:** the repository's Settings > Environments > New environment `testflight`: Required reviewers = the owner,
+   Deployment branches and tags = Selected, `main`. Then its **Environment secrets**: `ASC_KEY_ID`, `ASC_ISSUER_ID`,
+   `ASC_KEY_P8` (the whole text of the .p8 file, BEGIN and END lines included) and `APPLE_TEAM_ID`. Only the upload job
+   reads them, only from this environment; delete the .p8 from the computer afterwards.
+7. **The first upload:** run the workflow as above. About 15-30 minutes after it ends, App Store Connect > the app >
+   TestFlight lists the build (the app declares no non-exempt encryption, so there is no export question to answer).
+8. **Testers, members first:** TestFlight > External Testing > **+** group `Members`; fill in Test Information (feedback
+   email, a short description and, where it asks, a privacy policy URL: the site has none yet, a site-lane page comes
+   first), add the build (the first one goes to
+   Apple's beta review, about a day), then add members by email. No public link until the owner decides.
+
+If the key leaks: revoke it on the same page (step 4) and add a new one; nothing else holds it.
+
 ## The script
 
 ```sh
