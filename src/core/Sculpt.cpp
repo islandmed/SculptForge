@@ -2013,7 +2013,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             break;
         default: break;
         }
-        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f * depthRadius(rad) / rad);
+        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f * (rad > 0.0f ? depthRadius(rad) / rad : 1.0f));
         if (r.drag > 0.0f) d += p.strokeDelta * (dragScale * r.drag * f);
         scratch_[i] = d;
     }

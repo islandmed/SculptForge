@@ -31,6 +31,7 @@ struct PlaneKernel {
     // several times the form it works on sank or raised it by several of its own sizes per stroke (0 = r).
     float depthR = 0.0f;
     float dr() const { return depthR > 0.0f ? std::min(depthR, r) : r; }
+    float drShare() const { return r > 0.0f ? dr() / r : 1.0f; } // (how much of the brush's own size the depths are)
     bool invert = false, viewFalloff = false;
 
     static glm::vec3 flat(const glm::vec3& v, const glm::vec3& n) { return v - n * glm::dot(v, n); } // onto the plane
@@ -73,11 +74,11 @@ struct PlaneKernel {
             // Carves a sharp valley by default (raises a ridge when inverted).
             const float sharp = f * f;
             d = areaNormal * (-sign * s * dr() * 0.05f * sharp);
-            d += flat(center - x, areaNormal) * (0.25f * s * f * dr() / r);
+            d += flat(center - x, areaNormal) * (0.25f * s * f * drShare());
             break;
         }
         case BrushType::Pinch:
-            d = flat(center - x, areaNormal) * (sign * 0.2f * s * f * dr() / r);
+            d = flat(center - x, areaNormal) * (sign * 0.2f * s * f * drShare());
             break;
         case BrushType::SharpCrease: {
             // Narrow, deep V-groove (a ridge when inverted); the sides are always
@@ -86,7 +87,7 @@ struct PlaneKernel {
             d = areaNormal * (-sign * s * dr() * 0.08f * core);
             glm::vec3 pull = flat(center - x, areaNormal);
             pull -= strokeDir * glm::dot(pull, strokeDir);
-            d += pull * (0.3f * s * f * dr() / r);
+            d += pull * (0.3f * s * f * drShare());
             break;
         }
         case BrushType::Trim: {
@@ -149,17 +150,17 @@ struct PlaneKernel {
             }
             case BrushType::Crease: {
                 const glm::vec3 q = flat(center - x, areaNormal);
-                return areaNormal * (-sign * s * dr() * 0.05f * 2.0f * f * gf) + (q * gf - tflat * f) * (0.25f * s * dr() / r);
+                return areaNormal * (-sign * s * dr() * 0.05f * 2.0f * f * gf) + (q * gf - tflat * f) * (0.25f * s * drShare());
             }
             case BrushType::Pinch: {
                 const glm::vec3 q = flat(center - x, areaNormal);
-                return (q * gf - tflat * f) * (sign * 0.2f * s * dr() / r);
+                return (q * gf - tflat * f) * (sign * 0.2f * s * drShare());
             }
             case BrushType::SharpCrease: {
                 glm::vec3 q = flat(center - x, areaNormal);
                 q -= strokeDir * glm::dot(q, strokeDir);
                 const glm::vec3 dq = -(tflat - strokeDir * glm::dot(tflat, strokeDir));
-                return areaNormal * (-sign * s * dr() * 0.08f * 4.0f * f * f * f * gf) + (q * gf + dq * f) * (0.3f * s * dr() / r);
+                return areaNormal * (-sign * s * dr() * 0.08f * 4.0f * f * f * f * gf) + (q * gf + dq * f) * (0.3f * s * drShare());
             }
             case BrushType::Trim: {
                 const glm::vec3 planePoint = areaCenter - areaNormal * (sign * dr() * 0.02f * s);
