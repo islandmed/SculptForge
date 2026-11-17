@@ -59,3 +59,14 @@ run ui_policy json=""
 click "grow.py"
 python_startup
 expect_value triangles == 20480
+
+# What was checked is what runs: a script changed between its check and its run (here, a line added in between)
+# runs as it was checked (one subdivide fewer: 80 triangles, not 320).
+key `
+type Console/##console "open(grow, 'w').write('import sculptforge as sf' + chr(10) + 'sf.run(' + repr('new_sphere') + ', subdivisions=1)' + chr(10))"
+key enter
+key `
+click "Preferences##palette.preferences"
+click "grow.py"
+python_startup append sf.run('subdivide')
+expect_value triangles == 80

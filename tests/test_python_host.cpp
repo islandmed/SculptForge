@@ -214,6 +214,28 @@ TEST(python_host_runs_script_files) {
     std::filesystem::remove_all(dir);
 }
 
+// Run at start-up runs the bytes it hashed, not the file as it is by then (app/Python.cpp runStartupScripts).
+TEST(python_host_runs_the_source_it_was_given) {
+    Fixture& f = py();
+    if (!f.host) return;
+    const auto dir = std::filesystem::temp_directory_path() / "sf_pyhost_source";
+    std::filesystem::create_directories(dir);
+    const std::string path = (dir / "start.py").string();
+    std::ofstream(path) << "raise SystemExit('the file on disk ran')\n";
+    f.clear();
+    CHECK(f.host->runSource("# -*- coding: utf-8 -*-\nprint('given', __name__, __file__ == " + std::string("r'") + path +
+                                "')\nimport sys; print('argv', sys.argv[0] == __file__)\n",
+                            path) == S::Ok);
+    CHECK(contains(f.out, "given __main__ True") && contains(f.out, "argv True"));
+    CHECK(!contains(f.err, "the file on disk ran"));
+    f.clear();
+    CHECK(f.host->runSource("x = 1\nraise ValueError('from the bytes')\n", path) == S::Error);
+    CHECK(contains(f.err, "line 2") && contains(f.err, "ValueError: from the bytes"));
+    CHECK(f.host->runSource("print('after')\n", path) == S::Ok); // __main__ and argv put back
+    CHECK(contains(f.out, "after"));
+    std::filesystem::remove_all(dir);
+}
+
 TEST(python_host_edits_are_undoable) {
     Fixture& f = py();
     if (!f.host) return;

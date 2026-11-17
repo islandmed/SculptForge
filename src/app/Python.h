@@ -15,6 +15,7 @@
 
 #include "python/PyHost.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -80,6 +81,7 @@ public:
     bool startupChanged(const std::string& path) const { return changed_.count(path) != 0; } // didn't run: changed
     bool inScriptsFolder(const std::string& path) const;
     void runStartupScripts(bool again = false); // once, from the first frame (nothing to do: nothing loads); again: tests
+    std::function<void(const std::string& path)> afterStartupCheck; // tests: runs between a script's check and its run
 
     // Timers (sf.ui.timer, P3): the main loop wakes for the next one (seconds from now; false: none) and runs the
     // due ones each pass. Without timers, or Python, both are a pointer check.
