@@ -893,13 +893,13 @@ CommandRegistry::CommandRegistry() {
              return {true, "Splats cleared"};
          }});
 
-    add({"undo", "Undo the last action (a whole batch or checkpoint restore at once).", {},
+    add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!undoStepOrBatch(doc)) return {false, "Nothing to undo"};
              return {true, "Undone"};
          }});
 
-    add({"redo", "Redo the last undone action (a whole batch or checkpoint restore at once).", {},
+    add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
              if (!redoStepOrBatch(doc)) return {false, "Nothing to redo"};
              return {true, "Redone"};
