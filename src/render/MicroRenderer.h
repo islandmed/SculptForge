@@ -63,8 +63,12 @@ public:
     // past the stored resolution shows a smooth surface instead of the stored facets. Never past kMaxDrawLevel (the
     // patch index buffers are 16-bit), and the triangle budget still rules.
     int drawAbove = 0;
+    // Flat shading shows the stored grid itself: nothing above level_ (11-17 artist-qa: neighbouring clusters drawn one
+    // level apart above the stored grid read as a seam in flat shading, ~10 px facets next to the stored ones with a
+    // dark column between; smooth shading, which interpolates the stored normals, never showed it). Set per draw.
+    bool flatShading = false;
     static constexpr int kMaxDrawLevel = 8;
-    int maxDrawLevel() const { return std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
+    int maxDrawLevel() const { return flatShading ? level_ : std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
     // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
     const MicroFocus* focus() const { return focus_.get(); }
     MicroFocus* focus() { return focus_.get(); }
