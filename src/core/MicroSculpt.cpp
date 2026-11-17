@@ -518,6 +518,11 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
             coarse.assign(size_t(cm + 1) * (cm + 2) / 2, 0.0f);
             const bool pullCoarse = pinches && stride > 1;
             if (pullCoarse) coarsePull.assign(coarse.size(), glm::vec3(0.0f));
+            // Smooth and Smooth Peaks at stride > 1 (#220): the coarse points give the brush's weight only, and every grid
+            // point takes its own neighbours' average (the write below). Interpolating the coarse points' change left the
+            // points between them as they were: a big Smooth kept every crease along the coarse micro triangles (a
+            // diamond lattice after a big Flatten), and smoothed at a scale that jumped with the stride.
+            const bool smoothFine = readsNeighbours && !maskBrush && stride > 1;
             bool any = false;
             uint32_t cidx = 0;
             for (uint32_t cj = 0; cj <= cm; ++cj)
@@ -583,6 +588,11 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         const glm::vec3 from = pinchSampler.flat(t, float(i), float(j)) - pull * k;
                         return (pinchSampler.sample(t, from) - float(pinchSampler.grid(t)[idx])) * mm.step;
                     };
+                    if (smoothFine) {
+                        coarse[cidx] = std::min(1.0f, s * f);
+                        any = true;
+                        continue;
+                    }
                     switch (type) {
                     case BrushType::Standard: delta = sign * s * r * 0.06f * f * glm::dot(areaNormal, nn); break;
                     case BrushType::Inflate: delta = sign * s * r * 0.05f * f; break;
@@ -678,6 +688,26 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         delta += (pinchSampler.sample(t, from) - float(own[idx])) * mm.step;
                     }
                     if (delta != 0.0f) apply(idx, delta);
+                });
+                count += S;
+            } else if (smoothFine) {
+                // Each grid point towards its neighbours' average (as at stride 1), by the interpolated weight.
+                forInterpolated(coarse.data(), n, stride, [&](uint32_t idx, uint32_t i, uint32_t j, float w) {
+                    if (w <= 0.0f) return;
+                    float d;
+                    if (i > 0 && j > 0 && i + j < n) { // (inside: the rows above and below by offset)
+                        const int16_t* q = before.data() + idx;
+                        const ptrdiff_t up = ptrdiff_t(n + 1 - j), down = -ptrdiff_t(n + 2 - j);
+                        d = (int(q[-1]) + q[1] + q[up] + q[up - 1] + q[down] + q[down + 1]) * (1.0f / 6.0f) - float(*q);
+                    } else {
+                        float sum = 0.0f;
+                        int c = 0;
+                        forNeighbors(i, j, n, [&](uint32_t a2, uint32_t b2) { sum += float(before[MicroMesh::index(a2, b2, n)]), ++c; });
+                        d = c ? sum / float(c) - float(before[idx]) : 0.0f;
+                    }
+                    if (type == BrushType::SmoothPeaks) d = std::min(0.0f, d);
+                    d *= w;
+                    if (std::abs(d) >= 0.5f) apply(idx, d * mm.step); // (less rounds back to the value it has)
                 });
                 count += S;
             } else {
