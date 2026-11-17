@@ -145,6 +145,16 @@ do it (check_workflows.py), the notice says `Windows: test-signed (not for relea
 untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
 `release.sh --stage` and `verify_staged.py --require-signed` refuse the test certificate anyway).
 
+**One-time setup in SignPath (the maintainer; the workflow only submits requests).** In the SculptForge organization:
+1. *Trusted build systems*: add **GitHub.com** to the organization and link it to the project. Without it the first request
+   fails with "Trusted build system is not allowed to log into the organization" (seen in the 11-17 dry run).
+2. *Artifact configurations* `binaries` and `installer` (the XML above), set as the project's.
+3. *Signing policies*: `test-signing` (self-signed certificate; the dry run) and the release policy (the Foundation certificate,
+   *Verify origin* on, the maintainer as approver). Put the release policy's slug in `SIGNPATH_SIGNING_POLICY_SLUG`.
+4. A CI user whose API token is the repository secret `SIGNPATH_API_TOKEN`, allowed to submit to both policies.
+Then the dry run: Actions > Packages > Run workflow on a branch with *sign_test* ticked (it must end `Windows: test-signed`);
+only after that, and the release policy's first approved request, is `SIGNING=signpath` set on the repository.
+
 Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
 `SIGNPATH_TEST_POLICY_SLUG`, `SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
 secret, read only by the two signing steps, which run only when `SIGN` is true; the workflow never runs on pull requests or
