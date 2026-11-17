@@ -133,3 +133,26 @@ TEST(update_feed_challenge_results) {
     CHECK(parseUpdateFeed(feed, u, err));
     CHECK(u.challengeTitle.size() == 48 && u.challengeTitle == title.substr(0, 48));
 }
+
+TEST(installer_update_choice_applies_once_per_installer_run) {
+    const InstallerChoice off = parseInstallerChoice(R"({"check_updates": false})");
+    const InstallerChoice on = parseInstallerChoice(R"({"check_updates": true})");
+    CHECK(off.present && !off.checkUpdates && on.present && on.checkUpdates);
+    // No file, or one that isn't ours: nothing is read, nothing changes.
+    CHECK(!parseInstallerChoice("").present && !parseInstallerChoice("{}").present &&
+          !parseInstallerChoice(R"({"check_updates": "no"})").present && !parseInstallerChoice("[1]").present);
+    int64_t applied = 0;
+    bool check = true;
+    CHECK(!applyInstallerChoice(InstallerChoice{}, 100, applied, check) && check && applied == 0);
+    // First start after the installer: its choice wins and the run is recorded.
+    CHECK(applyInstallerChoice(off, 100, applied, check) && !check && applied == 100);
+    // Later starts: the same run is not applied again, so Preferences > Updates can switch it back on and stay on.
+    check = true;
+    CHECK(!applyInstallerChoice(off, 100, applied, check) && check);
+    // A reinstall (a newer file) applies its choice again, either way.
+    CHECK(applyInstallerChoice(off, 250, applied, check) && !check && applied == 250);
+    CHECK(applyInstallerChoice(on, 300, applied, check) && check && applied == 300);
+    // A file without a usable time is ignored.
+    check = false;
+    CHECK(!applyInstallerChoice(on, 0, applied, check) && !check);
+}

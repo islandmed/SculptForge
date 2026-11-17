@@ -1969,6 +1969,7 @@ private:
     void drawFileMenuProjectItems();
     void rememberRecent(const std::string& path);
     void saveProjectPrefs();
+    void applyInstallerUpdateChoice(); // bin/installer.json: the installer's update-check box (PanelProject.cpp)
     std::string prefDir_;
     std::vector<std::string> recentFiles_;
     std::function<void()> discardAction_;
@@ -2019,6 +2020,7 @@ private:
     void drawUpdatesSection(); // Preferences > Updates
     bool checkUpdates_ = true;
     int64_t updateCheckedAt_ = 0;   // unix time of the last automatic check
+    int64_t installerStamp_ = 0;    // the installer run whose update-check choice was applied (bin/installer.json, core/UpdateCheck.h)
     std::string updateSkipped_;     // "Skip this version"
     UpdateChannel updateChannel_ = appPrerelease()[0] ? UpdateChannel::Preview : UpdateChannel::Stable; // a beta stays on betas
     std::shared_ptr<UpdateJob> updateJob_;

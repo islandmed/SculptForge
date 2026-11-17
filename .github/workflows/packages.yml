@@ -541,6 +541,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the signed sculptforge-cli.exe does not start" }
       - name: Package
         run: cd build && cpack -C Release -G "NSIS;ZIP"
+      - name: Installer - the update-check page is in; a silent install writes the default and the uninstaller removes it
+        shell: pwsh
+        run: |
+          if (-not (Select-String -Path build\_CPack_Packages\win64\NSIS\project.nsi -Pattern 'Page custom SfUpdatePage' -Quiet)) { throw 'the installer has no update-check page (CPACK_NSIS_PAGE_COMPONENTS, CMakeLists.txt)' }
+          $dir = Join-Path $env:RUNNER_TEMP 'sf-installed'
+          $p = Start-Process (Get-ChildItem build\SculptForge-*-windows-*.exe).FullName -ArgumentList '/S', "/D=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "silent install exited $($p.ExitCode)" }
+          $j = Get-Content "$dir\bin\installer.json" -Raw | ConvertFrom-Json
+          if ($j.check_updates -ne $true) { throw "installer.json after a silent install: $($j | ConvertTo-Json -Compress) (want check_updates true)" }
+          $u = Start-Process "$dir\Uninstall.exe" -ArgumentList '/S', "_?=$dir" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "silent uninstall exited $($u.ExitCode)" }
+          if (Test-Path "$dir\bin\installer.json") { throw 'the uninstaller left bin\installer.json behind' }
       - name: Signing - the installer, for SignPath
         if: env.SIGN == 'true'
         shell: pwsh

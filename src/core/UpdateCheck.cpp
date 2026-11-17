@@ -183,4 +183,21 @@ ShownVersion shownVersion(const std::string& version, const std::string& prerele
     return v;
 }
 
+InstallerChoice parseInstallerChoice(const std::string& json) {
+    InstallerChoice c;
+    Json j;
+    std::string err;
+    if (!Json::parse(json, j, err) || !j.isObject() || !j["check_updates"].isBool()) return c;
+    c.present = true;
+    c.checkUpdates = j["check_updates"].asBool(true);
+    return c;
+}
+
+bool applyInstallerChoice(const InstallerChoice& choice, int64_t stamp, int64_t& appliedStamp, bool& checkUpdates) {
+    if (!choice.present || stamp <= 0 || stamp == appliedStamp) return false;
+    appliedStamp = stamp;
+    checkUpdates = choice.checkUpdates;
+    return true;
+}
+
 } // namespace sf

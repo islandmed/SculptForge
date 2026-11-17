@@ -727,6 +727,15 @@ set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\sculptforge.exe")
 set(CPACK_NSIS_URL_INFO_ABOUT "https://sculptforge.app/")
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\SculptForge.lnk' '$INSTDIR\\\\bin\\\\sculptforge.exe'")
+# The "Check for updates once a day" page before the files are copied (packaging/windows/update-check.nsh): its choice goes
+# to bin\installer.json, which the app applies once per installer run (core/UpdateCheck.h). CPack puts
+# CPACK_NSIS_PAGE_COMPONENTS between the Start Menu page and the install page (the installer has no components).
+# (NSIS wants backslashes in !include; CPack stores the value unescaped, so each is doubled, as for CPACK_NSIS_CREATE_ICONS_EXTRA.)
+string(REPLACE "/" "\\\\" SF_UPDATE_NSH "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/update-check.nsh")
+string(APPEND CPACK_NSIS_DEFINES "\n!include '${SF_UPDATE_NSH}'")
+set(CPACK_NSIS_PAGE_COMPONENTS "Page custom SfUpdatePage SfUpdatePageLeave")
+set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "!insertmacro SfWriteInstallerJson")
+set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "!insertmacro SfRemoveInstallerJson")
 # macOS disk image
 set(CPACK_DMG_VOLUME_NAME "SculptForge")
 if(APPLE)

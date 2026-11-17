@@ -91,6 +91,25 @@ void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
 
 bool App::interactive() const { return options_.renderPath.empty() && options_.recordPath.empty() && !demo_; }
 
+// The Windows installer's "Check for updates once a day" box (bin/installer.json next to the program, written by the
+// installer): applied once per installer run, so a reinstall sets it again and Preferences > Updates stays free in between.
+void App::applyInstallerUpdateChoice() {
+    const char* base = SDL_GetBasePath();
+    if (!base) return;
+    const std::string path = std::string(base) + "installer.json";
+    std::string text;
+    std::error_code ec;
+    {
+        std::ifstream f(fsPath(path), std::ios::binary);
+        if (!f) return;
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    const auto when = std::filesystem::last_write_time(fsPath(path), ec);
+    if (ec) return;
+    const int64_t stamp = std::chrono::duration_cast<std::chrono::seconds>(when.time_since_epoch()).count();
+    applyInstallerChoice(parseInstallerChoice(text), stamp, installerStamp_, checkUpdates_);
+}
+
 void App::initProject() {
     if (!interactive()) return;
     prefDir_ = userDataDir();
@@ -121,6 +140,7 @@ void App::initProject() {
         updatedThisStart_ = !lastSeen.empty() && compareVersions(SCULPTFORGE_VERSION, lastSeen) > 0;
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
+        installerStamp_ = int64_t(prefs["installer_stamp"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
         memberBuilds_ = prefs["member_builds"].asBool(false); // (the token itself is in the keychain only)
         if (prefs["member_login"].isString()) memberLogin_ = prefs["member_login"].asString().substr(0, 39);
@@ -202,6 +222,7 @@ void App::initProject() {
             offerFirstRunLanguage(osLanguageTag());
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }
+    applyInstallerUpdateChoice();
     initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     // (the starts milestone: counted on this computer only, never sent)
@@ -256,6 +277,7 @@ void App::saveProjectPrefs() {
     if (startInputStyle_ >= 0) prefs.set("input_style", startInputStyle_);
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
+    prefs.set("installer_stamp", double(installerStamp_));
     prefs.set("update_checked_at", double(updateCheckedAt_));
     prefs.set("featured_launch", double(featuredLaunch_));
     if (!featuredHidden_.empty()) {

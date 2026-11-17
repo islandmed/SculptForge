@@ -82,4 +82,16 @@ inline bool updateCheckDue(int64_t lastCheck, int64_t now) {
     return lastCheck <= 0 || now < lastCheck || now - lastCheck >= kUpdateCheckInterval;
 }
 
+// The Windows installer's "Check for updates once a day" box: the installer writes bin/installer.json
+// ({"check_updates": true|false}) next to the program. The app applies the choice once per installer run, so a reinstall
+// sets it again and the Preferences > Updates switch is free to change it in between. `stamp` is the file's modification
+// time (seconds), `appliedStamp` the one already applied (kept in the preferences). Returns true when the setting
+// changed or a new run was recorded (the preferences need saving). A portable build has no file: nothing happens.
+struct InstallerChoice {
+    bool present = false;       // the file exists and has the key
+    bool checkUpdates = true;
+};
+InstallerChoice parseInstallerChoice(const std::string& json);
+bool applyInstallerChoice(const InstallerChoice& choice, int64_t stamp, int64_t& appliedStamp, bool& checkUpdates);
+
 } // namespace sf
