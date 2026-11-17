@@ -314,13 +314,23 @@ struct AreaSums {
 // A brush bigger than the form it works on reaches both its sides: summed over all of them the area normal cancels toward
 // nothing and the dab's plane turns noisy, dab to dab (tester, 0.13.3: Clay crumpled, Inflate shot shards, Trim cut a
 // crater). The plane is read from what the camera faces (1 facing it, 0 turned away, over about 12 degrees at the
-// silhouette), and a plane brush leaves surface turned away from its own plane alone (1 facing it, 0 beyond ~100 degrees).
+// silhouette), and a plane brush leaves surface turned away from its own plane alone (1 facing it, fading to 0 by ~107 degrees: a wide fade, a hard cut tore a crease along the silhouette).
 // `big`: how much of this applies (Sculptor::bigness: 0 for a brush well inside the Part, 1 from its own size up).
 inline float viewFacing(const glm::vec3& n, const glm::vec3& viewDir, float big) {
     return glm::mix(1.0f, std::clamp((-glm::dot(n, viewDir) + 0.1f) / 0.2f, 0.0f, 1.0f), big);
 }
-inline float planeFacing(const glm::vec3& n, const glm::vec3& areaNormal, float big) {
+// (Trim cuts a clean plane: its gate is the narrow one, a wide fade left it steps at the edge)
+inline float planeFacingNarrow(const glm::vec3& n, const glm::vec3& areaNormal, float big) {
     return glm::mix(1.0f, std::clamp((glm::dot(n, areaNormal) + 0.2f) / 0.2f, 0.0f, 1.0f), big);
+}
+inline float planeFacing(const glm::vec3& n, const glm::vec3& areaNormal, float big) {
+    return glm::mix(1.0f, [&] { const float t = std::clamp((glm::dot(n, areaNormal) + 0.3f) / 0.8f, 0.0f, 1.0f); return t * t * (3.0f - 2.0f * t); }(), big);
+}
+// What a plane brush bigger than the Part may move one vertex in one dab: about the brush's own depth, not the whole gap to a plane a
+// big form curves far away from (Clay Block flattened a sphere into a wafer, then spread it). No limit for a brush up to the Part's size.
+inline glm::vec3 capMove(const glm::vec3& d, float depthR, float big) {
+    const float cap = depthR * (0.12f + 10.0f * (1.0f - big)), len = glm::length(d);
+    return len > cap && len > 0.0f ? d * (cap / len) : d;
 }
 template <class F>
 AreaSums areaSums(size_t n, F&& add) {
@@ -1183,7 +1193,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
     // Weighted area normal and centre of the brush region.
-    const float big = bigness(p.radius);
+    const float big = bigness(p.radius * reach);
     const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
@@ -1272,7 +1282,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         case BrushType::Standard: case BrushType::Flatten: case BrushType::Clay: case BrushType::Crease:
         case BrushType::Pinch: case BrushType::SharpCrease: case BrushType::Trim:
             // (Flatten pulls everything to the plane alike: a gate at the silhouette would shear the form there)
-            d = plane.offsetWith(x, type == BrushType::Flatten ? f : f * planeFacing(nrm[v], areaNormal, big)); // (core/SculptKernel.h)
+            d = plane.offsetWith(x, type == BrushType::Flatten ? f : f * (type == BrushType::Trim ? planeFacingNarrow(nrm[v], areaNormal, big) : planeFacing(nrm[v], areaNormal, big))); // (core/SculptKernel.h)
+            if (big > 0.0f && (type == BrushType::Clay || type == BrushType::Flatten)) d = capMove(d, depthRadius(r), big);
             break;
         case BrushType::Inflate:
             d = (inflateAlongNormals ? nrm[v] : areaNormal) * (sign * s * depthRadius(r) * 0.05f * f);
@@ -1326,9 +1337,15 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                     w *= 1.0f - k + k * brushFalloff(glm::length(o), r * 1.3f, k);
                 }
             }
-            glm::vec3 planePoint = areaCenter + areaNormal * (sign * r * 0.08f * s);
+            // (no facing gate: it sheared the form at the silhouette; the slab's depth below limits the reach instead)
+            glm::vec3 planePoint = areaCenter + areaNormal * (sign * depthRadius(r) * 0.08f * s);
             float h = glm::dot(x - planePoint, areaNormal);
+            if (big > 0.0f) { // a slab reaches only so deep: what lies far below its plane (the far side of a form it spans) stays
+                const float t = std::clamp((std::abs(h) / depthRadius(r) - 0.15f) / 0.35f, 0.0f, 1.0f);
+                w *= glm::mix(1.0f, 1.0f - t * t * (3.0f - 2.0f * t), big);
+            }
             if (sign * h < 0.0f) d = -areaNormal * (h * w * clayPull(s));
+            if (big > 0.0f) d = capMove(d, depthRadius(r), big);
             break;
         }
         case BrushType::SnakeHook: {
@@ -2015,6 +2032,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         }
         if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f * (rad > 0.0f ? depthRadius(rad) / rad : 1.0f));
         if (r.drag > 0.0f) d += p.strokeDelta * (dragScale * r.drag * f);
+        if (big > 0.0f && r.plane != BrushRecipe::Plane::None) d = capMove(d, depthRadius(rad), big);
         scratch_[i] = d;
     }
     });

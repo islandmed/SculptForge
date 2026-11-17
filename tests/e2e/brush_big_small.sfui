@@ -147,6 +147,41 @@ key ctrl+z
 key ctrl+z
 key ctrl+z
 
+action brush.clayblock
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clayblock-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clayblock-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clayblock-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
 action brush.trim
 brush_size 400
 snapshot
