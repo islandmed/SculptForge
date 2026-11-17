@@ -13,6 +13,7 @@
 #include "core/Document.h"
 #include "core/SelectionSets.h"
 #include "core/Undo.h"
+#include "python/CoreCalls.h"
 #include "python/PyHost.h"
 
 #include <SDL3/SDL.h>
@@ -36,6 +37,20 @@ std::string runtimeHome() {
     return {};
 }
 
+// Commands on documents a script makes of its own, run by this binary's core (the app's, in the app).
+int g_ownRuns = 0;
+const python::CoreCalls& countingCore() {
+    static const python::CoreCalls calls = [] {
+        python::CoreCalls c = python::directCoreCalls();
+        c.execute = [](Document& d, const std::string& name, const Args& args) {
+            ++g_ownRuns;
+            return python::directCoreCalls().execute(d, name, args);
+        };
+        return c;
+    }();
+    return calls;
+}
+
 struct Fixture {
     Document doc;
     CommandRegistry registry;
@@ -53,6 +68,7 @@ struct Fixture {
         }
         python::AppSide side;
         side.build = SF_PYHOST_BUILD;
+        side.core = &countingCore();
         side.documentSize = sizeof(Document);
         side.meshSize = sizeof(Mesh);
         side.home = runtimeHome();
@@ -103,6 +119,7 @@ TEST(python_host_refuses_another_build) {
     CommandRegistry registry;
     python::AppSide side;
     side.build = "0.0.0";
+    side.core = &python::directCoreCalls();
     side.documentSize = sizeof(Document);
     side.meshSize = sizeof(Mesh);
     side.document = &doc;
@@ -218,6 +235,31 @@ TEST(python_host_threads_cannot_touch_the_open_scene) {
     CHECK(f.line("t = threading.Thread(target=job); t.start(); t.join(); print(errs)") == S::Ok);
     CHECK(f.appRuns == runs);
     CHECK(contains(f.out, "main thread"));
+}
+
+// The host has no core of its own (CoreCalls.h): a script's edits land in the app's own state, and documents a script
+// makes run on the app's core.
+TEST(python_host_uses_the_apps_core) {
+    Fixture& f = py();
+    if (!f.host) return;
+    f.clear();
+    CHECK(f.line("sf.run('new_sphere', subdivisions=1)") == S::Ok);
+    CHECK(f.line("doc.mask = [0.5] * len(doc.vertices)") == S::Ok);
+    CHECK(f.doc.mesh.mask.size() == f.doc.mesh.vertexCount());
+    CHECK(!f.doc.mesh.mask.empty() && f.doc.mesh.mask[0] == 0.5f);
+    CHECK(f.line("doc.set_mesh([(0, 0, 0), (1, 0, 0), (0, 1, 0)], [(0, 1, 2)])") == S::Ok);
+    CHECK(f.doc.mesh.triangleCount() == 1 && f.doc.mesh.positions[1].x == 1.0f);
+    CHECK(f.doc.mesh.normals.size() == 3); // finished by the app's core
+    const int before = g_ownRuns;
+    CHECK(f.line("own = sf.Document(); sf.run(own, 'new_sphere', subdivisions=1); print(len(own.triangles))") == S::Ok);
+    CHECK(g_ownRuns == before + 1);
+    CHECK(contains(f.out, "80"));
+    CHECK(f.line("print(sf.run_script(own, 'subdivide')[0] != '', len(own.triangles))") == S::Ok);
+    CHECK(g_ownRuns == before + 2);
+    CHECK(contains(f.out, "True 320"));
+    CHECK(f.line("print('new_sphere' in sf.tool_schema())") == S::Ok);
+    CHECK(contains(f.out, "True"));
+    CHECK(f.doc.mesh.triangleCount() == 1); // the open scene untouched by the script's own document
 }
 
 TEST(python_host_completes_names) {

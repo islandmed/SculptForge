@@ -479,6 +479,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/CommandBar.cpp
     src/app/Console.cpp
     src/app/Python.cpp
+    src/python/CoreCalls.cpp
     src/app/PanelPython.cpp
     src/app/Config.cpp
     src/app/LibraryBrowser.cpp
@@ -796,7 +797,11 @@ endif()
 if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
   # The app loads it the first time a script runs (src/app/Python.cpp): CPython in it, nothing at start-up.
   add_library(sculptforge_pyhost MODULE src/python/AppHost.cpp src/python/Bindings.cpp)
-  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed sculptforge_core sculptforge_ai)
+  # No core of its own: every core function it calls is the app's (src/python/CoreCalls.h), so it takes only the core's
+  # headers, and the linker refuses a call that bypasses that (no undefined symbols).
+  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed glm::glm)
+  target_include_directories(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_INCLUDE_DIRECTORIES>)
+  target_compile_definitions(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_COMPILE_DEFINITIONS>)
   target_compile_definitions(sculptforge_pyhost PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
   set_target_properties(sculptforge_pyhost PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
   if(APPLE)
@@ -808,7 +813,7 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
     target_sources(sculptforge_pyhost PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-pyhost.rc)
   else()
     set_target_properties(sculptforge_pyhost PROPERTIES INSTALL_RPATH "$ORIGIN/python/lib")
-    target_link_options(sculptforge_pyhost PRIVATE -Wl,--exclude-libs,ALL) # its copy of the core stays its own
+    target_link_options(sculptforge_pyhost PRIVATE -Wl,--no-undefined)
     set(SF_PYHOST_DIR lib/sculptforge)
   endif()
   # In a build folder it sits where the installed app has it: next to the executable, or in the macOS bundle's
@@ -857,7 +862,7 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
   endif()
 endif()
 if(SCULPTFORGE_BUILD_PYTHON)
-  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp)
+  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp src/python/CoreCalls.cpp)
   set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
   target_link_libraries(sculptforge_python PRIVATE sculptforge_core sculptforge_ai)
   target_compile_definitions(sculptforge_python PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
@@ -895,6 +900,7 @@ if(SCULPTFORGE_BUILD_TESTS)
                                                          SF_PYHOST_BUILD="${PROJECT_VERSION}")
     target_link_libraries(sculptforge_tests PRIVATE SDL3::SDL3)
     add_dependencies(sculptforge_tests sculptforge_pyhost)
+    target_sources(sculptforge_tests PRIVATE src/python/CoreCalls.cpp)
   endif()
   sculptforge_pch(sculptforge_tests)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names

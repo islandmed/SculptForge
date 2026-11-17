@@ -12,7 +12,7 @@
 #include "python/PyHost.h"
 
 #include "core/Document.h"
-#include "core/SelectionSets.h"
+#include "core/SelectionSets.h" // (types only: every core function comes from the app, CoreCalls.h)
 
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
@@ -49,8 +49,9 @@ void mainThreadOnly() {
 
 std::shared_ptr<const python::Api> appApi() {
     auto api = std::make_shared<python::Api>();
+    api->core = g_app.core;
     api->execute = [](Document& doc, const std::string& name, const Args& args) {
-        if (!isApp(doc)) return python::standaloneRegistry().execute(doc, name, args); // a Document() of the script's own
+        if (!isApp(doc)) return g_app.core->execute(doc, name, args); // a Document() of the script's own
         mainThreadOnly();
         return g_app.run(name, args);
     };
@@ -61,17 +62,17 @@ std::shared_ptr<const python::Api> appApi() {
         g_app.edit(d, what, change);
     };
     api->replaceMesh = [](Document& d, Mesh&& m) {
-        if (!isApp(d)) return d.setMesh(std::move(m));
+        if (!isApp(d)) return g_app.core->setMesh(d, std::move(m));
         mainThreadOnly();
         g_app.replaceMesh(d, std::move(m));
     };
     api->addSelectionSet = [](Document& d, SelectionSet&& set, const std::string& label, std::string& msg) {
-        if (!isApp(d)) return sf::addSelectionSet(d, std::move(set), label, msg);
+        if (!isApp(d)) return g_app.core->addSelectionSet(d, std::move(set), label, msg);
         mainThreadOnly();
         return g_app.addSelectionSet(d, std::move(set), label, msg);
     };
     api->selectPart = [](Document& d, int i) {
-        if (!isApp(d)) return d.selectPart(i);
+        if (!isApp(d)) return g_app.core->selectPart(d, i);
         mainThreadOnly();
         g_app.selectPart(d, i);
     };
@@ -220,7 +221,7 @@ extern "C" SF_PYHOST_EXPORT python::Host* sf_pyhost_create(int abi, const python
         return nullptr;
     };
     if (abi != python::kHostAbi || !app || app->build != SCULPTFORGE_VERSION || app->documentSize != sizeof(Document) ||
-        app->meshSize != sizeof(Mesh) || !app->document || !app->registry || !app->run)
+        app->meshSize != sizeof(Mesh) || !app->document || !app->registry || !app->run || !app->core)
         return fail("this Python host belongs to another SculptForge build (reinstall SculptForge)");
     if (Py_IsInitialized()) return fail("Python is already running in this process");
     g_app = *app;

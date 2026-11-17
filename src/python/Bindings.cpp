@@ -16,12 +16,8 @@
 // Without NumPy (the app's own Python has none until you add it), the arrays are lists of rows instead.
 #include "python/Bindings.h"
 
-#include "ai/AiCommands.h"
-#include "ai/AiPolicy.h"
-#include "ai/SplatTrainer.h"
-#include "core/BrushLibrary.h"
 #include "core/Commands.h"
-#include "core/Multires.h"
+#include "core/Document.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
 
@@ -38,6 +34,7 @@ using namespace sf;
 namespace {
 
 std::shared_ptr<const python::Api> g_api; // set by bind(): how this module runs commands
+const python::CoreCalls* g_core = nullptr; // the core's functions (CoreCalls.h): g_api->core
 
 const CommandRegistry& registry() { return g_api->registry(); }
 
@@ -177,19 +174,9 @@ void edit(Document& d, python::Edit what, const std::function<void()>& change) {
 
 } // namespace
 
-const CommandRegistry& python::standaloneRegistry() {
-    static CommandRegistry r = [] {
-        CommandRegistry reg;
-        ai::setAiEnabled(ai::aiFeaturesAllowed(ai::AiSettings::load(ai::defaultAiSettingsPath()).enabled)); // Preferences > AI, SF_AI
-        ai::registerAiCommands(reg, [] { return ai::AiSettings::load(ai::defaultAiSettingsPath()); });
-        ai::registerSplatTrainCommands(reg, [] { return ai::SplatTrainSettings::load(ai::defaultSplatTrainSettingsPath()); });
-        return reg;
-    }();
-    return r;
-}
-
 void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* description) {
     g_api = std::move(api);
+    g_core = g_api->core;
     m.doc() = description;
     m.attr("__version__") = SCULPTFORGE_VERSION;
     py::register_exception<CommandError>(m, "CommandError", PyExc_RuntimeError);
@@ -197,8 +184,9 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
     py::class_<Document>(m, "Document", "A scene: the sculpt mesh (with layers), Gaussian splats and edit history.")
         .def(py::init([] {
             // With the user's brush library and SCULPTFORGE_BRUSH_PATH studio brushes, like the app.
-            auto doc = std::make_unique<Document>();
-            for (const auto& message : loadBrushLibrary(*doc))
+            std::vector<std::string> warnings;
+            auto doc = g_core->newDocument(warnings);
+            for (const auto& message : warnings)
                 if (PyErr_WarnEx(PyExc_RuntimeWarning, message.c_str(), 1) < 0) throw py::error_already_set();
             return doc;
         }))
@@ -214,7 +202,7 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
                 setAttribute(mask, v, d.mesh.vertexCount(), "mask");
                 edit(d, python::Edit::Mask, [&] {
                     d.mesh.mask.swap(mask);
-                    d.mesh.markAllDirty();
+                    g_core->markAllDirty(d.mesh);
                     d.modified = true;
                 });
             },
@@ -232,7 +220,7 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
                 edit(d, python::Edit::Colors, [&] {
                     if (v.is_none()) d.mesh.clearColors();
                     else d.mesh.colors.swap(colors);
-                    d.mesh.markAllDirty();
+                    g_core->markAllDirty(d.mesh);
                     d.modified = true;
                 });
             },
@@ -290,10 +278,9 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
                 for (const auto& t : mesh.triangles)
                     if (t.x >= mesh.vertexCount() || t.y >= mesh.vertexCount() || t.z >= mesh.vertexCount())
                         throw py::value_error("triangle index out of range");
-                mesh.rebuildTopology();
-                mesh.recomputeAllNormals();
+                g_core->finishMesh(mesh);
                 if (g_api->replaceMesh) g_api->replaceMesh(d, std::move(mesh));
-                else d.setMesh(std::move(mesh));
+                else g_core->setMesh(d, std::move(mesh));
             },
             py::arg("vertices"), py::arg("triangles"),
             "Replace the active Part's mesh with your own (in the app one undo step; in a pipeline it clears undo).")
@@ -313,11 +300,11 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
             "active_part", [](const Document& d) { return d.activePart; },
             [](Document& d, const py::object& v) {
                 int index = -1;
-                if (py::isinstance<py::str>(v)) index = d.findPart(v.cast<std::string>());
+                if (py::isinstance<py::str>(v)) index = g_core->findPart(d, v.cast<std::string>());
                 else index = v.cast<int>();
                 if (index < 0 || index >= d.partCount()) throw py::index_error("no such Part");
                 if (g_api->selectPart) g_api->selectPart(d, index);
-                else d.selectPart(index);
+                else g_core->selectPart(d, index);
             },
             "Index of the Part that vertices, mask, layers... and editing commands refer to. Set it to an "
             "index or a Part name to select another one.")
@@ -333,12 +320,12 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
                         for (const char* c : {"mask", "facegroups", "paint", "visibility", "uvs", "morph"}) {
                             uint32_t bit = 0;
                             std::string err;
-                            if (parseSetChannels(c, bit, err) && s->has(bit)) channels.append(c);
+                            if (g_core->parseSetChannels(c, bit, err) && s->has(bit)) channels.append(c);
                         }
                         out.append(py::dict(py::arg("name") = s->name, py::arg("channels") = channels,
                                             py::arg("level") = s->level, py::arg("vertex_count") = s->vertexCount,
                                             py::arg("triangle_count") = s->triangleCount,
-                                            py::arg("fits") = selectionSetFits(d.mesh, *s),
+                                            py::arg("fits") = g_core->selectionSetFits(d.mesh, *s),
                                             py::arg("morph_target") = s->name == list->morphTarget));
                     }
                 return out;
@@ -349,11 +336,11 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
             "selection_set",
             [](const Document& d, const std::string& name) {
                 const SelectionSetList* list = d.mesh.selectionSets.get();
-                const int i = list ? list->find(name) : -1;
+                const int i = list ? g_core->findSelectionSet(*list, name) : -1;
                 if (i < 0) throw py::key_error("no selection set " + name);
                 SelectionSetData data;
                 std::string err;
-                if (!selectionSetAt(d.mesh, *list->sets[size_t(i)], kSetAllChannels, data, err)) throw CommandError(err);
+                if (!g_core->selectionSetAt(d.mesh, *list->sets[size_t(i)], kSetAllChannels, data, err)) throw CommandError(err);
                 py::dict out;
                 if (data.channels & kSetMask) out["mask"] = floatRows(data.mask, 1);
                 if (data.channels & kSetFaceGroups) out["facegroups"] = attributeArray(data.facegroups);
@@ -387,9 +374,9 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
                 if (!data.channels) throw py::value_error("give at least one of mask, facegroups, colors, hidden, uvs, positions");
                 SelectionSet set;
                 std::string msg;
-                if (!makeSelectionSet(name, data, uint32_t(nv), uint32_t(nt), subdivCurrentLevel(d.mesh), set, msg) ||
+                if (!g_core->makeSelectionSet(name, data, uint32_t(nv), uint32_t(nt), g_core->subdivCurrentLevel(d.mesh), set, msg) ||
                     !(g_api->addSelectionSet ? g_api->addSelectionSet(d, std::move(set), "Store set " + name, msg)
-                                             : addSelectionSet(d, std::move(set), "Store set " + name, msg)))
+                                             : g_core->addSelectionSet(d, std::move(set), "Store set " + name, msg)))
                     throw CommandError(msg);
                 return msg;
             },
@@ -420,7 +407,7 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
         [](Document& doc, const std::string& script) {
             std::vector<ScriptStatement> statements;
             std::string err;
-            if (!parseScript(script, statements, err)) throw CommandError(err);
+            if (!g_core->parseScript(script, statements, err)) throw CommandError(err);
             py::list messages;
             for (const auto& st : statements) {
                 const CommandResult r = execute(doc, st.command, st.args);
@@ -450,6 +437,6 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
         },
         "Every available command with its parameters.");
 
-    m.def("tool_schema", [] { return registry().toolSchemaJson(); },
+    m.def("tool_schema", [] { return g_core->toolSchemaJson(registry()); },
           "Commands as LLM tool definitions (JSON), for wiring SculptForge into your own agents.");
 }

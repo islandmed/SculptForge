@@ -7,7 +7,8 @@
 //
 // The app hands the host its open scene and how to change it; the host runs Python on the main thread, inside the
 // frame, and gives back what it printed. Both halves are built from this source tree by the same compiler, so C++
-// types cross the line; the ABI number guards against a host from another build.
+// types cross the line; the ABI number guards against a host from another build. The host has no core of its own:
+// every core function it calls is the app's (AppSide::core, CoreCalls.h).
 #pragma once
 
 #include "core/Commands.h"
@@ -23,8 +24,12 @@ class Mesh;
 struct SelectionSet;
 
 namespace python {
+struct CoreCalls;
+}
 
-constexpr int kHostAbi = 1;
+namespace python {
+
+constexpr int kHostAbi = 2;
 
 // A direct change to a document's data from Python (doc.mask = ...).
 enum class Edit { Mask, Colors, FaceGroups, Hidden };
@@ -35,6 +40,7 @@ struct AppSide {
     size_t documentSize = 0, meshSize = 0;
     Document* document = nullptr; // the open scene
     const CommandRegistry* registry = nullptr;
+    const CoreCalls* core = nullptr; // the app's core, for the Python API (and documents a script makes of its own)
     // A command on the open scene, run the way the app runs one (it echoes, refreshes and lands in undo).
     std::function<CommandResult(const std::string& name, const Args& args)> run;
     std::function<void(Document&, Edit, const std::function<void()>& change)> edit; // records undo, then changes

@@ -18,9 +18,8 @@ PYBIND11_MODULE(sculptforge, m) {
     sf::ai::setStudioAiAllowed(sf::startStudioMode("", "", false).profile.ai);
     sf::audit::setClient("python"); // (the AI audit log, core/AuditLog.h)
     auto api = std::make_shared<sf::python::Api>();
-    api->execute = [](sf::Document& doc, const std::string& name, const sf::Args& args) {
-        return sf::python::standaloneRegistry().execute(doc, name, args);
-    };
-    api->registry = []() -> const sf::CommandRegistry& { return sf::python::standaloneRegistry(); };
+    api->core = &sf::python::directCoreCalls();
+    api->execute = api->core->execute;
+    api->registry = api->core->registry;
     sf::python::bind(m, std::move(api), "SculptForge: free, open-source digital sculpting - Python API for pipelines");
 }

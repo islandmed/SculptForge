@@ -14,8 +14,8 @@ scripts that add their own buttons and panels; their own Qt windows beside the a
 ## P1: how it is built
 
 **Two libraries.** The app (`sculptforge`) never links Python. `sculptforge_pyhost` (src/python/AppHost.cpp) holds
-CPython (pybind11's embed), the `sculptforge` module (src/python/Bindings.cpp, the same code as the pipeline module)
-and its own static copy of the core. The app loads it the first time a script runs (app/Python.cpp): a session that
+CPython (pybind11's embed) and the `sculptforge` module (src/python/Bindings.cpp, the same code as the pipeline
+module), and no core: the core functions the module calls come from the app. The app loads it the first time a script runs (app/Python.cpp): a session that
 never runs Python never maps libpython, so start-up and frames cost nothing. It is never unloaded (CPython can't be).
 
 **The line between them** (python/PyHost.h): one C entry point, `sf_pyhost_create`, given an `AppSide` and returning a
@@ -23,12 +23,14 @@ never runs Python never maps libpython, so start-up and frames cost nothing. It 
 one build, and the host refuses an `AppSide` from another build (version, ABI number, sizeof(Document), sizeof(Mesh)).
 It is not a plugin interface and never will be: plugins are WebAssembly (core/Plugin.h).
 
-**One core state.** The host's copy of the core has its own globals (undo sequence numbers, the undo batch, AI
-settings). So everything that changes the open scene goes back through the app: commands run through
-`App::runCommand` (they echo in the console, refresh the interface, record in macros and land in undo), attribute
-assignments record their undo step in the app, `set_mesh` and selection sets likewise. The host's core runs only on
-`sf.Document()` scenes a script makes for itself. On Linux the host's core symbols are local (`--exclude-libs`), so the
-two copies never resolve to each other.
+**One core state.** The host links none of the core (its headers only). Every core function the API calls goes through a
+table, `CoreCalls` (python/CoreCalls.h), that the app fills from its own core and hands over in `AppSide`; the host is
+linked with no undefined symbols allowed, so a call that bypasses the table fails the build. One core per process
+means one set of its globals (undo sequence numbers, the undo batch, AI settings) and a small host (the pipeline
+module fills the same table from the core it links). On top of that, everything that changes the open scene goes
+through the app: commands run through `App::runCommand` (they echo in the console, refresh the interface, record in
+macros and land in undo), attribute assignments record their undo step in the app, `set_mesh` and selection sets
+likewise. `sf.Document()` scenes a script makes for itself run the app's core commands directly, with no undo.
 
 **Threads.** Python runs on the main thread, inside the frame, holding the GIL only while it runs; between runs a
 script's own threads may run, but any change to the open scene from them raises an error (`mainThreadOnly`). print()

@@ -9,6 +9,7 @@
 #include "core/ManagedPolicy.h"
 #include "core/SelectionSets.h"
 #include "core/Undo.h"
+#include "python/CoreCalls.h"
 #include "python/PyHost.h"
 
 #include <SDL3/SDL.h>
@@ -97,6 +98,7 @@ python::Host* loadHost(python::AppSide& side, std::string& path, std::string& er
         return nullptr; // (the library stays loaded if it loaded: never unloaded, like a started host)
     }
     side.build = SCULPTFORGE_VERSION;
+    side.core = &python::directCoreCalls();
     side.documentSize = sizeof(Document);
     side.meshSize = sizeof(Mesh);
     // The runtime shipped with the app: python/ beside the host, or in the macOS bundle's Resources (none: the Python
