@@ -1,0 +1,93 @@
+# #214: hold Space while dragging out a selection (Mask / Select / Cut rectangle or lasso) to slide the whole shape;
+# let go of Space and it sizes again. The size (to the cursor) must not change while Space is down.
+run new_sphere subdivisions=5
+input_style classic
+key x
+expect_value symmetry_x == 0
+
+# MaskRect from the background: draw, hold Space and slide, let go and grow.
+click "Masking"
+click "Rectangle Mask##mask.rect"
+hold ctrl
+drag_path -0.1 -0.05 0.4 0.4 keep
+expect_value selection_shown == 1
+remember selection_x0 x0
+remember selection_y0 y0
+remember selection_w w0
+remember selection_h h0
+key_down space
+expect_value quickmenu_open == 0
+drag_path 0.4 0.4 0.7 0.6 keep
+expect_value selection_x0 > $x0
+expect_value selection_y0 > $y0
+expect_value selection_w < $w0+1
+expect_value selection_w > $w0-1
+expect_value selection_h < $h0+1
+expect_value selection_h > $h0-1
+shot space-mask-rect-moved
+key_up space
+remember selection_x0 x1
+drag_path 0.7 0.6 0.9 0.9 keep
+expect_value selection_x0 < $x1+1
+expect_value selection_x0 > $x1-1
+expect_value selection_w > $w0
+release
+hold none
+expect_value selection_shown == 0
+expect_value can_undo == 1
+key ctrl+z
+
+# The same for a lasso: every point slides, so the shape keeps its size.
+click "Lasso Mask##mask.lasso"
+hold ctrl
+drag_path -0.2 -0.05 0.45 -0.05 0.55 0.5 0.45 1.2 keep
+remember selection_x0 lx0
+remember selection_w lw0
+key_down space
+drag_path 0.45 1.2 0.7 1.2 keep
+expect_value selection_x0 > $lx0
+expect_value selection_w < $lw0+1
+expect_value selection_w > $lw0-1
+shot space-mask-lasso-moved
+key_up space
+release
+hold none
+expect_value can_undo == 1
+key ctrl+z
+
+# Cut Rectangle (Ctrl+Shift): the cut lands where the shape was slid to, not where it started.
+click "Cut"
+click "Cut Rectangle##cut.rect"
+expect_value hide_shape == 5
+remember triangles full
+hold ctrl+shift
+drag_path 0.1 0.1 0.35 0.35 keep
+key_down space
+drag_path 0.35 0.35 0.65 0.65 keep
+shot space-cut-rect-moved
+key_up space
+release
+hold none
+wait 0.2
+expect_value can_undo == 1
+expect_value triangles != $full
+key ctrl+z
+
+# Select Rectangle (Visibility): the same.
+click "Visibility"
+click "Select Rectangle##select.rect"
+hold ctrl+shift
+drag_path -0.2 -0.2 0.3 0.3 keep
+key_down space
+drag_path 0.3 0.3 0.6 0.5 keep
+key_up space
+release
+hold none
+expect_value hidden > 0
+key ctrl+z
+expect_value hidden == 0
+
+# Space with nothing being dragged still opens the QuickMenu.
+key space
+expect_value quickmenu_open == 1
+key escape

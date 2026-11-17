@@ -60,12 +60,23 @@ void App::beginSelection(float x, float y, SelectTarget target, SelectShape shap
     selectShape_ = shape;
     selectPath_.assign(1, ImVec2(x, y));
     selectMoved_ = false;
+    selectSpace_ = false;
+    selectLast_ = ImVec2(x, y);
     drag_ = Drag::Select;
 }
 
 void App::selectionMove(float x, float y) {
     const ImVec2 start = selectPath_.front();
+    const float dx = x - selectLast_.x, dy = y - selectLast_.y;
+    selectLast_ = ImVec2(x, y);
     if (!selectMoved_ && std::abs(x - start.x) < kClickSlopPx && std::abs(y - start.y) < kClickSlopPx) return;
+    if (selectMoved_ && selectSpace_) { // Space (#214): the cursor is the shape's moving end, so the rest slides with it
+        for (ImVec2& p : selectPath_) {
+            p.x += dx;
+            p.y += dy;
+        }
+        return;
+    }
     selectMoved_ = true;
     if (selectShape_ != SelectShape::Lasso && selectShape_ != SelectShape::CutLasso) return; // a rectangle or line only needs the cursor
     const ImVec2 last = selectPath_.back();
@@ -80,6 +91,7 @@ void App::selectionMouseUp() {
     else
         maskSelectMouseUp();
     selectPath_.clear();
+    selectSpace_ = false;
 }
 
 bool App::runSelection(const char* rectCommand, const char* lassoCommand, Args args) {

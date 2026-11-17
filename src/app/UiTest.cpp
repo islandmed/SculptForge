@@ -138,7 +138,8 @@
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
-//                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
+//                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
+//                            and selection_w / selection_h (from there to the cursor), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
@@ -1408,6 +1409,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "selection_shown") return app_.drag_ == App::Drag::Select && app_.selectMoved_ ? 1.0 : 0.0;
+    if (name == "selection_x0") return app_.selectPath_.empty() ? 0.0 : double(app_.selectPath_.front().x); // the shape's first point
+    if (name == "selection_y0") return app_.selectPath_.empty() ? 0.0 : double(app_.selectPath_.front().y);
+    if (name == "selection_w") return app_.selectPath_.empty() ? 0.0 : double(app_.mouseX_ - app_.selectPath_.front().x); // to the cursor
+    if (name == "selection_h") return app_.selectPath_.empty() ? 0.0 : double(app_.mouseY_ - app_.selectPath_.front().y);
     if (name == "symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
     // Radial and local symmetry (#63): the count while radial is on (0 off), its axis (0 X, 1 Y, 2 Z), local (1 on),
     // the copies every stroke makes, the brush cursors drawn last frame, the local centre.
