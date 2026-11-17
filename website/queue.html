@@ -83,7 +83,6 @@
         <ul class="member-reqs">
             <li><span class="badge">Member request</span><span class="idea">🧩 Parts &amp; Scene: Two-step lattice deformer</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">🧩 Parts &amp; Scene: Bend over a range (start/end span)</span><span class="st">Building</span></li>
-            <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Detachable panels (Member Request, November)</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">👁️ View &amp; Camera: Silhouette view: small window with a flat black outline of the model, saved camera angles and lens in mm</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">〰️ Curves &amp; Tubes: Standalone curves: polyline to Bezier/NURBS, resample with point slider, curve from edges</span><span class="st">Planned</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Discord Rich Presence (opt-in)</span><span class="st">Queued</span></li>
@@ -91,7 +90,6 @@
             <li><span class="badge">Member request</span><span class="idea">🖌️ Brushes: Wood detail brush pack: weathered grain, splinters/chaff, alphas in their own subfolder</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Multi-key shortcut sequences (e.g. A then A) for more bindable keys</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Benches (workspaces; one workbench per stage) with their own tools and keys: Sculpt/Retopo, Model, Paint/Render, UV, and how a mesh moves between them</span><span class="st">Queued</span></li>
-            <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu)</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">〰️ Curves &amp; Tubes: Improved Tube/curves: twist, spin and spread modifiers, rope / braid / sleeve profiles, and repeating a premade shape (e.g. a chain link) along a curve</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">👕 Cloth &amp; Garments: Cloth panel: one place for the Cloth brush settings and running a simulation (Drape)</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">📦 Files &amp; Pipeline: Houdini link via USD: watch an unowned USD file and reload when it changes</span><span class="st">Queued</span></li>
@@ -100,6 +98,7 @@
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Shelves for every option: drag any toggle, button or setting (e.g. Preferences &gt; Input &gt; Orbit around the pointer) onto a shelf and arrange them; alongside My Panel</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: iPad (or other tablet) as a native pressure-sensitive pen input for SculptForge on a Windows/Linux PC; answered 11-14: like a Wacom-style pen tablet feature; the hard part is Apple&#x27;s pressure-sensitivity drivers; no rush, and an iPadOS app alone would solve it for him</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: My Panel: drag individual checkboxes, sliders and displays (e.g. Backface culling, the subdivision level display, Mask by cavity) into it, and drop My Panel into a tray instead of only the Edit dropdown</span><span class="st">Queued</span></li>
+            <li><span class="badge">Member request</span><span class="idea">📦 Files &amp; Pipeline: Portable-data mode: settings, brushes and layout stored in the portable folder, so a USB stick carries the whole workbench</span><span class="st">Queued</span></li>
         </ul>
         <p class="member-cta"><a class="btn primary" href="support.html">Become a member</a></p>
       </div>
@@ -171,6 +170,7 @@
             <tr><td>⌨️ Interface: Screencast overlay: show pressed keys and mouse buttons for talks and tutorials</td><td class="st">Queued</td></tr>
             <tr><td>🧩 Parts &amp; Scene: New Parts and tools land exactly on the world origin (centre of the axis grid) so symmetry works at once</td><td class="st">Queued</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Render bridge: send a quick render straight to an image editor (any program) for client previews</td><td class="st">Queued</td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Hydra render delegate (low priority, with the render bridge)</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Startup splash screen (with the first-run welcome card)</td><td class="st">Queued</td></tr>
             <tr><td>🧩 Parts &amp; Scene: Primitive blockout kit: more primitives (cylinder, capsule, cone, torus), click-to-place on the surface, then merge the blockout into one mesh (Voxel Remesh)</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: Quad Remesh options: adaptive (curvature-based) density, Repeat, Retry, curve strength for guide curves</td><td class="st">Queued</td></tr>
@@ -226,8 +226,10 @@
             <tr><td>🧩 Parts &amp; Scene: Scatter / kitbash: insert objects on a surface chosen at random from a predefined list, fitting snugly to each other by their sides or vertices, and following a line you draw with a brush (today: Insert set = manual pick; Tool &gt; Tube &gt; Repeat along curve = one Part, spacing + turn)</td><td class="st">Queued</td></tr>
             <tr><td>Edge crease for subdivision + select edges by angle; creases through the Blender Bridge both ways <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.0</span></td></tr>
             <tr><td>Multi-object gizmo <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.11.16</span></td></tr>
+            <tr><td>⌨️ Interface: Detachable panels (Member Request, November) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.1</span></td></tr>
             <tr><td>⌨️ Interface: Shortcut editor: warn when a key is already used (no silent reassign) + per-shortcut reset button <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
             <tr><td>⌨️ Interface: Pan left/right/up/down as separate bindable keys (for game pads / analog sticks; zoom in/out keys exist) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
+            <tr><td>⌨️ Interface: Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>Generate a cavity map <span class="tag">member</span></td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
             <tr><td>Deformation panel expansion</td><td class="st">Shipped<span class="detail">in 0.11.14</span></td></tr>
             <tr><td>X/Y/Z orbit lock</td><td class="st">Shipped<span class="detail">in 0.11.13</span></td></tr>
