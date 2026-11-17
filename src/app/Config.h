@@ -149,6 +149,10 @@ struct UiPrefs {
     // bounds of what they touched are worked out once, when the pen lifts (Sculptor::draftStrokes). Off by
     // default; meant for laptops and battery (a hardware tier will turn it on).
     bool draftStrokes = false;
+    // Keep Strokes Editable (Forge Ink, core/MicroHistory.h): strokes on a micro level keep their dabs so they can be
+    // edited or removed later, exactly. Off until it passes its checks (then the default flips on); on the floor tier
+    // with little memory the app doesn't keep them (App::keepStrokesEditable).
+    bool keepStrokesEditable = false;
     // Experimental (docs/design/perf-moonshots.md), off by default. Live Move: the GPU draws a Move drag and the
     // move is applied once when the pen lifts (SF_LIVE_MOVE=0 / 1 overrides). Background Preview: heavy meshes'
     // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides). Fast Upload: stroke uploads

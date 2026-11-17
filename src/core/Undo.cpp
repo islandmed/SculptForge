@@ -5,6 +5,7 @@
 #include "core/MemoryGuard.h"
 
 #include "core/MeshTransform.h"
+#include "core/MicroHistory.h"
 #include "core/SelectionSets.h"
 
 #include <algorithm>
@@ -18,7 +19,7 @@ size_t UndoRecord::approxBytes() const {
                    facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
+                   (micro ? micro->bytes() : 0) + (ink ? ink->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
                    creases.bytes() + (transformOp ? transformOp->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
@@ -172,6 +173,10 @@ void UndoStack::push(UndoRecord record) {
 void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
     if (r.subdiv) {
         applySubdivUndo(*r.subdiv, mesh, bvh);
+        return;
+    }
+    if (r.ink) { // (replays strokes on the micro level: the base doesn't move)
+        r.ink->swapWith(mesh, bvh);
         return;
     }
     if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)

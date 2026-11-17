@@ -202,6 +202,7 @@ MicroMesh& mutableMicro(Mesh& m) {
         if (kept->focus) kept->focus->ensureAllFull(*kept, false); // the copy left behind stands alone: every tile full,
         m.micro = std::make_shared<MicroMesh>(*kept);
         kept->focus.reset(); // and the stream goes on with this Mesh
+        m.micro->ink = std::move(kept->ink); // (so does the stroke history: its undo steps are this Mesh's)
     }
     return *m.micro;
 }

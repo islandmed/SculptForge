@@ -12,6 +12,8 @@
 #include "app/AsyncStroke.h"
 
 #include "core/Micro.h"
+#include "core/HardwareProfile.h"
+#include "core/MemoryGuard.h"
 #include "core/PerfTrace.h"
 #include "core/Sculpt.h"
 #include "core/TierConfig.h"
@@ -158,6 +160,26 @@ bool App::fastBigBrushes() const {
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
     return env >= 0 ? env == 1 : uiPrefs_.fastBigBrushes;
+}
+
+bool App::keepStrokesEditable() {
+    static const int env = [] {
+        const char* v = std::getenv("SF_KEEP_EDITABLE");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    if (!(env >= 0 ? env == 1 : uiPrefs_.keepStrokesEditable)) return false;
+    // (the history's own memory is small: dabs and hashes; the tiles are the undo history's, inside its budget. What
+    // it guards is the replay's working set on a machine that is already short.)
+    constexpr size_t kGB = size_t(1) << 30;
+    const size_t total = totalMemoryBytes(), avail = availableMemoryBytesCached();
+    const bool low = (simulatedFloorTier() && total > 0 && total < 8 * kGB) || (avail > 0 && avail < kGB);
+    if (low) {
+        if (!inkGuardSaid_) status_ = "Strokes aren't kept editable for now: memory is low (they sculpt as usual)";
+        inkGuardSaid_ = true;
+        return false;
+    }
+    inkGuardSaid_ = false;
+    return true;
 }
 
 bool App::draftStrokes() const {

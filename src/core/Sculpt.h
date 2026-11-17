@@ -8,6 +8,7 @@
 #include "core/Dyntopo.h"
 #include "core/IndexBits.h"
 #include "core/Kelvinlet.h"
+#include "core/MicroHistory.h"
 #include "core/Mesh.h"
 #include "core/Stencil.h"
 #include "core/Symmetry.h"
@@ -99,6 +100,9 @@ struct DabParams {
     glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
     // The Stencil (#155, core/Stencil.h): each vertex also takes the image at the place it shows on screen.
     StencilView stencil;
+    // Screen pixels per world unit at the centre as the dab was placed (0: unknown, scripts). Not read by the brushes today;
+    // a Forge Ink dab record keeps it (MicroDab::pxPerUnit) so a level-of-detail choice made from it replays the same.
+    float pxPerUnit = 0.0f;
 };
 
 // Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
@@ -177,6 +181,10 @@ float brushFalloff(float dist, float radius, float focal = 0.0f);
 float focalRingFraction(float focal);
 // An alpha's stamp covers the square around the brush circle: its corners are radius x sqrt 2 out.
 constexpr float kAlphaReach = 1.4143f;
+// A recipe's surface pattern on a micro level (BrushRecipe::Pattern `pattern`, 0..1 times the tip) for copy `m` of a dab of
+// `radius`: each copy reads it at its source dab's point. The live stroke and Forge Ink's replay (core/MicroHistory.h) both
+// build it here, so a replay can't drift.
+std::function<float(const glm::vec3&)> microPatternTexture(int pattern, float scale, float amount, float radius, const SymCopy& m);
 // Falloff on an alpha brush (#60): the alpha is multiplied by this round falloff, which reaches
 // the stamp's corners (radius x kAlphaReach). -1 is 1 everywhere (the alpha shows hard to its edges), 0 the
 // smoothstep (soft, rounding a square alpha's corners), +1 a narrow soft point (the alpha mostly gone).
@@ -329,6 +337,14 @@ public:
     bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
     void flushDraft(Mesh& mesh, const BVH& bvh);
 
+    // Forge Ink (core/MicroHistory.h; Preferences > Performance > Keep Strokes Editable): when set before beginStroke,
+    // a stroke on a micro level records each dab as it is placed and stays editable after it ends (its undo tiles
+    // are the undo step endStroke returns, shared). Strokes the history can't replay (base moves, Stencil) bake
+    // what they reach. Off: a stroke is exactly as before, and bakes what it meets of an earlier kept one.
+    bool keepEditable = false;
+    // The kept stroke the last endStroke recorded (its id in the Part's microHistory), or 0.
+    uint32_t lastKeptStroke() const { return inkLast_; }
+
     // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
     const MicroStroke& microStroke() const { return micro_; }
     // Move on a micro level: false (default) deforms the base cage and the detail rides along; true moves the
@@ -455,6 +471,17 @@ private:
     // Micro-displacement levels (core/Micro.h): strokes on a mesh with one go to its grid instead.
     MicroStroke micro_;
     Mesh* microMesh_ = nullptr;
+    // Forge Ink: this stroke's dab records and header (keepEditable), and whether it can still be kept.
+    bool inkKeep_ = false, inkOk_ = true, inkHead_ = false;
+    float inkStep_ = 0.0f; // the grid's step as the stroke began
+    MicroInk ink_;
+    const BrushAlpha* inkAlphaFrom_ = nullptr;
+    std::vector<MicroDab> inkDabs_;
+    uint32_t inkLast_ = 0;
+    std::shared_ptr<const BrushAlpha> inkAlpha_; // the last alpha snapshot (strokes with the same alpha share it)
+    void inkHeader(bool maskBrush, const BrushAlpha* alpha, int pattern, float patternScale, float patternAmount);
+    void inkDab(MicroDab d);
+    void inkFinish(Mesh& mesh);
     // This stroke's dabs on a micro level go to the base vertices (-1: not decided yet; microBaseDab).
     int microBase_ = -1;
     bool microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p);

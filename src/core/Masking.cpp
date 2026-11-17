@@ -377,9 +377,15 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
     if (s <= 0.0f) return;
     if (microReady(mesh)) { // the micro level's own mask, per grid point (core/MicroSculpt.cpp)
         const double k0 = micro_.findMs + micro_.kernelMs + micro_.stitchMs;
-        for (const SymCopy& mirror : copies(sym))
-            micro_.dab(mesh, bvh, BrushType::Standard, mirror.point(p.center), mirror.dir(p.viewDir), p.radius, 1.0f, p.invert,
-                       p.focal, mirror.dir(p.alphaUp), true, s);
+        inkHeader(true, nullptr, 0, 0.0f, 0.0f);
+        for (const SymCopy& mirror : copies(sym)) {
+            MicroDab d; // (Forge Ink: kept with the stroke, core/MicroHistory.h)
+            d.type = BrushType::Standard, d.center = mirror.point(p.center), d.viewDir = mirror.dir(p.viewDir), d.radius = p.radius;
+            d.strength = 1.0f, d.invert = p.invert, d.focal = p.focal, d.alphaUp = mirror.dir(p.alphaUp), d.maskStrength = s;
+            d.copy = mirror, d.pxPerUnit = p.pxPerUnit;
+            micro_.dab(mesh, bvh, d.type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, true, s);
+            inkDab(d);
+        }
         timings.kernelMs += micro_.findMs + micro_.kernelMs + micro_.stitchMs - k0;
         ++timings.dabs;
         return;

@@ -142,6 +142,17 @@ void App::registerPerformanceUiActions() {
         "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
         "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
         "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+    add("perf.keep_strokes_editable", "Keep Strokes Editable",
+        [this] {
+            uiPrefs_.keepStrokesEditable = !uiPrefs_.keepStrokesEditable;
+            status_ = uiPrefs_.keepStrokesEditable ? "Keep strokes editable on" : "Keep strokes editable off";
+        },
+        [this] { return uiPrefs_.keepStrokesEditable; },
+        "On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or taken out later "
+        "and the strokes over it follow exactly as if it had always been that way. The stroke itself sculpts exactly "
+        "as before and its undo step is the same. A stroke that moves the base (big Standard, Clay and Inflate "
+        "brushes, Move on the base) or uses the Stencil fixes the strokes it reaches in place; so does an older stroke "
+        "once 20 others sit on it. Off when memory is low.");
     add("perf.fast_big_brushes", "Fast Big Brushes (Experimental)",
         [this] {
             uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
