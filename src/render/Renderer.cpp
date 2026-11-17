@@ -359,6 +359,34 @@ vec4 shadeAt(int i, int j) {
 }
 #else
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+// Adaptive Detail tiles (render/MicroTilePages.h): on a tiled slot the stored normal tilts by the tiles' surface
+// gradient, interpolated from the page's slopes like the shading grid (so it does not depend on the drawn level),
+// and detail finer than the stored grid catches the light.
+flat in int vTilePage;
+flat in vec3 vTileGi, vTileGj;
+uniform samplerBuffer uTileSlope;
+uniform int uTilePageLevel, uTileSamples;
+vec2 tileSlopeAt(int i, int j, int m) { return texelFetch(uTileSlope, vTilePage * uTileSamples + j * (m + 1) - (j * (j - 1)) / 2 + i).rg; }
+vec3 tileGradient() {
+    int m = 1 << uTilePageLevel;
+    vec2 g = vIJ * (float(m) / float(uN));
+    float fi = clamp(g.x, 0.0, float(m)), fj = clamp(g.y, 0.0, float(m));
+    int i0 = min(int(fi), m - 1), j0 = min(int(fj), m - 1);
+    if (i0 + j0 > m - 1) {
+        if (fi >= fj) i0 = m - 1 - j0;
+        else j0 = m - 1 - i0;
+    }
+    float a = fi - float(i0), b = fj - float(j0);
+    vec2 s;
+    if (a + b <= 1.0 || i0 + j0 + 2 > m) {
+        vec3 w = clamp(vec3(1.0 - a - b, a, b), 0.0, 1.0);
+        s = tileSlopeAt(i0, j0, m) * w.x + tileSlopeAt(i0 + 1, j0, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    } else {
+        vec3 w = clamp(vec3(1.0 - b, a + b - 1.0, 1.0 - a), 0.0, 1.0);
+        s = tileSlopeAt(i0 + 1, j0, m) * w.x + tileSlopeAt(i0 + 1, j0 + 1, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    }
+    return vTileGi * s.x + vTileGj * s.y;
+}
 #endif
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
@@ -396,6 +424,9 @@ void microFetch() {
     }
     w = clamp(w, 0.0, 1.0);
     vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
+#ifndef FOCUS
+    if (vTilePage >= 0) n = normalize(n) - tileGradient();
+#endif
     vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
     float c = dot(c3, w);
     gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
@@ -1366,6 +1397,26 @@ size_t Renderer::microPendingShading() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
         if (s.micro) total += s.micro->pendingShading();
+    return total;
+}
+
+size_t Renderer::microTilePages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->pages();
+    return total;
+}
+
+bool Renderer::microTilePagesWantFrame() const {
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePagesWantFrame()) return true;
+    return false;
+}
+
+size_t Renderer::microTilePageBytes() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->gpuBytes();
     return total;
 }
 

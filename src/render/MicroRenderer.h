@@ -19,12 +19,15 @@
 //   their neighbours) within a per-frame budget of grid points (the rest follows on the next frames).
 // - A level that streams from a detail file (Focus Detail) keeps a small record per tile and full grids only for
 //   the tiles drawn finer than its coarse level (render/MicroFocus.h).
+// - Adaptive Detail tiles (core/MicroTiles.h) draw through per-slot delta pages added to the surface at every level
+//   (render/MicroTilePages.h).
 // GL 3.3 core: texture buffers, instancing, no tessellation or compute shaders (macOS stops at GL 4.1).
 #pragma once
 
 #include "core/Micro.h"
 #include "render/Clusters.h"
 #include "render/MicroFocus.h"
+#include "render/MicroTilePages.h"
 #include "render/GL.h"
 
 #include <algorithm>
@@ -72,9 +75,14 @@ public:
     // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
     const MicroFocus* focus() const { return focus_.get(); }
     MicroFocus* focus() { return focus_.get(); }
+    // Adaptive Detail tiles' delta pages (null for a Focus Detail level), for tests and the benchmark.
+    const MicroTilePages* tilePages() const { return tilePages_.get(); }
+    // The tile pages want one more frame (MicroTilePages::wantsFrame).
+    bool tilePagesWantFrame() const { return tilePages_ && tilePages_->wantsFrame(); }
 
 private:
     friend class MicroFocus;
+    friend class MicroTilePages;
     void buildLayout(const Mesh& mesh);
     void uploadBase(const Mesh& mesh);
     void updateClusterBounds(const Mesh& mesh, const std::vector<uint32_t>& clusters);
@@ -137,6 +145,7 @@ private:
               unrolled = -1, corners = -1;
     } u_;
     std::unique_ptr<MicroFocus> focus_;
+    std::unique_ptr<MicroTilePages> tilePages_;
 };
 
 // The micro mesh shader's vertex stage (with the mesh fragment shader under MICRO).

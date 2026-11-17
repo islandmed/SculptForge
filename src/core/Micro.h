@@ -229,8 +229,17 @@ glm::vec3 microPoint(const Mesh& m, uint32_t tri, uint32_t i, uint32_t j);
 // stored resolution, TierBudgets::microDrawAbove) the linear mix of the three displaced stored corners of the micro
 // triangle holding it, pulled towards the corners' tangent planes (`shading`: the renderer's shading grid, the
 // stored normals; null = no pull, the flat micro triangle). Corner terms in one order on both sides of a shared
-// base edge: bit-identical seams.
-glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading = nullptr);
+// base edge: bit-identical seams. `pageLevel` >= 0 (Adaptive Detail tiles drawn, render/MicroTilePages.h): plus the
+// tiles' delta page (MicroTiles::pageValue at that level, the drawn point's index shifted up to it) along the base's
+// Phong normal at the page point's weights; nothing where the page is 0 (the same bits as without tiles).
+glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading = nullptr,
+                         int pageLevel = -1);
+// The light of Adaptive Detail tiles (render/MicroTilePages.h): per point of `tri`'s delta page (`m` segments,
+// `values` = MicroTiles::pageValues), the delta's slope along the page's i and j directions, in units of step per
+// page cell (`out`: 2 floats per point). Central differences inside, one-sided at the border; a shared edge or corner
+// takes the average of the surface gradient over the triangles that share it (0 where one of them has no tiles), so
+// both sides light alike.
+void microTileSlopes(const Mesh& m, uint32_t tri, uint32_t pageSegments, const int16_t* values, float* out);
 // The normal in a shading grid value (encodeShade's octahedral bytes, as the shaders decode it).
 glm::vec3 decodeShadeNormal(uint32_t v);
 // The micro surface at barycentric weights of base triangle t (displacement interpolated on the micro triangle

@@ -411,6 +411,7 @@
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
+#include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
 #include "core/Primitives.h"
 #include "core/Script.h"
@@ -699,6 +700,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return sum / double((bx - ax) * (by - ay));
     }
     if (name == "triangles") return double(m.triangleCount());
+    // Adaptive Detail tiles (core/MicroTiles.h): tiles alive on the active Part's Micro level; delta pages on the GPU.
+    if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
+    if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());

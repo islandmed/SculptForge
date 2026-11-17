@@ -32,12 +32,9 @@ TileFrame TileFrame::of(int depth, uint32_t path) {
     return f;
 }
 
-bool MicroTiles::enabled() {
-    static const bool on = [] {
-        const char* e = std::getenv("SF_MICRO_TILES");
-        return e && e[0] == '1';
-    }();
-    return on;
+bool MicroTiles::enabled() { // (read at each stroke's start: a ui script's `env` step turns it on and off)
+    const char* e = std::getenv("SF_MICRO_TILES");
+    return e && e[0] == '1';
 }
 
 size_t MicroTiles::defaultResidentBudget() {
@@ -311,12 +308,8 @@ float MicroTiles::lerpGrid(const int16_t* g, uint32_t n, float a, float b) {
     return g11 + (g01 - g11) * (1.0f - x) + (g10 - g11) * (1.0f - y);
 }
 
-float MicroTiles::heightAt(const MicroMesh& mm, uint32_t tri, const glm::vec3& w, int maxDepthWanted) const {
-    float h = lerpGrid(mm.disp.data() + size_t(tri) * mm.samples, mm.n, w.y, w.z);
-    int deepest = tri < maxDepth.size() ? maxDepth[tri] : 0;
-    if (maxDepthWanted >= 0) deepest = std::min(deepest, maxDepthWanted);
-    if (deepest <= 0 || byTri[tri].empty()) return h;
-    thread_local Tile scratch;
+template <class Lookup> float MicroTiles::descend(uint32_t tri, const glm::vec3& w, int deepest, Lookup&& lookup) const {
+    float h = 0.0f;
     TileFrame f;
     uint32_t path = 0;
     for (int d = 0; d <= deepest; ++d) {
@@ -325,13 +318,50 @@ float MicroTiles::heightAt(const MicroMesh& mm, uint32_t tri, const glm::vec3& w
         const int q = TileFrame::quadrantOf(a, b);
         f = f.child(q), path = path << 2 | uint32_t(q);
         if (d == 0) continue; // tree depth 1 = the root's own resolution: no tile there
-        const Tile* t = read(key(tri, d, path), scratch);
+        const Tile* t = lookup(key(tri, d, path));
         if (!t) continue; // no tile at this depth here = a zero delta (a dab makes tiles at its own depth only: no parents)
         f.coords(w, a, b);
         a = std::clamp(a, 0.0f, 1.0f), b = std::clamp(b, 0.0f, 1.0f - a);
         h += lerpGrid(t->delta.data(), kN, a, b);
     }
     return h;
+}
+
+float MicroTiles::deltaAt(uint32_t tri, const glm::vec3& w, int maxDepthWanted) const {
+    int deepest = tri < maxDepth.size() ? maxDepth[tri] : 0;
+    if (maxDepthWanted >= 0) deepest = std::min(deepest, maxDepthWanted);
+    if (deepest <= 0 || !hasTiles(tri)) return 0.0f;
+    thread_local Tile scratch;
+    return descend(tri, w, deepest, [&](uint64_t k) { return read(k, scratch); });
+}
+
+float MicroTiles::heightAt(const MicroMesh& mm, uint32_t tri, const glm::vec3& w, int maxDepthWanted) const {
+    return lerpGrid(mm.disp.data() + size_t(tri) * mm.samples, mm.n, w.y, w.z) + deltaAt(tri, w, maxDepthWanted);
+}
+
+int16_t MicroTiles::pageValue(uint32_t tri, uint32_t m, uint32_t i, uint32_t j) const { return pageRound(deltaAt(tri, pageWeights(m, i, j))); }
+
+void MicroTiles::pageValues(uint32_t tri, uint32_t m, int16_t* out) const {
+    const size_t count = size_t(m + 1) * (m + 2) / 2;
+    const int deepest = tri < maxDepth.size() ? maxDepth[tri] : 0;
+    if (deepest <= 0 || !hasTiles(tri)) {
+        std::fill(out, out + count, int16_t(0));
+        return;
+    }
+    // The triangle's tiles once (parked ones unpacked once, not per point), looked up by key as read() would.
+    const std::vector<Entry>& entries = byTri[tri];
+    thread_local std::vector<Tile> unpacked;
+    thread_local std::vector<const Tile*> found;
+    unpacked.resize(entries.size());
+    found.assign(entries.size(), nullptr);
+    for (size_t k = 0; k < entries.size(); ++k) found[k] = read(uint64_t(tri) << 32 | entries[k].pathKey, unpacked[k]);
+    auto lookup = [&](uint64_t key) -> const Tile* {
+        const uint32_t pk = uint32_t(key & 0xFFFFFFFFu);
+        auto it = std::lower_bound(entries.begin(), entries.end(), pk, ByPath{});
+        return it != entries.end() && it->pathKey == pk ? found[size_t(it - entries.begin())] : nullptr;
+    };
+    for (uint32_t j = 0; j <= m; ++j)
+        for (uint32_t i = 0; i + j <= m; ++i) out[MicroMesh::index(i, j, m)] = pageRound(descend(tri, pageWeights(m, i, j), deepest, lookup));
 }
 
 } // namespace sf

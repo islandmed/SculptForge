@@ -32,6 +32,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -62,7 +63,7 @@ struct MicroTiles {
         std::array<int16_t, kSamples> delta{};
     };
 
-    // Off unless SF_MICRO_TILES=1 (read once).
+    // Off unless SF_MICRO_TILES=1 (read when a stroke starts).
     static bool enabled();
     // The resident budget for a new store (SF_MICRO_TILES_RESIDENT_MB, else a quarter of the tier's resident cache cap).
     static size_t defaultResidentBudget();
@@ -144,6 +145,22 @@ struct MicroTiles {
     // The surface height (units of step) at base weights w of base triangle `tri`: the root grid (linear in its cell)
     // plus the deltas of the tiles under w down to `maxDepthWanted` (-1 = all). Bit-identical on both sides of a base edge.
     float heightAt(const MicroMesh& mm, uint32_t tri, const glm::vec3& w, int maxDepthWanted = -1) const;
+    // The tiles' share of it: heightAt less the root's linear height (the delta chain's sum; 0 where no tile).
+    float deltaAt(uint32_t tri, const glm::vec3& w, int maxDepthWanted = -1) const;
+    bool hasTiles(uint32_t tri) const { return tri < byTri.size() && !byTri[tri].empty(); }
+
+    // Delta PAGES (render/MicroTilePages.h draws them): the tile delta of base triangle `tri` at every grid point of
+    // a level with m segments, rounded to whole units of step (int16). A point (i, j) is at base weights
+    // ((m - i - j) / m, i / m, j / m), exact binary fractions, so a point on a base edge gets the same value from
+    // both triangles (as heightAt). pageValue is one point of it, the same bits (the CPU twin, core/Micro.h
+    // microDrawPoint, and the tests read it). `out` holds (m + 1)(m + 2) / 2 values, MicroMesh::index order.
+    void pageValues(uint32_t tri, uint32_t m, int16_t* out) const;
+    int16_t pageValue(uint32_t tri, uint32_t m, uint32_t i, uint32_t j) const;
+    static glm::vec3 pageWeights(uint32_t m, uint32_t i, uint32_t j) {
+        const float inv = 1.0f / float(m);
+        return glm::vec3(float(m - i - j) * inv, float(i) * inv, float(j) * inv);
+    }
+    static int16_t pageRound(float delta) { return int16_t(delta >= 32767.0f ? 32767 : delta <= -32767.0f ? -32767 : int(std::lround(delta))); }
     static float lerpGrid(const int16_t* g, uint32_t n, float a, float b);
 
     // The tile codec for one tile (the format of core/MicroStore.h microPackTiles): appended to `out`.
@@ -151,6 +168,8 @@ struct MicroTiles {
     static bool unpackTile(const uint8_t* data, size_t size, Tile& t);
 
 private:
+    // The delta chain's sum at w, the tiles found through lookup(key) -> const Tile* (null = none there).
+    template <class Lookup> float descend(uint32_t tri, const glm::vec3& w, int deepest, Lookup&& lookup) const;
     const Entry* findEntry(uint64_t key) const;
     Entry* findEntry(uint64_t key);
     Entry& insertEntry(uint64_t key);
