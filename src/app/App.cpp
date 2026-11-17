@@ -1893,7 +1893,10 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    closePopupsOnPressOutside(e);         // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+        closeTopPopupOnEscape())
+        return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
+    pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -1987,7 +1990,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
         // (Nor while the S / U / I / O pop-up follows the pointer: that click keeps or cancels the value.)
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
-            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this)) {
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this) && !pressSpent_) {
             mouseClicks_ = e.button.clicks;
             pointerEventNs_ = e.button.timestamp; // (the pen predictor's first sample)
             onMouseDown(e.button.x, e.button.y, e.button.button);
@@ -3654,6 +3657,11 @@ void App::updateTitle() {
 // ---------------------------------------------------------------------------
 
 void App::drawUi() {
+    // A press in the window a context menu or combo list came from, which ImGui left open: closed once the frame is drawn (#210).
+    struct CloseAfter {
+        App& app;
+        ~CloseAfter() { app.closeParentPressPopup(); }
+    } closeAfter{*this};
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();

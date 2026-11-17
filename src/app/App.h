@@ -2452,8 +2452,13 @@ private:
     ImVec4 dropdownRect_{};    // the open drop-down's rect last frame (x, y, w, h)
     // A press outside every open popup (a palette drop-down or task menu, the command palette, a context menu; not on the
     // menu names, which switch or close menus, nor with a modal dialog open) closes them before the UI sees the press, so
-    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix).
-    void closePopupsOnPressOutside(const SDL_Event& e);
+    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix). True: the press only closed a
+    // context menu or combo list over the canvas, and starts nothing (#210).
+    bool closePopupsOnPressOutside(const SDL_Event& e);
+    std::pair<ImGuiID, int> parentPress_{0, 0}; // the popup a press in its parent window left to ImGui (id, open frame)
+    void closeParentPressPopup();               // ... closed after the frame if ImGui left it open (#210)
+    bool closeTopPopupOnEscape(); // Esc closes the top context menu or combo list (#210)
+    bool pressSpent_ = false; // this press only closed a popup (closePopupsOnPressOutside)
     bool openDropdown_ = false;
     float decimateRatio_ = 0.5f;
     bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)

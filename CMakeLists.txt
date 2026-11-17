@@ -1319,6 +1319,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
+    sculptforge_ui_test(popup_click_outside_1440 popup_click_outside --size 1440x900) # #210: context menus and combo lists close on a press outside
+    sculptforge_ui_test(popup_click_outside_2880 popup_click_outside --size 2880x1800)
     sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px
     sculptforge_ui_test(unlit_view_2880 unlit_view --size 2880x3200)
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)

@@ -1111,6 +1111,7 @@ double Demo::query(const std::string& name, bool& known) const {
                                            : double(t->branches().size());
     }
     if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
+    if (name == "undo_steps") return double(app_.doc_.undo.undoCount());
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
     if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
@@ -1314,6 +1315,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quick_tour_offer") return app_.quickTourOffer_ ? 1.0 : 0.0;
     if (name == "quick_tour_done") return app_.quickTourDone_ ? 1.0 : 0.0;
     if (name == "dropdown_open") return app_.dropdown_.empty() ? 0.0 : 1.0;
+    if (name == "popups_open") return double(ImGui::GetCurrentContext()->OpenPopupStack.Size); // context menus and combos open
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
     // The one big-mesh tip (BigMeshTip.h): open now, shown once (project.json), Preferences > Performance open.
