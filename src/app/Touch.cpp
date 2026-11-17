@@ -124,20 +124,26 @@ void App::touchApply(const TwoFingerStep& step) {
     }
     // A twist rolls the view once it is clearly meant (a pinch's fingers turn a little on their own): then the
     // whole twist so far, so the view stays under the fingers.
-    touchTwistSum_ += step.angle;
+    // A rotation lock (Turntable, X or Z axis) keeps the view upright about its axis: a twist would tilt it, so it
+    // is ignored (one finger's orbit stays turntable yaw).
+    const bool locked = forceTurntable_ || uiPrefs_.orbitLock != 0;
     float roll = 0.0f;
-    if (touchTwisting_) roll = step.angle;
-    else if (std::abs(touchTwistSum_) > kTouchTwistStart) {
-        touchTwisting_ = true;
-        roll = touchTwistSum_;
+    if (!locked) {
+        touchTwistSum_ += step.angle;
+        if (touchTwisting_) roll = step.angle;
+        else if (std::abs(touchTwistSum_) > kTouchTwistStart) {
+            touchTwisting_ = true;
+            roll = touchTwistSum_;
+        }
     }
     if (roll != 0.0f) {
         if (autoOrtho_) { // an axis view turned: back to perspective, as when orbiting with the mouse
             camera_.ortho = false;
             autoOrtho_ = false;
         }
-        // Clockwise on screen (y down) turns the model clockwise, as the SpaceMouse's roll does.
-        camera_.setOrientation(camera_.orientation() * glm::angleAxis(-roll, glm::vec3(0, 0, 1)));
+        // The fingers turn clockwise on screen (y down, step.angle > 0): the camera turns counterclockwise about its
+        // view axis, so the model follows them clockwise (Invert twist: the other way).
+        camera_.setOrientation(camera_.orientation() * glm::angleAxis(uiPrefs_.invertTwist ? -roll : roll, glm::vec3(0, 0, 1)));
         orbitStarted_ = false;
     }
     if (!touchDirect_ && (touchTwisting_ || std::abs(touchZoomSum_) > kTouchPinchStart)) touchPinching_ = true;

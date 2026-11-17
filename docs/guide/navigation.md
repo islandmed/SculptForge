@@ -136,6 +136,7 @@ Two fingers on the model navigate; they never sculpt.
 | One finger | Sculpt, as with the mouse | Moves the pointer |
 
 A twist starts rolling once the fingers have turned about 10 degrees, so a pinch doesn't tilt the view by accident.
+With a rotation lock on (Turntable, X axis or Z axis), a twist does nothing: the view stays upright, and a pinch still zooms. If the roll goes against your fingers, turn on **Edit > Preferences > Input > Invert twist**.
 On a touch screen a single finger waits a moment for a second one before it sculpts; if the second finger lands
 after a stroke has started, the stroke ends there and the fingers take over the view (one undo removes the stroke).
 

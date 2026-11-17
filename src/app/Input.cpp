@@ -737,6 +737,11 @@ void App::drawInputSection() {
     }
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
+    ui::Checkbox("Invert twist##input.invert_twist", &uiPrefs_.invertTwist);
+    ui::HelpText("Invert twist", nullptr,
+                 "Roll the view against your fingers when you twist two fingers on a touch screen or trackpad. Off: the "
+                 "view rolls with them. A rotation lock (Turntable, X or Z axis) ignores the twist.",
+                 "Preferences > Input");
     {
         ImGui::TextDisabled("%s", tr("Two-key window"));
         ImGui::SetNextItemWidth(-FLT_MIN);
