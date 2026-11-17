@@ -19,6 +19,9 @@ function Expect([string]$what, [bool]$shouldPass, [scriptblock]$run) {
 
 $good = Join-Path $work 'good.exe'
 Copy-Item $src $good
+# System32 files are signed through Windows catalogs (any copy still reads as Microsoft-signed): extra bytes at the end
+# break the catalog's hash, so the copy is a plain unsigned file that takes our signature.
+$fs = [IO.File]::Open($good, 'Append'); $fs.Write([byte[]](1..16), 0, 16); $fs.Close()
 $sig = Set-AuthenticodeSignature -FilePath $good -Certificate $cert -HashAlgorithm SHA256
 Write-Host "signed copy: $($sig.Status)"
 
