@@ -1,6 +1,6 @@
-# Edit > Preferences > Updates: the "Check for updates" switch the Windows installer's box sets (its choice is applied to
 # Edit > Preferences > Updates: the "Check for updates" switch that the Windows installer's box sets (applied the first start
 # after each install: core/UpdateCheck.h, applyInstallerChoice; unit-tested). Shot at 1440 and 2880 wide (CMakeLists.txt).
+run ui_look look=classic layout=classic
 click "Preferences##palette.preferences"
 click "Updates##preferences.updates"
 expect_text "Check for updates"
