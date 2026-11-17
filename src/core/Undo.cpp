@@ -8,6 +8,7 @@
 #include "core/SelectionSets.h"
 
 #include <algorithm>
+#include <atomic>
 #include <utility>
 
 namespace sf {
@@ -147,8 +148,19 @@ UndoRecord UndoRecord::captureFaceGroups(const Mesh& mesh, std::string label, st
     return r;
 }
 
+namespace {
+std::atomic<uint64_t> gSeq{0}, gBatch{0}, gClearEpoch{0};
+} // namespace
+
+uint64_t nextUndoSeq() { return ++gSeq; }
+uint64_t undoClearEpoch() { return gClearEpoch.load(); }
+UndoBatchScope::UndoBatchScope() : id_(nextUndoSeq()), previous_(gBatch.exchange(id_)) {}
+UndoBatchScope::~UndoBatchScope() { gBatch = previous_; }
+
 void UndoStack::push(UndoRecord record) {
     if (record.empty()) return;
+    record.seq = nextUndoSeq();
+    record.batch = gBatch.load();
     undo_.push_back(std::move(record));
     if (listener) listener->undoPushed(undo_.back(), redo_);
     redo_.clear();
@@ -309,6 +321,7 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
 }
 
 void UndoStack::clear() {
+    ++gClearEpoch;
     undo_.clear();
     redo_.clear();
     if (listener) listener->undoCleared();

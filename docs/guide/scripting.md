@@ -325,6 +325,17 @@ talks to it over standard input and output.
 Nothing listens on the network, and nothing is installed into the AI tool. The setups below use the name `sculptforge`
 and `--mcp`; the Claude Desktop bundle is this server too.
 
+**All or nothing, and ways back.** Besides the commands, the headless server has tools for sequences:
+
+- `batch` runs up to 64 commands as **one undo step**. At the first error everything the batch did is rolled back, so
+  the scene is exactly as it was before (the reply says which command failed and why, with each command's result).
+  `stop_on_error: false` keeps going and keeps what worked. Each command passes your studio's policy and the audit log
+  as if it were called alone. Files an export wrote stay on disk if the batch is rolled back later.
+- `checkpoint_save`, `checkpoint_restore` and `checkpoint_list` name places in the undo history and go back (or
+  forward) to them in one go, across Parts too. They cost no memory: a checkpoint is a mark on the history, not a
+  copy of the scene. `undo` takes a restore back. A new edit after going back drops the steps ahead, and so the
+  checkpoints there; a new scene or an open clears them all. `checkpoint_restore` then says why it can't.
+
 ### I have a subscription
 
 | Subscription | Use | Set up |

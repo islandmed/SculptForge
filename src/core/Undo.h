@@ -11,6 +11,7 @@
 #include "core/TileImage.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -184,6 +185,10 @@ struct UndoRecord {
     // Steps pushed together on several Parts' histories (Figure Pose's Apply) share a non-zero id: the undo and
     // redo commands take every Part's top step with that id as one step.
     uint64_t group = 0;
+    // Stamped by UndoStack::push. `seq` orders every step of every Part's history (never reused); `batch` is the id of
+    // the UndoBatchScope the step was pushed in (0 = none): the undo and redo commands take the steps of one batch
+    // together (an AI agent's batch, a checkpoint restore; core/UndoBatch.h).
+    uint64_t seq = 0, batch = 0;
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
@@ -219,6 +224,30 @@ struct UndoListener {
     virtual void undoCleared() = 0;
 };
 
+// Where steps are being pushed from: while a scope is open, every step pushed (on any Part's history) carries its id.
+// Ids come from the same counter as step numbers, so they never repeat.
+uint64_t nextUndoSeq();
+class UndoBatchScope {
+public:
+    UndoBatchScope();
+    ~UndoBatchScope();
+    UndoBatchScope(const UndoBatchScope&) = delete;
+    UndoBatchScope& operator=(const UndoBatchScope&) = delete;
+    uint64_t id() const { return id_; }
+private:
+    uint64_t id_, previous_;
+};
+// Bumped whenever a history is cleared (a new scene, an open): marks made before it point at steps that are gone.
+uint64_t undoClearEpoch();
+
+// A place in the whole scene's history (core/UndoBatch.h): for every Part's history (by mesh key) the `seq` of its top
+// applied step (0 = none), plus what the scene looked like then. No copies of the scene: going back is undo.
+struct HistoryMark {
+    uint64_t epoch = 0; // undoClearEpoch() when made
+    uint64_t hash = 0;  // sceneHash() when made
+    std::map<uint32_t, uint64_t> tops;
+};
+
 class Timeline;
 
 class UndoStack {
@@ -235,6 +264,8 @@ public:
     const std::string& undoLabel() const { return undo_.back().label; }
     const std::string& redoLabel() const { return redo_.back().label; }
     size_t undoCount() const { return undo_.size(); }
+    size_t redoCount() const { return redo_.size(); }
+    const UndoRecord* redoStep(size_t back) const { return back < redo_.size() ? &redo_[redo_.size() - 1 - back] : nullptr; }
     // The step the next undo / redo applies (null if none): after undo() the undone step is lastRedo().
     UndoRecord* lastUndo() { return undo_.empty() ? nullptr : &undo_.back(); }
     UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }

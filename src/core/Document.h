@@ -121,6 +121,7 @@ struct Document {
     Mesh mesh;
     BVH bvh;
     UndoStack undo;
+    std::vector<std::pair<std::string, HistoryMark>> checkpoints; // named places in the history (MCP checkpoint_save)
     Sculptor sculptor;
     std::string path; // empty until saved/loaded
     bool modified = false; // set by edits the undo stack doesn't see (e.g. layer weights)
