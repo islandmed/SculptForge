@@ -10,6 +10,9 @@ added: **Python scripting in the app** (Edit > Preferences > Scripts, off by def
   first time a script runs, so it costs nothing at start-up or per frame. Nothing you open can start a script, AI tools
   and macros can't run Python, and a studio policy can lock it off (`"python": {"scripts": "never"}`). Requested by
   Tpqz_ on Discord and chris_gardner on Discord.
+changed: The app's Python is a trimmed CPython 3.13: no test suite, Tk/IDLE/turtle, ensurepip, venv, help() topic pages
+  (`pydoc_data`) or the interactive REPL editor (`_pyrepl`; the console has its own). Add packages to the Scripts
+  folder's site-packages.
 added: The Python module's mesh arrays work without NumPy: they are lists of rows when NumPy isn't installed.
 testers:
   - Any OS: Edit > Preferences > Scripts > Enable Python scripts. Open the console (`), click Python, type
