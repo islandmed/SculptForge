@@ -30,7 +30,25 @@ if(ANDROID)
   set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
   set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
 endif()
-if(SCULPTFORGE_BUILD_TESTS)
+# iPad (docs/ipad.md, scripts/ios-build.sh): -DCMAKE_SYSTEM_NAME=iOS, the Xcode generator for the device archive, Ninja for the
+# simulator. OpenGL ES 3.0 (render/GL.h es30Tier), no plugins (no JIT on iPadOS), no live face feed, no update check (TestFlight
+# says when a build is out). SCULPTFORGE_IOS_TESTS: the core test suite for the simulator (xcrun simctl spawn), nothing else.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(SF_IOS TRUE)
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 16.0 CACHE STRING "" FORCE) # (iPadOS 16: the base iPads from the 6th generation, 2018)
+  endif()
+  set(SF_IOS_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET}) # (packaging/ios/Info.plist.in)
+  set(SCULPTFORGE_GLES ON CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_PLUGINS OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE) # (the desktop suite runs programs, Python and the app's UI scripts)
+  option(SCULPTFORGE_IOS_TESTS "iPad: build the core test suite for the simulator" OFF)
+  set(SCULPTFORGE_IOS_BUILD "1" CACHE STRING "iPad: the build number (CFBundleVersion, rises with every TestFlight upload)")
+  add_compile_definitions(SF_IOS=1 GLES_SILENCE_DEPRECATION=1)
+endif()
+if(SCULPTFORGE_BUILD_TESTS OR SCULPTFORGE_IOS_TESTS)
   enable_testing()
 endif()
 # Position-independent code so the core libraries can also go into the Python module.
@@ -385,9 +403,11 @@ target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
 if(WIN32)
   target_link_libraries(sculptforge_mcp PRIVATE advapi32) # live mode's pipe ACL (src/link/AiLink.cpp)
 endif()
-add_executable(sculptforge-cli src/cli/main.cpp)
-target_compile_definitions(sculptforge-cli PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
-target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sculptforge_mcp)
+if(NOT SF_IOS) # (no command line on iPadOS)
+  add_executable(sculptforge-cli src/cli/main.cpp)
+  target_compile_definitions(sculptforge-cli PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
+  target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sculptforge_mcp)
+endif()
 
 # App code the tests also run (layout, looks, translations, Library, brush previews, camera, clusters): one static
 # library both link, so an edit to one of these files compiles once, not once per program.
@@ -611,7 +631,33 @@ if(SCULPTFORGE_BUILD_APP)
       target_sources(sculptforge PRIVATE packaging/windows/sculptforge.manifest)
     endif()
   endif()
-  if(APPLE)
+  if(SF_IOS)
+    # The iPad app (packaging/ios): bundle id app.sculptforge.ipad, the cube icon from an asset catalog (Xcode compiles it;
+    # the simulator build with Ninja goes without), signed by Xcode for TestFlight (scripts/ios-testflight.sh).
+    set_target_properties(sculptforge PROPERTIES
+      MACOSX_BUNDLE TRUE
+      OUTPUT_NAME "SculptForge"
+      MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/packaging/ios/Info.plist.in
+      MACOSX_BUNDLE_GUI_IDENTIFIER "app.sculptforge.ipad"
+      MACOSX_BUNDLE_EXECUTABLE_NAME "SculptForge"
+      MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later."
+      MACOSX_BUNDLE_BUNDLE_VERSION "${SCULPTFORGE_IOS_BUILD}"
+      MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+      XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "app.sculptforge.ipad"
+      XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
+      XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+      XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+      XCODE_ATTRIBUTE_SKIP_INSTALL "NO" # (the one target in the archive: CMAKE_XCODE_ATTRIBUTE_SKIP_INSTALL=YES for the rest)
+      XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)")
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+      target_sources(sculptforge PRIVATE packaging/ios/Assets.xcassets)
+      set_source_files_properties(packaging/ios/Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    endif()
+    target_sources(sculptforge PRIVATE src/app/IosDocumentPicker.mm) # (Open: the system's document picker)
+    set_source_files_properties(src/app/IosDocumentPicker.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON COMPILE_OPTIONS -fobjc-arc)
+    target_link_libraries(sculptforge PRIVATE "-framework OpenGLES" "-framework UIKit" "-framework QuartzCore"
+                                              "-framework UniformTypeIdentifiers")
+  elseif(APPLE)
     # SculptForge > Preferences... in the app menu (#111): SDL's item, given its action (src/app/MacAppMenu.h).
     target_sources(sculptforge PRIVATE src/app/MacAppMenu.mm)
     set_source_files_properties(src/app/MacAppMenu.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
@@ -640,6 +686,22 @@ endif()
 # --- Install layout and packages ---
 if(NOT APPLE)
   install(TARGETS sculptforge-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+# The iPad's core suite (SCULPTFORGE_IOS_TESTS): the same tests, run in the simulator by tools/ci/ios-sim-run.sh (ctest's emulator).
+if(SCULPTFORGE_IOS_TESTS)
+  file(GLOB SCULPTFORGE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
+  add_executable(sculptforge_tests ${SCULPTFORGE_TEST_SOURCES})
+  target_include_directories(sculptforge_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data" SF_TEST_ACTIONS)
+  target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_mcp sculptforge_appshared
+                                                  sculptforge_actions)
+  set_target_properties(sculptforge_tests PROPERTIES CROSSCOMPILING_EMULATOR ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/ios-sim-run.sh)
+  foreach(k RANGE 7)
+    set(shard_tmp ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/shard${k})
+    file(MAKE_DIRECTORY ${shard_tmp})
+    add_test(NAME sculptforge_tests_${k}of8 COMMAND sculptforge_tests --shard ${k}/8)
+    set_tests_properties(sculptforge_tests_${k}of8 PROPERTIES ENVIRONMENT "TMPDIR=${shard_tmp}")
+  endforeach()
 endif()
 if(UNIX AND NOT APPLE)
   install(FILES packaging/linux/org.sculptforge.SculptForge.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)

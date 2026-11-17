@@ -258,7 +258,9 @@ bool App::init(const AppOptions& options) {
     }
     glContext_ = sharedContext_ ? sharedContext_ : SDL_GL_CreateContext(window_);
     if (!glContext_) {
-#ifdef SF_GLES
+#if defined(SF_IOS)
+        startError_ = std::string("OpenGL ES 3.0 is not available: ") + SDL_GetError();
+#elif defined(SF_GLES)
         startError_ = std::string("OpenGL ES 3.2 is not available: ") + SDL_GetError();
 #else
         startError_ = std::string("OpenGL 3.3 is not available: ") + SDL_GetError();
@@ -342,7 +344,7 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
     logWindowGeometry();
 #endif
     timer.step("ImGui, settings, fonts");
@@ -535,9 +537,14 @@ void App::closeSplash() {
 
 void App::glWindowAttributes() {
 #ifdef SF_GLES
-    // Android (SCULPTFORGE_GLES): OpenGL ES 3.2; render/GL.cpp compiles the shaders as GLSL ES 3.20.
+    // Android (SCULPTFORGE_GLES): OpenGL ES 3.2; render/GL.cpp compiles the shaders as GLSL ES 3.20. The iPad: ES 3.0, the
+    // most iPadOS has (render/GL.h es30Tier).
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+#ifdef SF_IOS
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#endif
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -1245,6 +1252,12 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+#ifdef SF_IOS
+        if (inBackground_) { // (no GL calls until the app is in front again: the next event wakes the loop)
+            if (SDL_WaitEvent(&e)) onEvent(e);
+            continue;
+        }
+#endif
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())
@@ -1840,9 +1853,17 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         requestQuit();
         break;
-#ifdef __ANDROID__
+#ifdef SF_IOS
+    case SDL_EVENT_WILL_ENTER_BACKGROUND: // iPadOS ends an app that draws with OpenGL in the background: no frames until back
+        inBackground_ = true;
+        break;
+    case SDL_EVENT_DID_ENTER_FOREGROUND:
+        inBackground_ = false;
+        break;
+#endif
+#if defined(__ANDROID__) || defined(SF_IOS)
     case SDL_EVENT_DID_ENTER_BACKGROUND:
-        // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
+        // Android and iPadOS may end a background app without a word: the sculpt and the preferences are saved now, not in
         // the next autosave interval (the restore offer brings the sculpt back at the next start).
         touchReset();
         autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
@@ -1873,7 +1894,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         spaceHeld_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
     case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         if (e.window.windowID == SDL_GetWindowID(window_)) {

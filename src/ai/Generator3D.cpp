@@ -68,7 +68,13 @@ GeneratorResult runGenerator(const std::string& commandTemplate, const std::stri
 #if defined(_WIN32)
     cmd = "\"" + cmd + "\""; // cmd.exe strips one level of outer quotes
 #endif
+#ifdef SF_IOS
+    const int status = -1; // (iPadOS runs no other programs: std::system is unavailable there)
+    r.error = "Local generator commands can't run on the iPad";
+    return r;
+#else
     const int status = std::system(cmd.c_str());
+#endif
     if (status != 0) {
         r.error = "The generator exited with status " + std::to_string(status);
         return r;

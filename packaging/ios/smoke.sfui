@@ -1,0 +1,18 @@
+# The iPad app in the simulator (.github/workflows/ios.yml): it starts on OpenGL ES 3.0, opens the bust, sculpts a few
+# strokes with pressure, undoes one, and the pictures land in --ui-out (CI's screenshots, at each iPad's own size).
+shot 01-start
+run new_starter_mesh name=bust levels=2
+wait 0.5
+camera 20 5
+wait 0.3
+shot 02-bust
+key 2
+view_drag 0.42 0.40 0.58 0.42 0.6
+view_drag 0.44 0.48 0.56 0.50 0.9
+view_drag 0.46 0.56 0.54 0.57 0.4
+wait 0.5
+expect_value can_undo == 1
+shot 03-strokes
+key ctrl+z
+wait 0.3
+shot 04-undo

@@ -393,7 +393,7 @@ static int runMain(int argc, char** argv) {
     return finishIsolated(code);
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(SF_IOS) // (no other programs on the iPad)
 // --cli ARGS...: runs sculptforge-cli beside this program with ARGS. An AppImage has one entry point, so this is how an
 // MCP client starts its server ("SculptForge.AppImage --cli --mcp", Help > Connect an AI tool). Only our own program.
 static int execCli(int argc, char** argv) {
@@ -423,11 +423,23 @@ static void androidEnvironment() {
 }
 #endif
 
+#ifdef SF_IOS
+// iPad: HOME is the app's container already (settings, the log and autosaves go to its Library, as on a Mac); a project
+// saved or opened by a bare name lands in Documents, which the Files app shows.
+static void iosEnvironment() {
+    std::error_code ec;
+    std::filesystem::current_path(sf::dialogs::iosDocumentsDir(), ec);
+}
+#endif
+
 int main(int argc, char** argv) {
 #ifdef __ANDROID__
     androidEnvironment();
 #endif
-#ifndef _WIN32
+#ifdef SF_IOS
+    iosEnvironment();
+#endif
+#if !defined(_WIN32) && !defined(SF_IOS)
     if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
 #endif
     if (argc >= 2 && std::string(argv[1]) == "--ui-serve") {

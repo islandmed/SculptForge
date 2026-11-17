@@ -10,7 +10,7 @@
 #include <cstring>
 #include <mutex>
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
 #include <chrono>
 #include <filesystem>
 #include <vector>
@@ -59,6 +59,24 @@ bool intercept(Kind kind, SDL_DialogFileCallback callback, void* userdata) {
     return true;
 }
 
+#if defined(__ANDROID__) || defined(SF_IOS)
+std::string firstExtension(const SDL_DialogFileFilter* filters, int nfilters) {
+    if (nfilters < 1 || !filters || !filters[0].pattern) return {};
+    std::string p = filters[0].pattern;
+    p = p.substr(0, p.find(';'));
+    return p == "*" ? std::string() : p;
+}
+
+// Where Save writes without a picker: the app's own Projects folder (Android), Documents (iPad).
+std::string projectsDir() {
+#ifdef __ANDROID__
+    return androidProjectsDir();
+#else
+    return iosDocumentsDir();
+#endif
+}
+#endif
+
 #ifdef __ANDROID__
 // Android (android/README.md): the system document picker answers content:// URIs, which the app's file code can't
 // open. Each picked file is copied (SDL reads content URIs) into the app's own storage first and the app gets that
@@ -75,13 +93,6 @@ std::string fileNameOf(const std::string& uri) {
     }
     if (const size_t cut = out.find_last_of("/:"); cut != std::string::npos) out = out.substr(cut + 1);
     return out;
-}
-
-std::string firstExtension(const SDL_DialogFileFilter* filters, int nfilters) {
-    if (nfilters < 1 || !filters || !filters[0].pattern) return {};
-    std::string p = filters[0].pattern;
-    p = p.substr(0, p.find(';'));
-    return p == "*" ? std::string() : p;
 }
 
 bool copyIn(const char* from, const std::filesystem::path& to) {
@@ -176,6 +187,9 @@ void openFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* windo
     SDL_ShowOpenFileDialog(copyPicked, copy, window, filters, nfilters, nullptr, allowMany);
     (void)title;
     return;
+#elif defined(SF_IOS)
+    iosOpenFile(callback, userdata, window, filters, nfilters, allowMany);
+    (void)defaultLocation, (void)title;
 #else
     if (!title) {
         SDL_ShowOpenFileDialog(callback, userdata, window, filters, nfilters, defaultLocation, allowMany);
@@ -196,11 +210,11 @@ void openFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* windo
 void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
               int nfilters, const char* defaultLocation) {
     if (intercept(Kind::SaveFile, callback, userdata)) return;
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
     std::string name = defaultLocation && *defaultLocation ? std::filesystem::path(defaultLocation).filename().string() : "";
     const std::string ext = firstExtension(filters, nfilters);
     if (name.empty()) name = "Untitled" + (ext.empty() ? std::string() : "." + ext);
-    std::filesystem::path path = std::filesystem::path(androidProjectsDir()) / name;
+    std::filesystem::path path = std::filesystem::path(projectsDir()) / name;
     std::error_code ec;
     if (std::filesystem::exists(path, ec)) { // never over another project: "bust-1731340000.sfproj"
         const auto t = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -208,7 +222,7 @@ void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* windo
     }
     const std::string chosen = path.string();
     const char* const list[] = {chosen.c_str(), nullptr};
-    SDL_Log("Saving to %s (the app's Projects folder)", chosen.c_str());
+    SDL_Log("Saving to %s (the app's projects folder)", chosen.c_str());
     callback(userdata, list, 0);
     (void)window;
 #else
@@ -219,9 +233,9 @@ void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* windo
 void openFolder(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const char* defaultLocation,
                 bool allowMany) {
     if (intercept(Kind::OpenFolder, callback, userdata)) return;
-#ifdef __ANDROID__
-    // No folder picker the app's file code can use (content:// trees): as a cancel, for now.
-    SDL_Log("dialog requested: open folder (not on Android yet)");
+#if defined(__ANDROID__) || defined(SF_IOS)
+    // No folder picker the app's file code can use (content:// trees, security-scoped folders): as a cancel, for now.
+    SDL_Log("dialog requested: open folder (not on this device yet)");
     const char* const cancelled[] = {nullptr};
     callback(userdata, cancelled, -1);
     (void)window, (void)defaultLocation, (void)allowMany;

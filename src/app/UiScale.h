@@ -15,7 +15,7 @@ namespace sf {
 // DPI v2) reports 1.5 / 1 at 150 %, macOS 2 / 2 on Retina.
 inline float automaticUiScale(float displayScale, float pixelDensity) {
     float s = displayScale / (pixelDensity > 0.0f ? pixelDensity : 1.0f);
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
     // Fingers, not a mouse: the desktop layout half again as large, so its rows and buttons are about 30 dp tall
     // (Android's display scale alone makes them 20 dp). The tablet layout (M2) sizes its own touch targets.
     s *= 1.5f;

@@ -190,10 +190,15 @@ int ChildProcess::wait() {
 
 bool ChildProcess::start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
                          const std::vector<std::pair<std::string, std::string>>& env, std::string& error) {
-#ifdef __ANDROID__
-    // An Android app can't run the desktop's tools (splat trainer, COLMAP, ffmpeg): there are none to find.
+#if defined(__ANDROID__) || defined(SF_IOS)
+    // A tablet app can't run the desktop's tools (splat trainer, COLMAP, ffmpeg): there are none to find (iPadOS starts no
+    // other programs at all).
     (void)args, (void)logPath, (void)env;
+#ifdef SF_IOS
+    error = program + " can't run on the iPad";
+#else
     error = program + " can't run on Android";
+#endif
     return false;
 #endif
     const std::string exe = findOnPath(program);

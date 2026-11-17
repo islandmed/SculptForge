@@ -271,6 +271,8 @@ def main():
     square = flat(icon(1024)).resize((180, 180), Image.LANCZOS) if STYLE == "outline" else \
         sf("cube-mark-square", 180).convert("RGB")
     png(square, "website", "img", "apple-touch-icon.png")  # iOS rounds it
+    # The iPad app's icon (packaging/ios): one 1024 px square, no transparency (the App Store refuses alpha); iPadOS rounds it.
+    png(flat(icon(1024)), "packaging", "ios", "Assets.xcassets", "AppIcon.appiconset", "icon-1024.png")
     png(icon(256), "website", "img", "icon-256.png")  # the Discord announcements' avatar
     if STYLE == "outline":
         png(Image.open(os.path.join(OUTLINE, "site-icon-256.png")), "website", "img", "icon-256.png")

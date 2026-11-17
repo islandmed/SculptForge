@@ -520,10 +520,15 @@ bool writeText(const fs::path& p, const std::string& text) {
 bool launchDetached(const std::string& target) {
 #ifdef _WIN32
     const std::string cmd = "start \"\" \"" + target + "\"";
+#elif defined(SF_IOS)
+    (void)target; // (iPadOS starts no other programs)
+    return false;
 #else
     const std::string cmd = "open \"" + target + "\"";
 #endif
+#ifndef SF_IOS
     return std::system(cmd.c_str()) == 0;
+#endif
 }
 
 // Newest install of the other application in the default install locations (as GoB finds it).

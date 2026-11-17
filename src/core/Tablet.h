@@ -72,8 +72,8 @@ struct TabletSettings {
     // pressure (App::flushPenMotion), and no lost sample is held (PenPressureTracker::holdLostZero).
     bool classicTiming = false;
     // Palm rejection (Preferences > Tablet): fingers that land while the pen is near are a resting palm and do
-    // nothing (PalmGuard, core/TouchGesture.h). On for Android; a desktop touch screen with a pen opts in.
-#ifdef __ANDROID__
+    // nothing (PalmGuard, core/TouchGesture.h). On for Android and the iPad; a desktop touch screen with a pen opts in.
+#if defined(__ANDROID__) || defined(SF_IOS)
     bool palmRejection = true;
 #else
     bool palmRejection = false;

@@ -335,7 +335,7 @@ void App::drawSupportUi() {
         // (Only where a finger can be the pointer: Android, a touch screen, a UI test. A short desktop window with a mouse
         // keeps its movable window.)
         bool touchScreen = !options_.uiTest.empty();
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(SF_IOS)
         touchScreen = true;
 #else
         if (!touchScreen) {

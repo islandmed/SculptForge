@@ -31,6 +31,11 @@ bool openUrl(const char* url); // false when suppressed (callers say it couldn't
 #ifdef __ANDROID__
 std::string androidProjectsDir(); // where projects are saved on Android (NativeDialog.cpp)
 #endif
+#ifdef SF_IOS
+std::string iosDocumentsDir(); // where projects are saved on the iPad: Documents, "On My iPad > SculptForge" (IosDocumentPicker.mm)
+void iosOpenFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
+                 int nfilters, bool allowMany);
+#endif
 bool suppressed();           // no native dialog now (see above)
 void setScripted(bool on);   // a UI test script is running (Demo::loadScript)
 void answerNext(std::string path); // the next suppressed dialog answers PATH ("" = cancel)
