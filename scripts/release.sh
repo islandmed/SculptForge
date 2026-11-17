@@ -349,9 +349,10 @@ feed_done() { grep -qF "\"version\": \"$V\"" website/latest.json; }
 notes_names_check() {
     local f=${SF_LAUNCH_DIR:-$HOME/Work/.sf/state/launch}/$BASE.json out
     [ -n "$PRE" ] && return 0
-    out=$(python3 tools/release/notes_names.py "$BASE" --launch "$f" ${HIGHLIGHTS:+--highlights "$HIGHLIGHTS"} 2>&1) ||
+    local close=${SF_CLOSE_ON_RELEASE:-$HOME/Work/.sf/issues/close-on-release.tsv}
+    out=$(python3 tools/release/notes_names.py "$BASE" --launch "$f" ${HIGHLIGHTS:+--highlights "$HIGHLIGHTS"} --close "$close" 2>&1) ||
         die "what the release says up front names what it doesn't carry:
-$(sed 's/^/     /' <<<"$out")" "fix the line (the CMO's $f via launch.py headline, README.md's New in line, or HIGHLIGHTS), then $(resume "${STEP:-check}")"
+$(sed 's/^/     /' <<<"$out")" "fix the line (the CMO's $f via launch.py headline, README.md's New in line, or HIGHLIGHTS), or the note / close-on-release row for an issue, then $(resume "${STEP:-check}")"
 }
 
 headline_check() {

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Checks that what a release says up front names only what the release carries (release.sh steps stage and check).
 
-    tools/release/notes_names.py X.Y.Z [--launch FILE] [--highlights FILE]
+    tools/release/notes_names.py X.Y.Z [--launch FILE] [--highlights FILE] [--close close-on-release.tsv]
     tools/release/notes_names.py --self-test
 
 The release's own notes are the truth: its CHANGELOG.md section and its docs/guide/whats-new.md section. The launch
@@ -78,6 +78,25 @@ def problems(version, texts, root=ROOT):
     return out
 
 
+def unnamed_closes(version, tsv, root=ROOT):
+    """close-on-release rows for VERSION ("#N<TAB>X.Y.Z<TAB>branch") whose #N the version's CHANGELOG section doesn't name:
+    the timer closes an issue only when the tag's CHANGELOG names it (0.13.5: #218's line had no "(#218)", so it stayed
+    open). No CHANGELOG section yet (before the bump): no verdict."""
+    cl = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    sec = section(cl, rf"^## \[{re.escape(version)}\]", r"^## \[")
+    if not sec.strip() or not Path(tsv).is_file():
+        return []
+    out = []
+    for line in Path(tsv).read_text(encoding="utf-8").splitlines():
+        cols = line.split("\t")
+        if len(cols) >= 2 and cols[1].strip() == version and re.fullmatch(r"#\d+", cols[0].strip()):
+            n = cols[0].strip()
+            if not re.search(re.escape(n) + r"\b", sec):
+                out.append(f"close-on-release closes {n} with {version} ({cols[2].strip() if len(cols) > 2 else '?'}), "
+                           f"but the {version} CHANGELOG doesn't name {n}: add \"({n})\" to its line, or move the row on")
+    return out
+
+
 def main(argv):
     if argv[1:] == ["--self-test"]:
         return self_test()
@@ -100,6 +119,8 @@ def main(argv):
         for i, line in enumerate(l for l in Path(highlights).read_text(encoding="utf-8").splitlines() if l.strip()):
             texts.append((f"HIGHLIGHTS line {i + 1}", line))
     out = problems(version, texts)
+    if "--close" in argv:
+        out += unnamed_closes(version, argv[argv.index("--close") + 1])
     for p in out:
         print(p)
     return 1 if out else 0
@@ -128,6 +149,12 @@ def self_test():
         # the 0.13.2 case: a stale headline whose names start the line or follow a colon
         bad = problems("9.0.1", [("x", "Voxel Remesh keeps your sculpt smooth: Clay strokes no longer come out grainy")], root)
         assert any('"Remesh"' in p for p in bad) and any('"Clay"' in p for p in bad), bad
+        # close-on-release rows: #215 is named in 9.0.1's notes, #218 is not; other versions don't count
+        tsv = root / "close.tsv"
+        tsv.write_text("#215\t9.0.1\tfix/tube\n#218\t9.0.1\tchore/blender\n#193\t9.0.0\tfix/remesh\n")
+        miss = unnamed_closes("9.0.1", tsv, root)
+        assert len(miss) == 1 and "#218" in miss[0] and "#215" not in miss[0], miss
+        assert unnamed_closes("9.9.9", tsv, root) == [], "a version with no CHANGELOG section gave a verdict"
         # no notes for the version yet: no verdict
         assert problems("9.9.9", [("x", "Voxel Remesh")], root) == []
     print("notes_names: ok")
