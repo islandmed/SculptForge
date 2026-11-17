@@ -22,7 +22,7 @@ inline std::atomic<bool> preferencesWanted{false};
 inline void requestPreferences() { preferencesWanted.store(true); }
 inline bool takePreferencesRequest() { return preferencesWanted.exchange(false); } // true once per request
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && !defined(SF_IOS) // (the iPad has no app menu)
 void install(); // after SDL_Init: gives SDL's Preferences... item its action
 #else
 inline void install() {}

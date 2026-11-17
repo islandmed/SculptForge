@@ -24,6 +24,9 @@
 #elif defined(__APPLE__)
 #include <mach/mach.h>
 #include <sys/sysctl.h>
+#ifdef SF_IOS
+#include <os/proc.h>
+#endif
 #else
 #include <fstream>
 #include <unistd.h>
@@ -51,6 +54,9 @@ size_t systemAvailable() {
     MEMORYSTATUSEX m{};
     m.dwLength = sizeof m;
     return GlobalMemoryStatusEx(&m) ? size_t(m.ullAvailPhys) : 0;
+#elif defined(SF_IOS)
+    // The iPad: what this app may still take before iPadOS ends it (about half the device's memory), not what is free.
+    return os_proc_available_memory();
 #elif defined(__APPLE__)
     vm_statistics64_data_t vm{};
     mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
