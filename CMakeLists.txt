@@ -968,6 +968,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   # Every Micro stroke editable (core/MicroHistory.h): edit ms vs how deep the stroke is (tests/tools/ink_replay_bench.cpp).
   add_executable(sf_ink_replay_bench tests/tools/ink_replay_bench.cpp)
   target_link_libraries(sf_ink_replay_bench PRIVATE sculptforge_core)
+  # Detail per stroke (10x scoreboard axis 3): edge width and line FWHM one alpha dab resolves on a Micro level, and its cost (tests/tools/detail_bench.cpp).
+  add_executable(sf_detail_bench tests/tools/detail_bench.cpp)
+  target_link_libraries(sf_detail_bench PRIVATE sculptforge_core)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)
