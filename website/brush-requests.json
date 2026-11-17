@@ -1,7 +1,7 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-16T00:07:08Z",
+ "updated": "2026-11-17T07:07:07Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
@@ -42,10 +42,10 @@
   },
   {
    "rank": 5,
-   "title": "Brushes that stamp a mesh, and chisel brushes",
+   "title": "Insert brush on the shelf + chisel brushes",
    "votes": 0,
    "shipped": false,
-   "renamed": true,
+   "renamed": false,
    "created": "2026-11-06",
    "url": "https://discord.com/channels/1566592020024266812/1568255009135661116"
   },

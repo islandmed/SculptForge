@@ -610,9 +610,16 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
     return true;
 }
 
+// Why the active Part can't take an insert. Subdivision levels are no reason (the piece becomes a Part, below).
+std::string insertBlocker(const Mesh& mesh) {
+    if (!mesh.multires) return dyntopoBlocker(mesh);
+    return mesh.tube.empty() ? std::string() : dyntopoBlocker(mesh);
+}
+
 // Places `prim` (built around the origin, its axis +Y) where insert_primitive / insert_mesh say: on the surface
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
-// Part as one new face group, one undo step.
+// Part as one new face group, one undo step. On a mesh with
+// subdivision levels it is a new Part instead.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
     std::vector<SymCopy> mirrors;
     std::string error;
@@ -638,7 +645,8 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
     for (auto& p : prim.positions) p = at + rot * p;
     uint32_t group = 0;
-    for (uint32_t g : doc.mesh.facegroups) group = std::max(group, g);
+    if (!subdivLevelCount(doc.mesh)) // (a levelled mesh's piece is a Part of its own: group 1)
+        for (uint32_t g : doc.mesh.facegroups) group = std::max(group, g);
     prim.facegroups.assign(prim.triangles.size(), group + 1);
     prim.recomputeAllNormals();
     // Symmetry: a copy for each mirror image and radial turn (about the same centre as the brushes'), in the
@@ -663,10 +671,41 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     for (const SymCopy& m : mirrors)
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j) radial = radial || (i != j && m.m[i][j] != 0.0f);
+    const size_t tris = prim.triangleCount() * (1 + copies.size());
+    if (subdivLevelCount(doc.mesh)) {
+        // Subdivision levels can't take new faces, and Freeze Levels would drop every level but the one shown: the
+        // piece becomes a Part of its own beside the active one, so no level changes at all. Undo takes it away.
+        std::vector<const Mesh*> pieces{&prim};
+        for (const Mesh& c2 : copies) pieces.push_back(&c2);
+        Mesh piece = mergeMeshes(pieces);
+        const Part& from = doc.activePartInfo();
+        const std::string source = from.name;
+        const bool visible = from.visible;
+        const uint32_t folder = from.folder;
+        const Shading shading = from.shading;
+        const glm::mat4 place = from.transform; // (a moved linked copy: the piece stays where it was placed)
+        const int index = doc.addPart(std::move(piece), doc.uniquePartName(label), false, doc.activePart + 1);
+        Part& added = doc.parts[size_t(index)];
+        added.visible = visible;
+        added.folder = folder;
+        added.shading = shading;
+        added.transform = place;
+        const std::string name = added.name;
+        auto step = std::make_shared<PartStep>();
+        step->id = added.id;
+        step->at = index;
+        UndoRecord r;
+        r.label = "Insert " + label;
+        r.part = std::move(step);
+        doc.undo.push(std::move(r));
+        doc.modified = true;
+        return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + "s") +
+                          " as the new Part " + name + " (" + std::to_string(tris) + " triangles): " + source +
+                          " has subdivision levels, which stay as they are"};
+    }
     std::vector<const Mesh*> parts{&doc.mesh, &prim};
     for (const Mesh& c2 : copies) parts.push_back(&c2);
     Mesh merged = mergeMeshes(parts);
-    const size_t tris = prim.triangleCount() * (1 + copies.size());
     doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
     return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)")) +
                       " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")"};
@@ -801,7 +840,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "normal, its centre on the surface, as one new face group; one undoable step.",
              primitiveParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = insertBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  const std::string type = argString(a, "type", "sphere");
                  const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
@@ -829,7 +868,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "along the surface normal, as one new face group; one undoable step.",
              meshParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = insertBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  if (int(a.contains("part")) + int(a.contains("file")) + int(a.contains("set")) != 1)
                      return {false, "Give part=, file= or set="};
