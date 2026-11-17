@@ -1932,7 +1932,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
-        spaceHeld_ = false; // Space let go in another window never reaches us
+        spaceHeld_ = selectSpace_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
 #ifdef __ANDROID__
@@ -2015,6 +2015,10 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_KEY_DOWN:
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
+        if (e.key.key == SDLK_SPACE && drag_ == Drag::Select && !io.WantTextInput) { // #214: slide the shape
+            selectSpace_ = true; // (before the camera and the QuickMenu: Space mid-drag is only for this)
+            break;
+        }
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -2029,7 +2033,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
         std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
-        if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
+        if (e.key.key == SDLK_SPACE) spaceHeld_ = selectSpace_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at

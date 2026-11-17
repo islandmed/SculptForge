@@ -951,6 +951,9 @@ private:
     // Window pixels: the start, then the lasso's points (a rectangle's other corner is the cursor).
     std::vector<ImVec2> selectPath_;
     bool selectMoved_ = false; // left the click slop: a drag, not a click
+    // Space held mid-drag (#214): the whole shape follows the cursor instead of growing; let go and it sizes again.
+    bool selectSpace_ = false;
+    ImVec2 selectLast_{0.0f, 0.0f}; // the cursor at the last move: how far Space slides the shape
     float facegroupAngle_ = 30.0f;
     // visibleFace groupCount is O(triangles): recomputed only when the key below changes.
     size_t visibleGroups_ = 0;
