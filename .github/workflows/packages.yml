@@ -489,6 +489,9 @@ jobs:
       - name: Test
         # UI tests need a display; they run in CI with Mesa's software OpenGL.
         run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
+      - name: Product name and version in the exes (what SignPath's artifact configuration enforces)
+        shell: pwsh
+        run: ./tools/ci/check_pe_metadata.ps1 -Path build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe
       - name: Signing - settings present
         if: env.SIGN == 'true'
         shell: pwsh
@@ -527,6 +530,8 @@ jobs:
           github-artifact-id: ${{ steps.sign-binaries-in.outputs.artifact-id }}
           wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '3600' }} # a release policy may wait for an approval
           output-artifact-directory: signing/binaries-signed
+          parameters: |
+            version: ${{ toJSON(env.SF_VERSION) }}
       - name: Signing - signed binaries replace the built ones (the installer and .zip take them), checked
         if: env.SIGN == 'true'
         shell: pwsh
@@ -541,6 +546,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the signed sculptforge-cli.exe does not start" }
       - name: Package
         run: cd build && cpack -C Release -G "NSIS;ZIP"
+      - name: Product name and version in the installer
+        shell: pwsh
+        run: ./tools/ci/check_pe_metadata.ps1 -Path (Get-ChildItem build\SculptForge-*-windows-*.exe).FullName
       - name: Signing - the installer, for SignPath
         if: env.SIGN == 'true'
         shell: pwsh
@@ -567,6 +575,8 @@ jobs:
           github-artifact-id: ${{ steps.sign-installer-in.outputs.artifact-id }}
           wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '3600' }}
           output-artifact-directory: signing/installer-signed
+          parameters: |
+            version: ${{ toJSON(env.SF_VERSION) }}
       - name: Signing - signed installer replaces the built one, checked
         if: env.SIGN == 'true'
         shell: pwsh
