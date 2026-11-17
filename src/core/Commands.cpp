@@ -28,6 +28,7 @@
 #include "core/Multires.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
+#include "core/UndoBatch.h"
 #include "core/MeshTransform.h"
 #include "core/MeshCheck.h"
 #include "core/PathStroke.h"
@@ -892,23 +893,15 @@ CommandRegistry::CommandRegistry() {
              return {true, "Splats cleared"};
          }});
 
-    add({"undo", "Undo the last action.", {},
+    add({"undo", "Undo the last action (a whole batch or checkpoint restore at once).", {},
          [](Document& doc, const Args&) -> CommandResult {
-             doc.syncBvh(); // (a pending rebuild first: a whole-mesh step keeps the tree it swaps out)
-             if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
-             doc.modified = true;
+             if (!undoStepOrBatch(doc)) return {false, "Nothing to undo"};
              return {true, "Undone"};
          }});
 
-    add({"redo", "Redo the last undone action.", {},
+    add({"redo", "Redo the last undone action (a whole batch or checkpoint restore at once).", {},
          [](Document& doc, const Args&) -> CommandResult {
-             doc.syncBvh();
-             if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);
-             doc.modified = true;
+             if (!redoStepOrBatch(doc)) return {false, "Nothing to redo"};
              return {true, "Redone"};
          }});
 

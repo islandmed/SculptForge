@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cli/McpServer.h"
 
+#include "cli/McpBatch.h"
 #include "cli/McpTools.h"
 #include "core/AuditLog.h"
 #include "core/BrushLibrary.h"
@@ -62,6 +63,8 @@ Json toolList(const CommandRegistry& registry) {
     }
     if (policy::mcpToolAllowed("viewport_image", {})) tools.push(viewportImageTool()); // (cli/McpTools.h; reads: "info")
     if (policy::mcpToolAllowed("view_closeup", {})) tools.push(viewCloseupTool());
+    const Json history = historyToolList(); // (cli/McpBatch.h)
+    for (const Json& t : history.items()) tools.push(t);
     Json result = Json::object();
     result.set("tools", tools);
     return result;
@@ -87,6 +90,41 @@ Json errorReply(const Json& id, int code, const std::string& message) {
 }
 
 } // namespace
+
+bool mcpToolCallable(const CommandRegistry& registry, const std::string& name) {
+    return registry.find(name) && !hiddenFromAgents(name);
+}
+
+CommandResult callRegistryTool(const CommandRegistry& registry, Document& doc, const std::string& name, const Json& arguments,
+                              int64_t* ms) {
+    const Command* command = registry.find(name);
+    if (!command || hiddenFromAgents(name)) return {false, "Unknown tool: " + name};
+    Args args;
+    for (const auto& [key, value] : arguments.members()) {
+        if (value.isBool()) args[key] = value.asBool();
+        else if (value.isNumber()) args[key] = value.asNumber();
+        else if (value.isString()) args[key] = value.asString();
+        else args[key] = value.dump();
+    }
+    // Every call goes into the audit log (core/AuditLog.h), refused ones too; with audit.required, a call whose
+    // line can't be written is refused before it runs.
+    audit::Entry entry;
+    entry.tool = "mcp";
+    entry.command = name;
+    entry.args = audit::summarizeArgs(args);
+    std::string why;
+    CommandResult r;
+    const auto start = std::chrono::steady_clock::now();
+    if (!policyAllows(*command, &why)) r = {false, why};
+    else if (audit::required() && !audit::writable(&why)) r = {false, why};
+    else r = registry.execute(doc, name, args);
+    entry.ok = r.ok;
+    entry.message = r.message;
+    entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    audit::record(entry);
+    if (ms) *ms = entry.ms;
+    return r;
+}
 
 std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, const std::string& line) {
     Json msg;
@@ -163,31 +201,21 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
             result.set("isError", !ok);
             return reply(id, result).dump();
         }
-        const Command* command = registry.find(name);
-        if (!command || hiddenFromAgents(name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
-        Args args;
-        for (const auto& [key, value] : msg["params"]["arguments"].members()) {
-            if (value.isBool()) args[key] = value.asBool();
-            else if (value.isNumber()) args[key] = value.asNumber();
-            else if (value.isString()) args[key] = value.asString();
-            else args[key] = value.dump();
+        if (isHistoryTool(name)) {
+            HistoryToolReply h = callHistoryTool(registry, doc, name, msg["params"]["arguments"]);
+            Json text = Json::object();
+            text.set("type", "text");
+            text.set("text", h.text);
+            Json content = Json::array();
+            content.push(text);
+            Json result = Json::object();
+            result.set("content", content);
+            if (!h.structured.isNull()) result.set("structuredContent", h.structured);
+            result.set("isError", !h.ok);
+            return reply(id, result).dump();
         }
-        // Every call goes into the audit log (core/AuditLog.h), refused ones too; with audit.required, a call whose
-        // line can't be written is refused before it runs.
-        audit::Entry entry;
-        entry.tool = "mcp";
-        entry.command = name;
-        entry.args = audit::summarizeArgs(args);
-        std::string why;
-        CommandResult r;
-        const auto start = std::chrono::steady_clock::now();
-        if (!policyAllows(*command, &why)) r = {false, why};
-        else if (audit::required() && !audit::writable(&why)) r = {false, why};
-        else r = registry.execute(doc, name, args);
-        entry.ok = r.ok;
-        entry.message = r.message;
-        entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        audit::record(entry);
+        if (!mcpToolCallable(registry, name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
+        CommandResult r = callRegistryTool(registry, doc, name, msg["params"]["arguments"]);
         Json text = Json::object();
         text.set("type", "text");
         text.set("text", r.message);
