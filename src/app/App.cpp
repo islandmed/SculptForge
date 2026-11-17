@@ -1395,7 +1395,10 @@ int App::run() {
                         if (!saved) std::printf("drain: the saved file differs from the mesh%s%s\n", error.empty() ? "" : ": ", error.c_str());
                         std::filesystem::remove(path);
                     }
-                    const bool ok = sm.drainQueued && saved && (!save || sm.drainWorstFrame < 0.05) && // (saving never holds a frame up)
+                    // Saving never holds a frame up: no frame while the stroke drains is much slower than the stroke's
+                    // own (50 ms, or 1.5x the stroke's p99 frame on a slow machine such as CI's software GL).
+                    const double drainBound = std::max(0.05, 1.5 * framePct(0.99) / 1000.0);
+                    const bool ok = sm.drainQueued && saved && (!save || sm.drainWorstFrame < drainBound) &&
                                     (!esc || (sm.drainHeld && meshStateHash(doc_.mesh) != sm.before)) && // (Esc: dropped, the stroke kept)
                                     (none || save || esc || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
                     std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n",
