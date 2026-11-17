@@ -2438,57 +2438,37 @@ void App::drawPaletteBody(const std::string& id) {
     ImGui::PopID();
 }
 
-bool App::closePopupsOnPressOutside(const SDL_Event& e) {
-    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
+void App::closePopupsOnPressOutside(const SDL_Event& e) {
+    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return;
     ImGuiContext* g = ImGui::GetCurrentContext();
-    if (!g || g->OpenPopupStack.Size == 0) return false;
+    if (!g || g->OpenPopupStack.Size == 0) return;
     const float x = e.button.x, y = e.button.y;
     auto inside = [&](float rx, float ry, float rw, float rh) { return x >= rx && x < rx + rw && y >= ry && y < ry + rh; };
     const ImGuiWindow* hovered = g->HoveredWindow ? g->HoveredWindow->RootWindow : nullptr;
     for (const ImGuiPopupData& p : g->OpenPopupStack) {
         if (!p.Window) continue;
-        if (p.Window->Flags & ImGuiWindowFlags_Modal) return false; // (a modal dialog keeps its clicks: Esc or its buttons)
+        if (p.Window->Flags & ImGuiWindowFlags_Modal) return; // (a modal dialog keeps its clicks: Esc or its buttons)
         // Its own press: over it as ImGui sees it (an auto-sized popup grows a frame after its content), or in its rect.
         if (hovered == p.Window->RootWindow || inside(p.Window->Pos.x, p.Window->Pos.y, p.Window->Size.x, p.Window->Size.y))
-            return false;
-        // A press on a combo's own button toggles it: ImGui's. Anywhere else in the window that opened it, ImGui keeps a
-        // menu open when the press lands on an item (#210), so it closes here.
-        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow &&
-            p.PopupId == ImHashStr("##ComboPopup", 0, g->HoveredId))
-            return false;
+            return;
+        // A press in the window that opened it (a combo's own button, which closes it): ImGui's, as before.
+        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) return;
     }
-    const bool palette = !dropdown_.empty();
-    if (palette) {
+    if (!dropdown_.empty()) {
         const ImVec4 r = sculptForgeLayout() ? menuRect_ : dropdownRect_;
-        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return false;
+        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return;
         for (const CanvasRect& bar : {shell_.paletteBar, shell_.title})
-            if (inside(bar.x, bar.y, bar.w, bar.h)) return false; // (the menu names switch to another menu or close this one)
+            if (inside(bar.x, bar.y, bar.w, bar.h)) return; // (the menu names switch to another menu or close this one)
     }
     ImGui::ClosePopupToLevel(0, false);
     ImGui::FocusWindow(nullptr); // (a focused popup, even closed, blocks hovering the rest for a frame: the press)
     // On the bare canvas the press starts a stroke: ImGui still wants the mouse from the frame the popup was open.
-    // (Not for a context menu or combo list: that press only closes it, no accidental stroke, #210. A palette menu's
-    // press still acts, mode matrix.)
-    const bool bare = !g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup));
-    if (bare) ImGui::GetIO().WantCaptureMouse = false;
-    const bool spent = bare && !palette && e.button.button == SDL_BUTTON_LEFT;
+    if (!g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup)))
+        ImGui::GetIO().WantCaptureMouse = false;
     dropdown_.clear();
     dropdownRect_ = ImVec4();
     menuX_ = 0.0f;
     menuRect_ = ImVec4();
-    return spent;
-}
-
-bool App::closeTopPopupOnEscape() {
-    ImGuiContext* g = ImGui::GetCurrentContext();
-    // (A palette drop-down is the first popup: its own Esc closes it. A modal dialog keeps its Esc.)
-    const int base = dropdown_.empty() ? 0 : 1;
-    if (!g || g->OpenPopupStack.Size <= base) return false;
-    if (shortcutConflictOpen() || !capturingShortcut_.empty()) return false; // (the shortcut editor's own Esc, Config.cpp)
-    for (const ImGuiPopupData& p : g->OpenPopupStack)
-        if (p.Window && (p.Window->Flags & ImGuiWindowFlags_Modal)) return false;
-    ImGui::ClosePopupToLevel(g->OpenPopupStack.Size - 1, true);
-    return true;
 }
 
 void App::drawPaletteDropdown() {

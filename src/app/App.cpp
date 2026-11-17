@@ -1893,7 +1893,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    closePopupsOnPressOutside(e);         // a press outside open menus and popups acts, not only closes them (Shell.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -1987,7 +1987,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
         // (Nor while the S / U / I / O pop-up follows the pointer: that click keeps or cancels the value.)
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
-            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this) && !pressSpent_) {
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this)) {
             mouseClicks_ = e.button.clicks;
             pointerEventNs_ = e.button.timestamp; // (the pen predictor's first sample)
             onMouseDown(e.button.x, e.button.y, e.button.button);
@@ -2013,7 +2013,6 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
-        if (e.key.key == SDLK_ESCAPE && !e.key.repeat && !io.WantTextInput && closeTopPopupOnEscape()) break; // (#210)
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
