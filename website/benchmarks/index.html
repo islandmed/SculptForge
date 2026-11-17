@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge Benchmarks</title>
-  <meta name="description" content="Sculpting 33 to 201 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. One command reproduces it on yours.">
-  <meta property="og:title" content="SculptForge benchmarks: 33M to 201M triangles, measured, with raw results">
-  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 201 million. Run sculptforge --benchmark standard-33m and compare for yourself.">
+  <meta name="description" content="Sculpting 6 to 201 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
+  <meta property="og:title" content="SculptForge benchmarks: a public scene pack, 6M to 201M triangles, measured on real computers">
+  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 201 million. Download the scene pack, run one command and compare for yourself.">
   <meta property="og:url" content="https://sculptforge.app/benchmarks/">
   <link rel="canonical" href="https://sculptforge.app/benchmarks/">
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
@@ -48,6 +48,15 @@
     tbody tr:last-child td { border-bottom: 0; }
     th { color: var(--muted); font-weight: 600; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel); }
     td.num, th.num { text-align: right; }
+    th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+    th button:hover, th button:focus-visible { color: var(--text); }
+    th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    th[aria-sort="ascending"] button::after { content: "\25B2"; font-size: 0.7em; }
+    th[aria-sort="descending"] button::after { content: "\25BC"; font-size: 0.7em; }
+    th[aria-sort] { color: var(--text); }
+    .btn { display: inline-block; background: var(--accent); color: #111; font-weight: 600; text-decoration: none; padding: 8px 16px; border-radius: 8px; }
+    .btn:hover { filter: brightness(1.08); }
+    .tier { font-size: 0.78rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
     td.machine { white-space: normal; min-width: 220px; max-width: 320px; }
     details summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
     details dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 0.82rem; }
@@ -81,7 +90,28 @@
     so those rows say it in their machine line. The headline figures on the <a href="../fast/">How fast?</a> page are the medians of these rows.
   </div>
 
-  <h2 id="run">Run it yourself in 3 steps</h2>
+  <h2 id="pack">The scene pack: compare your computer with everyone else's</h2>
+  <div class="card">
+    <p style="margin-top:0">A small download of our own sculpts and one command. It measures how SculptForge feels on <em>your</em>
+      computer, writes a file with your hardware and the numbers, and you can add it to the table below.
+      Nothing leaves your computer unless you paste the file into an issue yourself.</p>
+    <p><a class="btn" href="pack/sculptforge-bench-pack-1.zip" download>Download the scene pack (50 KB)</a>
+      <span class="small muted">version 1, CC0, <a href="https://github.com/islandmed/SculptForge/tree/main/bench/pack">source</a></span></p>
+    <pre><code>unzip sculptforge-bench-pack-1.zip
+sculptforge --benchmark-pack sculptforge-bench-pack-1 --out results.json</code></pre>
+    <p class="small muted">Linux, macOS and Windows, about 5 minutes, needs the latest SculptForge release. Your own settings and files are not touched; no video is made. Close heavy programs first.</p>
+    <ul class="small">
+      <li><span class="tier">floor</span> <strong>creature-floor</strong>, 5.8 million triangles: the entry-level test every supported computer should carry, integrated graphics included.</li>
+      <li><span class="tier">standard</span> <strong>creature-standard</strong>, 23 million triangles: a mid-range computer.</li>
+      <li><span class="tier">high</span> <strong>creature-high</strong>, 92 million triangles: a workstation (about 14 GB of free memory; skipped, and said so, when the computer has less).</li>
+    </ul>
+    <p class="small" style="margin-bottom:0">Each scene gets the same scripted pen strokes (Clay at three sizes, Move, Smooth, a 240 px brush, an orbit) through the code a real pen uses.
+      The file lists your CPU, graphics card and driver, memory and operating system (read by the program, nothing typed), the
+      SculptForge version and, per scene and stroke, frame time p50 / p95 / p99, frames a second, stroke lag and the slowest frame.
+      The format: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md#the-scene-pack">docs/benchmark.md</a>.</p>
+  </div>
+
+  <h2 id="run">Or run the standard scenes in 3 steps</h2>
   <ol class="steps">
     <li><strong>Get SculptForge</strong>
       <p>Install the <a href="../index.html#download">latest release</a> (free, Linux, macOS, Windows). Close
@@ -121,13 +151,8 @@ sculptforge --benchmark core-100m</code></pre></li>
   </div>
   <div class="scroll">
     <table>
-      <thead><tr>
-        <th>Machine</th><th>OS</th><th>Processor</th><th>Graphics</th><th class="num">RAM</th><th>Build</th>
-        <th class="num">fps</th><th class="num">Frame p50</th><th class="num">p95</th><th class="num">p99</th>
-        <th class="num">Lag p50</th><th class="num">p95</th><th class="num">Worst stall</th>
-        <th class="num">Peak RAM</th><th class="num">GPU</th><th>Video</th><th>Raw</th>
-      </tr></thead>
-      <tbody id="rows"><tr><td colspan="17" class="empty muted">Loading results...</td></tr></tbody>
+      <thead><tr id="head"></tr></thead>
+      <tbody id="rows"><tr><td colspan="19" class="empty muted">Loading results...</td></tr></tbody>
     </table>
   </div>
   <p class="small muted">Worst stall, peak RAM and GPU memory are for the whole run of that size (every stroke).
@@ -151,8 +176,13 @@ sculptforge --benchmark core-100m</code></pre></li>
   <div class="grid2">
     <div class="card">
       <strong>The easy way: an issue</strong>
-      <p class="small">Open a <a href="https://github.com/islandmed/SculptForge/issues/new?template=benchmark_result.yml">Benchmark
-        result</a> issue, describe the computer, and paste the JSON file. We check it and add it here.</p>
+      <p class="small">Open a <a href="https://github.com/islandmed/SculptForge/issues/new?template=benchmark_pack_result.yml">Benchmark
+        pack result</a> issue, say who you are (a handle is fine, or leave it empty) and what the computer is, and paste
+        <code>results.json</code>. A person checks it (the pack's hash, the numbers, no links in what you typed) and adds it here,
+        usually within a day or two. Results of the standard scenes (<code>--benchmark standard-15m</code>) go in the
+        <a href="https://github.com/islandmed/SculptForge/issues/new?template=benchmark_result.yml">older form</a>.</p>
+      <p class="small muted">What gets listed: the hardware text the program read, the SculptForge version and the timings, with the
+        two lines you typed. No address, no account, no file paths.</p>
     </div>
     <div class="card">
       <strong>The direct way: a pull request</strong>
@@ -183,7 +213,10 @@ python3 tools/benchmark/submit.py add result.json \
   const $ = (id) => document.getElementById(id);
   const rows = $("rows"), sceneSel = $("scene"), phaseSel = $("phase"), count = $("count");
   const SCENES = [["standard-15m", "Standard 15M (head)", "15M"], ["standard-33m", "Standard 33M (head)", "33M"],
-                  ["core-100m", "Core 100M (micro levels)", "100M micro"], ["core-200m", "Core 200M (micro levels)", "200M micro"], ["spheres", "Spheres (100M and older runs)", ""]];
+                  ["core-100m", "Core 100M (micro levels)", "100M micro"], ["core-200m", "Core 200M (micro levels)", "200M micro"], ["spheres", "Spheres (100M and older runs)", ""],
+                  ["pack:creature-floor", "Scene pack: creature-floor (5.8M, entry level)", "creature-floor"],
+                  ["pack:creature-standard", "Scene pack: creature-standard (23M)", "creature-standard"],
+                  ["pack:creature-high", "Scene pack: creature-high (92M)", "creature-high"]];
   const STANDARD_PHASES = [["clay small", "Clay 25 px"], ["clay medium", "Clay 60 px"], ["clay large", "Clay 120 px"],
                            ["move", "Move 80 px"], ["smooth", "Smooth 60 px"], ["240 px brush", "Clay 240 px"], ["orbit", "Orbit"]];
   const CORE_PHASES = [["clay small", "Clay small"], ["clay large", "Clay large"], ["240 px brush", "Clay 240 px"], ["orbit", "Orbit"], ["still", "Still view"]];
@@ -200,12 +233,13 @@ python3 tools/benchmark/submit.py add result.json \
   function runsFor(r, scene) {
     const runs = r.runs || [];
     if (scene === "spheres") return r.scene ? [] : runs;
+    if (scene.startsWith("pack:")) return r.scene === "pack-1" ? runs.filter((x) => x.label === scene.slice(5)) : [];
     if (r.scene !== scene && !(r.scene === "standard" && scene.startsWith("standard-"))) return [];
     const label = SCENES.find((x) => x[0] === scene)[2];
     return runs.filter((x) => x.label === label);
   }
   function fillPhases() {
-    const list = sceneSel.value === "spheres" ? SPHERE_PHASES : sceneSel.value.startsWith("core-") ? CORE_PHASES : STANDARD_PHASES, keep = phaseSel.value;
+    const list = sceneSel.value === "spheres" ? SPHERE_PHASES : sceneSel.value.startsWith("pack:") ? STANDARD_PHASES : sceneSel.value.startsWith("core-") ? CORE_PHASES : STANDARD_PHASES, keep = phaseSel.value;
     phaseSel.innerHTML = "";
     list.forEach(([v, t]) => phaseSel.add(new Option(t, v)));
     if (list.some(([v]) => v === keep)) phaseSel.value = keep;
@@ -222,35 +256,75 @@ python3 tools/benchmark/submit.py add result.json \
       items.filter(([, v]) => v !== "" && v != null).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("") +
       `</dl></details></td>`;
   }
+  // One column per entry: how to show it, and what it sorts by (a number or a lowercase text; empty sorts last).
+  const lower = (v) => (v == null ? "" : String(v).toLowerCase());
+  const COLS = [
+    { h: "Machine", cell: ({ r, run }) => machineCell(r, run), key: ({ r }) => lower(r.name) },
+    { h: "OS", cell: ({ r }) => `<td>${esc(((r.hardware || {}).os || "").replace(/\s*\(.*\)$/, ""))}</td>`, key: ({ r }) => lower((r.hardware || {}).os) },
+    { h: "Processor", cell: ({ r }) => `<td>${esc((r.hardware || {}).cpu)}</td>`, key: ({ r }) => lower((r.hardware || {}).cpu) },
+    { h: "Graphics", cell: ({ r }) => `<td>${esc(((r.hardware || {}).gpu_name || (r.hardware || {}).gpu || "").split(",")[0])}</td>`,
+      key: ({ r }) => lower((r.hardware || {}).gpu_name || (r.hardware || {}).gpu) },
+    { h: "Driver", cell: ({ r }) => `<td class="small muted">${esc(((r.hardware || {}).driver || "").replace(/^OpenGL\s*/, ""))}</td>`, key: ({ r }) => lower((r.hardware || {}).driver) },
+    { h: "RAM", num: true, cell: ({ r }) => td(num((r.hardware || {}).ram_gb) ? esc(r.hardware.ram_gb) + " GB" : "-"), key: ({ r }) => (r.hardware || {}).ram_gb },
+    { h: "Tier", cell: ({ r, run }) => `<td>${esc(((r.hardware || {}).hw_tier || "") + (r.hw_simulate ? " (simulated)" : ""))}</td>`, key: ({ r }) => lower((r.hardware || {}).hw_tier) },
+    { h: "Build", cell: ({ r }) => {
+        const app = r.sculptforge || {};
+        const commit = app.commit && /^[0-9a-f]{7,40}$/.test(app.commit)
+          ? ` <a class="small" href="https://github.com/islandmed/SculptForge/commit/${app.commit}">${app.commit}</a>` : "";
+        return `<td>${esc(app.version)}${commit}</td>`; }, key: ({ r }) => lower((r.sculptforge || {}).version) },
+    { h: "fps", num: true, cell: ({ ph }) => td(num(ph.fps) ? ph.fps.toFixed(0) : "-"), key: ({ ph }) => ph.fps },
+    { h: "Frame p50", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p50), cls((ph.frame_ms || {}).p50)), key: ({ ph }) => (ph.frame_ms || {}).p50 },
+    { h: "p95", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p95), cls((ph.frame_ms || {}).p95)), key: ({ ph }) => (ph.frame_ms || {}).p95 },
+    { h: "p99", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p99), cls((ph.frame_ms || {}).p99)), key: ({ ph }) => (ph.frame_ms || {}).p99 },
+    { h: "Lag p50", num: true, cell: ({ ph, phase }) => td(phase === "orbit" ? "-" : px((ph.lag_px || {}).p50)), key: ({ ph, phase }) => (phase === "orbit" ? null : (ph.lag_px || {}).p50) },
+    { h: "p95", num: true, cell: ({ ph, phase }) => td(phase === "orbit" ? "-" : px((ph.lag_px || {}).p95)), key: ({ ph, phase }) => (phase === "orbit" ? null : (ph.lag_px || {}).p95) },
+    { h: "Worst stall", num: true, cell: ({ stall }) => td(ms(stall), num(stall) ? (stall <= 100 ? "ok" : stall <= 500 ? "meh" : "slow") : ""), key: ({ stall }) => stall },
+    { h: "Peak RAM", num: true, cell: ({ run }) => td(mb(run.peak_ram_mb)), key: ({ run }) => run.peak_ram_mb },
+    { h: "GPU", num: true, cell: ({ gpuMb }) => td(mb(gpuMb)), key: ({ gpuMb }) => gpuMb },
+    { h: "Video", cell: ({ r }) => `<td>${r.video && /^https:\/\//.test(r.video) ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-"}</td>` },
+    { h: "Raw", cell: ({ r }) => `<td>${r.raw && /^raw\/[a-z0-9._-]+\.json$/.test(r.raw) ? `<a href="${esc(r.raw)}">JSON</a>` : "-"}</td>` },
+  ];
+  let sort = { col: -1, dir: 1 }; // -1: the default order (mesh size, then frame p50)
+  const head = $("head");
+  head.innerHTML = COLS.map((c, i) => `<th class="${c.num ? "num" : ""}">${c.key ? `<button type="button" data-col="${i}">${esc(c.h)}</button>` : esc(c.h)}</th>`).join("");
+  function markSort() {
+    [...head.children].forEach((th, i) => { if (i === sort.col) th.setAttribute("aria-sort", sort.dir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
+  }
+  head.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-col]");
+    if (!b) return;
+    const col = +b.dataset.col;
+    sort = sort.col === col ? { col, dir: -sort.dir } : { col, dir: 1 };
+    markSort();
+    render();
+  });
   function render() {
     const scene = sceneSel.value, phase = phaseSel.value, out = [];
     for (const r of results)
       for (const run of runsFor(r, scene)) {
         const ph = (run.phases || []).find((p) => p.name === phase);
-        if (ph) out.push({ r, run, ph });
+        if (!ph) continue;
+        const hw = r.hardware || {};
+        out.push({ r, run, ph, phase,
+                   stall: num(run.worst_stall_ms) ? run.worst_stall_ms : ph.worst_stall_ms,
+                   gpuMb: num(run.vram_used_mb) && !/Apple|unified/i.test(hw.gpu || "") ? run.vram_used_mb : run.gpu_buffers_mb });
       }
-    out.sort((a, b) => (a.run.triangles - b.run.triangles) || (((a.ph.frame_ms || {}).p50 || 0) - ((b.ph.frame_ms || {}).p50 || 0)));
+    const p50 = (x) => (x.ph.frame_ms || {}).p50 || 0;
+    if (sort.col < 0) out.sort((a, b) => (a.run.triangles - b.run.triangles) || (p50(a) - p50(b)));
+    else {
+      const key = COLS[sort.col].key;
+      out.sort((a, b) => {
+        const x = key(a), y = key(b), nx = x == null || x === "", ny = y == null || y === "";
+        if (nx || ny) return nx === ny ? p50(a) - p50(b) : nx ? 1 : -1; // empty values last, whichever way it sorts
+        return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sort.dir || p50(a) - p50(b);
+      });
+    }
     count.textContent = out.length ? `${out.length} result${out.length === 1 ? "" : "s"}` : "";
     if (!out.length) {
-      rows.innerHTML = '<tr><td colspan="17" class="empty muted">No results for this scene yet. Run it and <a href="#submit">send yours</a>.</td></tr>';
+      rows.innerHTML = '<tr><td colspan="19" class="empty muted">No results for this scene yet. Run it and <a href="#submit">send yours</a>.</td></tr>';
       return;
     }
-    rows.innerHTML = out.map(({ r, run, ph }) => {
-      const hw = r.hardware || {}, f = ph.frame_ms || {}, lag = ph.lag_px || {}, app = r.sculptforge || {};
-      const commit = app.commit && /^[0-9a-f]{7,40}$/.test(app.commit)
-        ? ` <a class="small" href="https://github.com/islandmed/SculptForge/commit/${app.commit}">${app.commit}</a>` : "";
-      const video = r.video && /^https:\/\//.test(r.video) ? `<a href="${esc(r.video)}" rel="nofollow noopener">watch</a>` : "-";
-      const stall = num(run.worst_stall_ms) ? run.worst_stall_ms : ph.worst_stall_ms;
-      const gpu = num(run.vram_used_mb) && !/Apple|unified/i.test(hw.gpu || "") ? run.vram_used_mb : run.gpu_buffers_mb;
-      const rawLink = r.raw && /^raw\/[a-z0-9._-]+\.json$/.test(r.raw) ? `<a href="${esc(r.raw)}">JSON</a>` : "-";
-      return "<tr>" + machineCell(r, run) +
-        `<td>${esc((hw.os || "").replace(/\s*\(.*\)$/, ""))}</td><td>${esc(hw.cpu)}</td><td>${esc((hw.gpu || "").split(",")[0])}</td>` +
-        td(num(hw.ram_gb) ? esc(hw.ram_gb) + " GB" : "-") + `<td>${esc(app.version)}${commit}</td>` +
-        td(num(ph.fps) ? ph.fps.toFixed(0) : "-") + td(ms(f.p50), cls(f.p50)) + td(ms(f.p95), cls(f.p95)) + td(ms(f.p99), cls(f.p99)) +
-        td(phase === "orbit" ? "-" : px(lag.p50)) + td(phase === "orbit" ? "-" : px(lag.p95)) +
-        td(ms(stall), num(stall) ? (stall <= 100 ? "ok" : stall <= 500 ? "meh" : "slow") : "") +
-        td(mb(run.peak_ram_mb)) + td(mb(gpu)) + `<td>${video}</td><td>${rawLink}</td></tr>`;
-    }).join("");
+    rows.innerHTML = out.map((rec) => "<tr>" + COLS.map((c) => c.cell(rec)).join("") + "</tr>").join("");
   }
   SCENES.forEach(([v, t]) => sceneSel.add(new Option(t, v)));
   sceneSel.value = "standard-33m"; // the scene with the most published rows
@@ -265,7 +339,7 @@ python3 tools/benchmark/submit.py add result.json \
   fetch("results.json", { cache: "no-cache" })
     .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
     .then((data) => { results = Array.isArray(data.results) ? data.results : []; render(); })
-    .catch(() => { rows.innerHTML = '<tr><td colspan="17" class="empty muted">The results could not be loaded.</td></tr>'; });
+    .catch(() => { rows.innerHTML = '<tr><td colspan="19" class="empty muted">The results could not be loaded.</td></tr>'; });
 })();
 </script>
 </body>
