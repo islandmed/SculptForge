@@ -1,0 +1,134 @@
+name: iPad
+
+# The iPad app (docs/ipad.md) on GitHub's macOS runners (free for this public repo): the simulator build with the core test
+# suite run in the simulator and screenshots of the app on a base iPad and the biggest iPad Pro; the device archive (unsigned);
+# and the TestFlight upload, which stays dormant until the owner has added the App Store Connect key to the "testflight"
+# environment (docs/releasing.md "iPad / TestFlight"). Pinned actions only; no secrets anywhere but the upload job.
+
+on:
+  push:
+    branches: [main, 'feat/ipad-port']
+    paths:
+      - 'packaging/ios/**'
+      - 'scripts/ios-*.sh'
+      - 'tools/ci/ios-*.sh'
+      - '.github/workflows/ios.yml'
+      - 'src/render/GL.*'
+      - 'src/app/NativeDialog.*'
+      - 'src/app/IosDocumentPicker.mm'
+      - 'src/app/main.cpp'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+  schedule:
+    - cron: '37 9 * * *' # daily on main: a change to the shared code that breaks the iPad build shows the next day
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: 'Upload this build to TestFlight (needs the testflight environment secrets)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    name: Simulator (build, core tests, screenshots)
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install dependencies
+        run: brew install ninja ccache >/dev/null && xcodebuild -version
+      - name: Compiler cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .ccache
+          key: ccache-ios-sim.${{ github.sha }}
+          restore-keys: ccache-ios-sim.
+      - name: Build
+        shell: bash
+        run: scripts/ios-build.sh sim --tests --out build-ios-sim | tee app-path.txt
+      - name: Compiler cache (save)
+        if: always()
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .ccache
+          key: ccache-ios-sim.${{ github.sha }}
+      - name: The app in the simulator
+        id: shots
+        shell: bash
+        run: |
+          set -o pipefail
+          tools/ci/ios-sim-shots.sh "$(tail -1 app-path.txt)" ios-shots | tee shots.txt
+          grep '^SF_IOS_SIM=' shots.txt | tail -1 >> "$GITHUB_ENV"
+      - name: Core tests in the simulator
+        if: always() && steps.shots.outcome != 'skipped'
+        run: ctest --test-dir build-ios-sim -R '^sculptforge_tests_' -j 3 --output-on-failure --timeout 900
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: sculptforge-ipad-simulator-shots
+          path: ios-shots
+          retention-days: 14
+
+  device:
+    name: Device archive (unsigned)
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Archive
+        shell: bash
+        run: |
+          set -o pipefail
+          scripts/ios-build.sh device --build ${{ github.run_number }} --out build-ios-device | tail -1 | tee archive-path.txt
+          archive=$(tail -1 archive-path.txt)
+          app=$(find "$archive/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleVersion' \
+            "$app/Info.plist" | tee -a "$GITHUB_STEP_SUMMARY"
+          ls "$app" | tee -a "$GITHUB_STEP_SUMMARY"
+          du -sh "$app" | tee -a "$GITHUB_STEP_SUMMARY"
+          ditto -c -k --keepParent "$archive" SculptForge-ipad-unsigned.xcarchive.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sculptforge-ipad-unsigned-archive
+          path: SculptForge-ipad-unsigned.xcarchive.zip
+          retention-days: 14
+
+  testflight:
+    name: TestFlight upload
+    needs: [simulator, device]
+    if: github.event_name == 'workflow_dispatch' && inputs.testflight
+    runs-on: macos-15
+    timeout-minutes: 120
+    # The App Store Connect key lives only in this environment's secrets (the owner adds them; he can also require his
+    # approval for each run there). GitHub masks their values in the log, and nothing here prints them.
+    environment: testflight
+    steps:
+      - name: Secrets present?
+        id: gate
+        env:
+          HAVE_KEY: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
+        run: |
+          echo "ok=$HAVE_KEY" >> "$GITHUB_OUTPUT"
+          [ "$HAVE_KEY" = true ] || echo "No App Store Connect key in the testflight environment yet: upload skipped (docs/releasing.md)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.ok == 'true'
+      - name: Archive, sign and upload
+        if: steps.gate.outputs.ok == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: scripts/ios-testflight.sh --build ${{ github.run_number }} | tee -a "$GITHUB_STEP_SUMMARY"
