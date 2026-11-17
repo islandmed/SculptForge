@@ -984,8 +984,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
-            for (; p.sent < p.samples.size(); ++p.sent)
+            // (each with its own time, as SDL stamps a tablet's events: the batch is handled at once, they weren't made at once)
+            for (; p.sent < p.samples.size(); ++p.sent) {
+                const double ago = std::max(0.0, now - p.samples[p.sent].t);
+                pointerEventNs_ = SDL_GetTicksNS() - std::min<Uint64>(SDL_GetTicksNS(), Uint64(ago * 1e9));
                 onMouseMove(p.samples[p.sent].p.x, p.samples[p.sent].p.y, 0.0f, 0.0f, false);
+            }
+            pointerEventNs_ = 0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)

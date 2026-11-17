@@ -1927,7 +1927,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
             !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this)) {
             mouseClicks_ = e.button.clicks;
+            pointerEventNs_ = e.button.timestamp; // (the pen predictor's first sample)
             onMouseDown(e.button.x, e.button.y, e.button.button);
+            pointerEventNs_ = 0;
             mouseClicks_ = 1;
         }
         break;
@@ -1938,7 +1940,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         onMouseUp();
         break;
     case SDL_EVENT_MOUSE_MOTION:
+        pointerEventNs_ = e.motion.timestamp; // (the pen predictor's sample time: a batch is handled all at once)
         onMouseMove(e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel, e.motion.which == SDL_PEN_MOUSEID);
+        pointerEventNs_ = 0;
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
@@ -2690,7 +2694,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeRecipe_ = asyncStroke_ && recipe ? std::make_shared<const BrushRecipe>(*recipe) : nullptr;
     strokeAlpha_ = asyncStroke_ && !doc_.brushAlpha.empty() ? std::make_shared<const BrushAlpha>(doc_.brushAlpha) : nullptr;
     pointerLatest_ = glm::vec2(x, y);
-    pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+    pointerLatestAt_ = pointerEventSeconds();
     penPredictor_.reset(pointerLatest_, pointerLatestAt_);
     {
         const glm::vec3 n = glm::dot(hit.normal, partCamera().forward()) > 0.0f ? -hit.normal : hit.normal;
@@ -2758,7 +2762,7 @@ void App::strokeTo(float x, float y) {
     strokeMovedAt_ = double(SDL_GetTicksNS()) * 1e-9; // (Continuous dabs wait for the pointer to rest)
     if (asyncStroke_) {
         pointerLatest_ = glm::vec2(x, y);
-        pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+        pointerLatestAt_ = pointerEventSeconds();
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.

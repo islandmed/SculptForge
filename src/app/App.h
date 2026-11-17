@@ -489,6 +489,8 @@ private:
     PenPredictor penPredictor_;
     glm::vec2 pointerLatest_{0.0f};   // the newest pointer sample of the stroke (window pixels)
     double pointerLatestAt_ = 0.0;    // its time (seconds)
+    Uint64 pointerEventNs_ = 0;       // the pointer event being handled: when it happened (SDL ticks, ns; 0 = now)
+    double pointerEventSeconds() const; // that, or now: the pen predictor's sample time (not when it's handled)
     double frameSeconds_ = 1.0 / 60.0; // running mean of the frame interval (how far ahead to predict)
     double prepSeconds_ = 0.0;         // running mean of what packing a batch's upload costs (the batch size)
     Sculptor::DabFrame ghostFrame_;    // the last placed dab's frame (the ghost's estimates start from it)
@@ -3233,7 +3235,7 @@ private:
     // end and the side buttons, which are mapped in Preferences > Tablet.
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
     void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
-    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window, Uint64 timestamp);
     // SDL sends a pen sample's motion before its pressure (every platform; Wayland per tablet frame): the tip's
     // mouse motion, which moves the stroke, waits for the axes that follow it (Tablet.cpp).
     void flushPenMotion();

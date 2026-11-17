@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <vector>
 
 using namespace sf;
@@ -298,6 +299,39 @@ TEST(pen_predictor_tracks_a_circle_better_than_holding_still) {
         ++n;
     }
     CHECK(predicted / n < held / n * 0.25);
+}
+
+TEST(pen_predictor_stays_on_the_path_through_event_bursts) {
+    // A fast pen (samples 0.1-1 ms apart, whole-pixel positions, as most tablets and mice report) at 985 px/s on an
+    // arc, handled by a 60 fps frame loop in one batch per frame. With steps that small the filter's 1 / h and
+    // 1 / h^2 gains turned a half-pixel rounding into ~1e6 px/s, and the stroke preview's head left the path (#216
+    // floor runs: preview lag p99 ~230 ms). Steps under kMinStep count as one instant: the velocity stays near the
+    // pen's and the head a frame ahead stays on the path. (App stamps samples with the events' own times; stamped as
+    // they were handled, a whole batch would look this close together too.)
+    const double speed = 985.0;
+    auto path = [&](double t) {
+        const double a = speed * t / 600.0;
+        return glm::vec2(float(700.0 + 600.0 * std::sin(a)), float(400.0 + 600.0 * (1.0 - std::cos(a))));
+    };
+    auto offPath = [&](glm::vec2 q) { return std::abs(glm::distance(q, glm::vec2(700.0f, 1000.0f)) - 600.0f); };
+    std::mt19937 rng(216);
+    std::uniform_real_distribution<double> gap(0.0001, 0.001);
+    PenPredictor pp;
+    pp.reset(path(0.0), 0.0);
+    double t = 0.0, worstSpeed = 0.0, worstOff = 0.0;
+    for (int frame = 1; frame <= 60; ++frame) {
+        glm::vec2 latest = path(t);
+        for (; t + 0.001 < frame / 60.0;) { // this frame's samples, handled together
+            t += gap(rng);
+            latest = glm::round(path(t));
+            pp.add(latest, t);
+        }
+        if (frame < 4) continue;
+        worstSpeed = std::max(worstSpeed, double(glm::length(pp.velocity())));
+        worstOff = std::max(worstOff, double(offPath(pp.predict(t + 1.0 / 60.0, latest))));
+    }
+    CHECK(worstSpeed < speed * 2.0);
+    CHECK(worstOff < 8.0); // px: half a frame's travel (whole-pixel rounding a frame ahead is ~4.5; before: ~2900)
 }
 
 TEST(live_move_matches_the_grab) {

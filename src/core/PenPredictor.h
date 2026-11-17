@@ -20,6 +20,10 @@ class PenPredictor {
 public:
     static constexpr double kMaxAhead = 0.025; // seconds
     static constexpr double kStale = 0.05;     // no sample for this long: the pointer has stopped
+    // Samples closer together than this count as one instant: the filter's gains divide the residual by the step
+    // (b / h, 2g / h^2), so a burst a fraction of a millisecond apart (a batch of events stamped as they're handled,
+    // or a 1000 Hz pen) would throw the velocity to millions of pixels a second. 2 ms = a 500 Hz pen's period.
+    static constexpr double kMinStep = 0.002;
 
     void reset(glm::vec2 p, double t) {
         pos_ = p;
@@ -34,10 +38,10 @@ public:
             return;
         }
         const double dt = t - last_;
-        if (dt <= 1e-4) { // the same instant (several events in one batch): take the newest position
-            pos_ = p;
-            return;
-        }
+        // Too soon after the last step: wait for the next one, which spans this sample's motion with its true time
+        // (moving the position without the time would read as slower motion). predict() starts from the newest
+        // sample its caller passes, so nothing is lost.
+        if (dt < kMinStep) return;
         if (dt > kStale) { // after a pause the old velocity says nothing
             vel_ = (p - pos_) / float(dt);
             acc_ = glm::vec2(0.0f);

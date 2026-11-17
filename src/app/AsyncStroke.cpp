@@ -475,6 +475,12 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
     return frontRaycast(origin, dir, hit);
 }
 
+double App::pointerEventSeconds() const {
+    // SDL stamps events with SDL_GetTicksNS's clock; one in the future (a clock skew) counts as now.
+    const Uint64 now = SDL_GetTicksNS();
+    return double(pointerEventNs_ && pointerEventNs_ <= now ? pointerEventNs_ : now) * 1e-9;
+}
+
 glm::vec2 App::predictedPointer() const {
     if (!previewStrokes() || drag_ != Drag::Stroke || !asyncStroke_) return glm::vec2(mouseX_, mouseY_);
     // To when this frame reaches the screen: about a frame after the newest sample.
