@@ -255,8 +255,8 @@ Credit: the name for the credits</pre>
       <div class="wrap">
         <div class="billing" id="billing" hidden>
           <div role="group" aria-label="Billing">
-            <button type="button" data-billing="month" aria-pressed="true">Monthly</button>
             <button type="button" data-billing="year" aria-pressed="false">Yearly<span class="save">save 20%</span></button>
+            <button type="button" data-billing="month" aria-pressed="true">Monthly</button>
           </div>
         </div>
         <div class="tiers">
@@ -427,6 +427,7 @@ Credit: the name for the credits</pre>
         per.textContent = year ? '/ year' : '/ month';
         alt.textContent = year ? '$4 a month, billed yearly' : 'or $48 a year';
       }));
+      billing.querySelector('[data-billing="year"]').click(); // Yearly first and picked (owner 11-17); Monthly beside it
     })();
     // Founding Member places left, from members-live.json (onboarding writes it minutes after a payment; else the
     // release's founding.json): the note goes once all 100 are taken.
