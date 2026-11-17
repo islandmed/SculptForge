@@ -147,6 +147,37 @@ TEST(stroke_determinism_undo_restores_layers_mask_and_colours_exactly) {
     CHECK(std::all_of(d.mesh.mask.begin(), d.mesh.mask.end(), [](float m) { return m == 0.0f; }));
 }
 
+// The app's solver catches the exact normals up behind the brush on the clock (a share per batch, all of them at a pause): where
+// it has got by the next dab must not show in the stroke.
+TEST(stroke_determinism_normal_catch_up_between_dabs_does_not_change_the_stroke) {
+    const Mesh sphere = makeIcosphere(8);
+    std::vector<DabParams> dabs = bigDabs();
+    for (int i = 0; i < 5; ++i) dabs.push_back(dabs[size_t(i)]), dabs.back().center = glm::normalize(dabs.back().center + glm::vec3(0.15f, 0.0f, 0.1f)), dabs.back().viewDir = -dabs.back().center;
+    const auto run = [&](int mode) {
+        Document d = makeDoc(Mesh(sphere));
+        d.sculptor.beginStroke(d.mesh, "Standard");
+        d.sculptor.beginBatch();
+        for (size_t i = 0; i < dabs.size(); ++i) {
+            d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, dabs[i], kNoSymmetry);
+            d.sculptor.endBatch(d.mesh, d.bvh);
+            if (mode == 1) d.sculptor.catchUpNormals(d.mesh, d.bvh, 30000 * (i + 1)); // a part, more each time
+            if (mode == 2) d.sculptor.catchUpBehind(d.mesh, d.bvh, 0.35);
+            if (mode == 3 && i % 2) d.sculptor.catchUpNormals(d.mesh, d.bvh, SIZE_MAX); // a pause now and then
+            d.sculptor.beginBatch();
+        }
+        d.sculptor.endBatch(d.mesh, d.bvh);
+        d.undo.push(d.sculptor.endStroke());
+        return d.mesh;
+    };
+    const Mesh plain = run(0);
+    for (int mode = 1; mode <= 3; ++mode) {
+        const Mesh caught = run(mode);
+        std::printf("  catch-up mode %d: positions differ %zu, normals differ %zu\n", mode, differ(caught.positions, plain.positions), differ(caught.normals, plain.normals));
+        CHECK(differ(caught.positions, plain.positions) == 0);
+        CHECK(differ(caught.normals, plain.normals) == 0);
+    }
+}
+
 TEST(stroke_determinism_heavy_stroke_replays_and_undoes_exactly) {
     checkSphere(makeIcosphere(8), false); // 655k vertices
 }

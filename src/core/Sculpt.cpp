@@ -1119,6 +1119,9 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     auto& pos = mesh.positions;
     const auto& nrm = mesh.normals;
 
+    // The normals a dab reads are the exact ones, whenever the stroke's carried approximations have been caught up (a pause, a
+    // batch's share: by the clock): a dab that read what the clock had left would come out differently stroke to stroke.
+    if (p.frontFacesOnly && lazyCount_ > 0) catchUpNormals(mesh, bvh, SIZE_MAX);
     if (p.frontFacesOnly) {
         std::erase_if(verts_, [&](uint32_t v) { return glm::dot(nrm[v], p.viewDir) > 0.0f; });
         if (verts_.empty()) return;
@@ -1142,6 +1145,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         }, 65536);
         adaptiveDab_ = !masked.load();
     }
+    // (every other dab reads its vertices' own normals: the exact ones; an adaptive dab reads exact ones where it samples, below)
+    if (!adaptiveDab_ && lazyCount_ > 0) catchUpNormals(mesh, bvh, SIZE_MAX);
     // The normals a later mirror copy of this dab reads, carried now (earlyNormals_); not where the exact path's rings
     // matter (masks, an alpha, dynamic topology, the draft) or the brush isn't a plane brush.
     const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !p.viewFalloff && !useAlpha && !useStencil &&
@@ -1149,12 +1154,16 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
+    // An adaptive dab's sample reads the normals the faces give now: the ones in mesh.normals are carried by the
+    // dabs before it, and the exact ones catch up behind the brush on the clock (the same stroke came out differently
+    // by how far they had got).
+    const bool exactSamples = adaptiveDab_ && mesh.hasNormalTopology();
 
     // Weighted area normal and centre of the brush region.
     const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
-        acc.normal += glm::dvec3(nrm[v]) * double(w);
+        acc.normal += glm::dvec3(exactSamples ? mesh.exactNormalAt(v) : nrm[v]) * double(w);
         acc.center += glm::dvec3(pos[v]) * double(w);
         acc.weight += w;
     });

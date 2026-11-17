@@ -283,6 +283,11 @@ public:
     // neighbour of an inner vertex of a manifold is the corner of two of its triangles, so this is the average
     // over its ring.
     float curvatureAt(uint32_t v) const;
+    // The normal the faces around `v` give it (area-weighted, in ascending triangle order: the bits updateNormals and
+    // recomputeAllNormals write), from the positions as they are now; where `normals` may be a stroke's carried
+    // approximation. False from hasNormalTopology() when there are no rings to walk.
+    glm::vec3 exactNormalAt(uint32_t v) const;
+    bool hasNormalTopology() const { return implicit_ || vtOffsets_.size() == positions.size() + 1; }
 
     // The vertices sharing an edge with `v`, and the triangles around it, in ascending order.
     IndexRing neighbors(uint32_t v) const {

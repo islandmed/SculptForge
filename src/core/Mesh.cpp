@@ -653,6 +653,13 @@ void Mesh::recomputeAllNormals() {
     markAllDirty();
 }
 
+glm::vec3 Mesh::exactNormalAt(uint32_t v) const {
+    glm::vec3 sum(0.0f);
+    for (uint32_t t : vertexTriangles(v)) sum += faceNormal(positions, triangles[t]);
+    const float len = glm::length(sum);
+    return len > 1e-20f ? sum / len : glm::vec3(0, 1, 0);
+}
+
 void Mesh::updateNormals(std::span<const uint32_t> verts, float* curvature) {
     // The vertices whose normal changes: the moved ones and every neighbour, gathered as a set and listed in
     // index order; then each one's normal from its faces, in its triangle order (as recomputeAllNormals sums
