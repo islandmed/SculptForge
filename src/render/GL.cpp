@@ -22,6 +22,16 @@ bool g_es30 = false;
 
 bool es30Tier() { return g_es30; }
 
+namespace {
+GLuint g_windowFramebuffer = 0;
+PFN_BindFramebuffer g_realBindFramebuffer = nullptr;
+void SF_GLAPI bindFramebufferToWindow(GLenum target, GLuint framebuffer) {
+    g_realBindFramebuffer(target, framebuffer ? framebuffer : g_windowFramebuffer);
+}
+} // namespace
+
+void setWindowFramebuffer(GLuint framebuffer) { g_windowFramebuffer = framebuffer; }
+
 void setTestTexelLimit(uint32_t texels) { g_testTexelLimit = texels; }
 
 GLint maxTextureBufferTexels() {
@@ -683,6 +693,10 @@ const char* load(ProcLoader loader) {
     SF_GL_OPTIONAL(SF_GL_LOAD_OPTIONAL)
 #undef SF_GL_LOAD_OPTIONAL
     if (g_es30) es30::install();
+    if (g_windowFramebuffer && BindFramebuffer != &bindFramebufferToWindow) {
+        g_realBindFramebuffer = BindFramebuffer;
+        BindFramebuffer = &bindFramebufferToWindow;
+    }
     return nullptr;
 }
 

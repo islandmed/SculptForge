@@ -270,6 +270,10 @@ bool App::init(const AppOptions& options) {
     }
     SDL_GL_MakeCurrent(window_, glContext_);
     SDL_GL_SetSwapInterval(1);
+#ifdef SF_IOS
+    gl::setWindowFramebuffer(GLuint(SDL_GetNumberProperty(SDL_GetWindowProperties(window_),
+                                                          SDL_PROP_WINDOW_UIKIT_OPENGL_FRAMEBUFFER_NUMBER, 0)));
+#endif
     timer.step("window, GL context");
     splashCheckpoint();
 

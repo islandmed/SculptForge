@@ -13,7 +13,8 @@ namespace sf::splash {
 
 bool enabled(const Setting& s) {
     if (!s.interactive || !s.preference) return false;
-    return s.videoDriver != "offscreen" && s.videoDriver != "dummy";
+    // (uikit: the iPad has one window, full screen; the launch screen stands in for the splash)
+    return s.videoDriver != "offscreen" && s.videoDriver != "dummy" && s.videoDriver != "uikit";
 }
 
 bool due(bool isEnabled, bool alreadyShown) {

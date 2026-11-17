@@ -247,4 +247,8 @@ void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
 // by the renderer. SF_GLES_LEVEL=300 runs this tier on any driver, desktop GL included (tests: tests/render_matrix). Set by load().
 bool es30Tier();
 
+// The window's own framebuffer when it is not 0 (the iPad: SDL's UIKit view draws into a framebuffer object of its own).
+// Set before load(): binding framebuffer 0 then binds that one, so the renderer's "back to the window" works unchanged.
+void setWindowFramebuffer(GLuint framebuffer);
+
 } // namespace gl

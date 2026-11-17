@@ -21,6 +21,8 @@ TEST(splash_only_for_a_person_with_a_window_system_and_the_preference_on) {
     CHECK(!splash::enabled(s));
     s.videoDriver = "dummy";
     CHECK(!splash::enabled(s));
+    s.videoDriver = "uikit"; // the iPad: one full-screen window, its launch screen is the splash
+    CHECK(!splash::enabled(s));
     s.videoDriver = "x11";
     s.preference = false; // Preferences > Interface > Show startup splash
     CHECK(!splash::enabled(s));
