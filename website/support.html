@@ -427,6 +427,7 @@ Credit: the name for the credits</pre>
         per.textContent = year ? '/ year' : '/ month';
         alt.textContent = year ? '$4 a month, billed yearly' : 'or $48 a year';
       }));
+      billing.querySelector('[data-billing="year"]').click(); // yearly first (owner 11-17); Monthly is one click away
     })();
     // Founding Member places left, from members-live.json (onboarding writes it minutes after a payment; else the
     // release's founding.json): the note goes once all 100 are taken.
