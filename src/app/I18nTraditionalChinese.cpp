@@ -5401,8 +5401,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形以保留內側並隱藏其餘；加上 Alt 以隱藏內側。拖曳中放開 Shift 以保持正圓。"},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+從圓心拖曳圓形並遮罩其內一切；Ctrl+Alt+拖曳解除遮罩。拖曳時按 Shift 保持正圓；用 Tool > Masking 的選項從角落拖曳。包含遠側。"},
     // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
-    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
-     "Python 指令碼可以做到此電腦上任何程式能做的事。請只執行你信任的指令碼。指令碼只會在你執行時運行：你開啟的任何內容都無法啟動指令碼。"},
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one.",
+     "Python 指令碼可以做到此電腦上任何程式能做的事。請只執行你信任的指令碼。指令碼只會在你執行時運行，或在下方勾選後於啟動時運行；你開啟的任何內容都無法啟動指令碼。"},
     {"Commands",
      "命令"},
     {"Enable Python scripts",

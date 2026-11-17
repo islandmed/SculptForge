@@ -76,7 +76,7 @@ void App::drawPythonPrefs() {
                  "Preferences > Scripts");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", tr("A Python script can do anything a program on this computer can. Only run scripts you trust. "
-                                "Scripts run only when you run them: nothing you open can start one."));
+                                "Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one."));
     ImGui::PopStyleColor();
     if (py.loaded()) ImGui::TextDisabled("%s", (std::string(tr("Python")) + " " + py.version()).c_str());
     if (ImGui::Button(tr("Open Scripts folder##prefs.python"))) {
