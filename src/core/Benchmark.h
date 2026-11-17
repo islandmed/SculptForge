@@ -87,6 +87,9 @@ Mesh makeBenchHead(size_t triangles);
 // or "" with `error`. `millions` picks the size (core-100m: 100, the same head with half the base triangles).
 std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log = {},
                               int millions = 200);
+// "core-<N>m" (N = 1..4000 million micro triangles: core-100m, core-200m, core-400m, ...) -> N, else 0. The 10x
+// scoreboard's ceiling search (docs/design/perf-scoreboard.md) runs the same head at every size.
+int coreSceneMillions(const std::string& name);
 // The scene itself, built in memory (what core200mScenePath saves): `baseTriangles` base triangles at `level`.
 Mesh makeCore200mMesh(size_t baseTriangles = 195313, int level = 5);
 

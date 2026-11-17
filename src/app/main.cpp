@@ -115,7 +115,7 @@ void usage() {
         "                           brush (standard-33m: 33M; standard-100m: 104M, needs ~16 GB free; standard: 15M + 33M). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
-        "  --benchmark core-100m    The same at 100 million micro triangles\n"
+        "  --benchmark core-<N>m    The same head at N million micro triangles (core-100m, core-400m, core-800m ...)\n"
         "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
         "  --benchmark-pack DIR     The scene pack (the folder with pack.json, from sculptforge.app/benchmarks): its scenes\n"
         "                           from the entry level up, the standard strokes on each; add --out results.json (no video\n"
@@ -317,8 +317,8 @@ static int runMain(int argc, char** argv) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
                     options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-100m" && options.benchmarkScene != "standard-1b" &&
-                    options.benchmarkScene != "core-200m" && options.benchmarkScene != "core-100m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
+                    sf::coreSceneMillions(options.benchmarkScene) == 0) {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b or core-<N>m)\n", argv[i]);
                     return 1;
                 }
             }
@@ -394,10 +394,9 @@ static int runMain(int argc, char** argv) {
             return 1;
         }
     }
-    if (options.benchmarkScene == "core-200m" || options.benchmarkScene == "core-100m") { // research: micro triangles in memory, the project written once
+    if (const int millions = sf::coreSceneMillions(options.benchmarkScene)) { // research: micro triangles in memory, the project written once
         std::string error;
-        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); },
-                                  options.benchmarkScene == "core-100m" ? 100 : 200).empty()) {
+        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }, millions).empty()) {
             std::fprintf(stderr, "%s: %s\n", options.benchmarkScene.c_str(), error.c_str());
             return 1;
         }
