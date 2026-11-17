@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushLibrary.h"
+
+#include "core/DataDir.h"
 #include "core/FileReplace.h"
 
 #include "core/Commands.h"
@@ -308,16 +310,8 @@ BrushLibraryPaths& brushLibraryPaths() {
 }
 
 std::string appDataDir() {
-    // Matches SDL_GetPrefPath("SculptForge", "SculptForge"), which the app uses for its settings.
-#if defined(_WIN32)
-    const std::string base = env("APPDATA");
-    return base.empty() ? "" : base + "\\SculptForge\\SculptForge";
-#elif defined(__APPLE__)
-    return env("HOME") + "/Library/Application Support/SculptForge/SculptForge";
-#else
-    const std::string xdg = env("XDG_DATA_HOME");
-    return (xdg.empty() ? env("HOME") + "/.local/share" : xdg) + "/SculptForge/SculptForge";
-#endif
+    const DataLocation& loc = dataLocation(); // (a portable copy's data/ folder, else the per-user one)
+    return loc.portable ? loc.dir : perUserDataDir();
 }
 
 std::vector<std::string> splitSearchPath(const std::string& value) {

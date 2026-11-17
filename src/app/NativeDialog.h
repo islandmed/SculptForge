@@ -26,6 +26,9 @@ void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* windo
 void openFolder(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const char* defaultLocation,
                 bool allowMany);
 bool message(SDL_MessageBoxFlags flags, const char* title, const char* text, SDL_Window* window);
+// A question with two buttons: 1 = `first` (Return), 0 = `second` (Escape or the window's close), -1 = no dialog was
+// shown (suppressed as above, or the platform couldn't).
+int choose(const char* title, const char* text, const char* first, const char* second, SDL_Window* window);
 bool openUrl(const char* url); // false when suppressed (callers say it couldn't open), as SDL_OpenURL
 
 #ifdef __ANDROID__

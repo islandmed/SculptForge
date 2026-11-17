@@ -9,6 +9,7 @@
 #include "app/SearchAliases.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/DataDir.h"
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Primitives.h"
@@ -1220,7 +1221,7 @@ void App::initLibraryBrowser() {
         std::error_code ec;
         fs::remove_all(fsPath(library_.user), ec);
     } else if (!recording) {
-        const char* docs = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+        const char* docs = dataLocation().portable ? nullptr : SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS); // (a portable copy's library is data/library)
         library_.user = !uiPrefs_.libraryFolder.empty() ? uiPrefs_.libraryFolder // Preferences > Library
                                                         : defaultUserLibrary(docs ? docs : "", prefDir_);
     }

@@ -248,6 +248,7 @@ SculptForge keeps its settings in one folder per user:
 | Linux | `~/.local/share/SculptForge/SculptForge/` (or `$XDG_DATA_HOME/SculptForge/SculptForge/`) |
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/` |
 | Windows | `%APPDATA%\SculptForge\SculptForge\` (usually `C:\Users\<you>\AppData\Roaming\SculptForge\SculptForge\`) |
+| Portable copy | the `data` folder next to `sculptforge.exe` (see [A portable copy](installing.md#a-portable-copy-a-usb-stick)) |
 
 | File or folder | What it holds |
 |---|---|

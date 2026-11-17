@@ -193,6 +193,22 @@ size in **Edit > Preferences > Interface > UI scale** (**Automatic** follows Win
 
 See [Where settings live](troubleshooting.md#where-settings-live) for every file.
 
+### A portable copy (a USB stick)
+
+The portable .zip keeps everything it saves in its own folder, so the unzipped folder carries your workbench from one
+PC to another: settings, brushes and the library, layouts, shelves, hotkeys, My Panel, recent files, the log and
+caches go into `data` next to `sculptforge.exe`. Projects still save wherever you choose.
+
+- It works because of the small file `portable.txt` in the `bin` folder (a `data` folder there counts too). Delete
+  the file and the copy uses the computer's own settings again. The installer never has it.
+- **First run on a computer that already has SculptForge settings:** it asks **Import my settings and brushes** or
+  **Start fresh**. Importing copies; the installed copy's files are not changed, and a portable copy never writes to
+  them. Your AI keys stay in the computer's keychain and are not copied to the stick.
+- **Read-only stick:** SculptForge says so once in the status line and uses the computer's own folder for that session.
+- **Updates** keep the `data` folder.
+- The same works elsewhere: put an empty `portable.txt` next to the AppImage (Linux) or next to `SculptForge.app`
+  (macOS), and the data goes into a `data` folder beside it.
+
 ## Opening SculptForge for the first time
 
 The builds are not code-signed yet, so your operating system may warn you the first time.
