@@ -730,13 +730,14 @@ set(CPACK_NSIS_URL_INFO_ABOUT "https://sculptforge.app/")
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 # The installer's own version resource: SignPath's artifact configuration requires product name and version on every
 # signed file (docs/releasing.md "Windows code signing"; tools/ci/check_pe_metadata.ps1 checks it in CI).
+# (NSIS single quotes: CPack writes this value into CPackConfig.cmake without escaping double ones.)
 set(CPACK_NSIS_DEFINES "VIProductVersion ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.0
-VIAddVersionKey ProductName \"SculptForge\"
-VIAddVersionKey ProductVersion \"${PROJECT_VERSION}\"
-VIAddVersionKey FileVersion \"${PROJECT_VERSION}\"
-VIAddVersionKey FileDescription \"SculptForge installer\"
-VIAddVersionKey CompanyName \"The SculptForge contributors\"
-VIAddVersionKey LegalCopyright \"Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later.\"")
+VIAddVersionKey ProductName 'SculptForge'
+VIAddVersionKey ProductVersion '${PROJECT_VERSION}'
+VIAddVersionKey FileVersion '${PROJECT_VERSION}'
+VIAddVersionKey FileDescription 'SculptForge installer'
+VIAddVersionKey CompanyName 'The SculptForge contributors'
+VIAddVersionKey LegalCopyright 'Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later.'")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\SculptForge.lnk' '$INSTDIR\\\\bin\\\\sculptforge.exe'")
 # macOS disk image
 set(CPACK_DMG_VOLUME_NAME "SculptForge")
