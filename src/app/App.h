@@ -617,6 +617,8 @@ private:
     void showSupportCard(SupportCardReason reason); // (also Help > Support and the welcome)
     void closeSupportCard();
     bool supportCardOpen() const;
+    bool pleaBlocked() const;          // a member (or Android: members-only APKs): no membership card of any kind
+    void tickSupportCardQueue();       // opens the queued first-run card once the other first-run boxes are away
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
@@ -667,7 +669,7 @@ private:
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
     bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
-    bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
+    bool supportCardQueued_ = false;            // the first start's full card waits for the welcome and the tier card
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
     // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).
     struct WhatsNewPopup;
@@ -1534,6 +1536,7 @@ private:
     // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
     void drawHardwareTierSection();
     void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    bool tierCardCovered() const;      // a modal card is over it: the tier card waits (not drawn, no input)
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
