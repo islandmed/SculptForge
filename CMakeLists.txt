@@ -604,6 +604,8 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
     configure_file(packaging/windows/sculptforge.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc @ONLY)
     target_sources(sculptforge PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc)
+    configure_file(packaging/windows/sculptforge-cli.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-cli.rc @ONLY)
+    target_sources(sculptforge-cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-cli.rc)
     # Per-monitor DPI v2 from the first instruction (a window moved between 100 % and 150 % monitors stays sharp
     # and SDL reports each monitor's scale); MSVC merges it into the manifest the linker writes. (SDL 3 also asks
     # for it at start-up; the manifest covers what runs before, and other toolchains rely on that.)
@@ -726,6 +728,15 @@ set(CPACK_NSIS_MUI_ICON ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.
 set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\sculptforge.exe")
 set(CPACK_NSIS_URL_INFO_ABOUT "https://sculptforge.app/")
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+# The installer's own version resource: SignPath's artifact configuration requires product name and version on every
+# signed file (docs/releasing.md "Windows code signing"; tools/ci/check_pe_metadata.ps1 checks it in CI).
+set(CPACK_NSIS_DEFINES "VIProductVersion ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.0
+VIAddVersionKey ProductName \"SculptForge\"
+VIAddVersionKey ProductVersion \"${PROJECT_VERSION}\"
+VIAddVersionKey FileVersion \"${PROJECT_VERSION}\"
+VIAddVersionKey FileDescription \"SculptForge installer\"
+VIAddVersionKey CompanyName \"The SculptForge contributors\"
+VIAddVersionKey LegalCopyright \"Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later.\"")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\SculptForge.lnk' '$INSTDIR\\\\bin\\\\sculptforge.exe'")
 # macOS disk image
 set(CPACK_DMG_VOLUME_NAME "SculptForge")
