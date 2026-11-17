@@ -739,7 +739,7 @@ void Mesh::finishNormals(float* curvature, bool computeNormals) {
             if (!curvature) {
                 for (uint32_t ti : vertexTriangles(v)) sum += faceNormal(positions, triangles[ti]);
                 const float len = glm::length(sum);
-                if (len > 1e-20f) normals[v] = sum / len;
+                normals[v] = len > 1e-20f ? sum / len : glm::vec3(0, 1, 0); // (as recomputeAllNormals: a vertex with no face keeps no stale normal)
                 continue;
             }
             // With the cavity term (curvatureAt) from the same corners.
@@ -759,7 +759,7 @@ void Mesh::finishNormals(float* curvature, bool computeNormals) {
                     }
             }
             const float len = glm::length(sum);
-            if (len > 1e-20f) normals[v] = sum / len;
+            normals[v] = len > 1e-20f ? sum / len : glm::vec3(0, 1, 0);
             curvature[v] = corners && edges > 0.0f ? glm::dot(normals[v], around - p * float(corners)) / edges : 0.0f;
         }
     }, 4096);

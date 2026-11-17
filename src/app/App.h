@@ -504,7 +504,8 @@ private:
     uint64_t popCommits_ = 0;
     glm::vec2 predictedPointer() const; // where the pen will be when this frame shows (the cursor, the head)
     static uint64_t meshStateHash(const Mesh& mesh); // --measure-stroke SF_MEASURE_VERIFY=1
-    bool verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii);
+    bool verifyStroke(uint64_t before, const std::vector<glm::vec3>& beforePositions, const std::vector<glm::vec3>& beforeNormals,
+                      const std::vector<glm::vec2>& dabs, const std::vector<float>& radii);
     bool lastInputPen_ = false; // the last mouse event came from a pen (SDL_PEN_MOUSEID)
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;

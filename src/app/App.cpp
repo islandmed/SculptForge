@@ -1147,6 +1147,7 @@ int App::run() {
         std::vector<float> radii;       // each dab's brush radius (px)
         // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
         uint64_t before = 0;
+        std::vector<glm::vec3> beforePositions, beforeNormals; // (and the arrays themselves: the check says how many vertices differ)
         // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
         int snapshots = 0;
     } sm;
@@ -1265,7 +1266,11 @@ int App::run() {
             const CanvasRect c = canvasRect();
             sm.cx = c.x + c.w * 0.5f;
             sm.cy = c.y + c.h * 0.5f;
-            sm.r = 0.25f * std::min(c.w, c.h);
+            static const float circle = [] { // SF_MEASURE_CIRCLE=0.06: the circle's radius as a share of the canvas (a small circle on a big brush: one region over most of the model)
+                const char* v = std::getenv("SF_MEASURE_CIRCLE");
+                return v && *v ? std::clamp(float(std::atof(v)), 0.01f, 0.45f) : 0.25f;
+            }();
+            sm.r = circle * std::min(c.w, c.h);
             sm.started = true;
             sm.start = sm.lastFrame = sm.pressAt = seconds();
             strokeProbe_ = &sm.dabs;
@@ -1275,7 +1280,11 @@ int App::run() {
                 if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
             if (const char* v = std::getenv("SF_MEASURE_STRENGTH")) // e.g. 0.35: the Intensity (the preview's pull depends on it)
                 strength_ = std::clamp(float(std::atof(v)), 0.0f, 1.0f);
-            if (verify) sm.before = meshStateHash(doc_.mesh);
+            if (verify) {
+                sm.before = meshStateHash(doc_.mesh);
+                sm.beforePositions = doc_.mesh.positions;
+                sm.beforeNormals = doc_.mesh.normals;
+            }
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
                 std::printf("Stroke: no stroke began (nothing to sculpt under the circle's start)\n");
@@ -1347,7 +1356,7 @@ int App::run() {
                 if (verify && !(now == sm.view))
                     std::printf("verify: skipped (the view changed during the stroke: distance %.3f -> %.3f, canvas %.0fx%.0f -> %.0fx%.0f)\n",
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
-                else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
+                else if (verify && !verifyStroke(sm.before, sm.beforePositions, sm.beforeNormals, sm.dabs, sm.radii)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = dabSpacingPx(radiusPx_, 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);

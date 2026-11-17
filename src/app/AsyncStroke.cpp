@@ -641,24 +641,60 @@ static uint64_t positionsHash(const Mesh& mesh) {
     return h;
 }
 
-bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii) {
+// How many entries of two arrays differ, and the largest distance between a pair.
+static std::pair<size_t, float> arrayDiff(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+    if (a.size() != b.size()) return {std::max(a.size(), b.size()), INFINITY};
+    size_t n = 0;
+    float worst = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (a[i] != b[i]) {
+            ++n;
+            worst = std::max(worst, glm::length(a[i] - b[i]));
+        }
+    return {n, worst};
+}
+
+bool App::verifyStroke(uint64_t before, const std::vector<glm::vec3>& beforePositions, const std::vector<glm::vec3>& beforeNormals,
+                       const std::vector<glm::vec2>& dabs, const std::vector<float>& radii) {
     const uint64_t after = meshStateHash(doc_.mesh);
-    const uint64_t afterPositions = positionsHash(doc_.mesh);
+    const std::vector<glm::vec3> afterPositions = doc_.mesh.positions;
     const std::vector<glm::vec3> afterNormals = doc_.mesh.normals;
     runCommand("undo", {});
+    // Undo: the positions (what the artist's work is) apart from the normals (derived from them, recomputed around the dabs).
     const uint64_t undone = meshStateHash(doc_.mesh);
+    const auto [undoPosDiffs, undoPosWorst] = arrayDiff(doc_.mesh.positions, beforePositions);
+    const auto [undoNrmDiffs, undoNrmWorst] = arrayDiff(doc_.mesh.normals, beforeNormals);
     const bool undoOk = undone == before;
+    { // Which side is stale: the normals the mesh had before the stroke, or the ones undo left, against an exact recompute from the positions.
+        const std::vector<glm::vec3> left = doc_.mesh.normals;
+        doc_.mesh.recomputeAllNormals();
+        const auto [beforeStale, beforeWorst] = arrayDiff(beforeNormals, doc_.mesh.normals);
+        const auto [leftStale, leftWorst] = arrayDiff(left, doc_.mesh.normals);
+        std::printf("verify: against normals recomputed from the positions: before the stroke %zu differ (largest %.3g), after undo %zu differ (largest %.3g)\n",
+                    beforeStale, double(beforeWorst), leftStale, double(leftWorst));
+        doc_.mesh.normals = left;
+    }
+    std::printf("verify: undo: positions %s (%zu differ, largest %.3g; hash %016llx, was %016llx); normals %s (%zu differ, largest %.3g); "
+                "positions+normals hash %s\n",
+                undoPosDiffs ? "DIFFER (DATA LOSS)" : "identical", undoPosDiffs, double(undoPosWorst),
+                (unsigned long long)positionsHash(doc_.mesh), (unsigned long long)[&] {
+                    Mesh m;
+                    m.positions = beforePositions;
+                    return positionsHash(m);
+                }(),
+                undoNrmDiffs ? "DIFFER" : "identical", undoNrmDiffs, double(undoNrmWorst), undoOk ? "identical" : "DIFFERS");
     // The same dabs, placed here (as with predictive strokes off).
     const bool wasAsync = asyncStroke_;
     asyncStroke_ = false;
     haveLastDab_ = false;
-    const auto place = [&] {
+    const auto place = [&](size_t count) {
         doc_.syncBvh();
         haveLastDab_ = false;
+        pickSmoother_.reset(); // (as onMouseDown does: the filter's last pick would carry into this stroke's first dab)
         doc_.sculptor.draftStrokes = draftStrokes(); // (the measured stroke is one the solver thread takes)
         doc_.sculptor.beginStroke(doc_.mesh, brushLabel(strokeBrush_), doc_.activeLayer);
         const float radius = radiusPx_;
-        for (size_t i = 0; i < dabs.size(); ++i) {
+        for (size_t i = 0; i < count; ++i) {
             if (i < radii.size()) radiusPx_ = radii[i]; // (the size each dab had: it may change mid-stroke)
             dabAt(dabs[i].x, dabs[i].y, 1.0f);
         }
@@ -667,27 +703,38 @@ bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, cons
         doc_.undo.push(doc_.sculptor.endStroke());
         return meshStateHash(doc_.mesh);
     };
-    const uint64_t replay = place();
-    const bool samePositions = positionsHash(doc_.mesh) == afterPositions;
-    size_t normalDiffs = 0;
-    float maxNormalDiff = 0.0f;
-    for (size_t i = 0; i < afterNormals.size() && i < doc_.mesh.normals.size(); ++i)
-        if (afterNormals[i] != doc_.mesh.normals[i]) {
-            ++normalDiffs;
-            maxNormalDiff = std::max(maxNormalDiff, glm::length(afterNormals[i] - doc_.mesh.normals[i]));
-        }
-    std::printf("verify: positions %s; %zu normals differ (largest %.3g)\n", samePositions ? "identical" : "DIFFERENT",
-                normalDiffs, double(maxNormalDiff));
+    const uint64_t replay = place(dabs.size());
+    const auto [posDiffs, posWorst] = arrayDiff(doc_.mesh.positions, afterPositions);
+    const auto [nrmDiffs, nrmWorst] = arrayDiff(doc_.mesh.normals, afterNormals);
+    std::printf("verify: positions %s (%zu differ, largest %.3g); %zu normals differ (largest %.3g)\n",
+                posDiffs ? "DIFFERENT" : "identical", posDiffs, double(posWorst), nrmDiffs, double(nrmWorst));
     // And once more: the frame-loop path against itself (anything here that isn't deterministic shows).
+    const std::vector<glm::vec3> replayPositions = doc_.mesh.positions;
+    const std::vector<glm::vec3> replayNormals = doc_.mesh.normals;
     runCommand("undo", {});
-    const uint64_t again = place();
+    const uint64_t again = place(dabs.size());
+    if (const char* v = std::getenv("SF_MEASURE_VERIFY"); v && *v == '2') { // which dab first differs between two replays
+        for (size_t k = 1; k <= dabs.size(); ++k) {
+            runCommand("undo", {});
+            place(k);
+            const std::vector<glm::vec3> a = doc_.mesh.positions;
+            runCommand("undo", {});
+            place(k);
+            const auto [n, worst] = arrayDiff(doc_.mesh.positions, a);
+            std::printf("verify: first %zu dabs twice: %zu positions differ (largest %.3g)\n", k, n, double(worst));
+            std::fflush(stdout);
+        }
+    }
     asyncStroke_ = wasAsync;
+    const auto [twicePos, twicePosWorst] = arrayDiff(doc_.mesh.positions, replayPositions);
+    const auto [twiceNrm, twiceNrmWorst] = arrayDiff(doc_.mesh.normals, replayNormals);
     const bool same = replay == after;
-    std::printf("verify: undo %s; %zu dabs replayed without the solver thread: %s (replayed twice: %s)\n",
+    std::printf("verify: undo %s; %zu dabs replayed without the solver thread: %s (replayed twice: %s; %zu positions differ, largest %.3g; "
+                "%zu normals differ, largest %.3g)\n",
                 undoOk ? "restores the mesh" : "DIFFERS", dabs.size(), same ? "identical" : "DIFFERENT",
-                again == replay ? "identical" : "DIFFERENT");
+                again == replay ? "identical" : "DIFFERENT", twicePos, double(twicePosWorst), twiceNrm, double(twiceNrmWorst));
     std::fflush(stdout);
-    return undoOk && same;
+    return undoOk && same && again == replay;
 }
 
 } // namespace sf
