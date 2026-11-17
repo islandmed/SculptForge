@@ -14,6 +14,7 @@
 //                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
 //   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
 //   type LABEL TEXT          click a text field and type into it
+//   type_here TEXT           type over the text field that is open now (a slider's typed value, after a double-click), no click
 //   radial_import FILE       import a radial menu file (from the shots folder if radial_export wrote it there,
 //                            otherwise relative to the script), as Import... would
 //   radial_export N FILE     export radial menu N (1-based) to FILE in the shots folder, as Export... would
@@ -101,7 +102,7 @@
 //                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
 //                            (3 = a triple-click; 0 = only point at it, e.g. for a key that acts under the cursor)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
-//                            can_undo, dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
+//                            can_undo, level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
 //                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
@@ -1108,7 +1109,9 @@ double Demo::query(const std::string& name, bool& known) const {
                : name == "timeline_cursor" ? double(t->cursor())
                                            : double(t->branches().size());
     }
+    if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
+    if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
     if (name == "splats") return double(app_.doc_.splats.size());
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
@@ -1846,7 +1849,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 // a table + switch has no depth, and a new step is a name here, an enumerator and a case.)
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
-    Click, JumpClick, TierCard, Hover, HoverModel, Type, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
+    Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
@@ -1871,7 +1874,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"tier_card", StepVerb::TierCard},
         {"hover", StepVerb::Hover},
         {"hover_model", StepVerb::HoverModel}, {"hover_window", StepVerb::HoverModel},
-        {"type", StepVerb::Type},
+        {"type", StepVerb::Type}, {"type_here", StepVerb::TypeHere},
         {"key", StepVerb::Key},
         {"key_down", StepVerb::KeyDown}, {"key_up", StepVerb::KeyDown},
         {"hold", StepVerb::Hold},
@@ -2231,6 +2234,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         auto text = std::make_shared<std::string>(restOf(lineText_, 2));
         steps_.push_back([this, text](float) {
             // Select what's there, then type over it like a person would.
+            testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
+            SDL_Event e{};
+            e.type = SDL_EVENT_TEXT_INPUT;
+            e.text.windowID = SDL_GetWindowID(app_.window_);
+            e.text.text = text->c_str();
+            app_.handleEvent(e);
+            return true;
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::TypeHere: {
+        if (!need(1)) return false;
+        auto text = std::make_shared<std::string>(restOf(lineText_, 1));
+        steps_.push_back([this, text](float) {
             testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
             SDL_Event e{};
             e.type = SDL_EVENT_TEXT_INPUT;
@@ -4831,7 +4849,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 continue;
             }
             static const std::set<std::string> allowed = {
-                "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
+                "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "type_here", "key", "key_down",
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",

@@ -1,0 +1,135 @@
+# A double-click on any slider or drag number types an exact value (member request: Ctrl+click did it on Size and
+# Intensity only): Enter applies, Esc cancels and leaves the value as it was before the first click, Tab goes on to the
+# next field, a typed number stays inside the slider's range, and a pen's double-tap does the same. One script for every
+# widget kind, in the Classic and the Streamlined layout (the 1440 and 2880 runs are in CMakeLists.txt).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+brush_size 60
+expect_value draw_size == 60
+
+# Top bar slider (SliderInside): the double-click opens the typed field, the value is still 60 under it.
+double_click "##drawsize"
+expect_value typing == 1
+expect_value draw_size == 60
+shot typing_size
+type_here 120
+key enter
+expect_value typing == 0
+expect_value draw_size == 120
+
+# Esc cancels: the first click of the double-click landed at the item's middle, and it is put back.
+double_click "##drawsize"
+expect_value typing == 1
+type_here 300
+key escape
+expect_value typing == 0
+expect_value draw_size == 120
+
+# A number past the range is clamped like the slider (Intensity 1-100).
+double_click "##strength"
+type_here 500
+key enter
+expect_value z_intensity == 100
+wait 0.5
+double_click "##strength"
+expect_value typing == 1
+type_here 35
+key enter
+expect_value z_intensity == 35
+
+# The Level slider switches a level (slow on a dense Part), so a double-click must switch once, with the typed number,
+# never for the first click's jump; Esc switches nothing; a single click still switches once the double-click time is past.
+run subdiv_divide
+run subdiv_divide
+expect_value subdiv_level == 3
+click "Geometry##tool.geometry"
+expect "Geometry/##level"
+remember level_switches sw0
+double_click "Geometry/##level"
+expect_value typing == 1
+wait 0.6
+expect_value level_switches == $sw0
+expect_value subdiv_level == 3
+key escape
+wait 0.6
+expect_value level_switches == $sw0
+expect_value subdiv_level == 3
+double_click "Geometry/##level"
+type_here 1
+key enter
+wait 0.6
+expect_value subdiv_level == 1
+expect_value level_switches == $sw0+1
+wait 0.5
+click "Geometry/##level"
+expect_value level_switches == $sw0+1
+wait 0.6
+expect_value level_switches == $sw0+2
+expect_value subdiv_level != 1
+
+# The Remesh palette: an integer slider (Target Quads), and the voxel slider with its own typed field.
+click "Remesh##tool.remesh"
+double_click "##qtarget"
+expect_value typing == 1
+type_here 5000
+key enter
+expect_value retopo_target == 5000
+remember voxel_resolution v0
+double_click "##voxres"
+type_here 300
+key enter
+expect_value voxel_resolution == 300
+wait 0.5 # (a third click inside the double-click time on the same spot is a triple-click)
+double_click "##voxres"
+key escape
+expect_value voxel_resolution == 300
+
+# Tab moves on to the next field.
+double_click "##qtarget"
+expect_value typing == 1
+type_here 7000
+key tab
+expect_value retopo_target == 7000
+expect_value typing == 1
+key escape
+wait_idle 30
+shot remesh_typing
+
+# Drag numbers (already typed by a double-click) still do: Reshape's Size.
+run part_append type=cube name=Box
+click "Reshape##tool.deformation"
+double_click "##deform_size_x"
+expect_value typing == 1
+key escape
+expect_value typing == 0
+
+# A pen's double-tap on a slider.
+click "Draw##palette.draw"
+pen_tap "##drawsize" enter
+pen_tap "##drawsize"
+expect_value typing == 1
+type_here 80
+key enter
+expect_value draw_size == 80
+pen_out
+
+# The Streamlined layout (and at 200 %).
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+wait 0.5
+double_click "##drawsize"
+expect_value typing == 1
+type_here 45
+key enter
+expect_value draw_size == 45
+double_click "##strength"
+type_here 22
+key enter
+expect_value z_intensity == 22
+ui_scale 200
+wait_idle 60
+double_click "##drawsize"
+expect_value typing == 1
+shot streamlined_typing
+key escape
+expect_value draw_size == 45

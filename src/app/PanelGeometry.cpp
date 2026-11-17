@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <imgui_internal.h>
 #include <string>
 
 namespace sf {
@@ -36,7 +37,7 @@ void App::drawLevelSlider(bool compact) {
     const Mesh& m = doc_.mesh;
     const int levels = subdivLevelCount(m), current = subdivCurrentLevel(m);
     ImGui::BeginDisabled(levels < 2 && !(layout_.customize && ui::CtrlHeld() && ui::AltHeld())); // (a one-level Part's slider can still be picked up)
-    if (!sdivHeld_) sdivSlider_ = float(current + 1);
+    if (!sdivHeld_ && !sdivPending_) sdivSlider_ = float(current + 1);
     if (!compact) ImGui::SetNextItemWidth(-1);
     const bool grab = !compact && beginShelfGrab();
     char format[32];
@@ -45,8 +46,30 @@ void App::drawLevelSlider(bool compact) {
     if (grab) endShelfGrab("##levelgrab", "widget.level", "Level");
     sdivHeld_ = ImGui::IsItemActive();
     sdivSlider_ = std::round(sdivSlider_);
-    if (ImGui::IsItemDeactivatedAfterEdit() && int(sdivSlider_) - 1 != current)
-        runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
+    // A level switch can take a while on a dense Part, so a plain click's jump is held until the double-click time has
+    // passed: a second click types the number instead and only that switches (slider_exact.sfui). A drag, the keyboard
+    // or a typed number applies at once.
+    const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
+    if (typing) sdivPending_ = false;
+    const double now = ImGui::GetTime();
+    if (ImGui::IsItemDeactivatedAfterEdit() && int(sdivSlider_) - 1 != current) {
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left) && !sdivTyping_) {
+            sdivPending_ = true;
+            sdivPendingAt_ = now;
+        } else {
+            sdivPending_ = false;
+            ++sdivSwitches_;
+            runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
+        }
+    }
+    if (sdivPending_ && now - sdivPendingAt_ >= double(ImGui::GetIO().MouseDoubleClickTime) + 0.05) {
+        sdivPending_ = false;
+        if (int(sdivSlider_) - 1 != current) {
+            ++sdivSwitches_;
+            runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
+        }
+    }
+    sdivTyping_ = typing;
     ImGui::EndDisabled();
 }
 
