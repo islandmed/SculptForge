@@ -19,7 +19,10 @@ expect_text Members keep it moving.
 expect_text Every release stays free for everyone.
 expect_text RECOMMENDED
 expect_text Member
-expect_text $5
+expect_text $48
+expect_text / year
+expect_text $4 a month, billed yearly
+expect_no_text / month
 expect_text Quote
 expect_text One quote for the whole studio: any number of artists, each with everything in Member
 expect_text Betas and early builds of the next version
@@ -27,8 +30,7 @@ expect_text Member Requests: one a month, built first, credited to you
 expect_no_text 10 artists
 expect_text Isolated: a private release channel, no outside connections
 expect_text Tell us your team size, platforms and pipeline
-expect_text or $48 a year
-expect "Member, $48 a year##card.member_yearly"
+expect "or $5 a month##card.member_monthly"
 shot first_run
 # HiDPI: the same card at 200 %.
 ui_scale 200
@@ -47,21 +49,21 @@ expect_value support_requests == 0
 # Clicks on the card never reach the canvas or the shortcuts underneath; a tier opens its Stripe checkout.
 click "Become a member##card.member"
 expect_value support_requests == 1
-expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card
+expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card
 wait 0.4
 expect_value support_card_open == 0
 
 # Preferences > Support > Show the memberships shows it any time (the card closes the palette, so it is reopened
-# each time); the yearly Member checkout is in the footer.
+# each time); the monthly Member checkout is the small link in the footer.
 click "Preferences##palette.preferences"
 click "Support##preferences.support"
 expect "I'm already a member##prefs.member_verify"
 click "Show the memberships"
 expect_value support_card_open == 1
 wait 0.8
-click "Member, $48 a year##card.member_yearly"
+click "or $5 a month##card.member_monthly"
 expect_value support_requests == 2
-expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card
+expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card
 wait 0.4
 click "Preferences##palette.preferences"   # (Support stays expanded)
 click "Show the memberships"
