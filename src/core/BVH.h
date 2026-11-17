@@ -105,6 +105,8 @@ public:
     // The triangles of every leaf whose padded box the ray (from origin along dir, t >= 0) crosses.
     void rayTrianglesPadded(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& dir, std::span<const float> pad, float extra,
                             std::vector<uint32_t>& out) const;
+    // The box round the whole mesh (a hair larger than it after edits: refits only grow it).
+    AABB rootBounds() const { return nodes_.empty() ? AABB{} : nodes_[0].box; }
     size_t memoryBytes() const;
     // Exchanges the trees (whole-mesh undo steps keep the other mesh's tree, so undo doesn't rebuild one). Both then
     // report a new structureSerial(), so caches keyed on it (Micro) never take a swapped tree for the old one.

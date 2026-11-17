@@ -510,6 +510,10 @@ void App::buildGhost() {
     renderer_.setScreenStroke(GhostStroke()); // (set again below when this frame's dabs draw on the screen)
     const uint32_t id = doc_.meshKey(doc_.activePart); // (the renderer's slot: linked Parts share it)
     if (liveMove_.active) { // Live Move: one "dab" per mirror, the whole move so far
+        if (Sculptor::beyondPart(doc_.bvh, liveMove_.radius)) { // (the big-brush guards: no preview of what it would do)
+            renderer_.setGhost(id, GhostStroke());
+            return;
+        }
         GhostStroke g;
         g.kind = GhostKind::Move;
         g.focal = focalShift_;
@@ -597,6 +601,11 @@ void App::buildGhost() {
         d.up = screenUpVector(lastDabAngle_); // (the square tip of Clay Block turns with the dabs' angle)
         base.push_back(d);
     }
+    for (const GhostDab& b : base)
+        if (Sculptor::beyondPart(doc_.bvh, b.radius)) { // (a brush bigger than the Part takes guards the preview doesn't draw)
+            renderer_.setGhost(id, GhostStroke());
+            return;
+        }
     for (uint32_t m = 0; m < mirrors.size(); ++m)
         for (const GhostDab& b : base) {
             GhostDab d = b;

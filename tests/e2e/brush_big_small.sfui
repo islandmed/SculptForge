@@ -1,0 +1,218 @@
+# e2e: a brush bigger or smaller than the Part (tester report, 0.13.3, macOS): a fresh default sphere (about 82k triangles),
+# Symmetry X on. Bigger than the sphere: Inflate pulled shards, Move a spiky star, Sharp Crease wings, Clay a rocky crumple, Trim a
+# crater; smaller: barely touched. Each brush, each Size, three strokes across the sphere: the mesh stays valid and nothing is flung
+# out of the scene; at a Size under the sphere the stroke still moves it.
+run new_sphere subdivisions=6
+camera 0 0
+expect_value symmetry_x == 1
+snapshot_start
+
+action brush.inflate
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot inflate-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot inflate-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot inflate-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
+action brush.move
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot move-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot move-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot move-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
+action brush.sharpcrease
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot sharpcrease-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot sharpcrease-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot sharpcrease-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
+action brush.clay
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clay-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clay-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot clay-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
+action brush.trim
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot trim-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot trim-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot trim-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+
+action brush.standard
+brush_size 400
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot standard-big
+expect_mesh_valid
+expect_value moved_max < 2.5
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 150
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot standard-mid
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z
+brush_size 25
+snapshot
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.3 0.8 0.7
+stroke 0.3 0.7 0.7 0.3
+shot standard-small
+expect_mesh_valid
+expect_value moved > 20
+key ctrl+z
+key ctrl+z
+key ctrl+z

@@ -234,6 +234,13 @@ public:
     // and the BVH.
     void moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> verts, std::span<const glm::vec3> d);
 
+    // Whether a brush of radius r is bigger than the Part the BVH holds: its dabs then take the big-brush guards, which the GPU
+    // preview (render/Ghost.h) does not draw (the app shows no preview for them).
+    static bool beyondPart(const BVH& bvh, float r) {
+        const AABB b = bvh.rootBounds();
+        const glm::vec3 e = b.max - b.min;
+        return b.valid() && r > 0.5f * std::max({e.x, e.y, e.z});
+    }
     SculptTimings timings;
     // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
     // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
@@ -468,6 +475,14 @@ private:
     std::vector<glm::vec3> baseCorner_, baseNormal_;
     bool microReady(Mesh& mesh); // the mesh has a micro level: starts the micro stroke on first use
     float strokeDiagonal_ = 0.0f;
+    // The Part's own size for this stroke (half its longest side, taken at the stroke's first dab): the most a brush's
+    // depth scales with (depthRadius). A brush several times the form sank or raised it by several of the form's sizes per stroke.
+    float partReach_ = 0.0f;
+    uint64_t partReachStroke_ = 0;
+    void notePart(const BVH& bvh);
+    // 0 for a brush up to the Part's size, 1 from twice its size up: how much the big-brush guards (Sculpt.cpp viewFacing, planeFacing) apply.
+    float bigness(float r) const { return partReach_ > 0.0f ? std::clamp(r / partReach_ - 1.0f, 0.0f, 1.0f) : 0.0f; }
+    float depthRadius(float r) const { return partReach_ > 0.0f ? std::min(r, partReach_) : r; }
     // The last remesh (repairDab remeshes it again when the brush squashed a triangle).
     bool lastRemesh_ = false;
     bool topologyHeld_ = false;
@@ -539,6 +554,12 @@ private:
     std::vector<float> grabWeights_;
     std::vector<std::pair<size_t, glm::mat3>> grabMirrors_;
     std::vector<uint32_t> grabAll_, grabLeaves_;
+    // Where a vertex that two mirrors' regions both hold is moved by both (a brush bigger than the form, spanning the mirror
+    // plane): each entry's slot in grabAll_, and per slot the factor (strongest weight / sum of weights) that keeps the sum
+    // from being more than the strongest copy asks. Empty when no vertex is held twice.
+    std::vector<uint32_t> grabSlot_;
+    std::vector<float> grabScale_;
+    std::vector<glm::vec3> grabAcc_;
 
     // Layer brush: per-stroke height already applied to each vertex.
     void prepareLayer(const Mesh& mesh, float height);

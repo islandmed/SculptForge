@@ -301,7 +301,27 @@ constexpr float kRelaxStep = 0.1f; // (a dab that moves less than this share of 
 struct AreaSums {
     glm::dvec3 normal{0.0}, center{0.0};
     double weight = 0.0;
+    glm::dvec3 faceNormal{0.0}, faceCenter{0.0}; // the same over what the camera faces (viewFacing)
+    double faceWeight = 0.0;
+    // The dab's area normal, centre and weight: from the camera-facing part of the region where it has weight, else all of it.
+    void pick(glm::vec3& n, glm::vec3& c, float& w) const {
+        const bool face = faceWeight > 1e-6 * weight && faceWeight > 0.0;
+        n = glm::vec3(face ? faceNormal : normal);
+        c = glm::vec3(face ? faceCenter : center);
+        w = float(face ? faceWeight : weight);
+    }
 };
+// A brush bigger than the form it works on reaches both its sides: summed over all of them the area normal cancels toward
+// nothing and the dab's plane turns noisy, dab to dab (tester, 0.13.3: Clay crumpled, Inflate shot shards, Trim cut a
+// crater). The plane is read from what the camera faces (1 facing it, 0 turned away, over about 12 degrees at the
+// silhouette), and a plane brush leaves surface turned away from its own plane alone (1 facing it, 0 beyond ~100 degrees).
+// `big`: how much of this applies (Sculptor::bigness: 0 for a brush well inside the Part, 1 from its own size up).
+inline float viewFacing(const glm::vec3& n, const glm::vec3& viewDir, float big) {
+    return glm::mix(1.0f, std::clamp((-glm::dot(n, viewDir) + 0.1f) / 0.2f, 0.0f, 1.0f), big);
+}
+inline float planeFacing(const glm::vec3& n, const glm::vec3& areaNormal, float big) {
+    return glm::mix(1.0f, std::clamp((glm::dot(n, areaNormal) + 0.2f) / 0.2f, 0.0f, 1.0f), big);
+}
 template <class F>
 AreaSums areaSums(size_t n, F&& add) {
     constexpr size_t kBlock = 4096;
@@ -315,6 +335,9 @@ AreaSums areaSums(size_t n, F&& add) {
         total.normal += p.normal;
         total.center += p.center;
         total.weight += p.weight;
+        total.faceNormal += p.faceNormal;
+        total.faceCenter += p.faceCenter;
+        total.faceWeight += p.faceWeight;
     }
     return total;
 }
@@ -994,8 +1017,17 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
     return count;
 }
 
+void Sculptor::notePart(const BVH& bvh) {
+    if (partReachStroke_ == strokeId_) return;
+    partReachStroke_ = strokeId_;
+    const AABB b = bvh.rootBounds();
+    const glm::vec3 e = b.max - b.min;
+    partReach_ = b.valid() ? 0.5f * std::max({e.x, e.y, e.z}) : 0.0f;
+}
+
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    notePart(bvh);
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
     if (type == BrushType::Cloth) { // ClothBrush.cpp (no remeshing: the simulation keeps its own topology)
@@ -1151,16 +1183,22 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
     // Weighted area normal and centre of the brush region.
+    const float big = bigness(p.radius);
     const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i * stride];
         float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
         acc.normal += glm::dvec3(nrm[v]) * double(w);
         acc.center += glm::dvec3(pos[v]) * double(w);
         acc.weight += w;
+        const float wf = w * viewFacing(nrm[v], p.viewDir, big);
+        acc.faceNormal += glm::dvec3(nrm[v]) * double(wf);
+        acc.faceCenter += glm::dvec3(pos[v]) * double(wf);
+        acc.faceWeight += wf;
     });
-    glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
-    const float wsum = float(sums.weight);
-    if (wsum <= 0.0f) return;
+    glm::vec3 areaNormal, areaCenter;
+    float wsum;
+    sums.pick(areaNormal, areaCenter, wsum);
+    if (sums.weight <= 0.0) return;
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
@@ -1197,6 +1235,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.areaCenter = areaCenter;
     plane.strokeDir = strokeDir;
     plane.r = r;
+    plane.depthR = depthRadius(r);
     plane.s = s;
     plane.sign = sign;
     plane.focal = p.focal;
@@ -1232,10 +1271,11 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         switch (type) {
         case BrushType::Standard: case BrushType::Flatten: case BrushType::Clay: case BrushType::Crease:
         case BrushType::Pinch: case BrushType::SharpCrease: case BrushType::Trim:
-            d = plane.offsetWith(x, f); // (core/SculptKernel.h)
+            // (Flatten pulls everything to the plane alike: a gate at the silhouette would shear the form there)
+            d = plane.offsetWith(x, type == BrushType::Flatten ? f : f * planeFacing(nrm[v], areaNormal, big)); // (core/SculptKernel.h)
             break;
         case BrushType::Inflate:
-            d = (inflateAlongNormals ? nrm[v] : areaNormal) * (sign * s * r * 0.05f * f);
+            d = (inflateAlongNormals ? nrm[v] : areaNormal) * (sign * s * depthRadius(r) * 0.05f * f);
             break;
         case BrushType::Smooth: case BrushType::SmoothPeaks: {
             if (p.groupBorders && type == BrushType::Smooth) { // along the border, on the tangent plane; junctions and inner vertices stay
@@ -1663,6 +1703,7 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
 
 void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    notePart(bvh);
     if (microReady(mesh)) {
         // A micro level: the grid takes a Standard dab with the recipe's depth (its sign carves or builds) and its
         // surface pattern (Dragon Scales, Skin Pores..., #120: they sculpted plain blobs there). Planes, pinch and
@@ -1764,6 +1805,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     const bool copied = !m.identity();
     auto patternAt = [&](const glm::vec3& x) { return copied ? m.inversePoint(x) : x; };
     const float focalExp = std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f));
+    const float big = r.crispEdge ? 0.0f : bigness(p.radius); // (a crisp cut has its own facing rule)
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];
         float t = std::clamp((1.0f - brushDistance(p, pos[v]) / rad) / edge, 0.0f, 1.0f);
@@ -1774,6 +1816,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         acc.normal += glm::dvec3(nrm[v]) * double(w);
         acc.center += glm::dvec3(pos[v]) * double(w);
         acc.weight += w;
+        const float wf = w * viewFacing(nrm[v], p.viewDir, big);
+        acc.faceNormal += glm::dvec3(nrm[v]) * double(wf);
+        acc.faceCenter += glm::dvec3(pos[v]) * double(wf);
+        acc.faceWeight += wf;
         if (r.cavityMask != 0.0f) {
             auto ring = mesh.neighbors(v);
             if (!ring.empty()) {
@@ -1797,9 +1843,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         if (stencil.active() && w > 0.0f) w *= stencil.weight(pos[v]);
         weights_[i] = w;
     });
-    glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
-    const float wsum = float(sums.weight);
-    if (wsum <= 0.0f) return;
+    glm::vec3 areaNormal, areaCenter;
+    float wsum;
+    sums.pick(areaNormal, areaCenter, wsum);
+    if (sums.weight <= 0.0) return;
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
@@ -1872,6 +1919,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         const uint32_t v = verts_[i];
         const glm::vec3& x = pos[v];
         float f = weights_[i];
+        if (!r.crispEdge && (r.direction == BrushRecipe::Direction::Normal || r.plane != BrushRecipe::Plane::None))
+            f *= planeFacing(nrm[v], areaNormal, big); // (surface turned away from the brush's plane: out of its reach)
         const float h = glm::dot(x - areaCenter, areaNormal);
         // Crisp edge on a locked plane: the height and facing this stroke found the vertex with (h is what is left
         // of that height), so every dab of the stroke asks the same of it.
@@ -1912,7 +1961,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         case BrushRecipe::Direction::Stroke: dir = strokeDir; break;
         default: dir = areaNormal; break;
         }
-        glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f);
+        glm::vec3 d = dir * (sign * r.depth * 0.12f * depthRadius(rad) * s * f);
 
         // Crisp edge: a Flatten plane only cuts (a member's ask: it never raises or adds clay, at any depth; the
         // regular Flatten brush is the one that fills). A point below the plane stays where it is, so no dip is
@@ -1950,7 +1999,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         switch (r.plane) {
         case BrushRecipe::Plane::Clay: {
             float k;
-            const glm::vec3 planePoint = PlaneKernel::clayPlaneAt(areaCenter, areaNormal, p.center, sign, rad * 0.06f * s, k);
+            const glm::vec3 planePoint = PlaneKernel::clayPlaneAt(areaCenter, areaNormal, p.center, sign, depthRadius(rad) * 0.06f * s, k);
             float hc = glm::dot(x - planePoint, areaNormal);
             if (sign * hc < 0.0f) d -= areaNormal * (hc * f * r.planeAmount * clayPull(s) * k);
             break;
@@ -1964,7 +2013,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             break;
         default: break;
         }
-        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
+        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f * depthRadius(rad) / rad);
         if (r.drag > 0.0f) d += p.strokeDelta * (dragScale * r.drag * f);
         scratch_[i] = d;
     }
@@ -2038,7 +2087,10 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabMirrors_.clear();
     grabAll_.clear();
     grabLeaves_.clear();
+    grabSlot_.clear();
+    grabScale_.clear();
     if (!active_) return;
+    notePart(bvh);
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
     // A mask nearby (the micro level's own, or the base mesh's) takes the grid's per-point rule for the whole stroke: the
@@ -2070,6 +2122,18 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
         std::inplace_merge(grabAll_.begin(), grabAll_.begin() + std::ptrdiff_t(grabMirrors_[i - 1].first),
                            grabAll_.begin() + std::ptrdiff_t(grabMirrors_[i].first));
     grabAll_.erase(std::unique(grabAll_.begin(), grabAll_.end()), grabAll_.end());
+    if (bigness(p.radius) > 0.0f && grabAll_.size() < grabVerts_.size()) { // (a brush bigger than the Part; some vertex is in two mirrors' regions)
+        grabSlot_.resize(grabVerts_.size());
+        std::vector<float> sum(grabAll_.size(), 0.0f);
+        grabScale_.assign(grabAll_.size(), 0.0f);
+        for (size_t i = 0; i < grabVerts_.size(); ++i) {
+            const uint32_t slot = uint32_t(std::lower_bound(grabAll_.begin(), grabAll_.end(), grabVerts_[i]) - grabAll_.begin());
+            grabSlot_[i] = slot;
+            sum[slot] += grabWeights_[i];
+            grabScale_[slot] = std::max(grabScale_[slot], grabWeights_[i]);
+        }
+        for (size_t k = 0; k < sum.size(); ++k) grabScale_[k] = sum[k] > 0.0f ? grabScale_[k] / sum[k] : 0.0f;
+    }
     if (grabMirrors_.size() > 1) {
         std::sort(grabLeaves_.begin(), grabLeaves_.end());
         grabLeaves_.erase(std::unique(grabLeaves_.begin(), grabLeaves_.end()), grabLeaves_.end());
@@ -2092,6 +2156,23 @@ void Sculptor::grabMove(Mesh& mesh, const glm::vec3& delta) {
     }
     if (grabVerts_.empty()) return;
     auto clock = std::chrono::steady_clock::now();
+    if (!grabSlot_.empty()) {
+        // A vertex two mirrors both hold takes the mean of their moves at the strongest weight, not the sum: a brush spanning the
+        // mirror plane pulled the form apart (the copies' moves, mirrored, added up on every vertex between them).
+        grabAcc_.assign(grabAll_.size(), glm::vec3(0.0f));
+        size_t first = 0;
+        for (const auto& [end, m] : grabMirrors_) {
+            const glm::vec3 dm = m * delta;
+            for (size_t i = first; i < end; ++i) grabAcc_[grabSlot_[i]] += dm * grabWeights_[i];
+            first = end;
+        }
+        for (size_t k = 0; k < grabAcc_.size(); ++k) grabAcc_[k] *= grabScale_[k];
+        displaceAll(mesh, grabAll_, grabAcc_);
+        timings.kernelMs += lapMs(clock);
+        ++timings.dabs;
+        timings.vertices += grabAll_.size();
+        return;
+    }
     // One mirror after another (a vertex may be in two), each in parallel.
     size_t begin = 0;
     for (const auto& [end, m] : grabMirrors_) {

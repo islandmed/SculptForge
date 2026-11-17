@@ -34,6 +34,7 @@ bool Sculptor::batchable(const Mesh& mesh, BrushType type, const DabParams& p, c
         return false;
     if ((p.alpha && !p.alpha->empty()) || p.stencil.active() || p.frontFacesOnly || p.connectedOnly || p.viewFalloff) return false;
     if (mesh.normals.size() != mesh.vertexCount()) return false;
+    if (bigness(p.radius) > 0.0f) return false; // (a brush bigger than the Part: the dab-by-dab path's guards, Sculptor::dabSingle)
     if (!pending_.empty()) {
         const PendingDab& f = pending_.front();
         if (f.type != type || f.sym.x != sym.x || f.sym.y != sym.y || f.sym.z != sym.z || f.sym.radialOn() != sym.radialOn() ||
@@ -285,6 +286,7 @@ void Sculptor::flushBatch(Mesh& mesh, BVH& bvh) {
         const float strokeLen = glm::length(p.strokeDelta);
         k.strokeDir = strokeLen > 1e-12f ? p.strokeDelta / strokeLen : glm::vec3(0.0f);
         k.r = p.radius;
+        k.depthR = depthRadius(p.radius);
         k.s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
         k.sign = p.invert ? -1.0f : 1.0f;
         k.focal = p.focal;
