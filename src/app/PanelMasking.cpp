@@ -444,7 +444,7 @@ void App::drawMaskingSection() {
                 a->run();
             }
     }
-    if (maskShape_ == SelectShape::Circle) drawCircleOptions();
+    if (maskShape_ == SelectShape::Circle) drawCircleOptions("mask");
     if (maskShape_ != SelectShape::Pen) { // #91.3
         ImGui::Checkbox(tr("Front faces only##mask"), &maskFrontFacesOnly_);
         ui::HelpText("Front faces only", nullptr,

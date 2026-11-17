@@ -87,6 +87,29 @@ expect_value masked < $from_centre
 key ctrl+z
 click "Draw from corner##circle"
 
+# Space (#214) slides the circle: its size (the press to the cursor) stays, its centre moves; let go and it sizes again.
+hold ctrl
+drag_path 0.4 0.45 0.55 0.6 keep
+expect_value selection_shown == 1
+remember selection_x0 x0
+remember selection_w w0
+remember selection_h h0
+key_down space
+drag_path 0.55 0.6 0.75 0.75 keep
+expect_value selection_x0 > $x0
+expect_value selection_w < $w0+1
+expect_value selection_w > $w0-1
+expect_value selection_h < $h0+1
+expect_value selection_h > $h0-1
+shot circle_mask_space_moved
+key_up space
+release
+hold none
+expect_value masked > 100
+expect_value can_undo == 1
+key ctrl+z
+expect_value masked == 0
+
 # A click without dragging masks nothing new: on the background it inverts, as with the other shapes.
 hold ctrl
 drag_path 1.4 0.5 1.4 0.5

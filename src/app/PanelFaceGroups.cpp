@@ -95,7 +95,7 @@ void App::drawFaceGroupsSection() {
 
 void App::drawVisibilitySection() {
     ui::Segmented(*this, {"select.rect", "select.lasso", "select.circle"});
-    if (hideShape_ == SelectShape::Circle) drawCircleOptions();
+    if (hideShape_ == SelectShape::Circle) drawCircleOptions("select");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
     if (ImGui::Button(tr("Show all"), ImVec2(half, 0))) runCommand("show_all");

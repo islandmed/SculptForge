@@ -962,7 +962,7 @@ private:
     bool circleFromCorner_ = false, circleRound_ = false; // the options (Tool > Masking, Visibility, Cut)
     bool selectCorner_ = false, selectShiftAtPress_ = false; // latched when the drag starts
     DragEllipse selectEllipse() const;                       // window pixels
-    void drawCircleOptions();
+    void drawCircleOptions(const char* scope); // scope: the panel, so two open panels keep their own checkboxes
     void drawCircleShape(ImDrawList* dl, const DragEllipse& e, ImU32 fill, ImU32 line, float width) const;
     float facegroupAngle_ = 30.0f;
     // visibleFace groupCount is O(triangles): recomputed only when the key below changes.

@@ -57,6 +57,25 @@ wait 0.2
 expect_value can_undo == 1
 key ctrl+z
 
+# Space (#214) slides the circle before the cut: the size stays, the hole lands where it was slid to.
+hold ctrl+shift
+drag_path 0.4 0.45 0.55 0.6 keep
+remember selection_x0 x0
+remember selection_w w0
+key_down space
+drag_path 0.55 0.6 0.75 0.75 keep
+expect_value selection_x0 > $x0
+expect_value selection_w < $w0+1
+expect_value selection_w > $w0-1
+key_up space
+release
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_space_moved
+key ctrl+z
+expect_value triangles == $full
+
 # In: a round pocket; Add: a round boss; Clip presses the outside flat onto the rim. Each is one undo step.
 click "In##cut.in"
 hold ctrl+shift

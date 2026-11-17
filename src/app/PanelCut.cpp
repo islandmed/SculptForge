@@ -182,7 +182,8 @@ void App::drawCutOverlay() {
 }
 
 // Circle Mask, Select Circle and Cut Circle share these two options (#213); each is also on a key while dragging.
-void App::drawCircleOptions() {
+void App::drawCircleOptions(const char* scope) {
+    ImGui::PushID(scope);
     ImGui::Checkbox(tr("Draw from corner##circle"), &circleFromCorner_);
     ui::HelpText("Draw from corner", nullptr,
                  tr("The press and the cursor are opposite corners of the circle's box, not its centre. Cut Circle: Alt at "
@@ -193,13 +194,14 @@ void App::drawCircleOptions() {
                  tr("Always a perfect circle. Shift while dragging flips it for that drag (Select and Cut already hold "
                     "Shift: letting go of it flips)."),
                  "Tool > Masking");
+    ImGui::PopID();
 }
 
 void App::drawCutSection() {
     ImGui::TextDisabled("%s", tr("Ctrl+Shift+drag a Cut shape"));
     ui::Segmented(*this, {"cut.line", "cut.lasso"}); // two rows: the names fit a narrow tray
     ui::Segmented(*this, {"cut.rect", "cut.circle", "cut.polyline"});
-    if (hideShape_ == SelectShape::CutCircle) drawCircleOptions();
+    if (hideShape_ == SelectShape::CutCircle) drawCircleOptions("cut");
     ui::Segmented(*this, {"cut.away", "cut.in", "cut.add", "cut.clip"});
     if (cutMode_ == 1 || cutMode_ == 2) {
         ImGui::SetNextItemWidth(-1);
