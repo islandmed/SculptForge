@@ -2701,6 +2701,36 @@ private:
     ImFont* fontHelpTitle_ = nullptr;
     ImFont* fontConsole_ = nullptr;
     std::string commandSource_; // shown before echoed commands, e.g. "AI" while the agent drives the app
+    // A released stroke whose dabs the solver thread is still placing (AsyncStroke.cpp): a command from a shortcut or a
+    // menu waits for it in drainQueue_ (in order, each once; Esc drops them) instead of finishing the stroke on this
+    // thread, which froze the window for the rest of the stroke (up to ~1 s on a 28M mesh on the floor tier). Scripts,
+    // macros, the AI link and panel buttons still finish it first: they need the result at once.
+    int interactiveCommand_ = 0; // > 0: a shortcut or menu item is running
+    std::vector<std::pair<std::string, Args>> drainQueue_;
+    // A press while the stroke drains: it and the pointer after it wait (each with its event time) and run as they came
+    // once the stroke is done (drainQueue_'s kHeldPress entry), so the next stroke picks the finished surface.
+    struct HeldPointer {
+        enum Kind : uint8_t { Down, Move, Up } kind;
+        float x, y, dx, dy;
+        Uint8 button;
+        bool fromPen;
+        Uint64 ns;
+    };
+    std::vector<HeldPointer> heldPointer_;
+    bool holdingPointer_ = false;
+    bool drainNextFrame_ = false; // the stroke ended: the queue runs next frame (a stroke's end and a press are both long)
+    static constexpr const char* kHeldPress = "(stroke)";
+    void replayHeldPointer();
+    bool strokeDraining() const;
+public:
+    void runInteractive(const std::function<void()>& run) { // a menu item: as a shortcut (drainQueue_)
+        ++interactiveCommand_;
+        run();
+        --interactiveCommand_;
+    }
+private:
+    void runDrainQueue();
+    std::string drainStatus() const;
     std::mutex uiFileMutex_;
     std::vector<std::pair<int, std::string>> uiFiles_; // (kind, path) from file dialogs
     // ---- end Help/Console/Config (C) ----

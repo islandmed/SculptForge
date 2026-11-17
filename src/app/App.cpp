@@ -433,6 +433,7 @@ void App::shutdown() {
     closePanelWindows(); // (panels.json keeps them for the next start)
     autosavePrefs(true); // a change still waiting for its moment
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (!drainQueue_.empty()) runDrainQueue(); // (a save asked during the stroke's end still happens)
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
@@ -1147,6 +1148,10 @@ int App::run() {
         std::vector<float> radii;       // each dab's brush radius (px)
         // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
         uint64_t before = 0;
+        // SF_MEASURE_DRAIN=undo / stroke: right after the release, a Ctrl+Z (as the shortcut runs it) or a click on the
+        // model while the solver is still placing the dabs: it must wait for them (no frame blocked on them) and then run.
+        bool drainQueued = false, drainHeld = false;
+        double drainWorstFrame = 0.0, drainLast = 0.0;
         // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
         int snapshots = 0;
     } sm;
@@ -1265,7 +1270,11 @@ int App::run() {
             const CanvasRect c = canvasRect();
             sm.cx = c.x + c.w * 0.5f;
             sm.cy = c.y + c.h * 0.5f;
-            sm.r = 0.25f * std::min(c.w, c.h);
+            static const float circle = [] { // SF_MEASURE_CIRCLE: the circle's radius, a fraction of the view (a thin model)
+                const char* v = std::getenv("SF_MEASURE_CIRCLE");
+                return v && *v ? std::clamp(float(std::atof(v)), 0.01f, 0.45f) : 0.25f;
+            }();
+            sm.r = circle * std::min(c.w, c.h);
             sm.started = true;
             sm.start = sm.lastFrame = sm.pressAt = seconds();
             strokeProbe_ = &sm.dabs;
@@ -1302,9 +1311,27 @@ int App::run() {
                 sm.releaseAt = seconds();
                 onMouseUp(); // places the dabs still waiting (or, with predictive strokes, leaves them to the solver)
                 sm.releaseMs = (seconds() - sm.releaseAt) * 1000.0;
+                const double actionAt = seconds();
+                if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain && strokeDraining()) {
+                    if (std::string(drain) == "none") { // (the frames of a stroke's end alone, to compare)
+                        sm.drainQueued = true;
+                    } else if (std::string(drain) == "stroke") {
+                        onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT); // (on the circle: on the model)
+                        onMouseUp();
+                        sm.drainHeld = holdingPointer_;
+                    } else {
+                        runInteractive([this] { runCommand("undo"); });
+                    }
+                    if (std::string(drain) != "none") sm.drainQueued = !drainQueue_.empty();
+                    sm.drainWorstFrame = seconds() - actionAt; // (the shortcut's own time: finishing the stroke here froze the window)
+                }
                 sm.moving = false;
                 sm.releasing = true;
             }
+        } else if (sm.releasing && (doc_.sculptor.strokeActive() || !drainQueue_.empty())) {
+            const double t = seconds(); // (the frames while the stroke drains: from one to the next, the release's own included)
+            sm.drainWorstFrame = std::max(sm.drainWorstFrame, t - (sm.drainLast > 0.0 ? sm.drainLast : sm.releaseAt));
+            sm.drainLast = t;
         } else if (sm.releasing && !doc_.sculptor.strokeActive()) {
             {
                 const double releaseDoneMs = (seconds() - sm.releaseAt) * 1000.0;
@@ -1347,7 +1374,14 @@ int App::run() {
                 if (verify && !(now == sm.view))
                     std::printf("verify: skipped (the view changed during the stroke: distance %.3f -> %.3f, canvas %.0fx%.0f -> %.0fx%.0f)\n",
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
-                else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
+                else if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain) {
+                    // The queued Ctrl+Z took the whole stroke back; the held click became a stroke of its own after it.
+                    const bool none = std::string(drain) == "none", undo = !none && std::string(drain) != "stroke";
+                    const bool ok = sm.drainQueued && (none || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
+                    std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n", none ? "nothing" : undo ? "Ctrl+Z" : "a click",
+                                sm.drainQueued ? "waited" : "did NOT wait", sm.drainWorstFrame * 1000.0, ok ? "ok" : "FAILED");
+                    if (!ok) return 1;
+                } else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = dabSpacingPx(radiusPx_, 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
@@ -1375,7 +1409,10 @@ int App::run() {
         // the memory on Apple silicon: Lucy 28M stroke frame p99 31 -> 37 ms); light strokes keep overlapping.
         if (solverBound_ && (drag_ == Drag::Stroke || solverBusy())) waitLastFrame();
         flushGrab(); // Move: the pointer's moves since the last frame, as one
-        if (asyncStroke_) pumpStroke();
+        if (drainNextFrame_) { // (the stroke ended last frame: what waited for it runs now, its own frame)
+            drainNextFrame_ = false;
+            runDrainQueue();
+        } else if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
         kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
@@ -2079,7 +2116,16 @@ BrushType App::activeBrush() const {
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
-    if (strokeFinishing_) endStroke(); // the last stroke's dabs still being placed: finish them first
+    if (holdingPointer_ || strokeDraining() || !drainQueue_.empty()) { // the last stroke's dabs still being placed (or what waited for them): this press waits
+        if (!holdingPointer_) drainQueue_.emplace_back(kHeldPress, Args{});
+        holdingPointer_ = true;
+        heldPointer_.push_back({HeldPointer::Down, x, y, 0.0f, 0.0f, button, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        mouseX_ = x;
+        mouseY_ = y;
+        status_ = drainStatus();
+        return;
+    }
+    if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
     mouseX_ = x;
     mouseY_ = y;
     const SDL_Keymod mod = inputMods();
@@ -2268,6 +2314,12 @@ bool App::blenderNavigationDown(Uint8 button) {
 }
 
 void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
+    if (holdingPointer_) { // (after a held press: it moves as it did once the stroke before is done)
+        heldPointer_.push_back({HeldPointer::Move, x, y, dx, dy, 0, fromPen, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        mouseX_ = x;
+        mouseY_ = y;
+        return;
+    }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
     if (!fromPen && penInProximity_) penLeft();
@@ -2473,6 +2525,10 @@ float App::rollSweep(float x, float y, float dx, float dy) const {
 }
 
 void App::onMouseUp() {
+    if (holdingPointer_) {
+        heldPointer_.push_back({HeldPointer::Up, mouseX_, mouseY_, 0.0f, 0.0f, 0, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        return;
+    }
     rollPending_ = false;
     rollSideways_ = false;
     rightClick_.pending = rightClick_.down = false;
@@ -2584,7 +2640,16 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
     actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    if (key == SDLK_ESCAPE && !drainQueue_.empty()) { // Esc drops the commands waiting for the stroke
+        drainQueue_.clear();
+        heldPointer_.clear();
+        holdingPointer_ = false;
+        status_ = "Finishing stroke (queued commands cancelled)";
+        return;
+    }
+    ++interactiveCommand_;
     actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
+    --interactiveCommand_;
     keyDown_ = SDLK_UNKNOWN;
 }
 
@@ -3102,6 +3167,12 @@ void App::endStroke() {
 // ---------------------------------------------------------------------------
 
 void App::runCommand(const std::string& name, const Args& args) {
+    if (interactiveCommand_ > 0 && macros_.runDepth == 0 && commandSource_.empty() && (strokeDraining() || !drainQueue_.empty())) {
+        drainQueue_.emplace_back(name, args);
+        status_ = drainStatus();
+        lastCommandOk_ = true;
+        return;
+    }
     // In the app a macro asks before it first runs and a pack is reviewed before it's installed (PanelPacks.cpp),
     // whether they come from a button, a key, the console or a script.
     if (name == "macro_run" && macros_.runDepth == 0) {
@@ -3146,6 +3217,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         return;
     }
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (!drainQueue_.empty()) runDrainQueue(); // (what a shortcut queued runs before this, as it was asked first)
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
     if (name == "save_project") storeProjectSettings();
