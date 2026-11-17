@@ -11,4 +11,4 @@ testers:
   - A head with a micro level from an earlier version: open, zoom in on a pore. The detail reads the same from arm's length.
 ---
 Also on the branch (no user-visible change): `--benchmark core-<N>m` scenes at any size and the sf_detail_bench tool
-(tests/tools/detail_bench.cpp), the measurement harness for the Forge Ink work. Stacked on batch/0.13.5 (lands after it).
+(tests/tools/detail_bench.cpp), the measurement harness for the Forge Ink work. Based on main (0.13.6 is out); feat/forge-ink-tiles stacks on this branch.
