@@ -86,11 +86,6 @@ void App::StrokeSolver::loop() {
         double spent = 0.0;
         const SculptTimings before = app.doc_.sculptor.timings;
         app.dabView_ = &view;
-        if (finalize) { // a draft stroke's end: every normal and cavity term it touched
-            const auto t0 = std::chrono::steady_clock::now();
-            app.doc_.sculptor.flushDraft(app.doc_.mesh, app.doc_.bvh);
-            spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        }
         app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
@@ -98,13 +93,14 @@ void App::StrokeSolver::loop() {
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         {
+            // Then the normals: a share of the exact ones the brush has left behind while dabs keep coming (lifting the pen
+            // then waits for the last stretch only), the next ones at a pause, and at the release (`finalize`) every normal
+            // and cavity term a draft stroke touched, after this batch's dabs: flushed before them, the last dabs of a
+            // stroke still queued at the release (a slow machine) read other normals than the same stroke placed in one go.
             const auto t0 = std::chrono::steady_clock::now();
-            app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
-            // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
-            if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
-            // A share of the exact normals the brush has left behind, every batch: lifting the pen then waits for
-            // the last stretch only (they cost a tenth of what the dab-by-dab normals did over the stroke).
-            else if (!finalize) app.doc_.sculptor.catchUpBehind(app.doc_.mesh, app.doc_.bvh, 0.35);
+            using End = Sculptor::BatchEnd;
+            app.doc_.sculptor.finishBatch(app.doc_.mesh, app.doc_.bvh, finalize ? End::Release : catchUp ? End::Pause : End::Stroking,
+                                          catchUpLeaves);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         app.dabView_ = nullptr;

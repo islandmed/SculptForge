@@ -178,6 +178,44 @@ TEST(stroke_determinism_normal_catch_up_between_dabs_does_not_change_the_stroke)
     }
 }
 
+// Predictive + Draft (artist-qa, Lucy 28M on the floor tier): the solver thread places a stroke in batches, and a slow
+// machine still has dabs queued when the pen lifts; that last batch carries the release's draft flush. Flushed before its
+// dabs, they read the exact normals where the serial stroke (every dab, then the flush) read the stroke-start ones: 8.6M
+// positions differed by up to 0.89. The flush now follows the batch's dabs (Sculptor::finishBatch).
+TEST(stroke_determinism_draft_release_batch_matches_the_serial_stroke) {
+    const Mesh sphere = makeIcosphere(7);
+    std::vector<DabParams> dabs = bigDabs();
+    for (DabParams& p : dabs) p.radius = 0.8f; // (a draft has no adaptive path: smaller regions, the same order)
+    const auto run = [&](int mode) {
+        Document d = makeDoc(Mesh(sphere));
+        d.mesh.recomputeAllNormals();
+        d.sculptor.draftStrokes = true;
+        d.sculptor.beginStroke(d.mesh, "Standard");
+        if (mode == 0) { // serial (the frame loop, and verifyStroke's replay): every dab, then the flush
+            for (const DabParams& p : dabs) d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, kNoSymmetry);
+            d.sculptor.flushDraft(d.mesh, d.bvh);
+        } else { // the solver: batches of two, a pause after the first, the release on the last (dab 5 still queued)
+            using End = Sculptor::BatchEnd;
+            for (size_t b = 0; b < dabs.size(); b += 2) {
+                const bool last = b + 2 >= dabs.size();
+                if (mode == 2 && last) d.sculptor.flushDraft(d.mesh, d.bvh); // the old order: the release's flush first
+                d.sculptor.beginBatch();
+                for (size_t i = b; i < std::min(b + 2, dabs.size()); ++i) d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, dabs[i], kNoSymmetry);
+                d.sculptor.finishBatch(d.mesh, d.bvh, last ? End::Release : b == 0 ? End::Pause : End::Stroking, SIZE_MAX);
+            }
+        }
+        d.undo.push(d.sculptor.endStroke());
+        return d.mesh;
+    };
+    const Mesh serial = run(0), batched = run(1), flushFirst = run(2);
+    std::printf("  draft release: batched %zu positions / %zu normals differ; flush before the last dabs %zu positions differ\n",
+                differ(batched.positions, serial.positions), differ(batched.normals, serial.normals),
+                differ(flushFirst.positions, serial.positions));
+    CHECK(differ(batched.positions, serial.positions) == 0);
+    CHECK(differ(batched.normals, serial.normals) == 0);
+    CHECK(differ(flushFirst.positions, serial.positions) > 0); // (the order this test guards does show)
+}
+
 TEST(stroke_determinism_heavy_stroke_replays_and_undoes_exactly) {
     checkSphere(makeIcosphere(8), false); // 655k vertices
 }

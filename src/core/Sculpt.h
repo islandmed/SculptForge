@@ -328,6 +328,11 @@ public:
     bool draftActive() const { return draft_; }
     bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
     void flushDraft(Mesh& mesh, const BVH& bvh);
+    // The end of a batch of dabs on the app's solver thread (AsyncStroke.cpp): endBatch, then the normals' share for
+    // how the batch came (dabs still coming: catchUpBehind; the pen at rest: catchUpNormals of `catchUpLeaves`; the
+    // pen lifted: flushDraft, after the batch's own dabs, which the serial stroke placed before its flush too).
+    enum class BatchEnd { Stroking, Pause, Release };
+    void finishBatch(Mesh& mesh, BVH& bvh, BatchEnd end, size_t catchUpLeaves = 0);
 
     // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
     const MicroStroke& microStroke() const { return micro_; }

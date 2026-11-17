@@ -53,6 +53,15 @@ void Sculptor::endBatch(Mesh& mesh, BVH& bvh) {
     batching_ = false;
 }
 
+void Sculptor::finishBatch(Mesh& mesh, BVH& bvh, BatchEnd end, size_t catchUpLeaves) {
+    endBatch(mesh, bvh);
+    switch (end) {
+    case BatchEnd::Stroking: catchUpBehind(mesh, bvh, 0.35); break;
+    case BatchEnd::Pause: catchUpNormals(mesh, bvh, catchUpLeaves); break;
+    case BatchEnd::Release: flushDraft(mesh, bvh); break;
+    }
+}
+
 namespace {
 
 // A dab's frame on the surface from points with normals (the dab-by-dab path's areaSums, over a sample).
