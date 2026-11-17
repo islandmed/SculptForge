@@ -42,7 +42,7 @@ NAV_SHOP = "https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_med
 
 # (label, path under the site root, extra attributes)
 NAV_MENU = [("Features", "index.html#features"), ("Demos", "index.html#demos"), ("Brushes", "brushes.html"),
-        ("Guide", "guide/index.html"), ("For studios", "studios.html"), ("About", "why.html"), ("Shop", NAV_SHOP)]
+        ("Guide", "guide/index.html"), ("For studios", "studios.html"), ("About", "why.html"), ("Labs", "labs/index.html"), ("Shop", NAV_SHOP)]
 
 NAV_SOCIALS = [("Discord", "discord", "https://discord.gg/gWrYkEmQhH"),
            ("GitHub", "github", "https://github.com/islandmed/SculptForge"),
@@ -1065,6 +1065,7 @@ def page_html(page: Page, index: Page, chapters, position: int) -> str:
       </div>
       <div class="links">
         <a href="../performance/">Performance</a>
+        <a href="../labs/index.html">Labs</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
@@ -1314,9 +1315,11 @@ def supporters_html() -> str:
     <div class="wrap footer-grid">
       <div class="links">
         <a href="performance/">Performance</a>
+        <a href="labs/index.html">Labs</a>
         <a href="index.html">Home</a>
         <a href="support.html">Membership</a>
         <a href="terms.html">Terms</a>
+        <a href="privacy.html">Privacy</a>
         <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
 {footer_social("")}
@@ -1408,8 +1411,8 @@ def main() -> int:
         if wn:
             write_home(wn, False)
         urls = [SITE, SITE + "brushes.html", SITE + "press.html",
-                SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "jobs.html", SITE + "queue.html", SITE + "vote.html",
-                SITE + "supporters.html", SITE + "why.html", SITE + "code-signing.html",
+                SITE + "studios.html", SITE + "ai.html", SITE + "support.html", SITE + "terms.html", SITE + "privacy.html", SITE + "jobs.html", SITE + "queue.html", SITE + "vote.html",
+                SITE + "supporters.html", SITE + "why.html", SITE + "labs/", SITE + "labs/quantum.html", SITE + "code-signing.html",
                 SITE + "performance/", SITE + "llms.txt"] + [f"{SITE}guide/{p.name[:-3]}.html" for p in pages]
         (ROOT / "website" / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

@@ -3,123 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Exploring quantum computing - SculptForge research note</title>
-  <meta name="description" content="A research note, November 2026: where SculptForge stands on quantum computing, what we are watching, and what would have to be true before we ship anything.">
-  <meta name="theme-color" content="#111114">
+  <title>Exploring quantum computing - SculptForge Labs</title>
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
-  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
-  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Exploring: quantum computing">
-  <meta property="og:description" content="Today it does not beat a GPU at sculpting. What we are watching, and what would have to be true.">
-  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <meta property="og:url" content="https://sculptforge.app/research/quantum.html">
-  <link rel="canonical" href="https://sculptforge.app/research/quantum.html">
-  <meta name="twitter:card" content="summary_large_image">
-  <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=40">
-  <script src="../motion.js?v=15" defer></script>
-  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-  <style>
-    .rn { padding: 88px 0 72px; }
-    .rn .wrap { max-width: 760px; }
-    .rn h1 { font-size: clamp(2.2rem, 5.5vw, 3.4rem); margin: 8px 0 20px; }
-    .rn h2 { font-size: clamp(1.3rem, 2.6vw, 1.6rem); margin: 44px 0 12px; }
-    .rn p, .rn li { color: var(--muted); font-size: 1.05rem; line-height: 1.7; }
-    .rn .lede { color: #d4d4dc; font-size: 1.2rem; }
-    .rn ul { padding-left: 1.2em; }
-    .rn li { margin-bottom: 14px; }
-    .rn li strong { color: var(--text); }
-    .rn .fine { margin-top: 40px; }
-  </style>
+  <meta http-equiv="refresh" content="0; url=../labs/quantum.html">
+  <link rel="canonical" href="https://sculptforge.app/labs/quantum.html">
+  <meta name="robots" content="noindex">
 </head>
-<body>
-  <div class="scroll-progress" aria-hidden="true"></div>
-  <header class="nav">
-    <div class="wrap nav-inner">
-      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
-      <nav aria-label="Main">
-        <a href="../index.html#features">Features</a>
-        <a href="../index.html#demos">Demos</a>
-        <a href="../brushes.html">Brushes</a>
-        <a href="../guide/index.html">Guide</a>
-        <a href="../studios.html">For studios</a>
-        <a href="../why.html">About</a>
-        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
-        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
-        <a class="nav-support" href="../support.html">Support</a>
-        <a class="nav-dl" href="../index.html#download">Download</a>
-        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
-      </nav>
-    </div>
-  </header>
-
-  <main id="top">
-    <article class="rn">
-      <div class="wrap">
-        <p class="eyebrow">Research note, November 2026</p>
-        <h1>Exploring: quantum computing</h1>
-        <p class="lede">Quantum computers are interesting, and today they do not make sculpting better. We are watching the field as it develops, and we will ship nothing quantum until it measurably wins.</p>
-
-        <h2>Where we stand</h2>
-        <p>SculptForge runs on your own CPU and GPU. Today's quantum computers are reached through the cloud, and they do not beat a GPU at sculpting, retopology or brush physics. This page is not a feature announcement and there is nothing quantum in the app.</p>
-
-        <h2>What we are watching</h2>
-        <p>Three open research questions, each with what would have to be true for it to matter to an artist.</p>
-        <ul>
-          <li><p><strong>Quad layout as combinatorial optimisation.</strong> Choosing where a quad mesh puts its irregular vertices and edge flow is an integer optimisation problem.</p><p>A classical formulation is <a href="https://dl.acm.org/doi/10.1145/1576246.1531383" rel="noopener">mixed-integer quadrangulation</a>. Annealing-style and <a href="https://arxiv.org/abs/1411.4028" rel="noopener">QAOA</a> solvers target problems of this shape.</p><p>For a small, hard sub-problem to be worth sending away, the quantum solver would have to match or beat the classical one on layout quality, in less total time, including the cloud round trip. Whether near-term devices can do that on practical problems is still an open question (<a href="https://arxiv.org/abs/1801.00862" rel="noopener">Preskill, 2018</a>).</p></li>
-          <li><p><strong>Material and physics simulation.</strong> Cloth, soft bodies and fluids are simulated classically today, interactively. A quantum method would need error-corrected hardware, and a speedup large enough to survive that overhead.</p><p> <a href="https://arxiv.org/abs/2011.04149" rel="noopener">Babbush and colleagues</a> argue that quadratic speedups alone are unlikely to be enough.</p><p>It would also have to get the scene in and the result out without eating the gain (<a href="https://doi.org/10.1038/nphys3272" rel="noopener">Aaronson, 2015</a>).</p></li>
-          <li><p><strong>Quantum machine learning for generation.</strong> A claimed exponential quantum speedup for recommendation systems was later matched by a classical algorithm (<a href="https://arxiv.org/abs/1807.04271" rel="noopener">Tang, 2018</a>).</p><p>A reminder to check such claims against the best classical method. For this to matter, a quantum model would have to produce better results than a GPU model at the same cost, measured on the same task.</p></li>
-        </ul>
-
-        <h2>How we would do it, if it ever wins</h2>
-        <ul>
-          <li>Optional, and off by default. Nothing leaves your machine unless you switch it on, and it would show what is sent (only the sub-problem, never your whole project) before it goes.</li>
-          <li>Bring your own provider key, like our <a href="../guide/brush-lab.html">optional AI brushes</a>.</li>
-          <li>Never needed for the free app, and never a reason for anything to get slower or more expensive.</li>
-          <li>Judged with the same harness and habits as <a href="../performance/">our published benchmarks</a>: the slowest-frame milliseconds must not get worse, and the result must be better in quality and in total time, from start to finish, measured on ordinary hardware.</li>
-        </ul>
-
-        <h2>Researchers and providers</h2>
-        <p>If you work on quantum algorithms or hardware and want a real-world visual test case (a mesh, a layout problem, a simulation with a result you can see), we would like to hear from you.</p><p>This is a conversation about test cases, not a roadmap or a partnership. <a data-mail="Quantum research note" href="https://discord.gg/gWrYkEmQhH" rel="noopener">Email us</a>. <noscript>(Email needs JavaScript: ask on the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a> and we will reply privately.)</noscript></p>
-
-        <p class="fine">Research note, November 2026. Exploration only: no timeline, no promise, no partnership. We will update this page if the evidence changes.</p>
-      </div>
-    </article>
-  </main>
-
-  <footer class="footer">
-    <div class="wrap footer-grid">
-      <div>
-        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
-        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
-          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
-      </div>
-      <div class="links">
-        <a href="../performance/">Performance</a>
-        <a href="../guide/index.html">User Guide</a>
-        <a href="../brushes.html">Community brushes</a>
-        <a href="../benchmarks/">Benchmarks: 15M and 33M</a>
-        <a href="../press.html">Press kit</a>
-        <a href="../support.html">Membership</a>
-        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
-        <a href="../supporters.html">Members</a>
-        <a href="../terms.html">Terms</a>
-        <a href="../why.html">Why SculptForge</a>
-        <a href="quantum.html">Research</a>
-        <a href="../jobs.html">Jobs</a>
-        <a href="https://github.com/islandmed/SculptForge">Source code</a>
-        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
-        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
-      </div>
-      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
-    </div>
-  </footer>
-  <script>
-    document.querySelectorAll('a[data-mail]').forEach((a) => a.addEventListener('click', () => {
-      a.href = 'mailto:' + 'hello' + '@' + 'sculptforge.app' + '?subject=' + encodeURIComponent(a.dataset.mail);
-    }));
-  </script>
+<body style="background:#111114;color:#d4d4dc;font-family:system-ui,sans-serif;padding:32px">
+  <p>This note moved to <a href="../labs/quantum.html" style="color:#f08a3c">SculptForge Labs</a>.</p>
 </body>
 </html>

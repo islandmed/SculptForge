@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SculptForge Labs - what we are exploring</title>
+  <meta name="description" content="SculptForge Labs: what we are exploring and measuring. Nothing here is a promise or a release.">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
+  <link rel="icon" type="image/png" sizes="64x64" href="../img/favicon-64.png?v=7">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png?v=7">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SculptForge Labs">
+  <meta property="og:description" content="What we are exploring and measuring. Nothing here is a promise or a release.">
+  <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
+  <meta property="og:url" content="https://sculptforge.app/labs/">
+  <link rel="canonical" href="https://sculptforge.app/labs/">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=40">
+  <script src="../motion.js?v=15" defer></script>
+  <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    .lb { padding: 88px 0 80px; }
+    .lb .wrap { max-width: 960px; }
+    .lb h1 { font-size: clamp(2.2rem, 5.5vw, 3.4rem); margin: 8px 0 16px; }
+    .lb .lede { color: #d4d4dc; font-size: 1.2rem; max-width: 640px; margin: 0 0 36px; }
+    .lb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+    .lb-grid .card { display: flex; flex-direction: column; gap: 10px; flex: initial; }
+    .lb-grid .card h2 { font-size: 1.2rem; margin: 0; }
+    .lb-grid .card h2 a { color: #fff; }
+    .lb-grid .card h2 a:hover { color: var(--accent); text-decoration: none; }
+    .lb-grid .card p { margin: 0; }
+    .lb-grid .tag { color: var(--accent-2); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lb-grid .more { margin-top: auto; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="137" height="32" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="38" height="40" alt="SculptForge"></a>
+      <nav aria-label="Main">
+        <a href="../index.html#features">Features</a>
+        <a href="../index.html#demos">Demos</a>
+        <a href="../brushes.html">Brushes</a>
+        <a href="../guide/index.html">Guide</a>
+        <a href="../studios.html">For studios</a>
+        <a href="../why.html">About</a>
+        <a href="../labs/index.html" aria-current="page">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="../support.html">Support</a>
+        <a class="nav-dl" href="../index.html#download">Download</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="lb">
+      <div class="wrap">
+        <p class="eyebrow">SculptForge Labs</p>
+        <h1>Labs</h1>
+        <p class="lede">What we're exploring and measuring. Nothing here is a promise or a release.</p>
+        <div class="lb-grid">
+          <div class="card"><span class="tag">Research note, November 2026</span><h2><a href="quantum.html">Quantum computing</a></h2><p>Where it stands today, what we are watching, and what would have to be true before we ship anything. Today it does not beat a GPU at sculpting.</p><a class="more" href="quantum.html">Read the note</a></div>
+          <div class="card"><span class="tag">Measured</span><h2><a href="../performance/">Performance</a></h2><p>Slowest-frame milliseconds on dense scans, from a benchmark you can run yourself. Our low-end tier is simulated from a modest laptop's budget, and we say so.</p><a class="more" href="../performance/">See what we measure</a></div>
+          <div class="card"><span class="tag">In the open</span><h2><a href="../why.html#feedback">How SculptForge is built</a></h2><p>Artists decide what is worth building, agents build and test it, and every visible change is reviewed by eye.</p><a class="more" href="../why.html#feedback">How it works</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="../index.html"><img class="brand-wordmark" src="../img/logo-wordmark-dark.svg" width="103" height="24" alt="SculptForge"><img class="brand-cube" src="../img/logo-cube.svg" width="30" height="32" alt="SculptForge"></a>
+        <p class="fine">Copyright © 2026 The SculptForge contributors. SculptForge is licensed under the
+          <a href="https://github.com/islandmed/SculptForge/blob/main/LICENSE">GNU GPL v3.0 or later</a>.</p>
+      </div>
+      <div class="links">
+        <a href="../performance/">Performance</a>
+        <a href="../labs/index.html">Labs</a>
+        <a href="../guide/index.html">User Guide</a>
+        <a href="../brushes.html">Community brushes</a>
+        <a href="../benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="../press.html">Press kit</a>
+        <a href="../support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
+        <a href="../supporters.html">Members</a>
+        <a href="../terms.html">Terms</a>
+        <a href="../why.html">Why SculptForge</a>
+                <a href="../jobs.html">Jobs</a>
+        <a href="https://github.com/islandmed/SculptForge">Source code</a>
+        <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
+      </div>
+      <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
+    </div>
+  </footer>
+  <script>
+    document.querySelectorAll('a[data-mail]').forEach((a) => a.addEventListener('click', () => {
+      a.href = 'mailto:' + 'hello' + '@' + 'sculptforge.app' + '?subject=' + encodeURIComponent(a.dataset.mail);
+    }));
+  </script>
+</body>
+</html>

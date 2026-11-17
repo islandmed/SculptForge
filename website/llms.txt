@@ -16,7 +16,8 @@
 - [User Guide](https://sculptforge.app/guide/index.html): the full manual
 - [Membership](https://sculptforge.app/support.html): what members get, and what stays free
 - [Why SculptForge](https://sculptforge.app/why.html): who it is for and how it is built
-- [Exploring: quantum computing](https://sculptforge.app/research/quantum.html): research note, November 2026
+- [SculptForge Labs](https://sculptforge.app/labs/): what we are exploring and measuring, not promises or releases
+- [Exploring: quantum computing](https://sculptforge.app/labs/quantum.html): research note, November 2026
 - [Studios](https://sculptforge.app/studios.html): pipeline, deployment and security notes for teams
 
 ## Guide chapters
