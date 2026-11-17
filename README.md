@@ -49,6 +49,10 @@ curl -fsSL https://raw.githubusercontent.com/islandmed/SculptForge/main/install/
 ```powershell
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/islandmed/SculptForge/main/install/install.ps1 | iex
+
+# Windows (Scoop; the portable .zip, updated with `scoop update sculptforge`)
+scoop bucket add sculptforge https://github.com/islandmed/scoop-sculptforge
+scoop install sculptforge
 ```
 
 The builds aren't code-signed yet:

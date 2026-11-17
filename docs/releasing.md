@@ -36,7 +36,7 @@ the gates, what each step does, and how to recover.
      `[Unreleased]`; tests/ui/whats_new.sfui is pinned to the newest three sections (tools/release/pin_whats_new_test.py);
      website/guide is rebuilt. Don't bump version files by hand.
 
-   Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the
+   Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the Scoop manifest, the
    Omarchy PR is open, the home page's version text), so nothing stops after the tag for a reason known before it.
 3. **CI and Packages green on main** for exactly that commit. CI's run on main reuses the staging run of the same
    commit. For the bump commit, step `ci` and release.yml reuse the CI result of the commit before it when the bump
@@ -226,6 +226,7 @@ The home page's What's New area (between the `whats-new` markers in website/inde
 | site | update feed (version + your highlights), home page version text, pushes; then waits for the live feed (10 min) and guide (5 min) | latest.json says X.Y.Z |
 | aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball, and `.SRCINFO`; then, once `~/Work/.sf/aur-publish` exists (packaging/arch/SUBMIT.md), pushes both to the AUR | already at X.Y.Z with that checksum (and the AUR at X.Y.Z) |
 | brew | Homebrew cask through tools/publish/setup-channels.sh, after checking the .dmg's checksum here | the cask is at X.Y.Z |
+| scoop | packaging/scoop/sculptforge.json: version, url, checksum of the portable .zip (checked against SHA256SUMS.txt), pushed to main; then a copy to the islandmed/scoop-sculptforge bucket once that repository exists (ScoopInstaller/Extras updates itself from checkver once it accepts the manifest) | the manifest and the bucket are at X.Y.Z |
 | omarchy | bumps the PKGBUILD on our branch of omacom/omarchy-pkgs#1800 (author islandmed noreply) | the PR is at X.Y.Z |
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |
 | status | winget PR state, links, reminders | never |
