@@ -63,10 +63,10 @@ constexpr TourSlide kSlides[] = {
     {"Masking", "images/quick-tour/06-masking.jpg",
      "Hold Ctrl and paint to mask, Ctrl+Alt to unmask. Tool > Masking inverts, blurs and grows the mask, and builds "
      "one By cavity, By face group or along the border. Press G for the stroke popup: its Shapes row picks Mask Pen, "
-     "Lasso Mask or Rectangle Mask for the next Ctrl stroke.",
+     "Lasso Mask, Rectangle Mask or Circle Mask for the next Ctrl stroke.",
      "tool.masking", "ui.palette.tool"},
     {"Cut, Clip and Fill Holes", "images/quick-tour/07-cut.jpg",
-     "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle or polyline goes straight "
+     "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle, circle or polyline goes straight "
      "through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or Clip: press everything "
      "outside the shape flat onto its outline. Fill Holes (Tool > Geometry) caps every open boundary.",
      "tool.cut", "ui.palette.tool"},

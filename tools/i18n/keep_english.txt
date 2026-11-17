@@ -8,11 +8,14 @@ Rgb
 Mask Pen
 Lasso Mask
 Rectangle Mask
+Circle Mask
 Select Rectangle
 Select Lasso
+Select Circle
 Cut Line
 Cut Lasso
 Cut Rectangle
+Cut Circle
 Cut Polyline
 VDM
 SpaceMouse

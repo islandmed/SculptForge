@@ -53,9 +53,11 @@ constexpr ShapeLook kShapes[] = {
     {"Pen", ICON_LC_PEN_TOOL, "Mask", "Strokes paint the mask (Ctrl erases it), no key held, until you pick it again or another brush."},
     {"Lasso", ICON_LC_LASSO, "Mask", "A drag draws a lasso and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
     {"Rect", ICON_LC_SQUARE_DASHED, "Mask", "A drag draws a rectangle and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
+    {"Circle", ICON_LC_CIRCLE_DASHED, "Mask", "A drag draws a circle from its centre and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
     {"Line", ICON_LC_SLASH, "Cut", "A drag draws a Cut line (Alt: the other side), no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Lasso", ICON_LC_SCISSORS, "Cut", "A drag draws a Cut lasso, no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Rect", ICON_LC_SQUARE_DASHED, "Cut", "A drag draws a Cut rectangle, no key held, until you pick it again. Tool > Cut sets the mode."},
+    {"Circle", ICON_LC_CIRCLE_DASHED, "Cut", "A drag draws a Cut circle from its centre (Alt at the press: from a corner), no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Polyline", ICON_LC_WAYPOINTS, "Cut", "Clicks place a Cut polyline's points (the first point closes it, Enter ends it), no key held."},
 };
 static_assert(std::size(kShapes) == size_t(kStrokePopupShapes));
@@ -109,9 +111,11 @@ App::SelectShape App::selectShapeOf(StrokeShape shape) {
     case StrokeShape::MaskPen: return SelectShape::Pen;
     case StrokeShape::MaskLasso: return SelectShape::Lasso;
     case StrokeShape::MaskRect: return SelectShape::Rect;
+    case StrokeShape::MaskCircle: return SelectShape::Circle;
     case StrokeShape::CutLine: return SelectShape::CutLine;
     case StrokeShape::CutLasso: return SelectShape::CutLasso;
     case StrokeShape::CutRect: return SelectShape::CutRect;
+    case StrokeShape::CutCircle: return SelectShape::CutCircle;
     default: return SelectShape::CutPolyline;
     }
 }

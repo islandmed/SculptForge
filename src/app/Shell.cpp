@@ -542,10 +542,16 @@ void App::registerShellActions() {
           "Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
     shape("mask.rect", "Rectangle Mask", "Tool > Masking", &maskShape_, SelectShape::Rect,
           "Ctrl+drag draws a rectangle and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
+    shape("mask.circle", "Circle Mask", "Tool > Masking", &maskShape_, SelectShape::Circle,
+          "Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging "
+          "keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.");
     shape("select.rect", "Select Rectangle", "Tool > Visibility", &hideShape_, SelectShape::Rect,
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
     shape("select.lasso", "Select Lasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
           "Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.");
+    shape("select.circle", "Select Circle", "Tool > Visibility", &hideShape_, SelectShape::Circle,
+          "Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. "
+          "Let go of Shift while dragging to keep it round.");
     // Cut (PanelCut.cpp, core/Cut.h): the same Ctrl+Shift drag, cutting instead of hiding.
     shape("cut.line", "Cut Line", "Tool > Cut", &hideShape_, SelectShape::CutLine,
           "Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole "
@@ -556,6 +562,10 @@ void App::registerShellActions() {
     shape("cut.rect", "Cut Rectangle", "Tool > Cut", &hideShape_, SelectShape::CutRect,
           "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block, Clip "
           "presses what lies outside it onto its edges.");
+    shape("cut.circle", "Cut Circle", "Tool > Cut", &hideShape_, SelectShape::CutCircle,
+          "Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the "
+          "Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift "
+          "while dragging to keep it round.");
     shape("cut.polyline", "Cut Polyline", "Tool > Cut", &hideShape_, SelectShape::CutPolyline,
           "Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an "
           "open bent line (Alt: the other side), Esc to drop it.");
@@ -3537,7 +3547,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
-                     "held, to pick Mask Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).", "Left shelf");
+                     "held, to pick Mask Pen, Lasso Mask, Rectangle Mask or Circle Mask (Select Rectangle, Lasso or Circle).", "Left shelf");
         return;
     }
     const BrushRecipe* recipe = activeRecipe();

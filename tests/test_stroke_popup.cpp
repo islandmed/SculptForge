@@ -29,7 +29,7 @@ glm::vec2 centre(const StrokePopupGeometry& g, int item) { return g.itemMin(item
 } // namespace
 
 TEST(stroke_popup_items) {
-    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5 + 7);
+    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5 + 9);
     CHECK(strokePopupIsStroke(0));
     CHECK(strokePopupIsStroke(int(StrokeType::LazyMouse)));
     CHECK(!strokePopupIsStroke(kStrokePopupStrokes));

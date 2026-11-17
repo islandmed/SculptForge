@@ -360,11 +360,11 @@ constexpr Gesture kGestures[] = {
     {"Paint mask", "Hold Ctrl while stroking (Ctrl+Alt erases)"},
     {"Invert mask", "Ctrl + click the background"},
     {"Clear mask", "Ctrl + drag on the background (Mask Pen)"},
-    {"Mask a lasso or rectangle", "Ctrl + drag with Lasso Mask / Rectangle Mask (Tool > Masking; Ctrl+Alt unmasks)"},
+    {"Mask a lasso, rectangle or circle", "Ctrl + drag with Lasso Mask / Rectangle Mask / Circle Mask (Tool > Masking; Ctrl+Alt unmasks)"},
     {"Isolate face group", "Ctrl+Shift + click it (again: invert)"},
     {"Hide face group", "Ctrl+Shift+Alt + click it"},
     {"Show all", "Ctrl+Shift + click the background"},
-    {"Hide outside a rectangle or lasso", "Ctrl+Shift + drag (add Alt: inside; shape in Tool > Visibility)"},
+    {"Hide outside a rectangle, lasso or circle", "Ctrl+Shift + drag (add Alt: inside; shape in Tool > Visibility)"},
     {"Select a Part", "Alt + click it"},
     {"Help on any control", "Hold Ctrl and point at it (Ctrl+Alt: scripting parameters)"},
     {"Assign a shortcut", "Ctrl+Alt + click any button, then press the key"},
@@ -388,7 +388,7 @@ constexpr Gesture kBlenderGestures[] = {
     {"Invert / clear mask", "Ctrl+I / Alt+M"},
     {"Select a Part", "Alt+Q over it (Alt+click masks in this style), or triple-click it"},
     {"Hide face group", "H over it (Shift+H: show only it, again: everything; Alt+H shows all)"},
-    {"Hide outside a shape", "Ctrl+Shift + drag a rectangle or lasso (add Alt: inside; shape in Tool > Visibility); "
+    {"Hide outside a shape", "Ctrl+Shift + drag a rectangle, lasso or circle (add Alt: inside; shape in Tool > Visibility); "
                              "click: isolate the face group, the background shows all"},
     {"Cut", "Pick a Cut shape (Ctrl+Shift + click the brush tile, or Ctrl+Shift+B), then Ctrl+Shift + drag"},
     {"Brush radius / strength", "F / Shift+F, then drag or type a number"},

@@ -37,6 +37,21 @@ private:
     bool valid_ = false;
 };
 
+// The Circle tools (Mask, Select, Cut; #213): an ellipse dragged out in any flat space (window pixels in the app). By
+// default the press is the centre and the cursor a point on the rim's box; `fromCorner` makes the press and the cursor
+// opposite corners of the box instead. `round` keeps it a circle: from the centre its radius is the cursor's distance,
+// from a corner the box becomes the square the longer side makes (it grows toward the cursor).
+struct DragEllipse {
+    glm::vec2 centre{0.0f};
+    glm::vec2 radius{0.0f}; // per axis, never negative
+    bool valid() const { return radius.x > 0.0f && radius.y > 0.0f; }
+};
+DragEllipse dragEllipse(glm::vec2 press, glm::vec2 cursor, bool fromCorner, bool round);
+// The ellipse as a closed polygon (counter-clockwise, `segments` points), the shape the lasso commands take. 128
+// segments keep the rim within 0.03% of its radius.
+constexpr int kEllipseSegments = 128;
+std::vector<glm::vec2> ellipsePolygon(const DragEllipse& e, int segments = kEllipseSegments);
+
 // Projects a world point; false when it lies behind the camera.
 bool projectToNdc(const glm::mat4& viewProj, const glm::vec3& p, glm::vec2& ndc);
 // Front orthographic view of the mesh (+Z, like image_project): NDC -1..1

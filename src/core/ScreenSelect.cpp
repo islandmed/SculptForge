@@ -43,6 +43,34 @@ bool ScreenPolygon::contains(glm::vec2 p) const {
     return inside;
 }
 
+DragEllipse dragEllipse(glm::vec2 press, glm::vec2 cursor, bool fromCorner, bool round) {
+    glm::vec2 d = cursor - press;
+    DragEllipse e;
+    if (fromCorner) {
+        if (round) { // the square the longer side makes, toward the cursor
+            const float side = std::max(std::abs(d.x), std::abs(d.y));
+            d = glm::vec2(d.x < 0.0f ? -side : side, d.y < 0.0f ? -side : side);
+        }
+        e.centre = press + d * 0.5f;
+        e.radius = glm::abs(d) * 0.5f;
+    } else {
+        e.centre = press;
+        e.radius = round ? glm::vec2(glm::length(d)) : glm::abs(d);
+    }
+    return e;
+}
+
+std::vector<glm::vec2> ellipsePolygon(const DragEllipse& e, int segments) {
+    segments = std::max(segments, 3);
+    std::vector<glm::vec2> out;
+    out.reserve(size_t(segments));
+    for (int i = 0; i < segments; ++i) {
+        const float a = float(i) / float(segments) * 6.28318530718f;
+        out.push_back(e.centre + glm::vec2(std::cos(a), std::sin(a)) * e.radius);
+    }
+    return out;
+}
+
 bool projectToNdc(const glm::mat4& viewProj, const glm::vec3& p, glm::vec2& ndc) {
     const glm::vec4 clip = viewProj * glm::vec4(p, 1.0f);
     if (clip.w <= 1e-8f) return false;

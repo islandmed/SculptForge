@@ -30,7 +30,7 @@ StrokeLatch toggledStrokeLatch(StrokeLatch now, StrokeLatch picked);
 enum class StrokeModifier { Add, Sub, Smooth, Mask, Select, Count };
 // Shapes (Discord 11-03): a mask or Cut shape picked here latches Mask or Select with that shape, so a plain drag
 // masks with it or cuts with it, no Ctrl or Ctrl+Shift held (with the Mask latch on, Ctrl unmasks).
-enum class StrokeShape { MaskPen, MaskLasso, MaskRect, CutLine, CutLasso, CutRect, CutPolyline, Count };
+enum class StrokeShape { MaskPen, MaskLasso, MaskRect, MaskCircle, CutLine, CutLasso, CutRect, CutCircle, CutPolyline, Count };
 constexpr int kStrokePopupStrokes = int(StrokeType::Count);
 constexpr int kStrokePopupModifiers = int(StrokeModifier::Count);
 constexpr int kStrokePopupShapes = int(StrokeShape::Count);
@@ -44,7 +44,7 @@ inline StrokeShape strokePopupShape(int item) { return StrokeShape(item - kStrok
 inline int strokePopupItem(StrokeModifier m) { return kStrokePopupStrokes + int(m); }
 inline int strokePopupItem(StrokeShape s) { return kStrokePopupStrokes + kStrokePopupModifiers + int(s); }
 StrokeLatch strokeModifierLatch(StrokeModifier m); // Smooth / Mask / Select; None for Add and Sub
-inline StrokeLatch strokeShapeLatch(StrokeShape s) { return s <= StrokeShape::MaskRect ? StrokeLatch::Mask : StrokeLatch::Select; }
+inline StrokeLatch strokeShapeLatch(StrokeShape s) { return s <= StrokeShape::MaskCircle ? StrokeLatch::Mask : StrokeLatch::Select; }
 
 // Three sections, each a titled block of rows: Stroke, Modifiers, Shapes. All sizes in pixels (already scaled).
 struct StrokePopupGeometry {

@@ -338,8 +338,7 @@ constexpr Entry kSpanish[] = {
     {"Ctrl+Shift+drag a Cut shape", "Ctrl+Mayús+arrastrar una forma de Corte"},
     {"Depth %.2f", "Profundidad %.2f"},
     {"Copy the active Part (%s)", "Copiar la Parte activa (%s)"},
-    {"Lasso Mask and Rectangle Mask mask only what faces you: the far side and folds turned away stay as they are.",
-     "Lasso Mask y Rectangle Mask enmascaran solo lo que mira hacia ti: el lado de atrás y los pliegues que no te miran no cambian."},
+    {"Lasso Mask, Rectangle Mask and Circle Mask mask only what faces you: the far side and folds turned away stay as they are.", "Lasso Mask, Rectangle Mask y Circle Mask enmascaran solo lo que te da la cara: el lado lejano y los pliegues vueltos hacia otro lado se quedan como están."},
     {"How deep Cut In goes, or how far Cut Add stands out, as a share of the Part's size.",
      "Cuánto entra Cut In, o cuánto sobresale Cut Add, como fracción del tamaño de la Parte."},
     {"Invert (Alt)", "Invertir (Alt)"},
@@ -677,10 +676,7 @@ constexpr Entry kSpanish[] = {
     {"Invert visible", "Invertir visibles"},
     {"Hide", "Ocultar"},
     {"Show", "Mostrar"},
-    {"Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
-     "Ctrl+Shift+drag hides outside the rectangle or lasso (Alt: inside).",
-     "Ctrl+Mayús+clic en un grupo para aislarlo, +Alt para ocultarlo, en el fondo para mostrar todo.\n"
-     "Ctrl+Mayús+arrastrar oculta lo que queda fuera del rectángulo o el lazo (Alt: dentro)."},
+    {"Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\nCtrl+Shift+drag hides outside the rectangle, lasso or circle (Alt: inside).", "Ctrl+Shift+clic en un grupo para aislarlo, +Alt para ocultarlo, en el fondo para mostrar todo.\nCtrl+Shift+arrastrar oculta el exterior del rectángulo, lazo o círculo (Alt: interior)."},
 
     // --- Layers, paint, texture ---
     {"New paint layer", "Nueva capa de pintura"},
@@ -3678,10 +3674,7 @@ constexpr Entry kSpanish[] = {
      "micro triangles of the visible Parts' micro levels (Geometry > Micro).",
      "Triángulos que puedes ver y esculpir (Piezas visibles, sin las partes ocultas) y en toda la escena. Micro: los "
      "microtriángulos de los niveles micro de las Piezas visibles (Geometría > Micro)."},
-    {"Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl held, to pick Mask "
-     "Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).",
-     "Con Ctrl pulsado: el pincel de máscara (Ctrl+Mayús: el de selección). Haz clic, o pulsa B con Ctrl pulsado, "
-     "para elegir Mask Pen, Lasso Mask o Rectangle Mask (Select Rectangle o Select Lasso)."},
+    {"Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl held, to pick Mask Pen, Lasso Mask, Rectangle Mask or Circle Mask (Select Rectangle, Lasso or Circle).", "Ctrl pulsado: el pincel de máscara (Ctrl+Shift: el pincel de selección). Haz clic, o pulsa B con Ctrl pulsado, para elegir Mask Pen, Lasso Mask, Rectangle Mask o Circle Mask (Select Rectangle, Lasso o Circle)."},
     {"Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the selection's). Click with Ctrl "
      "held to choose.",
      "Con Ctrl pulsado: el trazo de la máscara, Dots (Mask Pen), Lasso o Rect (Ctrl+Mayús: el de la selección). Haz "
@@ -5881,6 +5874,14 @@ constexpr Entry kSpanish[] = {
      "Unos 2 minutos y 20 créditos por imagen (10 por texto). Rápido y bueno en todo."},
     {"Best results: a single object on a plain or transparent background.",
      "Mejores resultados: un solo objeto sobre un fondo liso o transparente."},
+    // --- Circle shapes (#213) ---
+    {"Draw from corner", "Dibuja desde la esquina"},
+    {"Keep round", "Mantén redondo"},
+    {"Always a perfect circle. Shift while dragging flips it for that drag (Select and Cut already hold Shift: letting go of it flips).", "Siempre un círculo perfecto. Shift mientras arrastras lo invierte en ese arrastre (Select y Cut ya mantienen Shift: soltarlo lo invierte)."},
+    {"The press and the cursor are opposite corners of the circle's box, not its centre. Cut Circle: Alt at the press turns it on for one drag.", "La pulsación y el cursor son esquinas opuestas de la caja del círculo, no su centro. Cut Circle: Alt al pulsar lo activa en ese arrastre."},
+    {"Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro (Alt al pulsar: desde una esquina): Away corta un agujero redondo a través del Part, In un hueco de profundidad Depth, Add un saliente redondo, Clip presiona lo que queda fuera sobre su borde. Suelta Shift mientras arrastras para mantenerlo redondo."},
+    {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro para conservar el interior y ocultar el resto; añade Alt para ocultar el interior. Suelta Shift mientras arrastras para mantenerlo redondo."},
+    {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+arrastra un círculo desde su centro y enmascara todo su interior; Ctrl+Alt+arrastra desenmascara. Shift mientras arrastras lo mantiene redondo; arrastra desde una esquina con la opción de Tool > Masking. El lado lejano queda incluido."},
 };
 
 } // namespace

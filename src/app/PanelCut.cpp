@@ -67,6 +67,14 @@ void App::cutMouseUp() {
         path.push_back(mouse);
         if (path.size() >= 3) runCut("lasso", path, true, false);
         break;
+    case SelectShape::CutCircle: { // the ellipse is a closed lasso of 128 points (#213)
+        const DragEllipse e = selectEllipse();
+        if (!e.valid()) break;
+        path.clear();
+        for (const glm::vec2& p : ellipsePolygon(e)) path.push_back(ImVec2(p.x, p.y));
+        runCut("lasso", path, true, false);
+        break;
+    }
     default: break;
     }
 }
@@ -162,6 +170,8 @@ void App::drawCutOverlay() {
         const ImVec2 p0(std::fmin(a.x, mouse.x), std::fmin(a.y, mouse.y)), p1(std::fmax(a.x, mouse.x), std::fmax(a.y, mouse.y));
         dl->AddRectFilled(p0, p1, closedFill);
         dl->AddRect(p0, p1, line, 0.0f, 0, 2.0f);
+    } else if (selectShape_ == SelectShape::CutCircle) {
+        drawCircleShape(dl, selectEllipse(), closedFill, line, 2.0f * uiScale_);
     } else {
         std::vector<ImVec2> path = selectPath_;
         path.push_back(mouse);
@@ -171,10 +181,25 @@ void App::drawCutOverlay() {
     dl->PopClipRect();
 }
 
+// Circle Mask, Select Circle and Cut Circle share these two options (#213); each is also on a key while dragging.
+void App::drawCircleOptions() {
+    ImGui::Checkbox(tr("Draw from corner##circle"), &circleFromCorner_);
+    ui::HelpText("Draw from corner", nullptr,
+                 tr("The press and the cursor are opposite corners of the circle's box, not its centre. Cut Circle: Alt at "
+                    "the press turns it on for one drag."),
+                 "Tool > Masking");
+    ImGui::Checkbox(tr("Keep round##circle"), &circleRound_);
+    ui::HelpText("Keep round", nullptr,
+                 tr("Always a perfect circle. Shift while dragging flips it for that drag (Select and Cut already hold "
+                    "Shift: letting go of it flips)."),
+                 "Tool > Masking");
+}
+
 void App::drawCutSection() {
     ImGui::TextDisabled("%s", tr("Ctrl+Shift+drag a Cut shape"));
     ui::Segmented(*this, {"cut.line", "cut.lasso"}); // two rows: the names fit a narrow tray
-    ui::Segmented(*this, {"cut.rect", "cut.polyline"});
+    ui::Segmented(*this, {"cut.rect", "cut.circle", "cut.polyline"});
+    if (hideShape_ == SelectShape::CutCircle) drawCircleOptions();
     ui::Segmented(*this, {"cut.away", "cut.in", "cut.add", "cut.clip"});
     if (cutMode_ == 1 || cutMode_ == 2) {
         ImGui::SetNextItemWidth(-1);

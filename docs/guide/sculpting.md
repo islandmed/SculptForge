@@ -434,8 +434,8 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, then 
 | **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
 
-**Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask** and **Rectangle Mask** turn Mask on with that
-shape, **Cut Line**, **Cut Lasso**, **Cut Rect** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
+**Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask**, **Rectangle Mask** and **Circle Mask** turn Mask on with that
+shape, **Cut Line**, **Cut Lasso**, **Cut Rect**, **Cut Circle** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
 then masks or cuts with it, no keys held (with a mask shape, <kbd>Ctrl</kbd>+drag unmasks; **Tool > Cut** still sets
 Away, In, Add or Clip).
 

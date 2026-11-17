@@ -90,14 +90,14 @@ See [Subdivision levels](subdivision-levels.md).
 Hold <kbd>Ctrl</kbd> and paint to mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> to unmask. **Tool > Masking** inverts, blurs
 and grows the mask, and builds one **By cavity**, **By face group** or along the border.
 
-Press <kbd>G</kbd> for the stroke popup: its **Shapes** row picks **Mask Pen**, **Lasso Mask** or **Rectangle Mask**
+Press <kbd>G</kbd> for the stroke popup: its **Shapes** row picks **Mask Pen**, **Lasso Mask**, **Rectangle Mask** or **Circle Mask**
 for the next <kbd>Ctrl</kbd> stroke. See [Masking](masking.md).
 
 ## Cut, Clip and Fill Holes
 
 ![Tool > Cut with its shapes and modes](images/quick-tour/07-cut.jpg)
 
-Pick a shape in **Tool > Cut** and draw it with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>: a line, lasso, rectangle or polyline
+Pick a shape in **Tool > Cut** and draw it with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>: a line, lasso, rectangle, circle or polyline
 goes straight through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or **Clip**: press
 everything outside the shape flat onto its outline.
 

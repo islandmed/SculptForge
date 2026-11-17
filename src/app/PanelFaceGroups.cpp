@@ -94,7 +94,8 @@ void App::drawFaceGroupsSection() {
 }
 
 void App::drawVisibilitySection() {
-    ui::Segmented(*this, {"select.rect", "select.lasso"});
+    ui::Segmented(*this, {"select.rect", "select.lasso", "select.circle"});
+    if (hideShape_ == SelectShape::Circle) drawCircleOptions();
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
     if (ImGui::Button(tr("Show all"), ImVec2(half, 0))) runCommand("show_all");
@@ -106,7 +107,7 @@ void App::drawVisibilitySection() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", tr("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
-                          "Ctrl+Shift+drag hides outside the rectangle or lasso (Alt: inside)."));
+                          "Ctrl+Shift+drag hides outside the rectangle, lasso or circle (Alt: inside)."));
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasMask());
     if (ImGui::Button(tr("Delete masked"), ImVec2(half, 0))) runCommand("delete_masked");

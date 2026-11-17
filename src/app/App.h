@@ -55,6 +55,7 @@
 #include "core/QRemesh.h"
 #include "core/RadialMenu.h"
 #include "core/Precision.h"
+#include "core/ScreenSelect.h"
 #include "core/StrokePopup.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
@@ -932,8 +933,9 @@ private:
     // visibility (Ctrl+Shift, classic SelectRect / SelectLasso) or for the mask
     // (Ctrl, MaskRect / MaskLasso). Pen is the mask's brush-stroke mode.
     // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
-    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
-    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine; }
+    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline, Circle, CutCircle };
+    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine && s != SelectShape::Circle; }
+    static bool isCircleShape(SelectShape s) { return s == SelectShape::Circle || s == SelectShape::CutCircle; }
     static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
     bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
     enum class SelectTarget { Hide, Mask };
@@ -954,6 +956,14 @@ private:
     // Space held mid-drag (#214): the whole shape follows the cursor instead of growing; let go and it sizes again.
     bool selectSpace_ = false;
     ImVec2 selectLast_{0.0f, 0.0f}; // the cursor at the last move: how far Space slides the shape
+    // The Circle shapes (#213): the press is the centre, or a corner of the ellipse's box (Alt at the press for Cut Circle,
+    // where Alt is free, or the option); Shift changed since the press (pressed for Mask, let go for Select and Cut,
+    // which hold it already) or the option keeps it round. The ellipse always runs from the press to the cursor.
+    bool circleFromCorner_ = false, circleRound_ = false; // the options (Tool > Masking, Visibility, Cut)
+    bool selectCorner_ = false, selectShiftAtPress_ = false; // latched when the drag starts
+    DragEllipse selectEllipse() const;                       // window pixels
+    void drawCircleOptions();
+    void drawCircleShape(ImDrawList* dl, const DragEllipse& e, ImU32 fill, ImU32 line, float width) const;
     float facegroupAngle_ = 30.0f;
     // visibleFace groupCount is O(triangles): recomputed only when the key below changes.
     size_t visibleGroups_ = 0;
