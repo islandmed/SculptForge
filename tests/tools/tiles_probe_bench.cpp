@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Adaptive Detail tiles, step 0 (the 10x scoreboard's axis 2, briefs/forge-ink-10x.md; design in the branch's REPORT):
-// a standalone prototype of the TILE STORE, no product code, that answers the design critique's question "what breaks
+// a standalone prototype of the TILE STORE (its own store, not core/MicroTiles.h, except --cover-product below) that answers the design critique's question "what breaks
 // first at 10x on a shared-RAM laptop": tile memory, the undo ring, or re-resolving + uploading the pages a dab dirtied.
 //
 // Model: the bench head at micro level 5 as the dense ROOT (the core-200m scene's base and level: today's shipped

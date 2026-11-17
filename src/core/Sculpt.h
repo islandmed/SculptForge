@@ -100,8 +100,9 @@ struct DabParams {
     glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
     // The Stencil (#155, core/Stencil.h): each vertex also takes the image at the place it shows on screen.
     StencilView stencil;
-    // Screen pixels per world unit at the centre as the dab was placed (0: unknown, scripts). Not read by the brushes today;
-    // a Forge Ink dab record keeps it (MicroDab::pxPerUnit) so a level-of-detail choice made from it replays the same.
+    // Screen pixels per world unit at the centre as the dab was placed (0: unknown, scripts). Adaptive Detail tiles
+    // (core/MicroTiles.h) cap how fine a dab may store with it; a Forge Ink dab record keeps it (MicroDab::pxPerUnit)
+    // so that choice replays the same.
     float pxPerUnit = 0.0f;
 };
 
