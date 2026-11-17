@@ -241,7 +241,9 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
             return reply(id, result).dump();
         }
         if (isHistoryTool(name)) {
+            const auto start = std::chrono::steady_clock::now();
             HistoryToolReply h = callHistoryTool(registry, doc, name, msg["params"]["arguments"]);
+            const int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
             Json text = Json::object();
             text.set("type", "text");
             text.set("text", h.text);
@@ -249,12 +251,17 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
             content.push(text);
             Json result = Json::object();
             result.set("content", content);
-            if (!h.structured.isNull()) result.set("structuredContent", h.structured);
+            // The scene's numbers like any tool's, plus the tool's own fields (a batch's steps, a checkpoint's marks).
+            Json structured = mcpStructuredResult(doc, h.ok, h.text, ms);
+            for (const auto& [key, value] : h.structured.members())
+                if (key != "ok" && key != "message" && key != "ms") structured.set(key, value);
+            result.set("structuredContent", structured);
             result.set("isError", !h.ok);
             return reply(id, result).dump();
         }
         if (!mcpToolCallable(registry, name)) return errorReply(id, -32602, "Unknown tool: " + name).dump();
-        CommandResult r = callRegistryTool(registry, doc, name, msg["params"]["arguments"]);
+        int64_t ms = 0;
+        CommandResult r = callRegistryTool(registry, doc, name, msg["params"]["arguments"], &ms);
         Json text = Json::object();
         text.set("type", "text");
         text.set("text", r.message);
@@ -262,7 +269,7 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
         content.push(text);
         Json result = Json::object();
         result.set("content", content);
-        result.set("structuredContent", mcpStructuredResult(doc, r.ok, r.message, entry.ms)); // (cli/McpScene.h)
+        result.set("structuredContent", mcpStructuredResult(doc, r.ok, r.message, ms)); // (cli/McpScene.h)
         result.set("isError", !r.ok);
         return reply(id, result).dump();
     }

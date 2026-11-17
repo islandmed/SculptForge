@@ -257,3 +257,21 @@ TEST(mcp_resources_refuse_what_they_do_not_know) {
     CHECK(s.rpc("resources/read", "{}").has("error")); // no uri
     CHECK(s.rpc("resources/subscribe", R"({"uri":"sculptforge://scene"})")["error"]["code"].asNumber() == -32601); // (not offered)
 }
+
+TEST(mcp_structured_content_covers_batch_and_checkpoints) {
+    Session s;
+    const Json schema = s.rpc("tools/list")["result"]["tools"][0]["outputSchema"];
+    const Json batch = s.call("batch", R"({"commands":[{"name":"new_sphere","arguments":{"subdivisions":2}},{"name":"subdivide"}]})");
+    const Json& sc = batch["result"]["structuredContent"];
+    CHECK(conforms(sc, schema, "batch").empty());
+    CHECK(sc["triangles"].asNumber() == double(s.doc.mesh.triangleCount()) && sc["steps"].size() == 2); // (the batch's own fields stay)
+    CHECK(sc["undoDepth"].asNumber() == double(s.doc.undo.undoCount()));
+    const Json mark = s.call("checkpoint_save", R"({"name":"a"})");
+    CHECK(conforms(mark["result"]["structuredContent"], schema, "checkpoint_save").empty() && mark["result"]["structuredContent"]["name"].asString() == "a");
+    const Json marks = s.call("checkpoint_list");
+    CHECK(conforms(marks["result"]["structuredContent"], schema, "checkpoint_list").empty() && marks["result"]["structuredContent"]["checkpoints"].size() == 1);
+    CHECK(marks["result"]["structuredContent"]["ms"].isNumber());
+    // Every tool the server lists, the batch tools too, says the same schema.
+    const Json all = s.rpc("tools/list");
+    for (const Json& t : all["result"]["tools"].items()) CHECK_MSG(t.has("outputSchema"), t["name"].asString());
+}
