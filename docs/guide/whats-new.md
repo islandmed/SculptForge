@@ -8,12 +8,21 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.6
 
 ```features
-date: unreleased
+date: 2026-11-17
 tagline: Insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run.
 highlight: Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail
 highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window
 highlight: A public benchmark you can run in one command
 ```
+
+- **Benchmark scene pack**: download a pack of our own sculpts and run `sculptforge --benchmark-pack bench-pack --out
+  results.json` on any computer; the result lists your hardware and the frame times, so computers can be compared.
+- **Insert on a mesh with subdivision levels**: Append > Insert on the model no longer asks you to Freeze Levels
+  first. The piece becomes a new Part beside the mesh, and every level keeps its detail. Requested by a member.
+- **Windows installer**: a "Check for updates once a day" box (on by default) says what the check sends; the choice
+  sets **Edit > Preferences > Updates**, which you can still change any time.
+- **Scoop**: on Windows, `scoop install sculptforge` installs the portable build and `scoop update sculptforge` keeps
+  it current (bucket: islandmed/scoop-sculptforge, see the install page).
 
 ## Version 0.13.5
 

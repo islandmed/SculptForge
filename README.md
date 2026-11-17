@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.5:</strong> a plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data (<a href="https://sculptforge.app/guide/whats-new.html#version-0135">how it works</a>)
+  <strong>New in 0.13.6:</strong> insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run (<a href="https://sculptforge.app/guide/whats-new.html#version-0136">how it works</a>)
 </p>
 
 <p align="center">

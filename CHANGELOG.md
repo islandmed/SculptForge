@@ -6,6 +6,42 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.6] - 2026-11-17
+
+### Added
+- **Benchmark scene pack** (`sculptforge --benchmark-pack DIR --out FILE`): the scenes in a downloadable pack
+  (`bench/pack`, our own Creature Head divided to 5.8, 23 and 92 million triangles, the first of them the entry-level
+  "floor" test) get the standard strokes, and one JSON result records the hardware (CPU, GPU, driver, RAM, OS,
+  hardware tier), the SculptForge version, the pack's hash and, per scene and stroke, frame time p50/p95/p99, frames a
+  second, stroke lag and the slowest frame. Scenes the computer has no memory for are left out and said so. The
+  benchmarks page lists community results, sortable by hardware, sent in through a "Benchmark pack result" issue.
+- **Windows installer**: a "Check for updates once a day" page (default on; silent installs keep it on). Its choice is
+  applied to Edit > Preferences > Updates the first start after each install, and the installer's privacy line names
+  what the check sends.
+- Scoop manifest for the portable Windows .zip (`packaging/scoop/sculptforge.json`, checkver and autoupdate from the
+  GitHub releases), kept at the newest release by the release script like winget, Homebrew and the AUR;
+  `sculptforge-cli` is on the PATH and SculptForge gets a Start menu shortcut. Fixes #170 (thanks @NemoStein).
+
+### Changed
+- **Windows files** (the command-line tool and the installer, as the app already did): Properties > Details shows the
+  product name SculptForge and the release's version, which Windows code signing through SignPath Foundation requires.
+- **Append > Insert on the model** works on a mesh with subdivision levels (it used to stop with "Dynamic topology
+  needs a mesh without subdivision levels"). The inserted piece (with its mirrored copies) is added as a new Part next
+  to the active one, so no level is frozen or changed; the status line says so, and one Undo takes the Part away.
+  Merge Parts joins it to the mesh after Freeze Levels, if you want it in one mesh (requested by a member).
+
+### Fixed
+- **Predictive strokes** (Preferences > Performance, experimental): on a dense mesh the stroke preview's head no
+  longer jumps off the stroke when the pen's samples arrive in a burst. Pen and mouse samples are now timed when they
+  happened, not when they were handled, and samples under 2 ms apart count as one instant. On the floor tier with a
+  240 px brush on a 28M-triangle mesh, the preview now trails the pen by about 35 ms at p99 instead of about 230 ms.
+  Thanks @Calavera00 (#216).
+- **Heavy meshes:** a shortcut or menu command (Undo, Save...) or a new click right after a stroke no longer freezes
+  the window while the stroke's last dabs are placed. It waits for them, and the status bar shows what is queued
+  ("Finishing stroke: undo queued"). Esc cancels the queued commands. They run in order, once each, as soon as the
+  stroke is done. The new click starts its stroke on the finished surface. Quitting and autosave still wait for the
+  stroke.
+
 ## [0.13.5] - 2026-11-16
 
 ### Added
