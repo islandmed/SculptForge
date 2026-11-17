@@ -1,0 +1,15 @@
+# My Panel opened from the Edit menu takes an Alt+drag (Member bug, Hameron), for the look review at 1440 logical px
+# (ui_my_panel_paths_1440 at 100 %, ui_my_panel_paths_1440_200 at 200 %): the drop-down stays open and holds the button.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+wait 0.2
+shot empty
+hold alt
+drag_to "Wire##view.wire" "My Panel/##totray" 0 100
+hold none
+wait 0.2
+expect_value mypanel_entries == 1
+shot added

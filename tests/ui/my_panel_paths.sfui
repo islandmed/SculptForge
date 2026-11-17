@@ -1,0 +1,42 @@
+# My Panel (Member bug, Hameron): an Alt+drag into My Panel adds the entry however My Panel was opened, not only on its key.
+# One block per path: its drop-down (Edit > My Panel...), the floating panel on its key, a window of its own (offscreen it
+# floats inside the main window; the real second window takes the drop from the main window's release, App::droppedOnMyPanelWindow).
+# (The tray is tests/ui/my_panel.sfui.)
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar
+run new_sphere subdivisions=3
+expect_value mypanel_entries == 0
+click "Parts##tool.part"                # (closed: Masking is then in view in the Tool palette)
+# The drop-down: it stays open when the drag starts on a shelf, and takes the drop.
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+hold alt
+drag_to "Masking##tool.masking" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 1
+expect_value mypanel_at@section:tool.masking == 0
+# On its key.
+key escape
+key f4
+wait 0.2
+expect_value mypanel_floating == 1
+hold alt
+drag_to "Wire##view.wire" "Masking##mypanel.section.tool.masking" 0 150
+hold none
+expect_value mypanel_entries == 2
+expect_value mypanel_at@action:view.wire == 1
+expect_value checked@view.wire == 0
+key f4
+wait 0.2
+expect_value mypanel_floating == 0
+# In a window of its own.
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+wait 0.2
+click "My Panel/##detach"
+wait 0.2
+expect_value detached_panels == 1
+hold alt
+drag_to "Orthographic##view.ortho" "Masking##mypanel.section.tool.masking" 0 150
+hold none
+expect_value mypanel_entries == 3
+expect_value checked@view.ortho == 0
