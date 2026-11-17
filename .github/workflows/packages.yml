@@ -180,10 +180,7 @@ jobs:
           SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
       - name: Python scripting starts from the installed files (app/Python.h)
         # (and no fallback to a Python home baked in at build time: only the runtime the package ships)
-        run: |
-          out=$(AppDir/usr/bin/sculptforge --python-selftest) && echo "$out"
-          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
-          ! find AppDir -type l -lname '/*' | grep . || { echo "a package must not link outside itself (above)"; exit 1; }
+        run: tools/ci/python-selftest.sh AppDir/usr/bin/sculptforge AppDir "$RUNNER_TEMP/pyrt/python"
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
       - uses: actions/upload-artifact@v7
@@ -347,10 +344,8 @@ jobs:
         run: |
           # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
           ctest --test-dir build --output-on-failure -LE ui -j 4
-          DESTDIR=$PWD/stage cmake --install build # the shipped Python starts, with no build-time fallback home:
-          out=$(stage/usr/bin/sculptforge --python-selftest) && echo "$out"
-          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
-          ! find stage -type l -lname '/*' | grep . || { echo "a package must not link outside itself (above)"; exit 1; }
+          DESTDIR=$PWD/stage cmake --install build # the shipped Python starts on its own files, no build-time fallback:
+          tools/ci/python-selftest.sh stage/usr/bin/sculptforge stage /opt/python
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
@@ -417,10 +412,8 @@ jobs:
         # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
         run: |
           ctest --test-dir build --output-on-failure -LE ui -j 4
-          cmake --install build --prefix stage # the shipped Python starts, with no build-time fallback home:
-          out=$(stage/SculptForge.app/Contents/MacOS/SculptForge --python-selftest) && echo "$out"
-          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
-          ! find stage -type l -lname '/*' | grep . || { echo "a package must not link outside itself (above)"; exit 1; }
+          cmake --install build --prefix stage # the shipped Python starts on its own files, no build-time fallback:
+          tools/ci/python-selftest.sh stage/SculptForge.app/Contents/MacOS/SculptForge stage "$RUNNER_TEMP/pyrt/python"
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
         # hdiutil sometimes fails with "Resource busy" on the runner (a disk image still attached): up to 3 tries.
         run: |
@@ -525,9 +518,15 @@ jobs:
         shell: pwsh
         run: |
           cmake --install build --config Release --prefix stage
-          # (a windowed exe: Start-Process waits for it and gives its exit code)
-          $p = Start-Process -FilePath stage\bin\sculptforge.exe -ArgumentList '--python-selftest' -Wait -PassThru -NoNewWindow `
-               -RedirectStandardOutput selftest.out -RedirectStandardError selftest.err
+          # Only the package's own files: the runtime it was built from moved away, no PYTHONHOME/PYTHONPATH
+          # (tools/ci/python-selftest.sh does the same on Linux and macOS).
+          Move-Item $env:SF_PYRT "$env:SF_PYRT.away"
+          Remove-Item Env:PYTHONHOME, Env:PYTHONPATH -ErrorAction SilentlyContinue
+          try {
+            # (a windowed exe: Start-Process waits for it and gives its exit code)
+            $p = Start-Process -FilePath stage\bin\sculptforge.exe -ArgumentList '--python-selftest' -Wait -PassThru -NoNewWindow `
+                 -RedirectStandardOutput selftest.out -RedirectStandardError selftest.err
+          } finally { Move-Item "$env:SF_PYRT.away" $env:SF_PYRT }
           Get-Content selftest.out, selftest.err
           if ($p.ExitCode -ne 0) { throw "python selftest failed ($($p.ExitCode))" }
           if (-not (Select-String -Path selftest.out -Pattern "python fallback home: none" -Quiet)) {
