@@ -336,12 +336,12 @@ void App::drawSupportCard() {
           "Member Requests: one a month, built first, credited to you", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
-        {"Studio", "$300", "/ month",
-         {"A flat rate for the whole studio: any number of artists, each with everything in Member",
+        {"Studio", "Quote", "personalized",
+         {"One quote for the whole studio: any number of artists, each with everything in Member",
           "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
           "Isolated: a private release channel, no outside connections",
           "First response within 2 business days; up to 3 custom items a month", nullptr},
-         "Studio membership", "Studio membership##card.studio", kStudioPageUrl, "Founding Studio: $150, first 5 studios"},
+         "Get a quote", "Get a quote##card.studio", kStudioPageUrl, "Tell us your team size, platforms and pipeline"},
     };
     const float gap = 22.0f * k, footer = 62.0f * k, tierH = 350.0f * k;
     const float tierW = (size.x - pad * 2.0f - gap) / 2.0f;
