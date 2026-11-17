@@ -2451,11 +2451,13 @@ bool App::closePopupsOnPressOutside(const SDL_Event& e) {
         // Its own press: over it as ImGui sees it (an auto-sized popup grows a frame after its content), or in its rect.
         if (hovered == p.Window->RootWindow || inside(p.Window->Pos.x, p.Window->Pos.y, p.Window->Size.x, p.Window->Size.y))
             return false;
-        // A press on a combo's own button toggles it: ImGui's. Anywhere else in the window that opened it, ImGui keeps a
-        // menu open when the press lands on an item (#210), so it closes here.
-        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow &&
-            p.PopupId == ImHashStr("##ComboPopup", 0, g->HoveredId))
+        // A press in the window that opened it: ImGui's first (a combo's own button closes it, an item acts). A menu
+        // still open when that frame ends was not closed by it (ImGui keeps one when the press lands on an item, #210):
+        // closeParentPressPopup closes it then.
+        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) {
+            parentPress_ = {p.PopupId, p.OpenFrameCount};
             return false;
+        }
     }
     const bool palette = !dropdown_.empty();
     if (palette) {
@@ -2479,11 +2481,21 @@ bool App::closePopupsOnPressOutside(const SDL_Event& e) {
     return spent;
 }
 
+void App::closeParentPressPopup() {
+    const auto press = std::exchange(parentPress_, {});
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!press.first || !g) return;
+    for (int i = 0; i < g->OpenPopupStack.Size; ++i)
+        if (g->OpenPopupStack[i].PopupId == press.first && g->OpenPopupStack[i].OpenFrameCount == press.second) {
+            ImGui::ClosePopupToLevel(i, false);
+            return;
+        }
+}
+
 bool App::closeTopPopupOnEscape() {
     ImGuiContext* g = ImGui::GetCurrentContext();
-    // (A palette drop-down is the first popup: its own Esc closes it. A modal dialog keeps its Esc.)
-    const int base = dropdown_.empty() ? 0 : 1;
-    if (!g || g->OpenPopupStack.Size <= base) return false;
+    // (With a palette drop-down open, its Esc closes it and what it holds together. A modal dialog keeps its Esc.)
+    if (!g || g->OpenPopupStack.Size == 0 || !dropdown_.empty()) return false;
     if (shortcutConflictOpen() || !capturingShortcut_.empty()) return false; // (the shortcut editor's own Esc, Config.cpp)
     for (const ImGuiPopupData& p : g->OpenPopupStack)
         if (p.Window && (p.Window->Flags & ImGuiWindowFlags_Modal)) return false;

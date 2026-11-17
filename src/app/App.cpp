@@ -1893,6 +1893,9 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+        closeTopPopupOnEscape())
+        return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
@@ -2013,7 +2016,6 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
-        if (e.key.key == SDLK_ESCAPE && !e.key.repeat && !io.WantTextInput && closeTopPopupOnEscape()) break; // (#210)
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
@@ -3651,6 +3653,11 @@ void App::updateTitle() {
 // ---------------------------------------------------------------------------
 
 void App::drawUi() {
+    // A press in the window a context menu or combo list came from, which ImGui left open: closed once the frame is drawn (#210).
+    struct CloseAfter {
+        App& app;
+        ~CloseAfter() { app.closeParentPressPopup(); }
+    } closeAfter{*this};
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();

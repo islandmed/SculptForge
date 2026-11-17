@@ -2448,6 +2448,8 @@ private:
     // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix). True: the press only closed a
     // context menu or combo list over the canvas, and starts nothing (#210).
     bool closePopupsOnPressOutside(const SDL_Event& e);
+    std::pair<ImGuiID, int> parentPress_{0, 0}; // the popup a press in its parent window left to ImGui (id, open frame)
+    void closeParentPressPopup();               // ... closed after the frame if ImGui left it open (#210)
     bool closeTopPopupOnEscape(); // Esc closes the top context menu or combo list (#210)
     bool pressSpent_ = false; // this press only closed a popup (closePopupsOnPressOutside)
     bool openDropdown_ = false;
