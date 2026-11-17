@@ -32,6 +32,14 @@ render_cell "Lit Sphere x dense Micro" mode=lit
 render_cell "PBR x dense Micro" mode=pbr
 render_cell "flat x dense Micro" mode=flat
 render_cell "wire x dense Micro" mode=wire
+# ... drawn ABOVE the stored level (close-ups: TierBudgets::microDrawAbove, posAt in the micro vertex shader): the camera
+# inside a few stored cells, so every drawn vertex is an interpolated one.
+camera_distance 0.03
+wait 0.3
+render_cell "Lit Sphere x dense Micro, above the stored level" mode=lit
+render_cell "flat x dense Micro, above the stored level" mode=flat
+key f
+wait 0.3
 
 # --- Focus Detail
 env SF_FOCUS_DETAIL 1
@@ -43,6 +51,11 @@ render_cell "Lit Sphere x Focus Detail" mode=lit
 render_cell "PBR x Focus Detail" mode=pbr
 render_cell "flat x Focus Detail" mode=flat
 render_cell "wire x Focus Detail" mode=wire
+camera_distance 0.03
+wait 0.3
+render_cell "Lit Sphere x Focus Detail, above the stored level" mode=lit
+key f
+wait 0.3
 
 # --- small, over the buffer limit
 gl_limits texels=16384

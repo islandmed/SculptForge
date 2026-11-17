@@ -22,6 +22,7 @@
 #include "core/Benchmark.h"
 #include "core/BrushAlpha.h"
 #include "core/Micro.h"
+#include "core/Sculpt.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -83,7 +84,7 @@ struct Profile {
 // The height change h(x) = before - after along the transect, and its edge / line widths (world units).
 Profile analyse(const std::vector<double>& before, const std::vector<double>& after, float r, bool line) {
     const int N = int(before.size());
-    std::vector<double> h(size_t(N), 0.0), x(size_t(N));
+    std::vector<double> h(size_t(N), 0.0), x(size_t(N), 0.0);
     for (int k = 0; k < N; ++k) {
         x[size_t(k)] = (-1.2 + 2.4 * double(k) / double(N - 1)) * r;
         h[size_t(k)] = std::isnan(before[size_t(k)]) || std::isnan(after[size_t(k)]) ? 0.0 : before[size_t(k)] - after[size_t(k)];
@@ -204,7 +205,8 @@ int main(int argc, char** argv) {
             const glm::vec3 center = mesh.positions[best]; // (the same spot: each dab is undone below)
             // Transects across the edge, offset along it (the line: the centre one only).
             const int T = isLine ? 1 : 9;
-            std::vector<std::vector<double>> before(size_t(T));
+            std::vector<std::vector<double>> before;
+            before.resize(size_t(T));
             for (int t = 0; t < T; ++t) {
                 const float off = isLine ? 0.0f : (-0.3f + 0.6f * float(t) / float(T - 1)) * r;
                 before[size_t(t)] = transect(mesh, bvh, center + upR * off, rightR, n, r, N);

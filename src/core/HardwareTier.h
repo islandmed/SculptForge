@@ -62,6 +62,9 @@ struct TierBudgets {
     uint64_t focusGpuPoolMB = 384;             // GPU page pool for close-up full tiles
     double focusUpdateMs = 3.0;                // main-thread promotion work per frame (App::updateFocusDetail)
     double focusLookaheadSeconds = 0.25;       // brush prediction
+    // Micro levels a close-up may draw ABOVE the stored one (render/MicroRenderer.h drawAbove): the heights linear
+    // between stored grid points over the Phong base, so facets never show however close the view gets; no new data.
+    int microDrawAbove = 2;
     // Coarse LOD (microlod: Renderer::stillDetail / triangleBudget)
     double stillFrameMs = 100.0;               // GPU time a full-detail still frame may take before it stays coarse
     double stillDelaySeconds = 0.15;           // rest before full detail
