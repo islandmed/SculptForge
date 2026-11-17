@@ -863,6 +863,17 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     size_t total = choose(target);
     for (int it = 0; it < 24 && budget && total > budget; ++it) total = choose(target *= 1.4142f);
     lastTargetPx = target;
+    if (static const bool dbg = std::getenv("SF_MICRO_DRAW_DEBUG") != nullptr; dbg) { // (research: the levels chosen this frame)
+        int hist[kMaxDrawLevel + 1] = {};
+        for (uint32_t c = 0; c < clusters; ++c)
+            if (visible[c]) ++hist[want_[c]];
+        const char* ev = std::getenv("SF_TIER_MICRO_DRAW_ABOVE");
+        std::fprintf(stderr, "micro draw: stored %d drawAbove %d (tier %d, env %s) maxDraw %d target %.2f px total %zu budget %zu levels:", level_, drawAbove,
+                     currentTierConfig().budgets.microDrawAbove, ev ? ev : "-", maxDraw, double(target), total, budget);
+        for (int l = 0; l <= kMaxDrawLevel; ++l)
+            if (hist[l]) std::fprintf(stderr, " L%d=%d", l, hist[l]);
+        std::fprintf(stderr, "\n");
+    }
     for (uint32_t c = 0; c < clusters; ++c) levels_[c] = uint32_t(want_[c]);
     gl::BindBuffer(GL_TEXTURE_BUFFER, levelData_);
     gl::BufferSubData(GL_TEXTURE_BUFFER, 0, GLsizeiptr(levels_.size() * 4), levels_.data());
