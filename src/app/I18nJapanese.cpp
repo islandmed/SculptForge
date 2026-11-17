@@ -6556,8 +6556,8 @@ constexpr Entry kJapanese[] = {
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+円を中心からドラッグし、内側を残して残りを隠す; Alt を足すと内側を隠す。ドラッグ中に Shift を離すと正円を保つ。"},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+円を中心からドラッグすると内側を全てマスクする; Ctrl+Alt+ドラッグでマスク解除。ドラッグ中の Shift で正円を保つ; Tool > Masking のオプションで角からドラッグ。向こう側も含む。"},
     // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
-    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
-     "Python スクリプトは、このコンピューター上のプログラムができることは何でもできます。信頼できるスクリプトだけを実行してください。スクリプトは実行したときだけ動作します: 開いたものからスクリプトが起動することはありません。"},
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one.",
+     "Python スクリプトは、このコンピューター上のプログラムができることは何でもできます。信頼できるスクリプトだけを実行してください。スクリプトが動作するのは、実行したときと、下でチェックしたスクリプトを起動時に実行するときだけです。開いたものからスクリプトが起動することはありません。"},
     {"Commands",
      "コマンド"},
     {"Enable Python scripts",

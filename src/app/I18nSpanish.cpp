@@ -5899,8 +5899,8 @@ constexpr Entry kSpanish[] = {
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro para conservar el interior y ocultar el resto; añade Alt para ocultar el interior. Suelta Shift mientras arrastras para mantenerlo redondo."},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+arrastra un círculo desde su centro y enmascara todo su interior; Ctrl+Alt+arrastra desenmascara. Shift mientras arrastras lo mantiene redondo; arrastra desde una esquina con la opción de Tool > Masking. El lado lejano queda incluido."},
     // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
-    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
-     "Un script de Python puede hacer cualquier cosa que pueda hacer un programa en este equipo. Ejecuta solo scripts en los que confíes. Los scripts se ejecutan solo cuando tú los ejecutas: nada de lo que abras puede iniciar uno."},
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one.",
+     "Un script de Python puede hacer cualquier cosa que pueda hacer un programa en este equipo. Ejecuta solo scripts en los que confíes. Los scripts se ejecutan solo cuando tú los ejecutas, o al iniciar si marcas uno abajo; nada de lo que abras puede iniciar uno."},
     {"Commands",
      "Comandos"},
     {"Enable Python scripts",
