@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.5
+
+```features
+date: unreleased
+tagline: A plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data.
+highlight: Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit
+highlight: Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails
+highlight: AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it
+```
+
 ## Version 0.13.4
 
 ```features
