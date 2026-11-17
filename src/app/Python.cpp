@@ -74,7 +74,7 @@ void recordEdit(Document& doc, python::Edit what, const std::function<void()>& c
 
 // Loads the host library and starts Python in it with `side` (its build stamp and home filled in here). Null with
 // `error` set when there is no host, it doesn't load or Python doesn't start; `path` is the host's file.
-python::Host* loadHost(python::AppSide& side, std::string& path, std::string& error) {
+python::Host* loadHost(python::AppSide& side, std::string& path, std::string& error, std::string* fallbackHome = nullptr) {
     path = findHost();
     if (path.empty()) {
         error = "Python isn't part of this build of SculptForge";
@@ -108,6 +108,14 @@ python::Host* loadHost(python::AppSide& side, std::string& path, std::string& er
             break;
         }
     }
+    if (fallbackHome) {
+#if defined(_WIN32)
+        auto fallback = reinterpret_cast<const char* (*)()>(reinterpret_cast<void*>(GetProcAddress(lib, "sf_pyhost_fallback_home")));
+#else
+        auto fallback = reinterpret_cast<const char* (*)()>(SDL_LoadFunction(lib, "sf_pyhost_fallback_home"));
+#endif
+        *fallbackHome = fallback ? fallback() : "?";
+    }
     char why[512] = "";
     python::Host* host = create(python::kHostAbi, &side, why, int(sizeof why));
     if (!host) error = std::string("Python couldn't start: ") + why;
@@ -133,8 +141,11 @@ int pythonSelfTest() {
     side.selectPart = [](Document& d, int i) { d.selectPart(i); };
     std::string out;
     side.write = [&](bool, const std::string& text) { out += text; };
-    std::string path, error;
-    python::Host* host = loadHost(side, path, error);
+    std::string path, error, fallback;
+    python::Host* host = loadHost(side, path, error, &fallback);
+    // (packages check this line: a package must have no fallback, only the runtime beside the host)
+    std::printf("python fallback home: %s\n", fallback.empty() ? "none" : fallback.c_str());
+    std::printf("python home: %s (host %s)\n", side.home.empty() ? "(none beside the host)" : side.home.c_str(), path.c_str());
     if (!host) {
         std::fprintf(stderr, "python selftest: %s (%s)\n", error.c_str(), path.empty() ? "no host" : path.c_str());
         return 1;
@@ -143,7 +154,7 @@ int pythonSelfTest() {
     for (const char* line : {"import json, math, zlib, ctypes, sqlite3, ssl, hashlib, decimal, pathlib, threading",
                              "sf.run('new_sphere', subdivisions=2); doc.mask = [0.0] * len(doc.vertices)",
                              "assert len(doc.triangles) == 320, len(doc.triangles)",
-                             "import sys; print('python selftest ok', sys.version.split()[0], sys.prefix)"})
+                             "import sys; print('python selftest ok', sys.version.split()[0], sys.prefix); print('sys.path:', sys.path)"})
         ok = host->runLine(line) == python::Host::Status::Ok && ok;
     std::fprintf(ok ? stdout : stderr, "%s%s", out.c_str(), ok ? "" : "python selftest FAILED\n");
     std::fflush(stdout);
@@ -239,6 +250,7 @@ bool PythonScripting::load() {
     std::string path;
     host_ = loadHost(side, path, loadError_);
     if (!host_) {
+        app_.status_ = loadError_; // (fails closed: no Python, and the status bar and console say why)
         app_.console_.print(Console::Kind::Error, loadError_);
         SDL_Log("Python: %s (%s)", loadError_.c_str(), path.c_str());
         return false;

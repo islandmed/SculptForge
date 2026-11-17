@@ -729,6 +729,15 @@ set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
 set(CPACK_RPM_PACKAGE_URL "https://sculptforge.app/")
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+# Python scripting's runtime (lib/sculptforge/python, cmake/PythonRuntime.cmake) ships whole: rpmbuild leaves its
+# scripts' shebangs alone and doesn't byte-compile them with the system's Python, and it neither needs nor offers
+# system packages (the host's libpython is the bundled one).
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global __brp_mangle_shebangs_exclude_from ^/usr/lib/sculptforge/python/
+%global _python_bytecompile_extra 0
+%global _python_bytecompile_errors_terminate_build 0
+%global __requires_exclude_from ^/usr/lib/sculptforge/python/
+%global __provides_exclude_from ^/usr/lib/sculptforge/python/
+%global __requires_exclude ^libpython3")
 # Windows installer
 set(CPACK_NSIS_DISPLAY_NAME "SculptForge")
 set(CPACK_NSIS_PACKAGE_NAME "SculptForge")
@@ -795,13 +804,51 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
     set(SF_PYHOST_DIR SculptForge.app/Contents/Frameworks)
   elseif(WIN32)
     set(SF_PYHOST_DIR ${CMAKE_INSTALL_BINDIR})
+    configure_file(packaging/windows/sculptforge-pyhost.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-pyhost.rc @ONLY)
+    target_sources(sculptforge_pyhost PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-pyhost.rc)
   else()
     set_target_properties(sculptforge_pyhost PROPERTIES INSTALL_RPATH "$ORIGIN/python/lib")
     target_link_options(sculptforge_pyhost PRIVATE -Wl,--exclude-libs,ALL) # its copy of the core stays its own
     set(SF_PYHOST_DIR lib/sculptforge)
   endif()
-  # In a build folder it sits next to the executable, where the app looks first.
-  set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:sculptforge>)
+  # In a build folder it sits where the installed app has it: next to the executable, or in the macOS bundle's
+  # Frameworks.
+  if(APPLE)
+    set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_BUNDLE_CONTENT_DIR:sculptforge>/Frameworks)
+  else()
+    set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:sculptforge>)
+  endif()
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import sys; print(sys.base_prefix)" OUTPUT_VARIABLE SF_PYTHON_BUILD_HOME
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  file(TO_CMAKE_PATH "${SF_PYTHON_BUILD_HOME}" SF_PYTHON_BUILD_HOME)
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    # Packages: only the runtime shipped beside the host, never a path baked in at build time (it would name a folder
+    # anyone could create on a user's computer). The build folder gets that same layout, for the tests.
+    if(APPLE)
+      set(SF_PYRT_STAGE $<TARGET_BUNDLE_CONTENT_DIR:sculptforge>/Resources/python)
+    else()
+      set(SF_PYRT_STAGE $<TARGET_FILE_DIR:sculptforge>/python)
+    endif()
+    if(WIN32)
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${SCULPTFORGE_PYTHON_RUNTIME}/Lib" "${SF_PYRT_STAGE}/Lib"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${SCULPTFORGE_PYTHON_RUNTIME}/DLLs" "${SF_PYRT_STAGE}/DLLs")
+    else()
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${SF_PYRT_STAGE}"
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${SCULPTFORGE_PYTHON_RUNTIME}/lib" "${SF_PYRT_STAGE}/lib")
+    endif()
+  else()
+    # Source and distribution builds against an installed Python (no runtime shipped): that Python's own home.
+    target_compile_definitions(sculptforge_pyhost PRIVATE SF_PYTHON_BUILD_HOME="${SF_PYTHON_BUILD_HOME}")
+  endif()
+  if(WIN32) # the Python DLLs the host links, beside it in the build folder (the installer puts them next to the exe)
+    file(GLOB SF_PYTHON_DLLS "${SF_PYTHON_BUILD_HOME}/python3*.dll" "${Python_RUNTIME_LIBRARY_DIRS}/python3*.dll")
+    foreach(dll ${SF_PYTHON_DLLS})
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different "${dll}"
+                         $<TARGET_FILE_DIR:sculptforge_pyhost>)
+    endforeach()
+  endif()
   add_dependencies(sculptforge sculptforge_pyhost)
   install(TARGETS sculptforge_pyhost LIBRARY DESTINATION ${SF_PYHOST_DIR})
   if(SCULPTFORGE_PYTHON_RUNTIME)

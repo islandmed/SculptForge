@@ -179,7 +179,10 @@ jobs:
           # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
           SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
       - name: Python scripting starts from the installed files (app/Python.h)
-        run: AppDir/usr/bin/sculptforge --python-selftest
+        # (and no fallback to a Python home baked in at build time: only the runtime the package ships)
+        run: |
+          out=$(AppDir/usr/bin/sculptforge --python-selftest) && echo "$out"
+          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
       - uses: actions/upload-artifact@v7
@@ -343,7 +346,9 @@ jobs:
         run: |
           # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
           ctest --test-dir build --output-on-failure -LE ui -j 4
-          DESTDIR=$PWD/stage cmake --install build && stage/usr/bin/sculptforge --python-selftest # (the shipped Python starts)
+          DESTDIR=$PWD/stage cmake --install build # the shipped Python starts, with no build-time fallback home:
+          out=$(stage/usr/bin/sculptforge --python-selftest) && echo "$out"
+          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
@@ -410,7 +415,9 @@ jobs:
         # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
         run: |
           ctest --test-dir build --output-on-failure -LE ui -j 4
-          cmake --install build --prefix stage && stage/SculptForge.app/Contents/MacOS/SculptForge --python-selftest # (the shipped Python starts)
+          cmake --install build --prefix stage # the shipped Python starts, with no build-time fallback home:
+          out=$(stage/SculptForge.app/Contents/MacOS/SculptForge --python-selftest) && echo "$out"
+          echo "$out" | grep -q "python fallback home: none" || { echo "a package must not fall back to a build-time Python home"; exit 1; }
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
         # hdiutil sometimes fails with "Resource busy" on the runner (a disk image still attached): up to 3 tries.
         run: |
@@ -510,7 +517,7 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
       - name: Product name and version in the exes (what SignPath's artifact configuration enforces)
         shell: pwsh
-        run: ./tools/ci/check_pe_metadata.ps1 -Path build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe
+        run: ./tools/ci/check_pe_metadata.ps1 -Path build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe, build\Release\sculptforge_pyhost.dll
       - name: Python scripting starts from the installed files (app/Python.h)
         shell: pwsh
         run: |
@@ -520,6 +527,8 @@ jobs:
                -RedirectStandardOutput selftest.out -RedirectStandardError selftest.err
           Get-Content selftest.out, selftest.err
           if ($p.ExitCode -ne 0) { throw "python selftest failed ($($p.ExitCode))" }
+          if (-not (Select-String -Path selftest.out -Pattern "python fallback home: none" -Quiet)) {
+            throw "a package must not fall back to a build-time Python home" }
       - name: Signing - settings present
         if: env.SIGN == 'true'
         shell: pwsh
@@ -537,7 +546,8 @@ jobs:
         run: |
           New-Item -ItemType Directory signing\binaries | Out-Null
           Copy-Item build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe signing\binaries
-          Copy-Item build\Release\*.dll signing\binaries -ErrorAction SilentlyContinue
+          # (not the Python runtime's DLLs, python3*.dll: not ours to sign; they ship as python-build-standalone built them)
+          Copy-Item build\Release\*.dll signing\binaries -Exclude python3*.dll -ErrorAction SilentlyContinue
       - name: Signing - upload the unsigned binaries
         if: env.SIGN == 'true'
         id: sign-binaries-in

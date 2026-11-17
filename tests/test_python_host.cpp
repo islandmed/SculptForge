@@ -24,6 +24,18 @@ using namespace sf;
 
 namespace {
 
+// The runtime a package build stages beside the host (its build folder has the install's layout), found the way the
+// app finds it (app/Python.cpp): "" when there is none and the host falls back to the Python it was built with.
+std::string runtimeHome() {
+    namespace fs = std::filesystem;
+    const fs::path host(SF_PYHOST_PATH);
+    for (const fs::path& home : {host.parent_path() / "python", host.parent_path() / ".." / "Resources" / "python"}) {
+        std::error_code ec;
+        if (fs::is_directory(home, ec)) return home.lexically_normal().string();
+    }
+    return {};
+}
+
 struct Fixture {
     Document doc;
     CommandRegistry registry;
@@ -43,6 +55,7 @@ struct Fixture {
         side.build = SF_PYHOST_BUILD;
         side.documentSize = sizeof(Document);
         side.meshSize = sizeof(Mesh);
+        side.home = runtimeHome();
         side.document = &doc;
         side.registry = &registry;
         side.run = [this](const std::string& name, const Args& args) {

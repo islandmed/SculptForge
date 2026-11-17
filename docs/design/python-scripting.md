@@ -68,6 +68,12 @@ What SculptForge guarantees:
   macros, `--run`, sculptforge-cli and AI tools (MCP, live mode) can't reach Python. tests/ui/python_console.sfui opens
   a project and files holding Python text and checks the host was never loaded.
 - **No ports, no network from the app** for scripting. The host opens no socket and adds no IPC.
+- **Only the shipped runtime in packages.** The host is found only beside the app (no setting or environment variable
+  names another library), and a package starts only the CPython it ships beside the host. A fallback to the build
+  Python's own home exists only in source builds against an installed Python (a developer's, AUR, brew): that
+  machine's own Python. It is never compiled into a package (CMakeLists.txt: not with SCULPTFORGE_PYTHON_RUNTIME),
+  `--python-selftest` prints it, and every package job fails unless it says "none" (input/CEO, 11-17). A package whose
+  runtime is missing has no Python and says why in the status bar.
 
 ## P2: script-made interface (plan)
 

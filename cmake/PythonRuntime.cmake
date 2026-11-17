@@ -12,6 +12,10 @@ function(sf_install_python_runtime RUNTIME DEST)
     PATTERN "idlelib" EXCLUDE PATTERN "tkinter" EXCLUDE PATTERN "turtledemo" EXCLUDE PATTERN "turtle.py" EXCLUDE
     PATTERN "ensurepip" EXCLUDE PATTERN "lib2to3" EXCLUDE
     PATTERN "_tkinter*" EXCLUDE PATTERN "tcl*" EXCLUDE PATTERN "tk*" EXCLUDE PATTERN "itcl*" EXCLUDE PATTERN "thread2*" EXCLUDE
+    PATTERN "libtcl*" EXCLUDE PATTERN "libtk*" EXCLUDE PATTERN "_test*" EXCLUDE PATTERN "_ctypes_test*" EXCLUDE
+    PATTERN "xxlimited*" EXCLUDE PATTERN "xxsubtype*" EXCLUDE
+    # the stable-ABI shim (python3.dll's counterpart): nothing loads it, and its $ORIGIN/../lib need trips dpkg-shlibdeps
+    PATTERN "libpython3.so" EXCLUDE
     PATTERN "*.a" EXCLUDE PATTERN "*.lib" EXCLUDE PATTERN "pkgconfig" EXCLUDE PATTERN "config-3*" EXCLUDE
     PATTERN "site-packages" EXCLUDE)
   if(WIN32)

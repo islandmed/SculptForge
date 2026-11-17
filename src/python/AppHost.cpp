@@ -201,6 +201,16 @@ PYBIND11_EMBEDDED_MODULE(sculptforge, m) {
     py::class_<Writer>(m, "_Writer").def("write", &Writer::write).def("flush", [](const Writer&) {});
 }
 
+// The Python home this host falls back to when no runtime sits beside it: "" in packages (--python-selftest prints it
+// and the package jobs check it is empty).
+extern "C" SF_PYHOST_EXPORT const char* sf_pyhost_fallback_home() {
+#if defined(SF_PYTHON_BUILD_HOME)
+    return SF_PYTHON_BUILD_HOME;
+#else
+    return "";
+#endif
+}
+
 extern "C" SF_PYHOST_EXPORT python::Host* sf_pyhost_create(int abi, const python::AppSide* app, char* error, int errorSize) {
     const auto fail = [&](const std::string& why) -> python::Host* {
         if (error && errorSize > 0) {
@@ -227,7 +237,13 @@ extern "C" SF_PYHOST_EXPORT python::Host* sf_pyhost_create(int abi, const python
     config.install_signal_handlers = 0; // Ctrl+C and the rest stay the app's
     config.write_bytecode = 0;          // no __pycache__ folders in the scripts folder or the app's install
     PyStatus status = PyStatus_Ok();
-    if (!g_app.home.empty()) status = PyConfig_SetBytesString(&config, &config.home, g_app.home.c_str());
+    std::string home = g_app.home;
+#if defined(SF_PYTHON_BUILD_HOME)
+    // No runtime shipped with this build (a source or distribution build against an installed Python): that Python.
+    // Never compiled into a package that ships a runtime (CMakeLists.txt): there, no runtime beside the host = no Python.
+    if (home.empty()) home = SF_PYTHON_BUILD_HOME;
+#endif
+    if (!home.empty()) status = PyConfig_SetBytesString(&config, &config.home, home.c_str());
     if (PyStatus_Exception(status)) {
         PyConfig_Clear(&config);
         return fail("Python's home folder: " + std::string(status.err_msg ? status.err_msg : "invalid"));
