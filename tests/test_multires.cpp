@@ -6,6 +6,7 @@
 // face groups / UVs / paint / sculpt layers follow the levels, undo steps across levels, Remove Below / Delete
 // Higher / Reconstruct, projects keep every level, and exports can write the base.
 #include "TestHarness.h"
+#include "GeomInvariants.h"
 
 #include "core/Commands.h"
 #include "core/Multires.h"
@@ -590,6 +591,67 @@ TEST(multires_freeze_levels_for_dynamic) {
     // Nothing to freeze on a plain mesh.
     Document p = makeDoc(makeCube(3));
     CHECK(!run(p, "subdiv_freeze").ok);
+}
+
+// Append > Insert on a mesh with levels (member request): no refusal, no Freeze Levels by hand. The piece becomes a Part
+// beside the active one, so every level keeps its detail bit for bit; undo takes the Part away and nothing else moved.
+TEST(multires_insert_keeps_every_level) {
+    Document d = dividedCube(3);
+    CHECK(stroke(d, "0,0,2", "Standard", 0.3));
+    CHECK(run(d, "subdiv_level", {{"level", 2.0}}).ok);
+    std::vector<std::vector<glm::vec3>> levels;
+    for (int l = 0; l <= 3; ++l) levels.push_back(subdivLevelMesh(d.mesh, l).positions);
+    const std::vector<glm::vec3> shown = d.mesh.positions;
+    const std::string shownText = subdivLevelText(d.mesh);
+    const Args at{{"x", 0.0}, {"y", 0.0}, {"z", 1.0}, {"nx", 0.0}, {"ny", 0.0}, {"nz", 1.0}, {"size", 0.4}};
+    auto levelsIntact = [&](Document& doc) {
+        bool ok = subdivLevelText(doc.mesh) == shownText && bitEqual(doc.mesh.positions, shown);
+        for (int l = 0; l <= 3; ++l) ok = ok && bitEqual(subdivLevelMesh(doc.mesh, l).positions, levels[size_t(l)]);
+        return ok;
+    };
+
+    Args prim = at;
+    prim["type"] = std::string("cylinder");
+    const CommandResult r = run(d, "insert_primitive", prim);
+    CHECK(r.ok);
+    CHECK(r.message.find("subdivision levels") != std::string::npos); // says what it did
+    CHECK(d.partCount() == 2);
+    CHECK(levelsIntact(d));
+    CHECK(d.activePart == 0); // the next insert goes on the same mesh
+    const Mesh& piece = d.partMesh(1);
+    CHECK(piece.triangleCount() > 0);
+    CHECK(geom::nonFinite(piece) == 0);
+    AABB box;
+    for (const glm::vec3& p : piece.positions) box.expand(p);
+    CHECK(box.max.z > 1.1f && box.min.z > 0.7f); // standing on the surface point, its axis along +Z
+    CHECK(d.parts[1].name == "cylinder");
+
+    // A mirrored insert and a Part's copy go the same way; each is one undo step.
+    Args mirrored = at;
+    mirrored["part"] = d.parts[1].name;
+    mirrored["x"] = 0.5;
+    mirrored["symmetry"] = std::string("x");
+    CHECK(run(d, "insert_mesh", mirrored).ok);
+    CHECK(d.partCount() == 3);
+    CHECK(d.partMesh(1).triangleCount() == 2 * piece.triangleCount()); // (new Parts sit right after the active one)
+    CHECK(levelsIntact(d));
+    CHECK(run(d, "undo").ok);
+    CHECK(d.partCount() == 2);
+    CHECK(levelsIntact(d));
+    CHECK(run(d, "redo").ok);
+    CHECK(d.partCount() == 3);
+    CHECK(run(d, "undo").ok);
+    CHECK(run(d, "undo").ok);
+    CHECK(d.partCount() == 1);
+    CHECK(levelsIntact(d));
+    CHECK(subdivLevelCount(d.mesh) == 4); // the base and three divisions
+
+    // Frozen (no levels): the piece still joins the mesh as a new face group, as before.
+    CHECK(run(d, "subdiv_freeze").ok);
+    const size_t tris = d.mesh.triangleCount();
+    CHECK(run(d, "insert_primitive", prim).ok);
+    CHECK(d.partCount() == 1);
+    CHECK(d.mesh.triangleCount() > tris);
 }
 
 TEST(multires_reconstruct_finds_lower_levels) {
