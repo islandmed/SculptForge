@@ -14,7 +14,7 @@
     {"name": "VFX Reference Platform", "version": "CY2027",
      "source": {"kind": "github_dir", "repo": "ves-tech/vfxplatform", "path": "_data/platforms", "name": "^CY(\\d{4})\\.yml$"},
      "notes": "https://vfxplatform.com/", "why": "Update the table in docs/studios.md, the rez package and the CI VFX builds."},
-    {"name": "Blender", "version": "5.2", "track": "minor", "source": {"kind": "endoflife", "product": "blender"},
+    {"name": "Blender", "version": "5.3", "track": "minor", "source": {"kind": "endoflife", "product": "blender"},
      "notes": "https://www.blender.org/download/releases/{major}-{minor}/", "why": "Add it to the bpy matrix in ci.yml and test the Blender bridge."},
     {"name": "Unreal Engine", "version": "5.8", "track": "minor",
      "source": {"kind": "page_title", "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-5-8-release-notes",

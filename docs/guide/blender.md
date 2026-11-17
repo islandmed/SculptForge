@@ -11,7 +11,7 @@ Keep Blender for the scene, rigging, shading and animation, and sculpt in Sculpt
 add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends them
 back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
 
-It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer. Gaussian splats go
+It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer; every release is tested on Blender 4.2 LTS, 5.2 and 5.3. Gaussian splats go
 the same way with Blender 5.3 or newer ([Splats with Blender](#splats-with-blender)).
 
 ## Install the add-on
