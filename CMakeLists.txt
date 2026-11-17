@@ -62,6 +62,7 @@ add_library(sculptforge_core STATIC
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp
   src/core/Benchmark.cpp
+  src/core/BenchPack.cpp
   src/core/HardwareProfile.cpp
   src/core/FrameGovernor.cpp
   src/core/PerfTrace.cpp
@@ -1062,6 +1063,8 @@ if(SCULPTFORGE_BUILD_TESTS)
              --map ${CMAKE_CURRENT_SOURCE_DIR}/tests/areas.map --tsv ${CMAKE_CURRENT_BINARY_DIR}/test-areas.tsv
              --units $<TARGET_FILE:sculptforge_tests>)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
+    # The scene pack (bench/pack, the Creature Head starter it names) hashes to the published one: changing it needs a new version.
+    add_test(NAME bench_pack_hash COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/make_pack.py check)
     # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
@@ -1516,6 +1519,8 @@ if(SCULPTFORGE_BUILD_TESTS)
                                             $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
                                             ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
       set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+      add_test(NAME bench_pack_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_pack_run.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-pack-run)
+      set_tests_properties(bench_pack_run PROPERTIES LABELS ui TIMEOUT 900 RUN_SERIAL TRUE)
       add_test(NAME bench_scene_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_scene_names.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-scene-names)
       set_tests_properties(bench_scene_names PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE)
     endif()
