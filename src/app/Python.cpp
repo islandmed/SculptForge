@@ -50,9 +50,8 @@ constexpr const char* kHostFile = "sculptforge_pyhost.so";
 #endif
 
 // Where the host library is: next to the executable (Windows, a build folder), lib/sculptforge beside bin/ (Linux
-// packages), Frameworks in the macOS bundle. SF_PYHOST names another (tests).
+// packages), Frameworks in the macOS bundle. Only there: no setting or environment variable can name another library.
 std::string findHost() {
-    if (const char* over = std::getenv("SF_PYHOST"); over && *over) return over;
     const char* base = SDL_GetBasePath();
     if (!base) return {};
     const fs::path exe = fsPath(base);
