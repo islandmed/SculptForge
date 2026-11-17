@@ -268,6 +268,52 @@ TEST(studio_audit_log_records_mcp_calls) {
     CHECK(l[1].find("sk-secret") == std::string::npos && l[1].find("0123456789abcdef") == std::string::npos);
 }
 
+TEST(studio_policy_and_audit_cover_mcp_resources) {
+    StudioState state("mcp_resources");
+    CommandRegistry registry;
+    Document doc;
+    auto rpc = [&](int id, const std::string& method, const std::string& params = "{}") {
+        Json j;
+        std::string err;
+        CHECK(Json::parse(handleMcpMessage(registry, doc, R"({"jsonrpc":"2.0","id":)" + std::to_string(id) + R"(,"method":")" + method +
+                                                              R"(","params":)" + params + "}"),
+                          j, err));
+        return j;
+    };
+    // Reading allowed: the numbers are in every result, resources work, and each read is in the audit log.
+    policy::setPolicyForTests(parsed(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"categories": ["info", "edit"]}})"));
+    CHECK(rpc(1, "initialize")["result"]["capabilities"]["resources"].isObject());
+    rpc(2, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})");
+    CHECK(rpc(3, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})")["result"]["structuredContent"].has("triangles"));
+    CHECK(rpc(4, "resources/read", R"({"uri":"sculptforge://scene"})")["result"]["contents"][0]["text"].asString().find("triangles") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("\"resources/read\"") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("sculptforge://scene") != std::string::npos);
+
+    // "info" not allowed: the scene's numbers stay hidden everywhere (results, schemas, resources).
+    policy::setPolicyForTests(parsed(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"categories": ["edit"]}})"));
+    CHECK(!rpc(5, "initialize")["result"]["capabilities"].has("resources"));
+    const Json call = rpc(6, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})");
+    const Json& sc = call["result"]["structuredContent"];
+    CHECK(sc["ok"].asBool() && sc.has("ms") && !sc.has("triangles") && !sc.has("bounds") && !sc.has("scene"));
+    const Json list = rpc(7, "tools/list");
+    CHECK(list["result"]["tools"][0]["outputSchema"]["properties"].has("ms") && !list["result"]["tools"][0]["outputSchema"]["properties"].has("triangles"));
+    CHECK(rpc(8, "resources/list")["result"]["resources"].size() == 0);
+    const Json read = rpc(9, "resources/read", R"({"uri":"sculptforge://scene"})");
+    CHECK(read.has("error") && read["error"]["message"].asString().find("policy") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("policy") != std::string::npos); // (the refused read is logged too)
+
+    // audit.required and an unwritable log: the read is refused before it runs.
+    policy::Policy p = parsed(R"({"format": "sculptforge-policy", "version": 1})");
+    p.auditRequired = true;
+    policy::setPolicyForTests(p);
+    const std::string blocker = state.auditDir + "/file";
+    std::ofstream(blocker) << "x";
+    audit::setPathForTests(blocker + "/audit.jsonl");
+    const Json blocked = rpc(10, "resources/read", R"({"uri":"sculptforge://scene"})");
+    CHECK(blocked.has("error") && blocked["error"]["message"].asString().find("audit log") != std::string::npos);
+    policy::resetPolicyForTests();
+}
+
 TEST(studio_audit_log_rotates_and_can_be_required) {
     StudioState state("audit_rotate");
     policy::Policy p = parsed(R"({"format": "sculptforge-policy", "version": 1, "audit": {"maxMB": 0.1, "keep": 2}})");

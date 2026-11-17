@@ -336,6 +336,32 @@ and `--mcp`; the Claude Desktop bundle is this server too.
   copy of the scene. `undo` takes a restore back. A new edit after going back drops the steps ahead, and so the
   checkpoints there; a new scene or an open clears them all. `checkpoint_restore` then says why it can't.
 
+### Numbers an agent can read
+
+The headless server answers in two forms. Every tool result still has its text line, and also a `structuredContent`
+object (every tool lists its `outputSchema` in `tools/list`), so an agent never has to parse a sentence:
+
+| Field | What it is |
+|---|---|
+| `ok`, `message`, `ms` | whether the call worked, the text line, how long it took in milliseconds |
+| `triangles`, `vertices`, `bounds` | the active Part, the same numbers `mesh_info` prints (`bounds` has `min` and `max`) |
+| `parts`, `activePart` | how many Parts the scene holds, and the active one (`index`, `name`) |
+| `undoDepth`, `canRedo` | undo steps the active Part's history holds, and whether redo has one to bring back |
+| `scene` | totals over every visible Part, with their combined bounds |
+
+The scene is also a set of read-only **resources** (`resources/list`, `resources/read`), JSON that costs no tool call
+and no undo step:
+
+| URI | What it holds |
+|---|---|
+| `sculptforge://scene` | the summary above, plus the file name and whether there are unsaved changes |
+| `sculptforge://parts` | every Part: name, triangles, vertices, visibility, subdivision levels |
+| `sculptforge://part/{index}` | one Part in detail: size and bounds, each subdivision level's triangles, the micro level (grid, triangles, memory), the material (vertex colour, paint layers, texture and its channels), UVs, mask, face groups and sculpt layers |
+| `sculptforge://history` | the last undo steps of the active Part, newest first (`?limit=50`, up to 200) |
+
+Resources follow the same studio rules as tools: when the policy doesn't let AI tools read ("info"), the numbers and
+resources are left out, and every read goes into the audit log.
+
 ### I have a subscription
 
 | Subscription | Use | Set up |

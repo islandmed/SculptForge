@@ -3,6 +3,7 @@
 #include "cli/McpServer.h"
 
 #include "cli/McpBatch.h"
+#include "cli/McpScene.h"
 #include "cli/McpTools.h"
 #include "core/AuditLog.h"
 #include "core/BrushLibrary.h"
@@ -41,6 +42,7 @@ bool policyAllows(const Command& c, std::string* why = nullptr) { return policy:
 
 Json toolList(const CommandRegistry& registry) {
     Json tools = Json::array();
+    const Json outputSchema = mcpOutputSchema(mcpMayReadScene()); // (cli/McpScene.h: every result's structuredContent)
     for (const auto& c : registry.all()) {
         if (hiddenFromAgents(c.name) || !policyAllows(c)) continue;
         Json props = Json::object(), required = Json::array();
@@ -59,12 +61,20 @@ Json toolList(const CommandRegistry& registry) {
         tool.set("name", c.name);
         tool.set("description", c.description);
         tool.set("inputSchema", schema);
+        tool.set("outputSchema", outputSchema);
         tools.push(tool);
     }
-    if (policy::mcpToolAllowed("viewport_image", {})) tools.push(viewportImageTool()); // (cli/McpTools.h; reads: "info")
-    if (policy::mcpToolAllowed("view_closeup", {})) tools.push(viewCloseupTool());
+    for (const char* image : {"viewport_image", "view_closeup"}) { // (cli/McpTools.h; reads: "info")
+        if (!policy::mcpToolAllowed(image, {})) continue;
+        Json tool = std::string(image) == "viewport_image" ? viewportImageTool() : viewCloseupTool();
+        tool.set("outputSchema", outputSchema);
+        tools.push(tool);
+    }
     const Json history = historyToolList(); // (cli/McpBatch.h)
-    for (const Json& t : history.items()) tools.push(t);
+    for (Json t : history.items()) {
+        t.set("outputSchema", outputSchema);
+        tools.push(t);
+    }
     Json result = Json::object();
     result.set("tools", tools);
     return result;
@@ -145,6 +155,12 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
         Json prompts = Json::object();
         prompts.set("listChanged", false);
         caps.set("prompts", prompts); // the recipes (cli/McpTools.h)
+        if (mcpMayReadScene()) {
+            Json resources = Json::object();
+            resources.set("subscribe", false);
+            resources.set("listChanged", false);
+            caps.set("resources", resources); // the scene as JSON (cli/McpScene.h)
+        }
         result.set("capabilities", caps);
         Json info = Json::object();
         info.set("name", "sculptforge");
@@ -173,6 +189,28 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
             return errorReply(id, -32602, error).dump();
         return reply(id, result).dump();
     }
+    if (method == "resources/templates/list") return reply(id, mcpResourceTemplates()).dump();
+    if (method == "resources/list" || method == "resources/read") {
+        // Reading the scene is not a tool call (no undo step), but it is an agent looking at the user's work: the
+        // audit log has it, and with audit.required a read whose line can't be written is refused.
+        const std::string uri = msg["params"]["uri"].asString();
+        audit::Entry entry;
+        entry.tool = "mcp";
+        entry.command = method;
+        if (method == "resources/read") entry.args.set("uri", uri);
+        const auto start = std::chrono::steady_clock::now();
+        Json result;
+        std::string error;
+        bool ok = mcpMayReadScene(&error) && (!audit::required() || audit::writable(&error));
+        if (ok && method == "resources/list") result = mcpResourceList(doc);
+        else if (ok) ok = mcpResourceRead(doc, uri, result, error);
+        entry.ok = ok;
+        entry.message = ok ? "resource" : error;
+        entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+        audit::record(entry);
+        if (!ok) return errorReply(id, -32002, error).dump(); // (the spec's "resource not found" / refused)
+        return reply(id, result).dump();
+    }
     if (method == "tools/call") {
         const std::string name = msg["params"]["name"].asString();
         if (name == "viewport_image" || name == "view_closeup") {
@@ -198,6 +236,7 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
             audit::record(entry);
             Json result = Json::object();
             result.set("content", content);
+            result.set("structuredContent", mcpStructuredResult(doc, ok, ok ? "image" : error, entry.ms));
             result.set("isError", !ok);
             return reply(id, result).dump();
         }
@@ -223,6 +262,7 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
         content.push(text);
         Json result = Json::object();
         result.set("content", content);
+        result.set("structuredContent", mcpStructuredResult(doc, r.ok, r.message, entry.ms)); // (cli/McpScene.h)
         result.set("isError", !r.ok);
         return reply(id, result).dump();
     }
