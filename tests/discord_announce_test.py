@@ -110,4 +110,18 @@ for answer, ok in ((Resp(200, "image/jpeg"), True), (Resp(200, "text/html"), Fal
         fail(f"card_url for {answer!r}: {got!r}")
 if u.seen[0] != ("https://sculptforge.app/media/release-0.12.8.jpg", "HEAD"):
     fail(f"card_url asked {u.seen[0]!r}")
+# 11-16: 0.13.5 went out twice (a rerun after a post). A release post leaves a discord-posted-<tag> marker, and a run
+# that finds one for its tag exits before waiting or posting.
+src = script()
+look, wait = src.find("discord-posted-{tag}"), src.find("FEED_WAIT_MINUTES")
+if look < 0 or wait < 0 or look > wait:
+    fail("the release path doesn't look for a discord-posted-<tag> marker before waiting on the feed")
+if "already posted" not in src or 'out.write(f"posted={what}' not in src:
+    fail("a found marker must say 'already posted' and a post must write the posted output")
+if "  actions: read" not in YML:
+    fail("the workflow needs actions: read to list the markers")
+step = YML[YML.find("- name: Mark the release as posted"):]
+if not step.startswith("- name: Mark the release as posted") or "steps.post.outputs.posted != ''" not in step \
+        or "actions/upload-artifact@" not in step or "name: discord-posted-${{ steps.post.outputs.posted }}" not in step:
+    fail("no pinned upload of the discord-posted-<tag> marker after a post")
 print("discord_announce ok")

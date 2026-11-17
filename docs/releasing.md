@@ -56,6 +56,9 @@ the gates, what each step does, and how to recover.
      website/latest.json (up to 45 minutes), then for the release card at website/media/release-X.Y.Z.jpg to be live on
      the site (up to 20 more; the launch kit commits it, site lane) and posts "## SculptForge X.Y.Z", the headline, the
      card and masked Download / What's new links. Other posts: .github/announcements/*.md, Actions > Discord announcement.
+     One post per release: a successful post leaves a `discord-posted-<tag>` artifact, and a run (or rerun) that finds
+     it posts nothing. Once the Release workflow has started, nobody posts the release by hand; posting by hand is the
+     fallback only after the announcement run has failed, and then that run is never rerun.
 
 ## Build once, promote
 

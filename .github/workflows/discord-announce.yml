@@ -34,6 +34,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # the discord-posted-<tag> markers (a rerun after a post does nothing)
 
 concurrency:
   group: discord-announce
@@ -53,6 +54,7 @@ jobs:
             website/latest.json
           sparse-checkout-cone-mode: false
       - name: Post to Discord
+        id: post
         env:
           WEBHOOK: ${{ secrets.DISCORD_ANNOUNCE_WEBHOOK }}
           EVENT: ${{ github.event_name }}
@@ -144,6 +146,11 @@ jobs:
                   if not started or not new:
                       print("This Release run published no new release; nothing to post."); sys.exit(0)
                   tag, url, pre = new[0]["tag_name"], new[0]["html_url"], new[0]["prerelease"]
+              # 11-16: 0.13.5 went out twice (a rerun after a post). A tag whose post already succeeded leaves a
+              # discord-posted-<tag> artifact; finding one, the run exits 0 and posts nothing.
+              marks = api(f"/repos/{env('REPO')}/actions/artifacts?name=discord-posted-{tag}&per_page=5")
+              if any(not a.get("expired") for a in marks.get("artifacts", [])):
+                  print(f"{tag}: already posted (a discord-posted-{tag} marker exists); nothing to post."); sys.exit(0)
               m = re.fullmatch(r"v(\d+\.\d+\.\d+)(?:-(beta|rc)\.(\d+))?", tag)
               if not m or pre != bool(m[2]):
                   print(f"{tag} is not vX.Y.Z, or a pre-release that is not vX.Y.Z-beta.N/-rc.N; nothing to post."); sys.exit(0)
@@ -192,4 +199,15 @@ jobs:
                                        headers={"Content-Type": "application/json", "User-Agent": UA})
           with urllib.request.urlopen(req, timeout=30) as r:
               print(what, len(text), r.status)
+          if event != "workflow_dispatch":  # a release post: leave its marker (the next step uploads it)
+              pathlib.Path("discord-posted.txt").write_text(f"{what}\n")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+                  out.write(f"posted={what}\n")
           EOF
+      - name: Mark the release as posted
+        if: steps.post.outputs.posted != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: discord-posted-${{ steps.post.outputs.posted }}
+          path: discord-posted.txt
+          retention-days: 90
