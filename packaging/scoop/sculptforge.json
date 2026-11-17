@@ -1,13 +1,13 @@
 {
-    "version": "0.13.5",
+    "version": "0.13.6",
     "description": "Open source digital sculpting: brushes, remeshing, layers, painting and a command-line tool.",
     "homepage": "https://sculptforge.app",
     "license": "GPL-3.0-or-later",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/islandmed/SculptForge/releases/download/v0.13.5/SculptForge-0.13.5-windows-x86_64.zip",
-            "hash": "c8cc10e349e0ed533b3d91cfa6e43cc1d4ec2ed4277654a19759633b604c0181",
-            "extract_dir": "SculptForge-0.13.5-windows-x86_64"
+            "url": "https://github.com/islandmed/SculptForge/releases/download/v0.13.6/SculptForge-0.13.6-windows-x86_64.zip",
+            "hash": "354262d4052f057eeddd8fbb6e9ef470d3dc0c0782ce1decc2cffe6266320c1e",
+            "extract_dir": "SculptForge-0.13.6-windows-x86_64"
         }
     },
     "bin": [
