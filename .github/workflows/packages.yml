@@ -262,7 +262,10 @@ jobs:
       id-token: write
       attestations: write
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.image }}
+    container:
+      image: ${{ matrix.image }}
+      # 11-17: rockylinux:9 was republished without PATH in its config; a step's GITHUB_PATH then left PATH without /usr/bin ("sh" not found).
+      env: { PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
     strategy:
       fail-fast: false
       matrix:
