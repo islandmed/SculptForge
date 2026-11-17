@@ -1517,6 +1517,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_drain_save COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_drain_save PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=save;SF_PREDICTIVE_STROKE=1")
+    # And Esc while the Ctrl+Z waits: it is dropped, the stroke stays.
+    add_test(NAME ui_stroke_drain_esc COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_esc PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=esc;SF_PREDICTIVE_STROKE=1")
     add_test(NAME ui_stroke_drain_click COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_drain_click PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=stroke;SF_PREDICTIVE_STROKE=1")

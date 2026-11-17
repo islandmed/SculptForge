@@ -1315,6 +1315,11 @@ int App::run() {
                 if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain && strokeDraining()) {
                     if (std::string(drain) == "none") { // (the frames of a stroke's end alone, to compare)
                         sm.drainQueued = true;
+                    } else if (std::string(drain) == "esc") { // Ctrl+Z, then Esc while it waits: the stroke stays
+                        runInteractive([this] { runCommand("undo"); });
+                        sm.drainQueued = !drainQueue_.empty();
+                        onKey(SDLK_ESCAPE, SDL_KMOD_NONE, false);
+                        sm.drainHeld = drainQueue_.empty(); // (cancelled)
                     } else if (std::string(drain) == "save") { // (Ctrl+S: the file must hold the finished stroke)
                         const std::string path = (std::filesystem::temp_directory_path() / "sf-measure-drain.sfproj").string();
                         runInteractive([this, path] { runCommand("save_project", {{"path", path}}); });
@@ -1325,7 +1330,7 @@ int App::run() {
                     } else {
                         runInteractive([this] { runCommand("undo"); });
                     }
-                    if (std::string(drain) != "none") sm.drainQueued = !drainQueue_.empty();
+                    if (std::string(drain) != "none" && std::string(drain) != "esc") sm.drainQueued = !drainQueue_.empty();
                     sm.drainWorstFrame = seconds() - actionAt; // (the shortcut's own time: finishing the stroke here froze the window)
                 }
                 sm.moving = false;
@@ -1379,8 +1384,8 @@ int App::run() {
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
                 else if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain) {
                     // The queued Ctrl+Z took the whole stroke back; the held click became a stroke of its own after it.
-                    const bool none = std::string(drain) == "none", save = std::string(drain) == "save";
-                    const bool undo = !none && !save && std::string(drain) != "stroke";
+                    const bool none = std::string(drain) == "none", save = std::string(drain) == "save", esc = std::string(drain) == "esc";
+                    const bool undo = !none && !save && !esc && std::string(drain) != "stroke";
                     bool saved = true;
                     if (save) { // the saved file, opened again, is the finished stroke's mesh, bit for bit
                         Document reread;
@@ -1391,9 +1396,10 @@ int App::run() {
                         std::filesystem::remove(path);
                     }
                     const bool ok = sm.drainQueued && saved && (!save || sm.drainWorstFrame < 0.05) && // (saving never holds a frame up)
-                                    (none || save || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
+                                    (!esc || (sm.drainHeld && meshStateHash(doc_.mesh) != sm.before)) && // (Esc: dropped, the stroke kept)
+                                    (none || save || esc || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
                     std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n",
-                                none ? "nothing" : save ? "Ctrl+S" : undo ? "Ctrl+Z" : "a click",
+                                none ? "nothing" : esc ? "Ctrl+Z then Esc" : save ? "Ctrl+S" : undo ? "Ctrl+Z" : "a click",
                                 sm.drainQueued ? "waited" : "did NOT wait", sm.drainWorstFrame * 1000.0, ok ? "ok" : "FAILED");
                     if (!ok) return 1;
                 } else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;

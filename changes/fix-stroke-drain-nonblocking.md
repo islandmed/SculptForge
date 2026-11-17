@@ -5,4 +5,4 @@ fixed: **Heavy meshes:** a shortcut or menu command (Undo, Save...) or a new cli
   The new click starts its stroke on the finished surface. Quitting and autosave still wait for the stroke.
 ---
 Commands from scripts, macros, the AI link and panel buttons still finish the stroke first (they need the result at once).
-Tests: ui_stroke_drain_undo, ui_stroke_drain_click, ui_stroke_drain_save (the saved file reloads byte-equal; no frame over 50 ms).
+Tests: ui_stroke_drain_undo, ui_stroke_drain_click, ui_stroke_drain_save (the saved file reloads byte-equal; no frame over 50 ms), ui_stroke_drain_esc (Esc drops the queued undo, the stroke stays).
