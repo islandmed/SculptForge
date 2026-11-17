@@ -159,7 +159,7 @@ void menuAction(App& app, const char* id) {
     const std::string label = std::string(trAction(a->id, a->label)) + "##" + a->id; // no icons: they'd misalign with the plain project items
     if (ImGui::MenuItem(label.c_str(), shortcut.empty() ? nullptr : shortcut.c_str(), checked, enabled) && a->run) {
         app.actions().touch(a->id);
-        a->run();
+        app.runInteractive(a->run);
     }
     ui::HelpAction(app, id);
 }

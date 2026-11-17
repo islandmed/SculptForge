@@ -52,9 +52,10 @@ bool App::dropPenMouseEvent(const SDL_Event& e) const {
     }
 }
 
-void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window) {
+void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window, Uint64 timestamp) {
     SDL_Event m{};
     m.type = type;
+    m.common.timestamp = timestamp; // (the pen sample's time: the pen predictor reads it)
     if (type == SDL_EVENT_MOUSE_MOTION) {
         m.motion.windowID = window;
         m.motion.which = SDL_PEN_MOUSEID;
@@ -99,27 +100,27 @@ void App::penMouseEvents(const SDL_Event& e, bool before) {
     if (before) {
         if ((e.type == SDL_EVENT_PEN_PROXIMITY_OUT || e.type == SDL_EVENT_PEN_PROXIMITY_IN) && penMouseDown_) {
             penMouseDown_ = false;
-            sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, penMouseX_, penMouseY_, e.pproximity.windowID);
+            sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, penMouseX_, penMouseY_, e.pproximity.windowID, e.common.timestamp);
         }
         return;
     }
     switch (e.type) {
     case SDL_EVENT_PEN_DOWN:
         if (penMouseDown_) break; // another pen already touches
-        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         penMouseDown_ = true;
         penMouseOwner_ = e.ptouch.which;
-        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_DOWN, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_DOWN, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         break;
     case SDL_EVENT_PEN_UP:
         if (!penMouseDown_ || e.ptouch.which != penMouseOwner_) break;
         penMouseDown_ = false;
-        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         break;
     case SDL_EVENT_PEN_MOTION:
         if (penMouseDown_ && e.pmotion.which != penMouseOwner_) break;
         if (penNoise_ && mouseSincePen_) break; // a resting pen doesn't pull the cursor back from the mouse
-        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID, e.common.timestamp);
         if (!penMouseDown_) {
             // A hovering pen presses nothing. Should the UI still hold a left button (a driver's press whose
             // release never came), let go of it: the pen's next tap is a click again.

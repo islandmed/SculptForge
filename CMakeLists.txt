@@ -1527,7 +1527,24 @@ if(SCULPTFORGE_BUILD_TESTS)
     # mesh, bit for bit, and its undo the mesh it started from.
     add_test(NAME ui_stroke_resize COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_resize PROPERTIES LABELS ui TIMEOUT 60 DISABLED TRUE # predictive strokes: not yet identical in every run
+                         # (20/20 on a laptop; a loaded CI runner gave different positions, the replay identical to itself)
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_RESIZE=1;SF_MEASURE_VERIFY=1;SF_PREDICTIVE_STROKE=1")
+    # Ctrl+Z, or a click on the model, while a released stroke's dabs are still being placed: it waits for them (the
+    # window keeps drawing) and then runs: the undo restores the mesh from before the stroke, the click is a stroke after it.
+    add_test(NAME ui_stroke_drain_undo COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_undo PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=undo;SF_PREDICTIVE_STROKE=1")
+    # And Ctrl+S: the file, opened again, is the finished stroke, bit for bit, and no frame waits on the stroke meanwhile.
+    add_test(NAME ui_stroke_drain_save COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_save PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=save;SF_PREDICTIVE_STROKE=1")
+    # And Esc while the Ctrl+Z waits: it is dropped, the stroke stays.
+    add_test(NAME ui_stroke_drain_esc COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_esc PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=esc;SF_PREDICTIVE_STROKE=1")
+    add_test(NAME ui_stroke_drain_click COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_click PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=stroke;SF_PREDICTIVE_STROKE=1")
     # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
     # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
     # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.

@@ -204,6 +204,36 @@ bool App::asyncStrokeAllowed() const {
 
 bool App::solverBusy() const { return solver_ && solver_->busy(); }
 
+bool App::strokeDraining() const { return asyncStroke_ && strokeFinishing_ && drag_ != Drag::Stroke; }
+
+void App::runDrainQueue() {
+    std::vector<std::pair<std::string, Args>> queued;
+    queued.swap(drainQueue_); // (each runs once; one that queues again waits for the next stroke's end)
+    for (const auto& [name, args] : queued) {
+        if (name == kHeldPress) replayHeldPointer();
+        else runCommand(name, args);
+    }
+}
+
+void App::replayHeldPointer() {
+    std::vector<HeldPointer> held;
+    held.swap(heldPointer_);
+    holdingPointer_ = false;
+    for (const HeldPointer& h : held) {
+        pointerEventNs_ = h.ns; // (the pen predictor's sample times: when they happened)
+        if (h.kind == HeldPointer::Down) onMouseDown(h.x, h.y, h.button);
+        else if (h.kind == HeldPointer::Move) onMouseMove(h.x, h.y, h.dx, h.dy, h.fromPen);
+        else onMouseUp();
+    }
+    pointerEventNs_ = 0;
+}
+
+std::string App::drainStatus() const {
+    std::string s = "Finishing stroke: ";
+    for (size_t i = 0; i < drainQueue_.size(); ++i) s += (i ? ", " : "") + (drainQueue_[i].first == kHeldPress ? std::string("next stroke") : drainQueue_[i].first);
+    return s + " queued (Esc cancels)";
+}
+
 void App::solverWait() {
     if (!solver_) return;
     solver_->wait();
@@ -316,7 +346,11 @@ void App::pumpStroke() {
     }
     if (dabQueue_.empty()) {
         if (strokeFinishing_) {
+            static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+            const auto t0 = std::chrono::steady_clock::now();
             finishStrokeNow(); // released, and every dab is on the GPU
+            drainNextFrame_ = !drainQueue_.empty(); // then what a shortcut asked for meanwhile, in order, next frame
+            if (log) SDL_Log("stroke end: %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             return;
         }
         // The pen rests (no dabs for a tenth of a second): the exact normals behind the brush (Fast Big Brushes)
@@ -473,6 +507,12 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
     glm::vec3 origin, dir;
     view.camera.screenRay(x - view.canvas.x, y - view.canvas.y, view.canvas.w, view.canvas.h, origin, dir);
     return frontRaycast(origin, dir, hit);
+}
+
+double App::pointerEventSeconds() const {
+    // SDL stamps events with SDL_GetTicksNS's clock; one in the future (a clock skew) counts as now.
+    const Uint64 now = SDL_GetTicksNS();
+    return double(pointerEventNs_ && pointerEventNs_ <= now ? pointerEventNs_ : now) * 1e-9;
 }
 
 glm::vec2 App::predictedPointer() const {
