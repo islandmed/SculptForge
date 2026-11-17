@@ -1,11 +1,11 @@
 {
-  "version": "0.13.3",
+  "version": "0.13.4",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Dynamic on a dense Part with a big brush no longer freezes the first stroke",
-    "Pick colour (C) picks from any Part under the pointer, and says why when it can't",
-    "A right drag that turned the view no longer opens the Quick Menu when you let go"
+    "On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar",
+    "A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it",
+    "Membership links in the app carry a small source tag, so we can see which one helps"
   ],
   "support": {
     "founding": {
