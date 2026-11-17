@@ -5883,6 +5883,27 @@ constexpr Entry kSpanish[] = {
     {"Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro (Alt al pulsar: desde una esquina): Away corta un agujero redondo a través del Part, In un hueco de profundidad Depth, Add un saliente redondo, Clip presiona lo que queda fuera sobre su borde. Suelta Shift mientras arrastras para mantenerlo redondo."},
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro para conservar el interior y ocultar el resto; añade Alt para ocultar el interior. Suelta Shift mientras arrastras para mantenerlo redondo."},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+arrastra un círculo desde su centro y enmascara todo su interior; Ctrl+Alt+arrastra desenmascara. Shift mientras arrastras lo mantiene redondo; arrastra desde una esquina con la opción de Tool > Masking. El lado lejano queda incluido."},
+    // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
+     "Un script de Python puede hacer cualquier cosa que pueda hacer un programa en este equipo. Ejecuta solo scripts en los que confíes. Los scripts se ejecutan solo cuando tú los ejecutas: nada de lo que abras puede iniciar uno."},
+    {"Commands",
+     "Comandos"},
+    {"Enable Python scripts",
+     "Habilitar scripts de Python"},
+    {"Lets the console and the Scripts folder run Python. A Python script is a program: it can do anything you can on this computer (files, network, other programs). Only run scripts you trust. Off by default.",
+     "Permite que la consola y la carpeta Scripts ejecuten Python. Un script de Python es un programa: puede hacer cualquier cosa que tú puedas hacer en este equipo (archivos, red, otros programas). Ejecuta solo scripts en los que confíes. Desactivado de forma predeterminada."},
+    {"Open Scripts folder",
+     "Abrir carpeta Scripts"},
+    {"Put .py files in the Scripts folder (Preferences > Scripts) to list them here.",
+     "Coloca archivos .py en la carpeta Scripts (Preferencias > Scripts) para listarlos aquí."},
+    {"Python scripts",
+     "Scripts de Python"},
+    {"Python, such as  sf.run('remesh', resolution=200)   or   print(doc.parts)",
+     "Python, como  sf.run('remesh', resolution=200)   o   print(doc.parts)"},
+    {"Scripts",
+     "Scripts"},
+    {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
+     "Los archivos .py de esta carpeta se listan en Archivo > Script. Los paquetes que instales en su carpeta site-packages se pueden importar."},
 };
 
 } // namespace

@@ -1,0 +1,63 @@
+# Python scripting (app/Python.h): off by default, and nothing you open runs Python or even loads it: a project
+# whose names hold Python, a .py file given to open, a script file of commands. Then Preferences > Scripts turns
+# it on and the console's Python mode runs lines and blocks against the open scene, each one undo step.
+run ui_look look=classic layout=classic        # the classic palette bar (Preferences##palette.preferences)
+run new_sphere subdivisions=2
+expect_value triangles == 320
+expect_value python_enabled == 0
+expect_value python_loads == 0
+
+# Files carry no code that runs: a Part named like a script, saved and opened again; a .py file opened as a model.
+run part_rename to="__import__('sculptforge').run('subdivide')"
+run save_project path=sf_ui_python_bait.sfproj
+run open path=sf_ui_python_bait.sfproj
+run_fails open path=$SCRIPT_DIR/data/python/bait.py
+run_fails part_append path=$SCRIPT_DIR/data/python/bait.py
+expect_value triangles == 320
+expect_value python_loads == 0
+
+# The console's Python mode says how to turn Python on, and loads nothing while it is off.
+key `
+expect_value console_open == 1
+click "Console/Python##console_mode1"
+type Console/##console "sf.run('subdivide')"
+key enter
+expect_text "turn them on in Preferences > Scripts"
+expect_value triangles == 320
+expect_value python_loads == 0
+shot python_off
+
+# Preferences > Scripts > Enable Python scripts.
+click "Preferences##palette.preferences"
+click "Scripts##preferences.scripts"
+expect_text "Only run scripts you trust"
+shot python_prefs
+click "Enable Python scripts##prefs.python"
+expect_value python_enabled == 1
+expect_value python_loads == 0
+key escape
+
+# A line, then a block (ended by an empty line): one undo step each.
+type Console/##console "sf.run('subdivide')"
+key enter
+expect_value python_loaded == 1
+expect_value triangles == 1280
+type Console/##console "for i in range(2): sf.run('subdivide')"
+key enter
+expect_text ">>> for i in range(2)"
+expect_value triangles == 1280
+type Console/##console ""
+key enter
+expect_text "... "
+expect_value triangles == 20480
+type Console/##console "print('parts:', [p['name'] for p in doc.parts])"
+key enter
+expect_text "parts: ["
+type Console/##console "1/0"
+key enter
+expect_text "ZeroDivisionError"
+shot python_console
+run undo
+expect_value triangles == 1280
+run undo
+expect_value triangles == 320

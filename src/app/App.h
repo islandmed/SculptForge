@@ -154,6 +154,7 @@ struct AppOptions {
 };
 
 class Demo;
+class PythonScripting; // app/Python.h
 struct LengthUnit; // core/Units.h
 struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
@@ -734,6 +735,12 @@ private:
     void pollAiLink();             // every frame: the connection's messages, one at a time
     void drawAiLink();             // the Approve and Allow dialogs, the "AI connected" badge
     void drawAiLinkPrefs();        // its switch in Preferences > AI
+    // ---- Python scripting (app/Python.h, PanelPython.cpp) ----
+    PythonScripting& python();     // made on first use (no file read, nothing loaded until a script runs)
+    void drawPythonPrefs();        // Preferences > Scripts
+    void drawPythonScripts();      // the Script palette's list of the Scripts folder
+    void runPythonFile(const std::string& path);
+    std::unique_ptr<PythonScripting> python_;
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
     void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
     int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
@@ -2607,6 +2614,7 @@ public:
 
 private:
     friend class Console;
+    friend class PythonScripting;
     friend class CommandPalette;
     friend void config::drawHotkeysSection(App&);
     friend void config::drawLibraryBrowserSection(App&);

@@ -390,6 +390,7 @@
 //                            dragged or hovered, fading out after)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
+#include "app/Python.h"
 #include "ai/Http.h"
 #include "ai/GradioClient.h"
 #include "ai/ImageTo3DService.h"
@@ -1185,6 +1186,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return !app_.prefDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
     if (name == "console_open") return app_.layout_.consoleOpen ? 1.0 : 0.0;
+    // Python scripting (app/Python.h): python_loads counts host loads (opening files must leave it 0).
+    if (name == "python_loads") return app_.python_ ? app_.python_->loads() : 0.0;
+    if (name == "python_loaded") return app_.python_ && app_.python_->loaded() ? 1.0 : 0.0;
+    if (name == "python_enabled") return app_.python().enabled() ? 1.0 : 0.0;
     if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
         const std::string id = name.substr(10);
         int n = 0;
@@ -3569,10 +3574,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
-    case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused
+    case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused ($SCRIPT_DIR as for run)
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
-        if (!parseScript(restOf(lineText_, 1), statements, error)) return false;
+        std::string text = restOf(lineText_, 1);
+        for (size_t at = text.find("$SCRIPT_DIR"); at != std::string::npos; at = text.find("$SCRIPT_DIR", at)) {
+            text.replace(at, 11, scriptDir_);
+            at += scriptDir_.size();
+        }
+        if (!parseScript(text, statements, error)) return false;
         run([this, line, statements] {
             for (const auto& st : statements) {
                 app_.runCommand(st.command, st.args);

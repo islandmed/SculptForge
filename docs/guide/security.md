@@ -34,6 +34,14 @@ process; nothing listens on a port. Each command an AI tool runs is checked agai
 AI tools can't install, remove or switch packs. Controlling an open SculptForge window can be forbidden outright
 (`"mcp": {"live": "never"}`), and MCP can be turned off entirely.
 
+## Scripts and plugins
+
+**Python scripts** are trusted local code, like any program the artist runs: they can read and write files and reach
+the network. Python is off until the artist turns it on (**Edit > Preferences > Scripts**), can be locked off with
+`"python": {"scripts": "never"}`, opens no port, and runs only when the artist runs a script: no file, pack, macro or AI
+tool can start one. **Plugins** (`.sfplugin`) are the sandboxed way to share tools: WebAssembly with no access to
+files, the network, the clock or other programs. See [Python scripting](python.md).
+
 ## Data at rest
 
 | | Where |

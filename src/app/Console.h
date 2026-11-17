@@ -38,7 +38,10 @@ public:
     void focusInput();
     void prefill(const std::string& text);
     void runLine(App& app, const std::string& line);
-    void runFile(App& app, const std::string& path);
+    void runFile(App& app, const std::string& path); // a .py file runs as Python (app/Python.h)
+    // Python mode (app/Python.h): the input line runs Python instead of script statements.
+    bool pythonMode() const { return pythonMode_; }
+    void setPythonMode(App& app, bool on);
     void queueScriptFile(std::string path); // from the file dialog thread
 
     void loadHistory(const std::string& path);
@@ -53,6 +56,8 @@ private:
     };
     void runStatements(App& app, std::vector<ScriptStatement> statements, size_t from, bool file);
     void addHistory(const std::string& line);
+    void runPythonLine(App& app, const std::string& line);
+    void completePython(App& app, ImGuiInputTextCallbackData* data);
     void complete(App& app, ImGuiInputTextCallbackData* data);
     void printHelp(App& app, const std::string& topic);
     static int inputCallback(ImGuiInputTextCallbackData* data);
@@ -83,6 +88,8 @@ private:
     bool hasPendingText_ = false;
     App* app_ = nullptr; // for the input callback
     bool closeRequested_ = false; // backtick typed into the input
+    bool pythonMode_ = false;
+    bool pythonMore_ = false; // a Python block is open: the next line continues it ("..." prompt)
     std::mutex pendingMutex_;
     std::vector<std::string> pendingFiles_;
 };

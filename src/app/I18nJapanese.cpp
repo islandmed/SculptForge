@@ -6540,6 +6540,27 @@ constexpr Entry kJapanese[] = {
     {"Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+円を中心からドラッグ（押した時の Alt: 角から）: Away は Part に丸い貫通穴を開け、In は深さ Depth のくぼみ、Add は丸い突起、Clip は外側をその縁に押し付ける。ドラッグ中に Shift を離すと正円を保つ。"},
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+円を中心からドラッグし、内側を残して残りを隠す; Alt を足すと内側を隠す。ドラッグ中に Shift を離すと正円を保つ。"},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+円を中心からドラッグすると内側を全てマスクする; Ctrl+Alt+ドラッグでマスク解除。ドラッグ中の Shift で正円を保つ; Tool > Masking のオプションで角からドラッグ。向こう側も含む。"},
+    // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
+     "Python スクリプトは、このコンピューター上のプログラムができることは何でもできます。信頼できるスクリプトだけを実行してください。スクリプトは実行したときだけ動作します: 開いたものからスクリプトが起動することはありません。"},
+    {"Commands",
+     "コマンド"},
+    {"Enable Python scripts",
+     "Python スクリプトを有効にする"},
+    {"Lets the console and the Scripts folder run Python. A Python script is a program: it can do anything you can on this computer (files, network, other programs). Only run scripts you trust. Off by default.",
+     "コンソールとスクリプトフォルダーで Python を実行できるようにします。Python スクリプトはプログラムです: このコンピューター上であなたができること（ファイル、ネットワーク、他のプログラム）は何でもできます。信頼できるスクリプトだけを実行してください。既定ではオフです。"},
+    {"Open Scripts folder",
+     "スクリプトフォルダーを開く"},
+    {"Put .py files in the Scripts folder (Preferences > Scripts) to list them here.",
+     ".py ファイルをスクリプトフォルダー（環境設定 > スクリプト）に置くと、ここに一覧表示されます。"},
+    {"Python scripts",
+     "Python スクリプト"},
+    {"Python, such as  sf.run('remesh', resolution=200)   or   print(doc.parts)",
+     "Python、たとえば  sf.run('remesh', resolution=200)   または   print(doc.parts)"},
+    {"Scripts",
+     "スクリプト"},
+    {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
+     "このフォルダー内の .py ファイルはファイル > スクリプトの下に一覧表示されます。その site-packages フォルダーにインストールしたパッケージはインポートできます。"},
 };
 
 } // namespace
