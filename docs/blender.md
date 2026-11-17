@@ -155,7 +155,7 @@ folder for **Add-ons > Install from Disk**), with fixed timestamps. CMake: `--ta
 `addons/blender/sculptforge_bridge/classic_keys.py`: the add-on preference `classic_keys` adds items to the add-on
 keyconfig's "Sculpt" keymap (`key_table()`) and removes exactly those again (`disable()`, also on unregister).
 Add-on keymap items take priority over Blender's own while they exist. Things that differ between versions,
-found by running real Blender 4.2.23 and 5.2.3 headless:
+found by running real Blender 4.2.23, 5.2.3 and 5.3.0 headless (CI runs the same three through the bpy wheel):
 
 - The radial controls' unified size / strength are `tool_settings.unified_paint_settings` in 4.2 and per mode,
   `tool_settings.sculpt.unified_paint_settings`, in 5 (`_unified_path()`).
