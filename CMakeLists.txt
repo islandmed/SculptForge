@@ -18,6 +18,11 @@ endif()
 
 option(SCULPTFORGE_BUILD_APP "Build the SculptForge desktop application" ON)
 option(SCULPTFORGE_BUILD_PYTHON "Build the Python module (import sculptforge)" OFF)
+option(SCULPTFORGE_APP_PYTHON "Python scripting in the app (the sculptforge_pyhost library, loaded on first use)" ${SCULPTFORGE_BUILD_PYTHON})
+# An unpacked CPython (python-build-standalone's install_only layout) to build the app's Python against and ship
+# beside it (lib/sculptforge/python, the Windows bin\python, the macOS bundle's Frameworks/python). Empty: the
+# Python CMake finds, not shipped (source builds, distribution packages that depend on their own python).
+set(SCULPTFORGE_PYTHON_RUNTIME "" CACHE PATH "CPython to build the app's Python against and install with it")
 set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names, e.g. vfx2026")
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
@@ -473,6 +478,8 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/CommandPalette.cpp
     src/app/CommandBar.cpp
     src/app/Console.cpp
+    src/app/Python.cpp
+    src/app/PanelPython.cpp
     src/app/Config.cpp
     src/app/LibraryBrowser.cpp
     src/app/Thumbnails.cpp
@@ -763,12 +770,47 @@ else()
 endif()
 include(CPack)
 
-# --- Python module ---
-if(SCULPTFORGE_BUILD_PYTHON)
-  find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+# --- Python module, and the app's Python host ---
+if(SCULPTFORGE_BUILD_PYTHON OR (SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP))
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    set(Python_ROOT_DIR ${SCULPTFORGE_PYTHON_RUNTIME})
+    set(Python_FIND_STRATEGY LOCATION)
+  endif()
+  set(SF_PYTHON_COMPONENTS Interpreter Development.Module)
+  if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP)
+    list(APPEND SF_PYTHON_COMPONENTS Development.Embed)
+  endif()
+  find_package(Python 3.9 REQUIRED COMPONENTS ${SF_PYTHON_COMPONENTS})
   sf_fetch_declare(pybind11 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(pybind11)
-  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp)
+endif()
+if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
+  # The app loads it the first time a script runs (src/app/Python.cpp): CPython in it, nothing at start-up.
+  add_library(sculptforge_pyhost MODULE src/python/AppHost.cpp src/python/Bindings.cpp)
+  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed sculptforge_core sculptforge_ai)
+  target_compile_definitions(sculptforge_pyhost PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
+  set_target_properties(sculptforge_pyhost PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+  if(APPLE)
+    set_target_properties(sculptforge_pyhost PROPERTIES SUFFIX ".dylib" INSTALL_RPATH "@loader_path/../Resources/python/lib")
+    set(SF_PYHOST_DIR SculptForge.app/Contents/Frameworks)
+  elseif(WIN32)
+    set(SF_PYHOST_DIR ${CMAKE_INSTALL_BINDIR})
+  else()
+    set_target_properties(sculptforge_pyhost PROPERTIES INSTALL_RPATH "$ORIGIN/python/lib")
+    target_link_options(sculptforge_pyhost PRIVATE -Wl,--exclude-libs,ALL) # its copy of the core stays its own
+    set(SF_PYHOST_DIR lib/sculptforge)
+  endif()
+  # In a build folder it sits next to the executable, where the app looks first.
+  set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:sculptforge>)
+  add_dependencies(sculptforge sculptforge_pyhost)
+  install(TARGETS sculptforge_pyhost LIBRARY DESTINATION ${SF_PYHOST_DIR})
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    include(cmake/PythonRuntime.cmake)
+    sf_install_python_runtime(${SCULPTFORGE_PYTHON_RUNTIME} ${SF_PYHOST_DIR})
+  endif()
+endif()
+if(SCULPTFORGE_BUILD_PYTHON)
+  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp)
   set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
   target_link_libraries(sculptforge_python PRIVATE sculptforge_core sculptforge_ai)
   target_compile_definitions(sculptforge_python PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
@@ -801,6 +843,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     target_compile_definitions(sculptforge_tests PRIVATE SF_PYTHON_EXE="${Python3_EXECUTABLE}")
   endif()
   target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_mcp sculptforge_appshared)
+  if(TARGET sculptforge_pyhost) # the app's Python host, loaded as the app loads it (tests/test_python_host.cpp)
+    target_compile_definitions(sculptforge_tests PRIVATE SF_PYHOST_PATH="$<TARGET_FILE:sculptforge_pyhost>"
+                                                         SF_PYHOST_BUILD="${PROJECT_VERSION}")
+    target_link_libraries(sculptforge_tests PRIVATE SDL3::SDL3)
+    add_dependencies(sculptforge_tests sculptforge_pyhost)
+  endif()
   sculptforge_pch(sculptforge_tests)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names
     target_link_libraries(sculptforge_tests PRIVATE sculptforge_actions)
@@ -825,6 +873,9 @@ if(SCULPTFORGE_BUILD_TESTS)
   if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
     add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
     set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
+  if(TARGET sculptforge_pyhost) # Python scripting's host starts from the build folder (packages run it on their install)
+    add_test(NAME python_selftest COMMAND sculptforge --python-selftest)
   endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.

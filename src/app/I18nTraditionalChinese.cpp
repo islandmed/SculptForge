@@ -5400,6 +5400,27 @@ constexpr Entry kTraditionalChinese[] = {
     {"Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形（按下時按 Alt: 從角落）: Away 在 Part 上切出貫通圓孔，In 做出深度為 Depth 的凹槽，Add 加上圓形凸台，Clip 把外側壓到其邊緣上。拖曳中放開 Shift 以保持正圓。"},
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形以保留內側並隱藏其餘；加上 Alt 以隱藏內側。拖曳中放開 Shift 以保持正圓。"},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+從圓心拖曳圓形並遮罩其內一切；Ctrl+Alt+拖曳解除遮罩。拖曳時按 Shift 保持正圓；用 Tool > Masking 的選項從角落拖曳。包含遠側。"},
+    // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
+     "Python 指令碼可以做到此電腦上任何程式能做的事。請只執行你信任的指令碼。指令碼只會在你執行時運行：你開啟的任何內容都無法啟動指令碼。"},
+    {"Commands",
+     "命令"},
+    {"Enable Python scripts",
+     "啟用 Python 指令碼"},
+    {"Lets the console and the Scripts folder run Python. A Python script is a program: it can do anything you can on this computer (files, network, other programs). Only run scripts you trust. Off by default.",
+     "讓主控台與指令碼資料夾可執行 Python。Python 指令碼是程式：它可以做到你在這台電腦上能做的任何事（檔案、網路、其他程式）。請只執行你信任的指令碼。預設為關閉。"},
+    {"Open Scripts folder",
+     "開啟指令碼資料夾"},
+    {"Put .py files in the Scripts folder (Preferences > Scripts) to list them here.",
+     "將 .py 檔案放到指令碼資料夾（偏好設定 > 指令碼），即可在這裡列出。"},
+    {"Python scripts",
+     "Python 指令碼"},
+    {"Python, such as  sf.run('remesh', resolution=200)   or   print(doc.parts)",
+     "Python，例如  sf.run('remesh', resolution=200)   或   print(doc.parts)"},
+    {"Scripts",
+     "指令碼"},
+    {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
+     "此資料夾中的 .py 檔案會列在檔案 > 指令碼下。安裝到其 site-packages 資料夾的套件可以匯入。"},
 };
 
 } // namespace

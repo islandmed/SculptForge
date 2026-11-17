@@ -3,6 +3,7 @@
 #include <csignal>
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
+#include "app/Python.h"
 #include "app/BooleanPreview.h"
 #include "app/NativeDialog.h"
 #include "core/FocusDetail.h"

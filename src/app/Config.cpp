@@ -329,7 +329,7 @@ void SDLCALL onUiFileChosen(void* userdata, const char* const* files, int) {
 const SDL_DialogFileFilter kUiFilters[] = {{"SculptForge UI layout", "json"}};
 const SDL_DialogFileFilter kBlenderKeymapFilters[] = {{"Blender keymap", "py"}, {"All files", "*"}};
 const SDL_DialogFileFilter kRadialFilters[] = {{"SculptForge radial menu", "json"}};
-const SDL_DialogFileFilter kScriptFilters[] = {{"SculptForge script", "sfscript;txt"}, {"All files", "*"}};
+const SDL_DialogFileFilter kScriptFilters[] = {{"SculptForge script", "sfscript;txt"}, {"Python script", "py"}, {"All files", "*"}};
 
 std::filesystem::path fsPath(const std::string& utf8) { return std::filesystem::path(std::u8string(utf8.begin(), utf8.end())); }
 
@@ -935,7 +935,7 @@ void App::initActions() {
         "The script console: every command you run appears as a script line, and you can type commands yourself.");
     add("script.run_file", "Run script file...", "Script", nullptr,
         [this] {
-            sf::dialogs::openFile(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 2, nullptr, false);
+            sf::dialogs::openFile(onUiFileChosen, &g_requests[kRunScript], window_, kScriptFilters, 3, nullptr, false);
         },
         ICON_LC_FILE_CODE, nullptr, nullptr, nullptr, "Run a text file of script statements, one per line (# starts a comment).");
     add("script.copy_session", "Copy session as script", "Script", nullptr,

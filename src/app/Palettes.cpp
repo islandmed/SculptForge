@@ -768,6 +768,10 @@ void App::drawPalette_Preferences() {
             drawAiPrefsSection(); // the Hugging Face token
         }
     }
+    if (subpalette("preferences.scripts", "Scripts")) {
+        tray::Section section;
+        drawPythonPrefs(); // Enable Python scripts (PanelPython.cpp)
+    }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;
         drawUpdatesSection();
@@ -866,6 +870,7 @@ void App::drawPalette_Script() {
     actionRow(*this, {"ui.console"});
     actionRow(*this, {"script.run_file"});
     actionRow(*this, {"script.copy_session", "script.clear_console"});
+    drawPythonScripts(); // the .py files in the Scripts folder (PanelPython.cpp)
     if (!any)
         hint(*this, "Every action is a script command: run them with --script \"subdivide; remesh resolution=200\" or the "
              "sculptforge-cli tool.");

@@ -248,6 +248,9 @@ print([c["name"] for c in sf.commands()])            # every command with its pa
 Failures raise `sculptforge.CommandError`. Long operations release the GIL, so you can run them on worker
 threads.
 
+The same module runs inside the app, against the open scene, from the console and from script files: see
+[Python scripting](python.md).
+
 ## AI agents (MCP)
 
 An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The AI

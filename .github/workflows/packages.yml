@@ -150,8 +150,11 @@ jobs:
       - name: Build
         run: |
           ccache -z # (ccache -s below: this run's hits, not the restored cache's lifetime)
+          # Python scripting in the app: CPython 3.13 shipped in lib/sculptforge/python (tools/ci/python-runtime.sh).
+          pyrt=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh linux "$RUNNER_TEMP/pyrt")
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$pyrt"
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -175,6 +178,8 @@ jobs:
           # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
           # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
           SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
+      - name: Python scripting starts from the installed files (app/Python.h)
+        run: AppDir/usr/bin/sculptforge --python-selftest
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
       - uses: actions/upload-artifact@v7
@@ -325,7 +330,8 @@ jobs:
           ccache -z
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
-            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
+            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python \
+            -DSCULPTFORGE_PYTHON_RUNTIME=/opt/python
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -337,6 +343,7 @@ jobs:
         run: |
           # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
           ctest --test-dir build --output-on-failure -LE ui -j 4
+          DESTDIR=$PWD/stage cmake --install build && stage/usr/bin/sculptforge --python-selftest # (the shipped Python starts)
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
@@ -386,9 +393,12 @@ jobs:
       - name: Build
         run: |
           ccache -z
+          # Python scripting in the app: a universal CPython 3.13 in the bundle (tools/ci/python-runtime.sh).
+          pyrt=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh macos "$RUNNER_TEMP/pyrt")
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$pyrt"
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -398,7 +408,9 @@ jobs:
           key: ccache-pkg-macos.${{ github.sha }}
       - name: Test
         # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
-        run: ctest --test-dir build --output-on-failure -LE ui -j 4
+        run: |
+          ctest --test-dir build --output-on-failure -LE ui -j 4
+          cmake --install build --prefix stage && stage/SculptForge.app/Contents/MacOS/SculptForge --python-selftest # (the shipped Python starts)
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
         # hdiutil sometimes fails with "Resource busy" on the runner (a disk image still attached): up to 3 tries.
         run: |
@@ -477,11 +489,15 @@ jobs:
           restore-keys: |
             ccache-pkg-windows.
             ccache-ci-windows.
+      - name: Python runtime (CPython 3.13 for Python scripting in the app, tools/ci/python-runtime.sh)
+        shell: bash
+        run: echo "SF_PYRT=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh windows "$(cygpath -m "$RUNNER_TEMP")/pyrt")" >> "$GITHUB_ENV"
       - name: Build (Visual Studio generator; ccache as cl.exe, one compiler per file)
         run: |
           ccache -z
           cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF `
-            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
+            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true" `
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$env:SF_PYRT"
           cmake --build build --config Release --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -495,6 +511,15 @@ jobs:
       - name: Product name and version in the exes (what SignPath's artifact configuration enforces)
         shell: pwsh
         run: ./tools/ci/check_pe_metadata.ps1 -Path build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe
+      - name: Python scripting starts from the installed files (app/Python.h)
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix stage
+          # (a windowed exe: Start-Process waits for it and gives its exit code)
+          $p = Start-Process -FilePath stage\bin\sculptforge.exe -ArgumentList '--python-selftest' -Wait -PassThru -NoNewWindow `
+               -RedirectStandardOutput selftest.out -RedirectStandardError selftest.err
+          Get-Content selftest.out, selftest.err
+          if ($p.ExitCode -ne 0) { throw "python selftest failed ($($p.ExitCode))" }
       - name: Signing - settings present
         if: env.SIGN == 'true'
         shell: pwsh

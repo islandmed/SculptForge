@@ -96,6 +96,7 @@ constexpr const char* kFullPolicy = R"({
   "network": {"enabled": false, "allow": ["https://sw.acme.internal/"], "localNetwork": true},
   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit"]},
   "maya": {"link": "never"},
+  "python": {"scripts": "never"},
   "audit": {"path": "/mnt/audit/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1abc", "scopes": ["openid", "email"],
              "useFor": ["https://llm.acme.internal/"]},
@@ -112,13 +113,14 @@ TEST(studio_policy_parses_every_key) {
     CHECK(p.network == policy::Lock::Off && p.networkAllow.size() == 1 && p.localNetwork);
     CHECK(p.mcp == policy::Lock::On && !p.mcpLiveAllowed && p.mcpCategories.size() == 2);
     CHECK(!p.mayaLinkAllowed && policy::describe(p).find("Maya Live link never") != std::string::npos);
+    CHECK(!p.pythonAllowed && policy::describe(p).find("Python scripts never") != std::string::npos);
     CHECK(p.auditPath == "/mnt/audit/{user}@{host}.jsonl" && p.auditMaxMB == 20 && p.auditKeep == 10 && p.auditRequired);
     CHECK(p.signInConfigured() && p.clientId == "0oa1abc" && p.scopes.size() == 2 && p.signInUseFor.size() == 1);
     CHECK(p.updateCheck == policy::Lock::On && p.updateChannel == "stable" && !p.updateFeed.empty());
     // Everything is optional: the smallest policy manages nothing.
     const policy::Policy empty = parsed(R"({"format": "sculptforge-policy", "version": 1})");
     CHECK(empty.ai == policy::Lock::Unset && empty.network == policy::Lock::Unset && empty.mcpLiveAllowed &&
-          empty.mayaLinkAllowed);
+          empty.mayaLinkAllowed && empty.pythonAllowed);
     CHECK(policy::describe(p).find("telemetry none") != std::string::npos);
 }
 
@@ -136,6 +138,8 @@ TEST(studio_policy_rejects_mistakes) {
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"live": "sometimes"}})").empty());
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "maya": {"link": true}})").empty());
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "maya": {"port": 1}})").empty());
+    CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "python": {"scripts": "sometimes"}})").empty());
+    CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "python": {"enabled": true}})").empty());
     // There is no telemetry to turn on.
     CHECK(parseError(R"({"format": "sculptforge-policy", "version": 1, "telemetry": true})").find("no telemetry") !=
           std::string::npos);
@@ -155,7 +159,7 @@ TEST(studio_policy_fails_closed) {
     const policy::Policy broken = policy::loadPolicyFile(dir + "/policy.json", "test", &messages);
     CHECK(broken.present && broken.broken && !messages.empty());
     CHECK(broken.ai == policy::Lock::Off && broken.network == policy::Lock::Off && broken.mcp == policy::Lock::Off);
-    CHECK(!broken.mcpLiveAllowed && !broken.mayaLinkAllowed && broken.updateCheck == policy::Lock::Off);
+    CHECK(!broken.mcpLiveAllowed && !broken.mayaLinkAllowed && !broken.pythonAllowed && broken.updateCheck == policy::Lock::Off);
     const policy::Policy missing = policy::loadPolicyFile(dir + "/none.json", "test");
     CHECK(missing.broken && missing.ai == policy::Lock::Off);
     std::ofstream(dir + "/good.json") << kFullPolicy;
