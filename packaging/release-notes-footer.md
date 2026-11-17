@@ -22,3 +22,5 @@ Each file is also attached without its version number (e.g. `SculptForge-macos.d
 
 The builds are not code-signed yet. **macOS:** right-click the app → **Open** the first time.
 **Windows:** if SmartScreen appears, choose **More info → Run anyway**. Checksums are in `SHA256SUMS.txt`.
+
+Code signing policy: https://sculptforge.app/code-signing.html

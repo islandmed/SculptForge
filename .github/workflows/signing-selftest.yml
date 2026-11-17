@@ -6,9 +6,6 @@ name: Signing self-test
 
 on:
   workflow_dispatch:
-  push: # TEMP-PUSH-TRIGGER (removed before READY)
-    branches: [ci/signpath-windows]
-    paths: ['.github/workflows/signing-selftest.yml', 'tools/ci/**']
 
 permissions:
   contents: read

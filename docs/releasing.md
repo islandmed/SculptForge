@@ -133,11 +133,39 @@ and `v*` tags only:
    `verify` also refuses staged Windows packages without a signature when `SIGNING=signpath` (`verify_staged.py
    --require-signed`), so a run staged before the switch can't be promoted unsigned: use `--rebuild`.
 
-SignPath artifact configurations (project SculptForge; both zips are flat, files at the root):
-`binaries` = `<zip-file><pe-file-set><include path="*.exe" max-matches="unbounded"/><include path="*.dll" min-matches="0"
-max-matches="unbounded"/><for-each><authenticode-sign/></for-each></pe-file-set></zip-file>` and `installer` =
-`<zip-file><pe-file path="SculptForge-*.exe"><authenticode-sign/></pe-file></zip-file>` (inside the usual
-`<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">`).
+SignPath artifact configurations (project SculptForge; both zips are flat, files at the root). SignPath Foundation requires the
+product name and version on every signed file, set and enforced: the exes (and the installer's NSIS version resource,
+CMakeLists.txt) carry `SculptForge` and the build's version, tools/ci/check_pe_metadata.ps1 fails the job before a request
+if they don't, and the workflow passes the version as the parameter `version`. `binaries`:
+
+```xml
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
+  <zip-file>
+    <pe-file-set product-name="SculptForge" product-version="${version}">
+      <include path="*.exe" max-matches="unbounded" />
+      <include path="*.dll" min-matches="0" max-matches="unbounded" />
+      <for-each><authenticode-sign /></for-each>
+    </pe-file-set>
+  </zip-file>
+</artifact-configuration>
+```
+
+`installer`:
+
+```xml
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
+  <zip-file>
+    <pe-file path="SculptForge-*.exe" product-name="SculptForge" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
+```
+
+(No third-party DLL is shipped: SDL and every other dependency are linked into the exes. Upstream binaries must never go
+to SignPath under our subscription.)
 
 **Test signing** (a policy `test-signing` with a self-signed "SculptForge Test" certificate, looks worse to users than
 unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
@@ -148,11 +176,12 @@ untrusted root and requires the signer, and such a run can never be promoted (no
 **One-time setup in SignPath (the maintainer; the workflow only submits requests).** In the SculptForge organization:
 1. *Trusted build systems*: add **GitHub.com** to the organization and link it to the project. Without it the first request
    fails with "Trusted build system is not allowed to log into the organization" (seen in the 11-17 dry run).
-2. *Artifact configurations* `binaries` and `installer` (the XML above), set as the project's.
+2. *Artifact configurations* `binaries` and `installer` (the XML above, with the `version` parameter), set as the project's.
 3. *Signing policies*: `test-signing` (self-signed certificate; the dry run) and the release policy (the Foundation certificate,
    *Verify origin* on, the maintainer as approver). Put the release policy's slug in `SIGNPATH_SIGNING_POLICY_SLUG`.
 4. A CI user whose API token is the repository secret `SIGNPATH_API_TOKEN`, allowed to submit to both policies.
-Then the dry run: Actions > Packages > Run workflow on a branch with *sign_test* ticked (it must end `Windows: test-signed`);
+The plumbing around the signatures (verify_signed.ps1, check_pe_metadata.ps1) is exercised without SignPath or a secret by
+Actions > Signing self-test (a throwaway self-signed certificate). Then the dry run: Actions > Packages > Run workflow on a branch with *sign_test* ticked (it must end `Windows: test-signed`);
 only after that, and the release policy's first approved request, is `SIGNING=signpath` set on the repository.
 
 Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
