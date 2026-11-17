@@ -85,21 +85,21 @@
    "slug": "strokes-alphas",
    "ideas": [
     {
-     "slug": "noise-panel",
-     "anchor": "vote-noise-panel",
-     "title": "Noise panel",
-     "line": "A pop-up to add procedural or alpha noise to the whole model with curves, live preview, mask by noise and presets, then apply.",
-     "where": "a small sidebar panel whose Make Noise button opens the pop-up",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "multi-image-projection",
      "anchor": "vote-multi-image-projection",
      "title": "Multi-image projection",
      "line": "Place several reference images and project their depth and colour onto any surface, building on Stencil.",
      "where": "Brush > Stencil",
+     "votes": 1,
+     "status": "open",
+     "shipped": ""
+    },
+    {
+     "slug": "noise-panel",
+     "anchor": "vote-noise-panel",
+     "title": "Noise panel",
+     "line": "A pop-up to add procedural or alpha noise to the whole model with curves, live preview, mask by noise and presets, then apply.",
+     "where": "a small sidebar panel whose Make Noise button opens the pop-up",
      "votes": 0,
      "status": "open",
      "shipped": ""
@@ -874,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-16T04:38:08Z"
+ "updated": "2026-11-17T00:38:07Z"
 }
