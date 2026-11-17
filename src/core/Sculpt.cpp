@@ -455,6 +455,13 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     topologyHeld_ = false;
     microMesh_ = nullptr;
     microBase_ = -1;
+    inkKeep_ = keepEditable, inkOk_ = true, inkHead_ = false;
+    inkAlphaFrom_ = nullptr;
+    inkDabs_.clear();
+    inkLast_ = 0;
+    inkFixed_ = 0;
+    inkMesh_ = nullptr;
+    inkStep_ = mesh.micro ? mesh.micro->step : 0.0f;
     cageFree_.clear();
     cageTriMax_.clear();
     kelvinMaskBlocked_.v = false;
@@ -571,10 +578,77 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
 bool Sculptor::microReady(Mesh& mesh) {
     if (!mesh.micro || !microMatches(mesh)) return false;
     if (!micro_.active() || microMesh_ != &mesh) {
+        micro_.hashTiles = inkKeep_;
         micro_.begin(mesh);
         microMesh_ = &mesh;
+        inkStep_ = mesh.micro->step;
     }
     return true;
+}
+
+void Sculptor::inkHeader(bool maskBrush, const BrushAlpha* alpha, int pattern, float patternScale, float patternAmount) {
+    if (!inkKeep_ || !inkOk_) return;
+    if (alpha && alpha->empty()) alpha = nullptr;
+    if (pattern == 0 || patternAmount <= 0.0f) pattern = 0, patternScale = 0.3f, patternAmount = 0.0f;
+    if (!inkHead_) {
+        inkHead_ = true;
+        ink_ = MicroInk{};
+        ink_.maskBrush = maskBrush;
+        ink_.adaptive = micro_.adaptive;
+        ink_.pattern = pattern, ink_.patternScale = patternScale, ink_.patternAmount = patternAmount;
+        inkAlphaFrom_ = alpha;
+        if (alpha) { // (a snapshot: the brush's alpha may change after the stroke)
+            if (!inkAlpha_ || inkAlpha_->width != alpha->width || inkAlpha_->height != alpha->height || inkAlpha_->tileX != alpha->tileX ||
+                inkAlpha_->tileY != alpha->tileY || inkAlpha_->values != alpha->values)
+                inkAlpha_ = std::make_shared<const BrushAlpha>(*alpha);
+            ink_.alpha = inkAlpha_;
+        }
+        return;
+    }
+    // (one header a stroke: a dab that needs another one can't be kept)
+    if (ink_.maskBrush != maskBrush || inkAlphaFrom_ != alpha || ink_.pattern != pattern || ink_.patternScale != patternScale ||
+        ink_.patternAmount != patternAmount)
+        inkOk_ = false;
+}
+
+void Sculptor::inkDab(MicroDab d) {
+    if (!inkKeep_ || !inkOk_) return;
+    d.seq = uint32_t(inkDabs_.size());
+    inkDabs_.push_back(d);
+}
+
+void Sculptor::inkFinish(Mesh& mesh) {
+    // Everything is fixed by a new topology, sculpt layers moving, or the grid's range growing (every value rescaled,
+    // which no replay repeats exactly); base vertices moving (Move on the cage, big dabs' base kernel) fix the strokes
+    // on the triangles whose corners or corner normals they changed.
+    const bool everything = record_.topology || !record_.layerOffsets.empty() || !mesh.micro || mesh.micro->step != inkStep_;
+    const bool baseMoved = everything || !record_.positions.empty() || microBase_ == 1;
+    const bool keep = inkKeep_ && inkOk_ && inkHead_ && record_.micro && !baseMoved && !inkDabs_.empty();
+    MicroHistory* h = microHistory(mesh, keep);
+    inkFixed_ = 0;
+    if (h) {
+        std::vector<uint32_t> tiles;
+        if (record_.micro) tiles = record_.micro->tris;
+        if (!everything && !record_.positions.empty()) {
+            std::vector<uint32_t> ring; // (moved vertices and their neighbours: their normals changed)
+            for (uint32_t v : record_.positions.indices) {
+                if (v >= mesh.vertexCount()) continue;
+                ring.push_back(v);
+                for (uint32_t u : mesh.neighbors(v)) ring.push_back(u);
+            }
+            std::sort(ring.begin(), ring.end());
+            ring.erase(std::unique(ring.begin(), ring.end()), ring.end());
+            for (uint32_t v : ring)
+                for (uint32_t t : mesh.vertexTriangles(v)) tiles.push_back(t);
+        }
+        std::sort(tiles.begin(), tiles.end());
+        tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
+        if (keep) inkLast_ = h->record(ink_, std::move(inkDabs_), record_.micro, std::move(micro_.tilePre), std::move(micro_.tilePost));
+        else if (everything) inkFixed_ = h->bakeAll();
+        else if (!tiles.empty()) inkFixed_ = h->bakeMeeting(tiles);
+    }
+    inkDabs_.clear();
+    micro_.tilePre.clear(), micro_.tilePost.clear();
 }
 
 void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach) {
@@ -957,8 +1031,14 @@ UndoRecord Sculptor::endStroke() {
         }
     }
     if (microBase_ == 1 && microMesh_) microRaiseBulge(*microMesh_); // (the base moved under it)
-    if (micro_.active() && microMesh_) record_.micro = micro_.end(*microMesh_);
+    if (micro_.active() && microMesh_) {
+        record_.micro = micro_.end(*microMesh_);
+        inkFinish(*microMesh_); // (Forge Ink: keeps the stroke editable, or bakes what it reached)
+    } else if (inkMesh_ && inkMesh_->micro) {
+        inkFinish(*inkMesh_); // (the stroke moved the base only: Move on the cage, Kelvinlet)
+    }
     microMesh_ = nullptr;
+    inkMesh_ = nullptr;
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -996,6 +1076,7 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (mesh.micro) inkMesh_ = &mesh; // (Forge Ink: endStroke settles this mesh's kept strokes)
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
     if (type == BrushType::Cloth) { // ClothBrush.cpp (no remeshing: the simulation keeps its own topology)
@@ -1021,9 +1102,17 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     } else if (microReady(mesh)) {
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
-        for (const SymCopy& m : copies(sym))
-            micro_.dab(mesh, bvh, type, m.point(p.center), m.dir(p.viewDir), p.radius, p.strength * std::clamp(p.pressure, 0.0f, 1.0f),
-                       p.invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, stencilTexture(p, m), m.dir(p.strokeDelta));
+        if (p.stencil.active()) inkOk_ = false; // (a Stencil is the view's: not kept)
+        inkHeader(false, p.alpha, 0, 0.0f, 0.0f);
+        for (const SymCopy& m : copies(sym)) {
+            MicroDab d;
+            d.type = type, d.center = m.point(p.center), d.viewDir = m.dir(p.viewDir), d.radius = p.radius;
+            d.strength = p.strength * std::clamp(p.pressure, 0.0f, 1.0f), d.invert = p.invert, d.focal = p.focal;
+            d.alphaUp = m.dir(p.alphaUp), d.strokeDir = m.dir(p.strokeDelta), d.copy = m, d.pxPerUnit = p.pxPerUnit;
+            micro_.dab(mesh, bvh, type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, false, 0.0f, p.alpha,
+                       stencilTexture(p, m), d.strokeDir);
+            inkDab(d);
+        }
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         timings.vertices += micro_.points - pts;
@@ -1667,7 +1756,6 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         // A micro level: the grid takes a Standard dab with the recipe's depth (its sign carves or builds) and its
         // surface pattern (Dragon Scales, Skin Pores..., #120: they sculpted plain blobs there). Planes, pinch and
         // drag aren't grid brushes.
-        const float patternFreq = 1.0f / std::max(p.radius * recipe.patternScale, 1e-6f);
         const bool patterned = recipe.pattern != BrushRecipe::Pattern::None && recipe.patternAmount > 0.0f;
         const bool invert = p.invert != (recipe.depth < 0.0f);
         // (Standard's 0.08 r layer per full dab against the recipe's 0.12 r * depth)
@@ -1675,18 +1763,21 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
         const float pressure = std::pow(std::clamp(p.pressure, 0.0f, 1.0f), recipe.pressureCurve);
         const double k0 = micro_.findMs + micro_.kernelMs, s0 = micro_.stitchMs;
         const uint64_t pts = micro_.points;
+        if (p.stencil.active()) inkOk_ = false;
+        inkHeader(false, p.alpha, patterned ? int(recipe.pattern) : 0, recipe.patternScale, recipe.patternAmount);
         for (const SymCopy& m : copies(sym)) {
             const auto stencil = stencilTexture(p, m);
             std::function<float(const glm::vec3&)> texture; // (each copy reads the pattern at its source dab's point)
-            if (patterned)
-                texture = [&recipe, patternFreq, &m](const glm::vec3& x) {
-                    return glm::mix(1.0f, samplePattern(recipe.pattern, m.inversePoint(x) * patternFreq), recipe.patternAmount);
-                };
+            if (patterned) texture = microPatternTexture(int(recipe.pattern), recipe.patternScale, recipe.patternAmount, p.radius, m);
             std::function<float(const glm::vec3&)> both = texture;
             if (stencil && texture) both = [&texture, &stencil](const glm::vec3& x) { return texture(x) * stencil(x); };
             else if (stencil) both = stencil;
-            micro_.dab(mesh, bvh, BrushType::Standard, m.point(p.center), m.dir(p.viewDir), p.radius, strength * pressure,
-                       invert, p.focal, m.dir(p.alphaUp), false, 0.0f, p.alpha, both);
+            MicroDab d;
+            d.type = BrushType::Standard, d.center = m.point(p.center), d.viewDir = m.dir(p.viewDir), d.radius = p.radius;
+            d.strength = strength * pressure, d.invert = invert, d.focal = p.focal, d.alphaUp = m.dir(p.alphaUp);
+            d.copy = m, d.pxPerUnit = p.pxPerUnit;
+            micro_.dab(mesh, bvh, d.type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, false, 0.0f, p.alpha, both);
+            inkDab(d);
         }
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
@@ -2039,6 +2130,7 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabAll_.clear();
     grabLeaves_.clear();
     if (!active_) return;
+    if (mesh.micro) inkMesh_ = &mesh;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
     // A mask nearby (the micro level's own, or the base mesh's) takes the grid's per-point rule for the whole stroke: the
@@ -2047,7 +2139,14 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     if (!gridGrab && mesh.micro && (mesh.micro->hasMask() || mesh.hasMask()))
         for (const SymCopy& m : copies(sym)) gridGrab = gridGrab || microMaskNear(mesh, bvh, m.point(p.center), p.radius);
     if (gridGrab && microReady(mesh)) {
-        for (const SymCopy& m : copies(sym)) micro_.beginGrab(mesh, bvh, m.point(p.center), p.radius, p.focal, m.m);
+        for (const SymCopy& m : copies(sym)) {
+            MicroDab d;
+            d.op = MicroDab::Op::GrabBegin, d.type = BrushType::Move, d.center = m.point(p.center), d.radius = p.radius, d.focal = p.focal;
+            d.copy = m, d.pxPerUnit = p.pxPerUnit;
+            micro_.beginGrab(mesh, bvh, d.center, d.radius, d.focal, m.m);
+            inkHeader(false, nullptr, 0, 0.0f, 0.0f);
+            inkDab(d);
+        }
         return;
     }
     for (const SymCopy& m : copies(sym)) {
@@ -2085,6 +2184,9 @@ void Sculptor::grabMove(Mesh& mesh, const glm::vec3& delta) {
     if (micro_.active() && microMesh_ == &mesh) { // (a micro level moves and stitches in one go)
         const double k0 = micro_.kernelMs, s0 = micro_.stitchMs;
         micro_.grab(mesh, delta);
+        MicroDab d;
+        d.op = MicroDab::Op::Grab, d.type = BrushType::Move, d.delta = delta;
+        inkDab(d);
         timings.kernelMs += micro_.kernelMs - k0;
         timings.normalsMs += micro_.stitchMs - s0;
         ++timings.dabs;
@@ -2122,6 +2224,9 @@ void Sculptor::restoreStroke(Mesh& mesh, BVH& bvh) {
     if (!active_) return;
     if (micro_.active() && microMesh_ == &mesh) {
         micro_.restore(mesh);
+        MicroDab d;
+        d.op = MicroDab::Op::Restore;
+        inkDab(d);
         return;
     }
     topologyHeld_ = true; // (positions come back, topology wouldn't)
@@ -2166,6 +2271,12 @@ void Sculptor::prepareLayer(const Mesh& mesh, float height) {
         std::fill(layerStamp_.begin(), layerStamp_.end(), 0);
         layerEpoch_ = 1;
     }
+}
+
+std::function<float(const glm::vec3&)> microPatternTexture(int pattern, float scale, float amount, float radius, const SymCopy& m) {
+    const float freq = 1.0f / std::max(radius * scale, 1e-6f);
+    const auto kind = BrushRecipe::Pattern(pattern);
+    return [kind, freq, amount, m](const glm::vec3& x) { return glm::mix(1.0f, samplePattern(kind, m.inversePoint(x) * freq), amount); };
 }
 
 } // namespace sf

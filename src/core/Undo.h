@@ -127,6 +127,7 @@ struct SelectionSetsUndo {
 // Adding or removing a whole Part (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
 // which see the whole scene: the record itself leaves the mesh alone.
 struct PartStep;
+struct MicroInkStep;
 // The transform and per-vertex weights of a transform step (core/MeshTransform.h), kept on Pose Mesh steps so
 // Figure Pose can replay them at full resolution (core/FigurePose.h).
 struct TransformOp;
@@ -149,6 +150,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
 //  - part: a Part added to the scene (Extract), taken out on undo and put back on redo
 //  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
+//  - ink: an edit or removal of a stroke a micro level keeps editable (core/MicroHistory.h), applied on its own
 //  - uvs: per triangle corner texture coordinates (restoring a selection set's UVs)
 //  - sets: the Selection Sets list (core/SelectionSets.h)
 //  - creases: per triangle corner edge creases (core/EdgeSelect.h)
@@ -177,7 +179,10 @@ struct UndoRecord {
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<PartStep> part; // (shared: PartStep is defined in core/Document.h)
     std::unique_ptr<UvUndo> uv;           // UVs, seams and pins (UV Editor, core/Uv.h)
-    std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
+    // Micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h). Shared: a stroke kept
+    // editable (Forge Ink, core/MicroHistory.h) keeps the same tiles in its record, and replaying it rewrites them here.
+    std::shared_ptr<MicroUndo> micro;
+    std::shared_ptr<MicroInkStep> ink;    // an edit or removal of a kept stroke (core/MicroHistory.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
     UndoChannel<float> creases;           // per corner, like `uvs`
@@ -192,7 +197,7 @@ struct UndoRecord {
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro &&
+               facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro && !ink &&
                uvs.empty() && !sets && !uv && creases.empty();
     }
     size_t approxBytes() const;

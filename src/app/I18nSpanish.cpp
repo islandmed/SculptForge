@@ -926,6 +926,18 @@ constexpr Entry kSpanish[] = {
     {"Multithreading", "Multihilo"},
     {"Predictive Strokes", "Trazos predictivos"},
     {"Draft Strokes", "Trazos de borrador"},
+    {"Keep Strokes Editable", "Mantener trazos editables"},
+    {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
+     "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
+     "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
+     "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
+     "sit on it. Off when memory is low.",
+     "En un nivel micro, cada trazo conserva los toques de los que está hecho, así que después se "
+     "puede mover, cambiar o quitar, y los trazos que tiene encima lo siguen exactamente. Cada trazo "
+     "esculpe y se deshace exactamente como antes. Los trazos que mueven la base (los pinceles "
+     "Standard, Clay e Inflate grandes, Move sobre la base) o usan la Plantilla fijan en su sitio los "
+     "trazos que alcanzan; también queda fijado un trazo cuando tiene otros 20 encima. Desactivado "
+     "cuando queda poca memoria."},
     {"Live Move (Experimental)", "Mover en vivo (experimental)"},
     {"Background Preview (Experimental)", "Vista previa en segundo plano (experimental)"},
     {"Fast Upload (Experimental)", "Subida rápida (experimental)"},

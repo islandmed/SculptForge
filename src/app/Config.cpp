@@ -154,6 +154,7 @@ Json toJson(const UiPrefs& p) {
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
     j.set("draftStrokes", p.draftStrokes);
+    j.set("keepStrokesEditable", p.keepStrokesEditable);
     j.set("liveMove", p.liveMove);
     j.set("backgroundPreview", p.backgroundPreview);
     j.set("fastUpload", p.fastUpload);
@@ -282,6 +283,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
     p.draftStrokes = j["draftStrokes"].asBool(p.draftStrokes);
+    p.keepStrokesEditable = j["keepStrokesEditable"].asBool(p.keepStrokesEditable);
     p.liveMove = j["liveMove"].asBool(p.liveMove);
     p.backgroundPreview = j["backgroundPreview"].asBool(p.backgroundPreview);
     p.fastUpload = j["fastUpload"].asBool(p.fastUpload);

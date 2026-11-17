@@ -6,6 +6,7 @@
 #include "core/Commands.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
+#include "core/MicroHistory.h"
 #include "core/Multires.h"
 
 #include <algorithm>
@@ -196,6 +197,72 @@ void registerMicroCommands(CommandRegistry& reg) {
                  microNoise(doc.mesh, amp, freq, uint32_t(argNumber(a, "seed", 1)));
                  doc.undo.push(std::move(r));
                  return {true, "Added surface noise to " + millions(double(microTriangleCount(doc.mesh))) + " micro triangles"};
+             }});
+
+    // Forge Ink (core/MicroHistory.h): the strokes a micro level keeps editable (Preferences > Performance > Keep
+    // Strokes Editable), for scripts and the AI assistant until the stroke list has its panel.
+    reg.add({"ink_strokes", "Lists the strokes this Part's micro level keeps editable (id, brush dabs, editable or fixed).", {},
+             [](Document& doc, const Args&) -> CommandResult {
+                 MicroHistory* h = microHistory(doc.mesh, false);
+                 if (!h || h->size() == 0) return {true, "No kept strokes"};
+                 std::string out;
+                 char buf[128];
+                 for (const MicroRecord& r : h->records()) {
+                     if (!r.applied()) continue;
+                     std::snprintf(buf, sizeof buf, "%u: %zu dabs, %zu tiles, %s\n", r.id, r.dabs.size(), r.tiles.size(),
+                                   r.baked ? "fixed" : "editable");
+                     out += buf;
+                 }
+                 std::snprintf(buf, sizeof buf, "%zu editable, %.1f KB besides the undo history", h->editable(), double(h->bytes()) / 1e3);
+                 return {true, out + buf};
+             }});
+    reg.add({"ink_edit_stroke",
+             "Moves a kept stroke (offset in scene units) and/or scales its strength; the strokes over it follow exactly. Undoable.",
+             {{"id", T::Number, "The stroke (ink_strokes).", true},
+              {"dx", T::Number, "Offset along X (default 0).", false},
+              {"dy", T::Number, "Offset along Y (default 0).", false},
+              {"dz", T::Number, "Offset along Z (default 0).", false},
+              {"strength", T::Number, "Strength factor (default 1).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 MicroHistory* h = microHistory(doc.mesh, false);
+                 const uint32_t id = uint32_t(argNumber(a, "id", 0));
+                 const MicroRecord* rec = h ? h->find(id) : nullptr;
+                 if (!rec || rec->baked || !rec->applied()) return {false, "No editable stroke " + std::to_string(id)};
+                 const glm::vec3 off(float(argNumber(a, "dx", 0)), float(argNumber(a, "dy", 0)), float(argNumber(a, "dz", 0)));
+                 const float k = float(argNumber(a, "strength", 1));
+                 UndoRecord r;
+                 r.label = "Edit stroke";
+                 r.ink = std::make_shared<MicroInkStep>();
+                 r.ink->op = MicroInkStep::Op::Edit;
+                 r.ink->id = id;
+                 r.ink->dabs = rec->dabs;
+                 for (MicroDab& d : r.ink->dabs) {
+                     // (each mirror's dab moves by the offset's mirror image; Move's drags stay as they were)
+                     if (d.op == MicroDab::Op::Dab || d.op == MicroDab::Op::GrabBegin) d.center += d.copy.dir(off);
+                     if (d.op == MicroDab::Op::Dab) d.strength *= k, d.maskStrength *= k;
+                 }
+                 std::string why;
+                 if (!r.ink->swapWith(doc.mesh, doc.bvh, &why)) return {false, "Can't edit stroke " + std::to_string(id) + ": " + why};
+                 doc.undo.push(std::move(r));
+                 return {true, "Edited stroke " + std::to_string(id)};
+             }});
+    reg.add({"ink_remove_stroke", "Takes a kept stroke out; the strokes over it follow exactly. Undoable.",
+             {{"id", T::Number, "The stroke (ink_strokes).", true}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 MicroHistory* h = microHistory(doc.mesh, false);
+                 const uint32_t id = uint32_t(argNumber(a, "id", 0));
+                 const MicroRecord* rec = h ? h->find(id) : nullptr;
+                 if (!rec || rec->baked || !rec->applied()) return {false, "No editable stroke " + std::to_string(id)};
+                 UndoRecord r;
+                 r.label = "Remove stroke";
+                 r.ink = std::make_shared<MicroInkStep>();
+                 r.ink->op = MicroInkStep::Op::Remove;
+                 r.ink->id = id;
+                 r.ink->out = false;
+                 std::string why;
+                 if (!r.ink->swapWith(doc.mesh, doc.bvh, &why)) return {false, "Can't remove stroke " + std::to_string(id) + ": " + why};
+                 doc.undo.push(std::move(r));
+                 return {true, "Removed stroke " + std::to_string(id)};
              }});
 }
 

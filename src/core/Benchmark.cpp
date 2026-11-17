@@ -621,6 +621,12 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
             if (!o.brushFilter.empty() && b.name.find(o.brushFilter) == std::string::npos) continue;
             log("  " + b.name);
             Sculptor& sc = doc.sculptor;
+            // (SF_KEEP_EDITABLE=1: strokes kept editable, Forge Ink core/MicroHistory.h: what recording costs)
+            static const bool keep = [] {
+                const char* e = std::getenv("SF_KEEP_EDITABLE");
+                return e && e[0] == '1';
+            }();
+            sc.keepEditable = keep;
             sc.beginStroke(m, b.name);
             Symmetry sym;
             MicroStroke& ms = sc.microStroke();

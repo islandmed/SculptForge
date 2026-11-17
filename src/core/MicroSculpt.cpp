@@ -12,6 +12,7 @@
 #include "core/Micro.h"
 #include "core/AtomicRef.h"
 #include "core/FocusDetail.h"
+#include "core/MicroHistory.h"
 
 #include "core/BVH.h"
 #include "core/BrushAlpha.h"
@@ -902,11 +903,27 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         }
     }, 256);
     const bool masked = mm.hasMask() && oldMask_.size() == count * S;
+    std::vector<uint64_t> pre, post; // (Forge Ink: per entry of tiles_, put in the step's order below)
+    if (hashTiles) {
+        pre.resize(count), post.resize(count);
+        poolFor(count, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t t = tiles_[i];
+                pre[i] = microTileHash(m, t, oldDisp_.data() + i * S, masked ? oldMask_.data() + i * S : nullptr);
+                post[i] = microTileHash(m, t, mm.tileDisp(t), mm.tileMask(t));
+            }
+        }, 64);
+    }
+    tilePre.clear(), tilePost.clear();
     if (fits) {
         u->journal = true;
         u->tris.resize(count);
         u->keys.resize(count);
         for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
+        if (hashTiles) {
+            tilePre.resize(count), tilePost.resize(count);
+            for (size_t k = 0; k < count; ++k) tilePre[k] = pre[order[k].second], tilePost[k] = post[order[k].second];
+        }
         microPackTiles(change.data(), count, mm.samples, u->packed);
         u->firsts = std::move(firsts);
         if (masked) {
@@ -916,6 +933,7 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         }
     } else { // (a change wider than 16 bits: whole old tiles)
         u->tris = tiles_;
+        tilePre = std::move(pre), tilePost = std::move(post);
         u->disp = std::move(oldDisp_);
         if (masked) u->mask = std::move(oldMask_);
     }

@@ -477,6 +477,10 @@ private:
     bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
     bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
     bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
+    // Keep Strokes Editable (SF_KEEP_EDITABLE=0 / 1 overrides), unless memory is short: the floor tier under 8 GB, or
+    // under 1 GB free now (the status line says so once). Strokes then run exactly as before.
+    bool keepStrokesEditable();
+    bool inkGuardSaid_ = false;
     bool backgroundDabs() const;       // a heavy mesh's dabs on the solver thread without the preview (SF_BACKGROUND_DABS)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
     bool solverBusy() const;

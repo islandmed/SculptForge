@@ -50,6 +50,7 @@ namespace sf {
 
 class BVH;
 class CommandRegistry;
+class MicroHistory;
 class FocusDetail;
 struct Document;
 struct RayHit;
@@ -95,6 +96,19 @@ struct MicroMesh {
         }
     };
     mutable Reach reach;
+    // Forge Ink: the level's stroke history (core/MicroHistory.h; null until a stroke is kept editable). A copy starts
+    // without one (its strokes' undo steps belong to the original); mutableMicro hands it to the copy that goes on.
+    struct Ink {
+        std::shared_ptr<MicroHistory> history;
+        Ink() = default;
+        Ink(const Ink&) {}
+        Ink& operator=(const Ink&) {
+            history.reset();
+            return *this;
+        }
+        Ink(Ink&&) = default;
+        Ink& operator=(Ink&&) = default;
+    } ink;
 
     // What changed since the renderer last looked: per base triangle a bit, or everything.
     std::vector<uint64_t> dirtyBits;
@@ -115,6 +129,11 @@ struct MicroMesh {
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)
     size_t bytes() const;
     bool hasMask() const { return !mask.empty(); }
+    // One base triangle's grid (and mask: null without one). Code that reads whole tiles goes through these, so a tile
+    // of its own size (variable-depth detail tiles, later) is read one way everywhere.
+    uint32_t tileSamples(uint32_t) const { return samples; }
+    const int16_t* tileDisp(uint32_t tri) const { return disp.data() + size_t(tri) * samples; }
+    const uint8_t* tileMask(uint32_t tri) const { return hasMask() ? mask.data() + size_t(tri) * samples : nullptr; }
     float rangeWorld() const { return 32767.0f * step; } // the largest |d| `step` can hold
 
     static uint32_t index(uint32_t i, uint32_t j, uint32_t n) { return j * (n + 1) - j * (j - 1) / 2 + i; }
@@ -316,6 +335,10 @@ public:
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
+    // Forge Ink (core/MicroHistory.h): end() also hashes each changed tile as the stroke found it and left it
+    // (microTileHash), in the order of the undo step's tiles.
+    bool hashTiles = false;
+    std::vector<uint64_t> tilePre, tilePost;
 
 private:
     std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid

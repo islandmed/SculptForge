@@ -1388,6 +1388,18 @@ constexpr Entry kJapanese[] = {
      "予測ストローク"},
     {"Draft Strokes",
      "ドラフトストローク"},
+    {"Keep Strokes Editable", "ストロークを編集可能に保つ"},
+    {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
+     "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
+     "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
+     "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
+     "sit on it. Off when memory is low.",
+     "マイクロレベルでは、各ストロークが自身を構成するダブを保持するため、後から移動・変更・削除"
+     "でき、その上のストロークも正確に追従します。各ストロークのスカルプトと元に戻す動作は以前と"
+     "まったく同じです。ベースを動かすストローク（大きな Standard、Clay、Infla"
+     "te ブラシ、ベース上の Move）やステンシルを使うストロークは、届いた範囲のストローク"
+     "をその場に固定します。上に 20 本のストロークが重なったストロークも固定されます。メモリ"
+     "が少ないときはオフになります。"},
     {"%d threads",
      "%dスレッド"},
     {"Memory",

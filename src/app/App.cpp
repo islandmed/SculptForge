@@ -2752,6 +2752,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
+    doc_.sculptor.keepEditable = doc_.mesh.micro && keepStrokesEditable(); // (Forge Ink: micro levels only)
     // Big brushes where the CPU has room: the exact normals the analytic ones defer land at the pen-up. On a 4-core
     // floor machine that cost more than it saved (E-core floor, 120 px release 0.5 -> 1.3 s), and at 120 px even on
     // the 3060 (release +190 ms for -45 ms lag); from 160 px on 6+ threads it wins (3060 240 px p50 428 -> 283 ms,
@@ -3103,6 +3104,10 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
     p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
+    { // (the view's scale at the dab, kept with a Forge Ink dab record: detail depth is picked from it, never re-derived)
+        const float wpp = cam.worldPerPixel(hit.position, canvasH);
+        p.pxPerUnit = wpp > 0.0f ? 1.0f / wpp : 0.0f;
+    }
     // Smooth keeps its own Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
