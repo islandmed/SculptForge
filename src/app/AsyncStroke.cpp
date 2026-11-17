@@ -480,6 +480,9 @@ void App::finishStrokeNow() {
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
         status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
+    if (const size_t fixed = doc_.sculptor.lastFixedStrokes())
+        status_ = fixed == 1 ? "1 editable stroke under this one is now fixed in place"
+                             : std::to_string(fixed) + " editable strokes under this one are now fixed in place";
     strokeEndedForRemesh(r); // Tool > Remesh > Remesh after each stroke (#121): stretched enough to remesh?
     if (!r.empty()) {
         doc_.undo.push(std::move(r));

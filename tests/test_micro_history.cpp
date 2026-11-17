@@ -364,3 +364,37 @@ TEST(micro_ink_edit_geom_invariants) {
     CHECK(h->edit(doc.mesh, doc.bvh, id, back));
     CHECK(grid(doc.mesh) == before);
 }
+
+// Move on the base cage fixes only the kept strokes on the triangles it moved (corners or corner normals); a stroke
+// elsewhere stays editable, and editing it there and back is exact.
+TEST(micro_ink_cage_move_fixes_only_what_it_moved) {
+    Document doc = inkDoc();
+    Symmetry none;
+    none.x = false;
+    Sculptor& sc = doc.sculptor;
+    auto stroke = [&](glm::vec3 at) {
+        CHECK(sc.beginStroke(doc.mesh, "Standard"));
+        for (int i = 0; i < 6; ++i)
+            sc.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(at + glm::vec3(0.03f * float(i), 0.0f, 0.0f), 0.15f), none);
+        doc.undo.push(sc.endStroke());
+        return sc.lastKeptStroke();
+    };
+    const uint32_t near = stroke(glm::vec3(0.0f, 0.0f, 1.0f)), far = stroke(glm::vec3(0.0f, 0.0f, -1.0f));
+    CHECK(near != 0 && far != 0);
+    sc.microMoveAlongNormals = false; // (the default: Move pulls the base cage)
+    CHECK(sc.beginStroke(doc.mesh, "Move"));
+    sc.beginGrab(doc.mesh, doc.bvh, dabAt(glm::vec3(0.0f, 0.0f, 1.0f), 0.2f), none);
+    sc.grab(doc.mesh, doc.bvh, glm::vec3(0.0f, 0.0f, 0.05f));
+    doc.undo.push(sc.endStroke());
+    MicroHistory* h = microHistory(doc.mesh, false);
+    CHECK(h->find(near)->baked);
+    CHECK(!h->find(far)->baked);
+    CHECK(sc.lastFixedStrokes() == 1);
+    const std::vector<int16_t> before = grid(doc.mesh);
+    std::vector<MicroDab> dabs = h->find(far)->dabs;
+    for (MicroDab& d : dabs) d.strength *= 0.5f;
+    CHECK(h->edit(doc.mesh, doc.bvh, far, dabs));
+    CHECK(grid(doc.mesh) != before);
+    CHECK(h->edit(doc.mesh, doc.bvh, far, dabs));
+    CHECK(grid(doc.mesh) == before);
+}

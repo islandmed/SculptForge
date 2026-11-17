@@ -113,9 +113,10 @@ public:
                 std::unique_ptr<MicroRecord>* removed = nullptr, size_t* at = nullptr);
     // Puts a removed stroke back at `at` (its old place) and runs it and the strokes above it that it reaches again.
     bool reinsert(Mesh& m, const BVH& bvh, std::unique_ptr<MicroRecord> rec, size_t at, std::string* why = nullptr);
-    // A stroke the history doesn't hold changed `tiles` (ascending; empty = the base or everything): bakes what it meets.
-    void bakeMeeting(const std::vector<uint32_t>& tiles);
-    void bakeAll();
+    // A stroke the history doesn't hold changed `tiles` (ascending; empty = everything): bakes what it meets. Both
+    // return how many editable strokes they baked.
+    size_t bakeMeeting(const std::vector<uint32_t>& tiles);
+    size_t bakeAll();
     // Follows the app's undo history: a stroke whose step it dropped is baked (applied) or forgotten (a dropped redo).
     void sync();
     const MicroRecord* find(uint32_t id) const;

@@ -459,6 +459,9 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     inkAlphaFrom_ = nullptr;
     inkDabs_.clear();
     inkLast_ = 0;
+    inkFixed_ = 0;
+    inkMesh_ = nullptr;
+    inkStep_ = mesh.micro ? mesh.micro->step : 0.0f;
     cageFree_.clear();
     cageTriMax_.clear();
     kelvinMaskBlocked_.v = false;
@@ -615,21 +618,34 @@ void Sculptor::inkDab(MicroDab d) {
 }
 
 void Sculptor::inkFinish(Mesh& mesh) {
-    // (the base moved, or the grid's range grew: every value was rescaled, which no replay repeats exactly)
-    const bool baseMoved = !record_.positions.empty() || record_.topology || !record_.layerOffsets.empty() || microBase_ == 1 ||
-                           !mesh.micro || mesh.micro->step != inkStep_;
+    // Everything is fixed by a new topology, sculpt layers moving, or the grid's range growing (every value rescaled,
+    // which no replay repeats exactly); base vertices moving (Move on the cage, big dabs' base kernel) fix the strokes
+    // on the triangles whose corners or corner normals they changed.
+    const bool everything = record_.topology || !record_.layerOffsets.empty() || !mesh.micro || mesh.micro->step != inkStep_;
+    const bool baseMoved = everything || !record_.positions.empty() || microBase_ == 1;
     const bool keep = inkKeep_ && inkOk_ && inkHead_ && record_.micro && !baseMoved && !inkDabs_.empty();
     MicroHistory* h = microHistory(mesh, keep);
+    inkFixed_ = 0;
     if (h) {
-        if (keep) {
-            inkLast_ = h->record(ink_, std::move(inkDabs_), record_.micro, std::move(micro_.tilePre), std::move(micro_.tilePost));
-        } else if (baseMoved) {
-            h->bakeAll();
-        } else if (record_.micro) {
-            std::vector<uint32_t> tiles = record_.micro->tris;
-            std::sort(tiles.begin(), tiles.end());
-            h->bakeMeeting(tiles);
+        std::vector<uint32_t> tiles;
+        if (record_.micro) tiles = record_.micro->tris;
+        if (!everything && !record_.positions.empty()) {
+            std::vector<uint32_t> ring; // (moved vertices and their neighbours: their normals changed)
+            for (uint32_t v : record_.positions.indices) {
+                if (v >= mesh.vertexCount()) continue;
+                ring.push_back(v);
+                for (uint32_t u : mesh.neighbors(v)) ring.push_back(u);
+            }
+            std::sort(ring.begin(), ring.end());
+            ring.erase(std::unique(ring.begin(), ring.end()), ring.end());
+            for (uint32_t v : ring)
+                for (uint32_t t : mesh.vertexTriangles(v)) tiles.push_back(t);
         }
+        std::sort(tiles.begin(), tiles.end());
+        tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
+        if (keep) inkLast_ = h->record(ink_, std::move(inkDabs_), record_.micro, std::move(micro_.tilePre), std::move(micro_.tilePost));
+        else if (everything) inkFixed_ = h->bakeAll();
+        else if (!tiles.empty()) inkFixed_ = h->bakeMeeting(tiles);
     }
     inkDabs_.clear();
     micro_.tilePre.clear(), micro_.tilePost.clear();
@@ -1018,8 +1034,11 @@ UndoRecord Sculptor::endStroke() {
     if (micro_.active() && microMesh_) {
         record_.micro = micro_.end(*microMesh_);
         inkFinish(*microMesh_); // (Forge Ink: keeps the stroke editable, or bakes what it reached)
+    } else if (inkMesh_ && inkMesh_->micro) {
+        inkFinish(*inkMesh_); // (the stroke moved the base only: Move on the cage, Kelvinlet)
     }
     microMesh_ = nullptr;
+    inkMesh_ = nullptr;
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -1057,6 +1076,7 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    if (mesh.micro) inkMesh_ = &mesh; // (Forge Ink: endStroke settles this mesh's kept strokes)
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
     if (type == BrushType::Cloth) { // ClothBrush.cpp (no remeshing: the simulation keeps its own topology)
@@ -2110,6 +2130,7 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabAll_.clear();
     grabLeaves_.clear();
     if (!active_) return;
+    if (mesh.micro) inkMesh_ = &mesh;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
     // A mask nearby (the micro level's own, or the base mesh's) takes the grid's per-point rule for the whole stroke: the

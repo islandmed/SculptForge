@@ -344,6 +344,8 @@ public:
     bool keepEditable = false;
     // The kept stroke the last endStroke recorded (its id in the Part's microHistory), or 0.
     uint32_t lastKeptStroke() const { return inkLast_; }
+    // How many kept strokes the last endStroke fixed in place (it moved the base under them, or wrote over them unkept).
+    size_t lastFixedStrokes() const { return inkFixed_; }
 
     // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
     const MicroStroke& microStroke() const { return micro_; }
@@ -478,6 +480,8 @@ private:
     const BrushAlpha* inkAlphaFrom_ = nullptr;
     std::vector<MicroDab> inkDabs_;
     uint32_t inkLast_ = 0;
+    size_t inkFixed_ = 0;
+    Mesh* inkMesh_ = nullptr; // the micro mesh this stroke touched (whatever path it took)
     std::shared_ptr<const BrushAlpha> inkAlpha_; // the last alpha snapshot (strokes with the same alpha share it)
     void inkHeader(bool maskBrush, const BrushAlpha* alpha, int pattern, float patternScale, float patternAmount);
     void inkDab(MicroDab d);

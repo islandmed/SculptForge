@@ -210,18 +210,22 @@ void MicroHistory::release() {
                 r.post.shrink_to_fit();
 }
 
-void MicroHistory::bakeMeeting(const std::vector<uint32_t>& tiles) {
+size_t MicroHistory::bakeMeeting(const std::vector<uint32_t>& tiles) {
     sync();
     if (tiles.empty()) return bakeAll();
-    bool baked = false;
+    const size_t before = editable();
     for (size_t i = recs_.size(); i-- > 0;)
-        if (!recs_[i].baked && recs_[i].applied() && meets(recs_[i].tiles, tiles)) bake(i), baked = true;
+        if (!recs_[i].baked && recs_[i].applied() && meets(recs_[i].tiles, tiles)) bake(i);
+    const size_t baked = before - editable();
     if (baked) release();
+    return baked;
 }
 
-void MicroHistory::bakeAll() {
+size_t MicroHistory::bakeAll() {
+    const size_t baked = editable();
     for (MicroRecord& r : recs_) r.baked = true;
     release();
+    return baked;
 }
 
 size_t MicroHistory::indexOf(uint32_t id) const {
