@@ -2214,6 +2214,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
     ImGui::End();
 }
 
+// My Panel open as a drop-down while an Alt-press starts a drag from somewhere else (the drag that fills it): the press
+// would close it (ImGui focuses the window pressed), so it is opened again, and the drop has its target. Only with Alt.
+static bool keepMyPanelDropdown(const std::string& dropdown) {
+    return dropdown == "mypanel" && ui::AltHeld() && !ui::CtrlHeld() && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+           !ImGui::IsPopupOpen("##palettedropdown");
+}
+
 // A task menu's drop-down: its sections (palettes) down the left, the chosen one beside them, under its header (whose
 // tray icon still pins it to a tray). dropdown_ is the chosen palette, so ui.palette.* and F3 open it in its menu.
 void App::drawTaskMenu() {
@@ -2222,6 +2229,8 @@ void App::drawTaskMenu() {
         openDropdown_ = false;
     }
     if (dropdown_.empty()) return;
+    const bool reopen = keepMyPanelDropdown(dropdown_); // (without taking the focus: that would end the drag's source item)
+    if (reopen) ImGui::OpenPopup("##palettedropdown");
     const int menuIndex = taskMenuOf(dropdown_);
     const PaletteDef* def = findPalette(dropdown_);
     if (menuIndex < 0 || !def) {
@@ -2251,7 +2260,7 @@ void App::drawTaskMenu() {
     ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - sb - 4.0f * s), y));
     ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w + sb, vp->Size.y - y - 8.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
-    const bool open = ImGui::BeginPopup("##palettedropdown");
+    const bool open = ImGui::BeginPopup("##palettedropdown", reopen ? ImGuiWindowFlags_NoFocusOnAppearing : 0);
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
@@ -2483,6 +2492,7 @@ bool App::closePopupsOnPressOutside(const SDL_Event& e) {
     // press still acts, mode matrix.)
     const bool bare = !g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup));
     if (bare) ImGui::GetIO().WantCaptureMouse = false;
+    if (dropdown_ == "mypanel" && ui::AltHeld() && !ui::CtrlHeld()) return false; // an Alt-drag into it starts here: it comes back (keepMyPanelDropdown)
     const bool spent = bare && !palette && e.button.button == SDL_BUTTON_LEFT;
     dropdown_.clear();
     dropdownRect_ = ImVec4();
@@ -2526,6 +2536,8 @@ void App::drawPaletteDropdown() {
         openDropdown_ = false;
     }
     if (dropdown_.empty()) return;
+    const bool reopen = keepMyPanelDropdown(dropdown_); // (without taking the focus: that would end the drag's source item)
+    if (reopen) ImGui::OpenPopup("##palettedropdown");
     const PaletteDef* def = findPalette(dropdown_);
     if (!def) {
         dropdown_.clear();
@@ -2542,7 +2554,7 @@ void App::drawPaletteDropdown() {
     ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->Size.y - y - 8.0f * s));
     // Whole-pixel padding: auto-fit truncates sizes, and a fraction of a pixel too little shows a scrollbar.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(std::round(6.0f * s), std::round(6.0f * s)));
-    const bool open = ImGui::BeginPopup("##palettedropdown");
+    const bool open = ImGui::BeginPopup("##palettedropdown", reopen ? ImGuiWindowFlags_NoFocusOnAppearing : 0);
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();

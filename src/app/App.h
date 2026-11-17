@@ -2357,6 +2357,7 @@ private:
     void drawMyPanelFloating();
     void registerMyPanelActions();
     void finishMyPanelDrag();
+    bool droppedOnMyPanelWindow(); // the pointer is over My Panel's own window as a drag ends
     bool myPanelAdd(const std::string& entry, int at); // false when it is not an entry
     void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();

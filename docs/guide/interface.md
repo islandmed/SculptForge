@@ -274,9 +274,9 @@ works like any other palette: put it in a tray, or open it in a window of its ow
 
 Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
 
-In a My Panel kept in a window of its own you can reorder and remove entries, but to add one, drag it in from the main
-window first. What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and
-**Reset Layout** empties it.
+However My Panel is open (its key, the Edit menu, a tray, or a window of its own), hold <kbd>Alt</kbd> and drag an
+entry onto it. In a window of its own the entry lands at the end of the panel; drag within that window to reorder.
+What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset Layout** empties it.
 
 ## The shelves
 

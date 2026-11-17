@@ -200,6 +200,25 @@ void App::drawPalette_MyPanel() {
     ImGui::PopID();
 }
 
+// A My Panel in a window of its own is another ImGui context: it never sees a drag that began in the main window (the
+// press holds the mouse there, so it gets no motion either). The release is the main window's: if the pointer, mouse or
+// pen, is over that window then, the entry lands at the end of the panel.
+bool App::droppedOnMyPanelWindow() {
+    if (!window_) return false;
+    int wx = 0, wy = 0;
+    SDL_GetWindowPosition(window_, &wx, &wy);
+    const ImVec2 m = ImGui::GetIO().MousePos;
+    const float gx = float(wx) + m.x, gy = float(wy) + m.y; // the main window's coordinates, on the desktop
+    for (const PanelWindow& p : panelWindows_) {
+        if (p.id != "palette.mypanel" || !p.window || !p.shown) continue;
+        int px = 0, py = 0, pw = 0, ph = 0;
+        SDL_GetWindowPosition(p.window, &px, &py);
+        SDL_GetWindowSize(p.window, &pw, &ph);
+        if (gx >= float(px) && gx < float(px + pw) && gy >= float(py) && gy < float(py + ph)) return true;
+    }
+    return false;
+}
+
 // The end of a drag: an entry dragged out of My Panel and dropped anywhere but on a My Panel is removed (like a shelf
 // item). Called once a frame after every window, with the shelves' own finishShelfDrag.
 void App::finishMyPanelDrag() {
@@ -215,6 +234,8 @@ void App::finishMyPanelDrag() {
         return;
     }
     if (!myPanelDrag_.active) return;
+    if (!myPanelDrag_.accepted && !myPanelDrag_.fromPanel && droppedOnMyPanelWindow() && myPanelAdd(myPanelDrag_.entry, int(layout_.myPanel.size())))
+        status_ = "Added to My Panel";
     if (!myPanelDrag_.accepted && myPanelDrag_.fromPanel) {
         auto& list = layout_.myPanel;
         if (const auto it = std::find(list.begin(), list.end(), myPanelDrag_.entry); it != list.end()) {
