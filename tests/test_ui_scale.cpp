@@ -16,6 +16,12 @@ namespace {
 bool near(float a, float b, float eps = 0.01f) { return std::abs(a - b) < eps; }
 } // namespace
 
+#ifdef SF_IOS
+TEST(ui_scale_automatic_is_half_again_for_fingers_on_the_ipad) {
+    CHECK(near(automaticUiScale(2.0f, 2.0f), 1.5f)); // a Retina iPad: points, then the touch factor (UiScale.h)
+    CHECK(near(automaticUiScale(0.0f, 1.0f), 1.5f));
+}
+#else
 TEST(ui_scale_automatic_follows_the_display) {
     CHECK(near(automaticUiScale(1.0f, 1.0f), 1.0f));
     CHECK(near(automaticUiScale(1.25f, 1.0f), 1.25f)); // Windows 125 % (per-monitor DPI v2: pixels, density 1)
@@ -27,6 +33,7 @@ TEST(ui_scale_automatic_follows_the_display) {
     CHECK(near(automaticUiScale(1.5f, 0.0f), 1.5f));
     CHECK(near(automaticUiScale(NAN, 1.0f), 1.0f));
 }
+#endif
 
 TEST(ui_scale_choice_wins_and_is_clamped) {
     CHECK(near(resolveUiScale(0.0f, 1.5f), 1.5f)); // Automatic

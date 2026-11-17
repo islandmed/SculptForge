@@ -38,16 +38,17 @@ for type in "${types[@]}"; do
   xcrun simctl install "$udid" "$app" || { echo "$type: install failed"; fail=1; continue; }
   # 1. it starts: the start screen after a while
   xcrun simctl launch --terminate-running-process --stdout="$out/$name-start.log" --stderr="$out/$name-start.log" "$udid" $bundle
-  sleep 25
+  sleep 40 # (the simulator draws with a software renderer: a few seconds a frame)
   xcrun simctl io "$udid" screenshot "$out/$name-start.png" >/dev/null
   xcrun simctl spawn "$udid" launchctl list | grep -q "UIKitApplication:$bundle" ||
-    { echo "$type: the app is not running 25 s after it started (log: $name-start.log)"; fail=1; }
+    { echo "$type: the app is not running 40 s after it started (log: $name-start.log)"; fail=1; }
   xcrun simctl terminate "$udid" $bundle 2>/dev/null
-  # 2. the smoke script: open, sculpt, undo
+  # 2. the smoke script: open, sculpt, undo, at this iPad's own pixel size (the start log's "window ... (WxH px")
+  size=$(sed -nE 's/.*window [0-9]+x[0-9]+ \(([0-9]+x[0-9]+) px.*/\1/p' "$out/$name-start.log" | head -1)
   mkdir -p "$out/$name"
   xcrun simctl launch --stdout="$out/$name-smoke.log" --stderr="$out/$name-smoke.log" "$udid" $bundle \
-    --ui-test "$script" --ui-out "$out/$name"
-  for _ in $(seq 1 90); do
+    --ui-test "$script" --ui-out "$out/$name" ${size:+--size "$size"}
+  for _ in $(seq 1 600); do # (up to 20 minutes: software rendering at full iPad size)
     grep -qE '^(PASS|FAIL) ' "$out/$name-smoke.log" 2>/dev/null && break
     sleep 2
   done

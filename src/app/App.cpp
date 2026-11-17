@@ -210,7 +210,11 @@ bool App::init(const AppOptions& options) {
 
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                                   ((headless || splashEnabled_) ? SDL_WINDOW_HIDDEN : 0) |
-                                  (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
+                                  (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0)
+#ifdef SF_IOS
+                                  | SDL_WINDOW_FULLSCREEN // (the iPad: the whole screen, no status bar)
+#endif
+        ;
     const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
     rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
     const WindowState saved = rememberWindow_ ? loadWindowState() : WindowState{};
@@ -830,6 +834,7 @@ int App::runUiTest(int w, int h, int fps) {
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);
+    std::fflush(stdout); // (the verdict reaches a log file even if the exit is cut short)
     return demo_->failures().empty() ? 0 : 1;
 }
 
@@ -1539,6 +1544,11 @@ int App::run() {
         // CPU and GPU overlap: the GPU draws this frame while the CPU builds the next. At most one frame in flight
         // (the input lag doesn't grow): the last frame's GPU work is done before this one is shown.
         waitLastFrame();
+#ifdef SF_IOS
+        // (iPadOS shows the renderbuffer bound at the swap: SDL's view's own, not a view target's the renderer left bound)
+        gl::BindRenderbuffer(GL_RENDERBUFFER, GLuint(SDL_GetNumberProperty(SDL_GetWindowProperties(window_),
+                                                                           SDL_PROP_WINDOW_UIKIT_OPENGL_RENDERBUFFER_NUMBER, 0)));
+#endif
         SDL_GL_SwapWindow(window_);
         if (mainWindowHidden_) revealMainWindow(); // the first frame is on the window: show it, the splash goes
         lastFrameFence_ = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);

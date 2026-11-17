@@ -30,7 +30,7 @@ using namespace sf;
 namespace {
 
 std::string repoPath(const char* rel) {
-    std::string root = __FILE__;
+    std::string root = SF_TEST_DATA_DIR; // (absolute: __FILE__ may be relative to the build, and the iPad simulator runs from /)
     return root.substr(0, root.rfind("tests")) + rel;
 }
 

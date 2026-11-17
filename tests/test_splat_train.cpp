@@ -274,6 +274,7 @@ TEST(splat_capture_brush_arguments) {
     CHECK(brushArguments("d", "o", fast, false).size() + 4 == a.size());
 }
 
+#ifndef SF_IOS // (the iPad trains no splats: it starts no tools at all)
 TEST(splat_train_job_reports_missing_tools) {
     const fs::path photos = photoFolder("sf_train_missing", 4);
     ai::SplatTrainJob job;
@@ -296,6 +297,7 @@ TEST(splat_train_job_reports_missing_tools) {
     CHECK(!job.start(r, err) && err.find("not found") != std::string::npos);
     CHECK(!job.busy());
 }
+#endif
 
 TEST(splat_train_job_photos_to_splat_with_live_previews) {
     if (!*fakeTools()) return;

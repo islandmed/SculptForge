@@ -8,7 +8,7 @@
 
 #include <chrono>
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(SF_IOS) // (the iPad starts no other programs: ChildProcess::start says so)
 #include "ai/Process.h"
 
 #include <atomic>

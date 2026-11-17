@@ -52,6 +52,9 @@
 		<key>UIColorName</key>
 		<string></string>
 	</dict>
+	<!-- A trackpad or mouse on the iPad: its pointer, scrolling and clicks (SDL reads them) -->
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>UIStatusBarHidden</key>
 	<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
