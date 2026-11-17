@@ -5919,6 +5919,16 @@ constexpr Entry kSpanish[] = {
      "Scripts"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "Los archivos .py de esta carpeta se listan en Archivo > Script. Los paquetes que instales en su carpeta site-packages se pueden importar."},
+    {"Run at start-up",
+     "Ejecutar al iniciar"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "Los scripts marcados se ejecutan cada vez que se inicia SculptForge (con Python activado), para que estén los botones y paneles que añaden. Un script que ha cambiado no se ejecuta hasta que vuelvas a marcarlo."},
+    {"Trust this version",
+     "Confiar en esta versión"},
+    {"changed, didn't run",
+     "cambió, no se ejecutó"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "El script cambió desde que elegiste ejecutarlo al iniciar, así que no se ejecutó. Revisa qué cambió; si confías en él, esto lo ejecuta al iniciar a partir de ahora (no lo ejecuta ahora)."},
 };
 
 } // namespace

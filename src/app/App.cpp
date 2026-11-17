@@ -1246,6 +1246,8 @@ int App::run() {
             int timeout = io.WantTextInput ? kCaretTickMs : kIdleTickMs;
             if (redrawAt_ > 0.0) timeout = std::clamp(int((redrawAt_ - t0) * 1000.0) + 1, 0, timeout);
             if (panelsActiveUntil_ > t0) timeout = std::min(timeout, 16); // a hovered panel window's tooltips
+            if (double in = 0.0; python_ && python_->timerWake(in)) // a script's timer (sf.ui.timer)
+                timeout = std::clamp(int(in * 1000.0) + 1, 0, timeout);
             if (SDL_WaitEventTimeout(&e, timeout)) {
                 onEvent(e);
             } else if (io.WantTextInput) {
@@ -1256,6 +1258,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        if (python_) python_->tickTimers(); // a script's due timers (what they change shows through frameKey)
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())

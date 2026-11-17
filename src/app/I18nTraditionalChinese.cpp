@@ -5434,6 +5434,16 @@ constexpr Entry kTraditionalChinese[] = {
      "指令碼"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "此資料夾中的 .py 檔案會列在檔案 > 指令碼下。安裝到其 site-packages 資料夾的套件可以匯入。"},
+    {"Run at start-up",
+     "啟動時執行"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "勾選的指令碼會在每次啟動 SculptForge 時執行（需開啟 Python），讓它們加入的按鈕和面板都在。指令碼有變更後，要再勾選一次才會執行。"},
+    {"Trust this version",
+     "信任此版本"},
+    {"changed, didn't run",
+     "已變更，未執行"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "此指令碼在你選擇啟動時執行之後已變更，所以沒有執行。請檢查變更內容；如果你信任它，之後每次啟動都會執行（現在不會執行）。"},
 };
 
 } // namespace

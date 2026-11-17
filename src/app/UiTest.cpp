@@ -257,6 +257,7 @@
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
+//   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
@@ -1872,7 +1873,7 @@ enum class StepVerb { None,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
-    GeneratorStub, Env, Run, RunFails, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
+    GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
@@ -1948,7 +1949,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"generator_stub", StepVerb::GeneratorStub},
         {"env", StepVerb::Env},
         {"run", StepVerb::Run},
-        {"run_fails", StepVerb::RunFails},
+        {"run_fails", StepVerb::RunFails}, {"python_startup", StepVerb::PythonStartup},
         {"first_run_language", StepVerb::FirstRunLanguage},
         {"support_card", StepVerb::SupportCard},
         {"member_card", StepVerb::MemberCard},
@@ -3575,6 +3576,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::PythonStartup:
+        run([this] { app_.python().runStartupScripts(true); });
+        break;
     case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused ($SCRIPT_DIR as for run)
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
