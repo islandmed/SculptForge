@@ -13,7 +13,8 @@
 //                            failing cell is listed by NAME (the script's "mode x path") with its picture in --ui-out, and
 //                            the script goes on, so every empty cell of a run is named. splats=1: the loaded splats alone (the
 //                            box is theirs); when they carry view-dependent colour (SH degree >= 1) it must show: drawn again
-//                            with their plain colour only, at least 10% of the box changes.
+//                            with their plain colour only, at least 10% of the box changes; drawn with that colour per
+//                            quad corner (not the once-a-splat pre-pass), no channel differs by more than 1/255.
 // Value: render_coverage (the last cell's share, 0-1).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -103,6 +104,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         }
         // The same view with the splats' plain colour only: the share of the box that changes.
         double viewColorShare = -1.0;
+        int prepassDiff = -1; // the largest channel difference, pre-pass vs per corner (0-255)
         if (ok && splats && app.doc_.splats.shDegree > 0) {
             Image plain;
             plain.width = plain.height = size;
@@ -117,6 +119,15 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
                         break;
                     }
             viewColorShare = box.boxW * box.boxH > 0 ? double(changed) / double(box.boxW * box.boxH) : 0.0;
+            // The same view with that colour per quad corner (the old path): the pre-pass's once a splat must match it.
+            Image corner;
+            corner.width = corner.height = size;
+            s.splatViewColor = true;
+            s.splatShPerVertex = true;
+            ok = ok && app.renderer_.renderToImage(cam, size, size, s, corner.rgba, err);
+            for (size_t p = 0; ok && p < img.rgba.size(); ++p)
+                prepassDiff = std::max(prepassDiff, std::abs(int(img.rgba[p]) - int(corner.rgba[p])));
+            if (!app.renderer_.splatColorPrepass()) prepassDiff = 256; // (both drawn per corner: nothing compared)
         }
         app.renderSettings_ = saved;
         app.splatViewColorForced_ = forced;
@@ -140,11 +151,17 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
                 std::snprintf(buf, sizeof buf, "the view-dependent colour is not drawn: %.1f%% of the box changes without it, wanted 10%%",
                               viewColorShare * 100.0);
                 why = buf;
+            } else if (prepassDiff > 255) {
+                why = "the view colour pre-pass did not run (drawn per corner)";
+            } else if (prepassDiff > 1) {
+                std::snprintf(buf, sizeof buf, "the view colour pre-pass differs from the per-corner colour by %d/255, wanted <= 1",
+                              prepassDiff);
+                why = buf;
             }
         }
         if (ok) lastRenderCoverage_ = r.coverage;
         std::printf("render_cell %-40s coverage %5.1f%%, %d colours", name.c_str(), r.coverage * 100.0, r.colors);
-        if (viewColorShare >= 0.0) std::printf(", view colour %.1f%%", viewColorShare * 100.0);
+        if (viewColorShare >= 0.0) std::printf(", view colour %.1f%%, pre-pass diff %d", viewColorShare * 100.0, prepassDiff);
         std::printf("%s\n", why.empty() ? "" : "  FAIL");
         if (!why.empty()) {
             std::string path;

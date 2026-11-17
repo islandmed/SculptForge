@@ -16,5 +16,6 @@ testers:
 ---
 SH rotation: per band, the exact matrix by least squares on 32 directions in the 3DGS basis (core/Splats.cpp
 ShRotation; the add-on's splats.rotated_sh is the same). Renderer: bands 1-3 as half floats in a second texture buffer
-(96 B a splat at SH 3), evaluated in the splat vertex shader in the cloud's own frame. Floor tier: off and not uploaded
-(1.5M splats SH 3 on the floor bench machine: frame p50 20 -> 42 ms).
+(96 B a splat at SH 3), evaluated once a splat in the cloud's own frame by a fragment pre-pass into an RGBA32F texture
+when the eye moves (feat/splat-sh-prepass; per quad corner before: 1.5M splats SH 3, orbit p95 75 -> 49 ms, p99 90 ->
+53 ms). Floor tier: off and not uploaded (SH 3 still p50 17.6 -> 31 ms there with the pre-pass).

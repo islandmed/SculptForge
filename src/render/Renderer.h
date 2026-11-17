@@ -46,6 +46,7 @@ struct RenderSettings {
     bool showSplats = true;
     float splatOpacity = 1.0f; // global fade for using a capture as reference
     bool splatViewColor = true; // splats' view-dependent colour (SH degree >= 1); else their plain colour
+    bool splatShPerVertex = false; // tests only: that colour per quad corner, not by the once-a-splat pre-pass
     bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
@@ -198,6 +199,8 @@ public:
     // Re-uploads the splats when `version` (or `viewColor`) differs from the last upload. `viewColor` false: their SH
     // bands 1-3 stay on the CPU (no GPU memory) and they draw in their plain colour.
     void syncSplats(const SplatCloud& splats, uint64_t version, bool viewColor);
+    // The splats' view colour comes from the once-a-splat pre-pass (false: none needed, or per quad corner).
+    bool splatColorPrepass() const { return splatColorWidth_ > 0; }
     using Viewport = RenderViewport;
     void draw(const Camera& camera, int fbWidth, int fbHeight, const RenderSettings& settings, const Viewport& viewport = {});
     // draw() for the app's window (whose framebuffer has no multisampling): through an offscreen target with
@@ -370,7 +373,9 @@ public:
 private:
     void drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
                        const RenderSettings& settings);
-    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity, bool viewColor);
+    // `perVertexSh`: evaluate the view colour per quad corner (tests: compares with the pre-pass's, once a splat).
+    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity, bool viewColor,
+                    bool perVertexSh);
 
     GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
     // Splats: per-splat data in a texture buffer, drawn as instanced quads in back-to-front order.
@@ -380,6 +385,12 @@ private:
     int splatShDegree_ = 0, splatShTexels_ = 0;
     bool splatShWanted_ = true;
     glm::mat3 splatShFrame_{1.0f};
+    // The view colour pre-pass: one RGBA32F texel a splat (rows of splatColorWidth_; 0: none, evaluated per corner),
+    // for the eye it was evaluated from.
+    GLuint splatColorProgram_ = 0, splatColorFbo_ = 0, splatColorTexture_ = 0;
+    int splatColorWidth_ = 0;
+    bool splatColorFresh_ = false;
+    glm::vec3 splatColorEye_{0.0f};
     uint64_t splatVersion_ = ~uint64_t(0);
     std::vector<glm::vec3> splatCenters_;
     std::vector<uint32_t> splatSorted_;
