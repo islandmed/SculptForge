@@ -175,6 +175,7 @@ add_library(sculptforge_core STATIC
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp
+  src/core/MicroTiles.cpp
   src/core/FocusDetail.cpp
   src/core/FocusBench.cpp
   src/core/MultiresCommands.cpp

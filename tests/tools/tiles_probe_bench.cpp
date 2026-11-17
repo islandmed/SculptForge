@@ -25,7 +25,12 @@
 // mega-poly spike's wall, over every base triangle). Bars: RSS < 4 GB with 1B-equivalent spacing in brushed areas (depth
 // >= 2 on this root), re-resolve + upload of one dab < 16 ms, walk < 5 ms. The first bar missed names M2's priority.
 //
-//   sf_tiles_probe_bench [baseTriangles=195313] [level=5] [strokes=30] [zooms=1,4,16,64] [--px-rule=1.0]
+//   sf_tiles_probe_bench [baseTriangles=195313] [level=5] [strokes=30] [zooms=1,4,16,64] [--px-rule=1.0] [--cover=D]
+//
+// --cover=D (the critique's "live document growth" wall, 11-16): after the passes, EVERY tile of depth D over the whole
+// head is allocated (a finished pore pass everywhere), and the store's MB and RSS are printed: tiles win by sparsity,
+// not compression (fully covered they cost ~1.2x a dense grid of the same spacing), so this is the number a tile
+// budget (park / page out what the view doesn't show) has to be designed against.
 #include "core/BVH.h"
 #include "core/Benchmark.h"
 #include "core/Micro.h"
@@ -172,7 +177,7 @@ struct Resolver {
             f = f.child(q), path = path << 2 | uint32_t(q);
             if (d == 0) continue; // tree depth 1 = the root's resolution: no tile there
             const Tile* t = store.find(tileKey(tri, d, path));
-            if (!t) break; // nothing finer under here
+            if (!t) continue; // no tile at this depth = a zero delta (dabs make tiles at their own depth only)
             const glm::vec3 r2 = w - f.o;
             const float det2 = f.u.y * f.v.z - f.v.y * f.u.z;
             const float a2 = std::clamp((r2.y * f.v.z - f.v.y * r2.z) / det2, 0.0f, 1.0f), b2 = std::clamp((f.u.y * r2.z - r2.y * f.u.z) / det2, 0.0f, 1.0f);
@@ -586,9 +591,11 @@ int main(int argc, char** argv) {
     int level = 5, strokes = 30;
     std::vector<float> zooms = {1.0f, 4.0f, 16.0f, 64.0f};
     float pxRule = 1.0f;
+    int cover = 0;
     int pos = 0;
     for (int i = 1; i < argc; ++i) {
         if (std::strncmp(argv[i], "--px-rule=", 10) == 0) pxRule = float(std::atof(argv[i] + 10));
+        else if (std::strncmp(argv[i], "--cover=", 8) == 0) cover = std::atoi(argv[i] + 8);
         else if (pos == 0) baseTriangles = size_t(std::atol(argv[i])), ++pos;
         else if (pos == 1) level = std::atoi(argv[i]), ++pos;
         else if (pos == 2) strokes = std::atoi(argv[i]), ++pos;
@@ -740,6 +747,24 @@ int main(int argc, char** argv) {
         }
         std::printf("\nUndo 10 strokes: %.1f ms, %zu tiles freed, %zu alive, tile pool MB %.1f (slots stay for reuse), undo ring MB %.1f, RSS %.0f MB (peak %.0f).\n", ms(t1), freed, p.store.alive(),
                     double(p.store.bytes()) / 1e6, double(ringBytes) / 1e6, double(residentBytes()) / 1e6, double(peakResidentBytes()) / 1e6);
+    }
+    if (cover > 0) { // the whole head refined to `cover`: what a finished detail pass everywhere costs to hold
+        const auto t2 = Clock::now();
+        const size_t before = p.store.alive();
+        const uint32_t tilesPerTri = 1u << (2 * (cover + 1));
+        p.store.pool.reserve(p.store.pool.size() + size_t(mm.baseTriangles) * tilesPerTri); // (one allocation: the peak is the store, not a doubling)
+        p.store.slotOf.reserve(p.store.slotOf.size() + size_t(mm.baseTriangles) * tilesPerTri);
+        for (uint32_t tri = 0; tri < mm.baseTriangles; ++tri)
+            for (uint32_t path = 0; path < tilesPerTri; ++path) {
+                bool born = false;
+                p.store.obtain(tileKey(tri, cover, path), born);
+            }
+        const size_t tiles = p.store.alive();
+        const double poolMB = double(p.store.pool.size() * sizeof(Tile)) / 1e6, indexMB = double(p.store.slotOf.size() * 52) / 1e6;
+        std::printf("\nFull coverage at depth %d (every tile of the head, %u per base triangle): %zu tiles (+%zu) in %.1f s; pool %.0f MB + index ~%.0f MB; RSS %.0f MB (peak %.0f); a dense grid of that spacing (%.1fB micro triangles) would be %.0f MB: bar < 4000 MB: %s.\n",
+                    cover, tilesPerTri, tiles, tiles - before, ms(t2) / 1000.0, poolMB, indexMB, double(residentBytes()) / 1e6, double(peakResidentBytes()) / 1e6,
+                    double(mm.microTriangles()) * std::pow(4.0, cover) / 1e9, double(mm.microTriangles()) * std::pow(4.0, cover) * 0.5 * 2 / 1e6,
+                    peakResidentBytes() < size_t(4000) * 1000000 ? "ok" : "MISSED");
     }
     // 1B-equivalent spacing: the finest brushed cell as a uniform grid over the whole head.
     int deepest = 0;

@@ -44,6 +44,8 @@
 #include <mutex>
 #include <span>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace sf {
@@ -54,6 +56,7 @@ class MicroHistory;
 class FocusDetail;
 struct Document;
 struct RayHit;
+struct MicroTiles;
 enum class BrushType;
 
 struct MicroMesh {
@@ -124,6 +127,9 @@ struct MicroMesh {
     // Focus Detail (core/FocusDetail.h, prototype): set when the level streams from a detail file. Tiles outside
     // the focus hold a coarse grid; brushes and undo make the tiles they change full first (ensureFull).
     std::shared_ptr<FocusDetail> focus;
+    // Adaptive Detail tiles (core/MicroTiles.h, prototype, SF_MICRO_TILES=1): detail finer than this level's grid,
+    // only where a brush put it. Null = none. Owned by this level (mutableMicro copies it with the level).
+    std::shared_ptr<MicroTiles> tiles;
 
     size_t microTriangles() const { return size_t(baseTriangles) * n * n; }
     size_t microVertices() const; // unique grid points (shared edges and corners counted once)
@@ -324,9 +330,10 @@ public:
     void dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
              float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
              const BrushAlpha* alpha = nullptr, const std::function<float(const glm::vec3&)>& texture = {},
-             const glm::vec3& strokeDir = glm::vec3(0.0f));
+             const glm::vec3& strokeDir = glm::vec3(0.0f), float pxPerUnit = 0.0f);
     // (texture: a brush recipe's surface pattern, 0..1 at a surface point, times the tip; #120. strokeDir: where the
-    // stroke is heading, for Sharp Crease's pull across it; 0 = none)
+    // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
+    // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);
@@ -348,8 +355,21 @@ public:
     // (microTileHash), in the order of the undo step's tiles.
     bool hashTiles = false;
     std::vector<uint64_t> tilePre, tilePost;
+    // Adaptive Detail tiles (core/MicroTiles.h): the depth the last dab wrote at (0 = the root grid) and the tiles it wrote.
+    int lastDepth = 0;
+    size_t lastTiles = 0;
 
 private:
+    // Adaptive Detail tiles of this stroke: those born in it (undo frees them) and the deltas of those it changed
+    // that existed before (first touch), by key.
+    std::vector<uint64_t> bornKeys_;
+    std::unordered_set<uint64_t> bornSet_; // (the same keys: a later dab of the stroke finds them, not an old tile)
+    std::unordered_map<uint64_t, std::vector<int16_t>> oldTiles_;
+    // The dab's write at `depth` > 0 (true: written to tiles, the root untouched; false: not a tile brush, write the root).
+    void endTiles(MicroUndo& u, const MicroTiles& tiles);
+    bool dabTiles(Mesh& m, BrushType type, const glm::vec3& center, float r, float strength, bool invert, float focal,
+                  const glm::vec3& areaNormal, const glm::vec3& areaCenter, const glm::vec3& right, const glm::vec3& up,
+                  const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth);
     std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
     std::vector<int16_t> snap_;           // Pinch, Crease, Sharp Crease: the grids of this dab's triangles as it found them
     std::vector<uint32_t> snapOf_;        // per base triangle: its grid in snap_ + 1 (0 = none)
@@ -403,6 +423,13 @@ struct MicroUndo {
     std::vector<int16_t> firsts;     // journal: each tile's first change
     std::vector<uint8_t> mask;
     bool maskAdded = false; // the step allocated the mask: undo frees it again (redo brings it back)
+    // Adaptive Detail tiles (core/MicroTiles.h) the stroke changed: each tile's change as a journal (as above, 153
+    // points), `tileBorn`: 1 = the tile did not exist before the stroke (undo frees it, redo makes it again).
+    std::vector<uint64_t> tileKeys;
+    std::vector<uint8_t> tileBorn;
+    std::vector<int16_t> tileFirsts;
+    std::vector<uint8_t> tilePacked;
+    bool tilesApplied = true; // (as `applied`, for the tiles' journal)
     bool swapWhole = false;
     std::shared_ptr<MicroMesh> whole;
     void swapWith(Mesh& m);

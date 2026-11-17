@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/MicroTiles.h"
 #include "core/AtomicRef.h"
 #include "core/FocusDetail.h"
 
@@ -54,7 +55,7 @@ size_t MicroMesh::microVertices() const {
 
 size_t MicroMesh::bytes() const {
     return disp.capacity() * sizeof(int16_t) + mask.capacity() + triRange.capacity() * sizeof(uint16_t) +
-           edgeNeighbor.capacity() * sizeof(uint32_t) + dirtyBits.capacity() * sizeof(uint64_t);
+           edgeNeighbor.capacity() * sizeof(uint32_t) + dirtyBits.capacity() * sizeof(uint64_t) + (tiles ? tiles->bytes() : 0);
 }
 
 void MicroMesh::clearDirty() {
@@ -78,6 +79,9 @@ int MicroMesh::widen(float need) {
     rescaled = true;
     reach.all = true;
     if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
+    if (tiles) // Adaptive Detail tiles hold deltas in the same units
+        for (MicroTiles::Tile& t : tiles->pool)
+            for (int16_t& v : t.delta) v = int16_t(int(v) / div);
     ++revision;
     return div;
 }
@@ -203,6 +207,7 @@ MicroMesh& mutableMicro(Mesh& m) {
         m.micro = std::make_shared<MicroMesh>(*kept);
         kept->focus.reset(); // and the stream goes on with this Mesh
         m.micro->ink = std::move(kept->ink); // (so does the stroke history: its undo steps are this Mesh's)
+        if (m.micro->tiles) m.micro->tiles = std::make_shared<MicroTiles>(*m.micro->tiles); // (the copy's own tiles)
     }
     return *m.micro;
 }
@@ -1072,6 +1077,7 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
+    if (!tileKeys.empty() && !mm.tiles) mm.tiles = std::make_shared<MicroTiles>(), mm.tiles->resize(mm.baseTriangles);
     if (mm.focus) mm.focus->ensureFull(mm, tris, true); // (undo writes full tiles only)
     const size_t S = samples;
     // Values kept in another step size (the range grew since): convert to the current one.
@@ -1152,13 +1158,53 @@ void MicroUndo::swapWith(Mesh& m) {
         }, 64);
         for (uint32_t t : tris) mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
     }
+    // Adaptive Detail tiles (core/MicroTiles.h): undo subtracts each tile's change and frees the tiles the stroke
+    // made; redo makes them again (zero) and adds the change back. Journaled as the root tiles are.
+    if (!tileKeys.empty() && mm.tiles) {
+        MicroTiles& tiles = *mm.tiles;
+        const bool undo = tilesApplied;
+        std::vector<int16_t> change(tileKeys.size() * MicroTiles::kSamples, 0);
+        if (microUnpackTiles(tilePacked.data(), tilePacked.size(), tileKeys.size(), MicroTiles::kSamples, change.data())) {
+            for (size_t k = 0; k < tileKeys.size(); ++k) {
+                int16_t* c = change.data() + k * MicroTiles::kSamples;
+                uint32_t p = 0;
+                for (uint32_t j = 0; j <= MicroTiles::kN; ++j)
+                    for (uint32_t i = 0; i + j <= MicroTiles::kN; ++i, ++p) {
+                        int v;
+                        if (p == 0) v = tileFirsts[k];
+                        else if (i > 0) v = int(c[p - 1]) + int(c[p]);
+                        else v = int(c[MicroTiles::index(0, j - 1)]) + int(c[p]);
+                        c[p] = int16_t(std::clamp(v, -32767, 32767));
+                    }
+            }
+            const float ratio = step / mm.step;
+            const int sgn = undo ? -1 : 1;
+            for (size_t k = 0; k < tileKeys.size(); ++k) {
+                const uint64_t key = tileKeys[k];
+                if (undo && tileBorn[k]) { // born in the stroke: gone again
+                    tiles.release(key);
+                    mm.markDirty(MicroTiles::keyTri(key));
+                    continue;
+                }
+                bool born = false;
+                MicroTiles::Tile* t = undo ? tiles.find(key) : tiles.obtain(key, born);
+                if (!t) continue;
+                for (uint32_t p = 0; p < MicroTiles::kSamples; ++p) {
+                    const float c = ratio == 1.0f ? float(change[k * MicroTiles::kSamples + p]) : float(change[k * MicroTiles::kSamples + p]) * ratio;
+                    t->delta[p] = int16_t(std::clamp(int(t->delta[p]) + sgn * int(std::lround(c)), -32767, 32767));
+                }
+                mm.markDirty(MicroTiles::keyTri(key));
+            }
+            tilesApplied = !tilesApplied;
+        }
+    }
     for (uint32_t t : tris) mm.markDirty(t);
     ++mm.revision;
 }
 
 size_t MicroUndo::bytes() const {
     return tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
-           mask.size() + (swapWhole && whole ? whole->bytes() : 0);
+           mask.size() + tileKeys.size() * (sizeof(uint64_t) + 1 + sizeof(int16_t)) + tilePacked.size() + (swapWhole && whole ? whole->bytes() : 0);
 }
 
 // ---------------------------------------------------------------------------
