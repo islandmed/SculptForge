@@ -447,6 +447,10 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     draftLeaves_.clear();
     dropLazy(); // (a stroke that never ended)
     pending_.clear();
+    planeHistory_.clear();
+    dabSerial_ = dabNow_ = 0;
+    sampleStride_ = 0;
+    sampleNormals_.clear();
     lockedPlanes_.clear();
     lastRegion_ = 0;
     lastRegionRadius_ = 0.0f;
@@ -800,7 +804,7 @@ void Sculptor::cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts) {
 }
 
 void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence,
-                           const float* given) {
+                           const float* given, bool absolute) {
     const size_t n = verts.size();
     const bool cage = mesh.micro && (mesh.micro->hasMask() || mesh.hasMask()) && mesh.micro->baseTriangles == mesh.triangles.size();
     if (cage) cageFreeFor(mesh, verts);
@@ -840,8 +844,9 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
                 rec.indices[r] = v;
                 rec.values[r++] = target[v];
             }
-            const glm::vec3 dk = d[i] * k;
-            mesh.positions[v] += dk;
+            const glm::vec3 dk = absolute ? d[i] - mesh.positions[v] : d[i] * k;
+            if (absolute) mesh.positions[v] = d[i];
+            else mesh.positions[v] += dk;
             if (layered) target[v] += dk / weight;
         }
     }, kBlock);
@@ -996,6 +1001,7 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    dabNow_ = dabSerial_++;
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
     if (type == BrushType::Cloth) { // ClothBrush.cpp (no remeshing: the simulation keeps its own topology)
@@ -1033,7 +1039,9 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
     lastFusable_ = adaptiveDabs && isPlaneKernelBrush(type) && type != BrushType::Trim && !(p.alpha && !p.alpha->empty()) && !p.stencil.active() &&
                    !p.frontFacesOnly && !p.connectedOnly && !p.viewFalloff && !dyntopo.enabled;
     if (batching_ && batchable(mesh, type, p, sym)) { // a fused batch's (SculptBatch.cpp)
-        pending_.push_back({type, p, sym});
+        if (!pending_.empty() && (pending_.size() >= 64 || !batchCompatible(pending_.front(), type, p, sym)))
+            flushBatch(mesh, bvh); // (a new batch of its own)
+        pending_.push_back({type, p, sym, dabNow_});
         pendingMesh_ = &mesh;
         pendingBvh_ = &bvh;
         return;
@@ -1202,6 +1210,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.focal = p.focal;
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
+    if (lastFusable_) recordPlane(plane, dabNow_); // (a later dab picked before this one moved the surface takes it, SculptBatch.cpp)
 
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
@@ -1593,6 +1602,10 @@ void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_p
     const auto leaves = bvh.queriedLeaves(); // (the query that found verts_)
     if (adaptiveDab_) { // the normals are done; the exact ones later (catchUpNormals, flushDraft), the GPU's now
         adaptiveDab_ = false;
+        if (adaptiveDabs) { // (the fused dabs' sample: the normals this dab left, as the stroke's later dabs read them)
+            if (sampleNormals_.empty()) startSampleNormals(mesh, verts_.size());
+            else refreshSampleNormals(mesh, verts_);
+        }
         lazyMesh_ = &mesh;
         lazyBvh_ = &bvh;
         addLazyLeaves(bvh, leaves);
@@ -2120,6 +2133,9 @@ void Sculptor::grabFinish(Mesh& mesh, BVH& bvh) {
 // Puts every vertex the current stroke moved back to its stroke-start position.
 void Sculptor::restoreStroke(Mesh& mesh, BVH& bvh) {
     if (!active_) return;
+    planeHistory_.clear();
+    sampleStride_ = 0; // (the surface is the stroke's start again: the sample's normals are worked out afresh)
+    sampleNormals_.clear();
     if (micro_.active() && microMesh_ == &mesh) {
         micro_.restore(mesh);
         return;

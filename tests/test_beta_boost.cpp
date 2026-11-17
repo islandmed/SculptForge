@@ -67,6 +67,7 @@ StrokeResult strokeOn(const Mesh& head, BrushType type, float radius, bool adapt
         if (g_record) g_record->push_back(p.center);
         if (g_replay) p.center = (*g_replay)[size_t(i)];
         p.viewDir = p.pickDir = glm::vec3(0, 0, -1);
+        p.pickedAfter = d.sculptor.dabsOnSurface(); // (as the app picks: on the surface the waiting dabs have yet to move)
         p.radius = radius;
         p.strength = strength;
         p.strokeDelta = glm::vec3(0.15f * radius, 0, 0);

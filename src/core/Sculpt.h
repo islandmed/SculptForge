@@ -26,6 +26,8 @@
 
 namespace sf {
 
+struct PlaneKernel; // (core/SculptKernel.h)
+
 struct BrushAlpha;
 struct VectorDisplacement;
 
@@ -94,8 +96,11 @@ struct DabParams {
     // many-dab alpha brushes (Dots, Spray), which keep the sphere: a dab there is per-frame hot.
     bool stampFootprint = false;
     // The direction of the ray that picked `center` (zero: viewDir), so a fused batch (Sculptor::beginBatch) can
-    // find where that ray meets the surface the batch's earlier dabs left.
+    // find where that ray meets the surface the dabs since the pick left. `pickedAfter`: how many of the stroke's
+    // dabs the surface had taken when it was picked (Sculptor::dabsOnSurface); the dabs from there on moved the
+    // surface under it. SIZE_MAX: picked on the surface as it is when the dab is placed.
     glm::vec3 pickDir{0.0f};
+    size_t pickedAfter = SIZE_MAX;
     glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
     // The Stencil (#155, core/Stencil.h): each vertex also takes the image at the place it shows on screen.
     StencilView stencil;
@@ -316,14 +321,20 @@ public:
     // the plane brushes core/SculptKernel.h lists, no alpha, mask or falloff options) wait and are then placed
     // in one pass over the vertices they reach: each vertex goes through the dabs in order, moved by exactly
     // the offset each gives where it is by then, so it ends where the dab-by-dab stroke leaves it. Each dab's
-    // area plane comes from an even sample of the region, moved along dab by dab; each dab's centre, picked on
-    // the surface as the batch began, is moved along by the dabs before it. The normals, the BVH and the GPU's
-    // copy follow once a batch instead of once a dab. Any other dab places the waiting ones first.
+    // area plane comes from the stroke's sample of the region (sampleStride_), moved along dab by dab; each dab's
+    // centre, picked on the surface before the dabs since moved it (pickedAfter), is moved along by them. The
+    // result does not depend on how the dabs were split into batches (a recorded list comes out bit for bit the
+    // same placed one by one, in batches of 8 or in one: tests/test_fused_invariance.cpp), except where a mask or
+    // hidden faces are in reach (such a batch is placed dab by dab). The normals, the BVH and the GPU's copy
+    // follow once a batch instead of once a dab. Any other dab places the waiting ones first.
     void beginBatch() {
         batching_ = true;
         lastLazyLeaves_.clear();
     }
     void endBatch(Mesh& mesh, BVH& bvh);
+    // How many of the stroke's dabs the surface has taken so far (those waiting in a batch haven't moved it yet): a dab
+    // picked on the surface now has this as its DabParams::pickedAfter.
+    size_t dabsOnSurface() const { return pending_.empty() ? dabSerial_ : pending_.front().serial; }
     size_t batchWaiting() const { return pending_.size(); }
     bool draftActive() const { return draft_; }
     bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
@@ -426,8 +437,10 @@ private:
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
+    // given: each vertex's influence (0 = not moved, else 1 with `absolute`); absolute: `d` holds the places the vertices
+    // go to, not their moves (a fused batch's: the sum of the moves rounds, the place doesn't).
     void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true,
-                     const float* given = nullptr); // given: each vertex's influence (0 = not moved)
+                     const float* given = nullptr, bool absolute = false);
     // A micro level's mask as the base cage sees it. Moving a base vertex shifts the grid points of the triangles
     // around it (their corners) and, through the corners' normals, those of the ring beyond; so a base vertex is as
     // free as the freest grid point within two rings leaves it: 1 - the largest mask in the triangles touching it or
@@ -513,7 +526,21 @@ private:
         BrushType type;
         DabParams p;
         Symmetry sym;
+        size_t serial; // (its number in the stroke)
     };
+    // The planes of the stroke's last fused-capable dabs, in order, with the dab's number: a dab picked on the surface
+    // before they moved it takes them in turn (DabParams::pickedAfter), whichever batch they were placed in.
+    struct PlaneRecord {
+        size_t serial = 0;
+        BrushType type = BrushType::Standard;
+        glm::vec3 center{0.0f}, viewDir{0.0f}, areaNormal{0.0f}, areaCenter{0.0f}, strokeDir{0.0f};
+        float r = 0.0f, s = 0.0f, sign = 1.0f, focal = 0.0f;
+        bool invert = false, viewFalloff = false;
+    };
+    friend PlaneKernel kernelOfRecord(const PlaneRecord& r);
+    std::vector<PlaneRecord> planeHistory_;
+    size_t dabSerial_ = 0, dabNow_ = 0; // (dabs given to the stroke; the number of the one being placed)
+    void recordPlane(const PlaneKernel& k, size_t serial);
     bool batching_ = false;
     std::vector<PendingDab> pending_;
     Mesh* pendingMesh_ = nullptr;
@@ -523,6 +550,16 @@ private:
     float lastRegionRadius_ = 0.0f;
     bool batchable(const Mesh& mesh, BrushType type, const DabParams& p, const Symmetry& sym) const;
     void flushBatch(Mesh& mesh, BVH& bvh);
+    static bool batchCompatible(const PendingDab& first, BrushType type, const DabParams& p, const Symmetry& sym);
+    // The area planes of a stroke's fused dabs come from a fixed sample of the mesh: the vertices whose index is a
+    // multiple of sampleStride_, with the normals the stroke's dabs left them (sampleNormals_[v / sampleStride_],
+    // carried dab by dab, never the exact ones the catch-up works out when the pen rests), so what a dab's plane is
+    // doesn't depend on which batch it was placed in (SculptBatch.cpp). Kept only with adaptiveDabs.
+    size_t sampleStride_ = 0;
+    std::vector<glm::vec3> sampleNormals_;
+    static constexpr size_t kMaxSampleSlots = 2'000'000; // (24 MB: the stride is at least vertices / this)
+    void startSampleNormals(const Mesh& mesh, size_t regionVertices);
+    void refreshSampleNormals(const Mesh& mesh, std::span<const uint32_t> verts);
     std::vector<float> givenInfluence_;
     void flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> leaves);
     std::vector<glm::vec3> scratch_;

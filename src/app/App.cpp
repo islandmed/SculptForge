@@ -3000,6 +3000,7 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     p.viewDir = cam.forward();
     p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
     p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
+    p.pickedAfter = doc_.sculptor.dabsOnSurface(); // (the dabs waiting in a fused batch haven't moved this surface yet)
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
     // Smooth keeps its own Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
