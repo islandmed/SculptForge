@@ -163,8 +163,7 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 SculptForge is free for any number of artists, and nothing in the app is ever paywalled. Studio: personalized quote.
 Use **Get a quote** on the [Studios page](https://sculptforge.app/studios.html) with your team size, platforms and pipeline needs.
 
-The first 5 studios become Founding Studios at a flat $150 a month, locked for as long as they stay subscribed. Each
-artist gets everything in Member, and the studio gets:
+Each artist gets everything in Member, and the studio gets:
 
 - **Its own build** with its brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths and logo built in.
 - **Isolation:** a private release channel, and no outside connections by default (see

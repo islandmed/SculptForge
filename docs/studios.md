@@ -134,8 +134,7 @@ SculptForge is GPL-3.0-or-later. In practice:
 
 ## Studio builds and offline deployment
 
-A Studio membership is a personalized quote for the whole studio, any number of artists (Founding Studio: a flat $150
-for the first 5 studios). It includes:
+A Studio membership is a personalized quote for the whole studio, any number of artists. It includes:
 
 - a custom build with your own assets and defaults baked in
 - a private release channel
