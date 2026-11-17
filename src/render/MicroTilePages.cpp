@@ -153,8 +153,9 @@ void MicroTilePages::sync(const Mesh& mesh, MicroRenderer& r, const std::vector<
                         std::sort(victims.begin(), victims.end(), [&](uint32_t a, uint32_t b) { return lastUse_[a] > lastUse_[b]; });
                         listed = true;
                     }
-                    if (victims.empty()) { // (the pool is full of pages drawn this frame: the rest wait)
+                    if (victims.empty()) { // (the pool is full of pages drawn this frame: the rest wait for the view to change)
                         starved_ += want.size() - k;
+                        capped_ = false;     // (no more frames for them: the budget holds them back, not the upload)
                         break;
                     }
                     freePage(owner_[victims.back()]);
