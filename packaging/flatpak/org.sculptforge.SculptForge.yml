@@ -103,11 +103,11 @@ modules:
         dest: _deps-src/plog
       - type: archive
         only-arches: [x86_64]
-        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
-        sha256: e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d
+        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-x86_64-linux-c-api.tar.xz
+        sha256: 6e41f86b5d3bc2bf4517d54795d6bea5b28a61ed30529000896a82c6d94618f3
         dest: _deps-src/wasmtime
       - type: archive
         only-arches: [aarch64]
-        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
-        sha256: 1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84
+        url: https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-aarch64-linux-c-api.tar.xz
+        sha256: 963eb8d4e9f3893fab107637cd884158e3a779c41b52aa42abc254318d1ed9dc
         dest: _deps-src/wasmtime

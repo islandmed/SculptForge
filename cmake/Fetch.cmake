@@ -30,17 +30,17 @@ set(SF_PIN_pybind11 https://github.com/pybind/pybind11/archive/refs/tags/v3.0.4.
     74b6a2c2b4573a400cafb6ecbf60c98df300cd3d0041296b913d02b2cbbb2676)
 
 # wasmtime's C API, prebuilt (cmake/Wasmtime.cmake): sandboxed plugins. Update every release (docs/releasing.md).
-set(SF_WASMTIME_VERSION 50.0.1) # also in each URL below
-set(SF_PIN_wasmtime_linux_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-linux-c-api.tar.xz
-    e2c0c26e1aef52f82f0b9918ad6f34cc30f4b557aee3e261cb127a9462be8f4d)
-set(SF_PIN_wasmtime_linux_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-linux-c-api.tar.xz
-    1a36140a016a9cc098f02a37bb0cc7be6451032861ba70049127928d2f31ef84)
-set(SF_PIN_wasmtime_macos_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-macos-c-api.tar.xz
-    b6d436cba5c0964785c6ff7c9b5a743131555a0227b4f742185c4fb520c502c5)
-set(SF_PIN_wasmtime_macos_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-aarch64-macos-c-api.tar.xz
-    a49327ca596fae51cd92e230265132112bb7896c5a24e4d58cd05b56612e26bb)
-set(SF_PIN_wasmtime_windows_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.1/wasmtime-v50.0.1-x86_64-windows-c-api.zip
-    8b461d9dc12b076d0414b1023433bbb2dc08d3b1c0f0a156853ede35f0147802)
+set(SF_WASMTIME_VERSION 50.0.2) # also in each URL below
+set(SF_PIN_wasmtime_linux_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-x86_64-linux-c-api.tar.xz
+    6e41f86b5d3bc2bf4517d54795d6bea5b28a61ed30529000896a82c6d94618f3)
+set(SF_PIN_wasmtime_linux_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-aarch64-linux-c-api.tar.xz
+    963eb8d4e9f3893fab107637cd884158e3a779c41b52aa42abc254318d1ed9dc)
+set(SF_PIN_wasmtime_macos_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-x86_64-macos-c-api.tar.xz
+    961ae0a09d0e910c840dcf4548025c7a30538d2ff7e2161fd2c7f843e487de6d)
+set(SF_PIN_wasmtime_macos_aarch64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-aarch64-macos-c-api.tar.xz
+    6a1a303cd6c3b5e8023e8d481b893b21a79d1cfba7c748bb50d3ffd09f167c4e)
+set(SF_PIN_wasmtime_windows_x86_64 https://github.com/bytecodealliance/wasmtime/releases/download/v50.0.2/wasmtime-v50.0.2-x86_64-windows-c-api.zip
+    6fae50cdf9ff3c9796fba89612c5e7439b49a27ffdd53c93c5de085555a029c6)
 
 function(sf_fetch_declare name)
   if(NOT DEFINED SF_PIN_${name})
