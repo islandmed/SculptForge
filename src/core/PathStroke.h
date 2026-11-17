@@ -26,6 +26,7 @@ struct PathStroke {
     bool invert = false;
     bool curve = true;     // pass a smooth Catmull-Rom curve through the points (else straight segments)
     float spacing = -1.0f; // dab spacing as a fraction of the radius; < 0: the recipe's (0.15 for built-ins)
+    float alphaAngle = 0.0f; // the alpha turned by this much (radians, counter-clockwise on screen; Alpha > Angle)
     uint32_t seed = 1;     // recipe jitter is deterministic per seed
     Symmetry symmetry{false, false, false};
 };

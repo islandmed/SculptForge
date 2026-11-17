@@ -507,6 +507,8 @@ constexpr Entry kJapanese[] = {
      "カスタムブラシの1つです。"},
     {"Remove from shelf",
      "シェルフから削除"},
+    {"Regenerate thumbnail",
+     "サムネイルを再生成"},
     {"Tile size",
      "タイルサイズ"},
     {"Small",

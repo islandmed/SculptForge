@@ -623,12 +623,12 @@ void PickerUi::select(App& app, const BrushItem& item) {
 ImTextureID PickerUi::thumbnail(App& app, const BrushItem& item) {
     switch (item.kind) {
     case BrushItem::Kind::Type:
-        return app.thumbs_.brush(item.index);
+        return app.brushThumbnail(item.index);
     case BrushItem::Kind::Paint:
         return app.thumbs_.brush(kPaintBrush);
     case BrushItem::Kind::Recipe:
         return item.index >= 0 && item.index < int(app.doc_.brushes.size())
-                   ? app.thumbs_.recipe(app.doc_.brushes[size_t(item.index)])
+                   ? app.recipeThumbnail(app.doc_.brushes[size_t(item.index)])
                    : ImTextureID(0);
     case BrushItem::Kind::File:
     case BrushItem::Kind::Guides:
@@ -776,6 +776,11 @@ void drawBrushGrid(App& app, GridMode mode) {
                 shelf.insert(std::find(shelf.begin(), shelf.end(), "widget.add_brush"), action); // before [+]
                 app.status_ = "Added " + b.name + " to the bottom shelf";
             }
+            // The thumbnail shows the brush's alpha and stroke (#208): made again from the alpha file as it is now.
+            if (b.kind == BrushItem::Kind::Type && ImGui::MenuItem(tr("Regenerate thumbnail")))
+                app.regenerateBrushThumbnail(b.index);
+            if (b.kind == BrushItem::Kind::Recipe && ImGui::MenuItem(tr("Regenerate thumbnail")))
+                app.regenerateRecipeThumbnail(app.doc_.brushes[size_t(b.index)]);
             if (b.kind == BrushItem::Kind::Recipe) {
                 // The same menu as the Brush palette's custom-brush list (PanelBrushLibrary.cpp).
                 if (ImGui::MenuItem(tr("Copy brush code"))) app.copyBrushCode(b.index);

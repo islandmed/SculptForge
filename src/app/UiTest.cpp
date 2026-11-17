@@ -121,6 +121,8 @@
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
 //                            subdiv_levels (the active Part's, 0 none),
+//                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
+//                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
@@ -1344,6 +1346,8 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const auto& [id, tex] : app_.partThumbs_) n += tex ? 1.0 : 0.0;
         return n;
     }
+    if (name == "brush_looks") return double(app_.thumbs_.looksRequested()); // alpha looks the brush thumbnails were asked for (#208)
+    if (name == "thumbnails_regenerated") return double(app_.thumbs_.regenerated());
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
     if (name == "boolean_preview") {

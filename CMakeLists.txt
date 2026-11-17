@@ -1224,6 +1224,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
     sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
     sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
+    # A brush's thumbnail shows its alpha in its stroke type (tests/ui/brush_alpha_thumbnail.sfui, #208), at 1440 px and 2880 px.
+    sculptforge_ui_test(brush_alpha_thumbnail_1440 brush_alpha_thumbnail --size 1440x900)
+    sculptforge_ui_test(brush_alpha_thumbnail_2880 brush_alpha_thumbnail --size 2880x1800)
     # A shelf slot follows its brush through a rename (tests/ui/shelf_slot_rename.sfui).
     sculptforge_ui_test(shelf_slot_rename_1440 shelf_slot_rename --size 1440x900)
     sculptforge_ui_test(shelf_slot_rename_2880 shelf_slot_rename --size 2880x1800)

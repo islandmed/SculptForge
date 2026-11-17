@@ -111,7 +111,9 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     // Screen axes of the projection: jitter scatters in them, alphas point "up" along `up`.
     const glm::vec3 helper = std::abs(view.y) > 0.9f ? glm::vec3(0.0f, 0.0f, -1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
     const glm::vec3 right = glm::normalize(glm::cross(view, helper));
-    const glm::vec3 up = glm::cross(right, view);
+    const glm::vec3 screenUp = glm::cross(right, view);
+    const glm::vec3 up = stroke.alphaAngle == 0.0f ? screenUp
+                                                   : screenUp * std::cos(stroke.alphaAngle) - right * std::sin(stroke.alphaAngle);
 
     const std::string label = recipe ? recipe->name : brushLabel(type);
     if (!doc.sculptor.beginStroke(mesh, label, doc.activeLayer)) {
@@ -201,7 +203,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
         size_t at = 0;
         for (glm::vec3 s : samples) {
             const size_t index = at++;
-            if (recipe && recipe->jitter > 0.0f) s += (right * rnd() + up * rnd()) * (recipe->jitter * radius);
+            if (recipe && recipe->jitter > 0.0f) s += (right * rnd() + screenUp * rnd()) * (recipe->jitter * radius);
             RayHit hit;
             if (!project(s, hit)) continue;
             DabParams p = base;

@@ -248,3 +248,27 @@ TEST(brush_settings_save_load_invariant_same_values_same_dab) {
     CHECK(same && moved); // identical, and the dab did something
     std::remove(path.c_str());
 }
+
+TEST(brush_settings_peek_shows_what_a_brush_has_now) {
+    // The brush thumbnails (#208) read a brush's alpha and stroke without switching to it: this session's values, else
+    // the saved ones, else nothing.
+    BrushSettingsStore store;
+    const std::string a = brushSettingsKey("", "Moss"), b = brushSettingsKey("", "Bark");
+    BrushToolSettings out;
+    CHECK(!store.peek(a, out));
+    BrushToolSettings saved;
+    saved.alphaName = "Scales";
+    saved.stroke = StrokeType::DragRect;
+    store.store(a, saved);
+    CHECK(store.peek(a, out) && out == saved);
+    BrushToolSettings live; // a switch away from Bark stores its live values for the session
+    live.alphaName = "Pores";
+    store.switchBrush(b, a, live);
+    CHECK(store.peek(b, out) && out.alphaName == "Pores");
+    BrushToolSettings edited = saved; // the session's values win over the saved ones
+    edited.alphaName = "Rivets";
+    store.switchBrush(a, b, edited);
+    CHECK(store.peek(a, out) && out.alphaName == "Rivets");
+    store.reset(a);
+    CHECK(!store.peek(a, out));
+}

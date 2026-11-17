@@ -970,6 +970,7 @@ constexpr Entry kSpanish[] = {
     {"Use as VDM", "Usar como VDM"},
     {"Show in file manager", "Mostrar en el gestor de archivos"},
     {"Refresh thumbnail", "Actualizar miniatura"},
+    {"Regenerate thumbnail", "Regenerar miniatura"},
     {"Nothing here matches \"%s\".", "Aquí nada coincide con \"%s\"."},
     {"Library rows", "Filas de la Biblioteca"},
     {"Library at the top", "Biblioteca arriba"},

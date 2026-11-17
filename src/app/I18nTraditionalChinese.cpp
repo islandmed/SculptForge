@@ -802,6 +802,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Use as VDM", "用作 VDM"},
     {"Show in file manager", "在檔案管理員中顯示"},
     {"Refresh thumbnail", "重新整理縮圖"},
+    {"Regenerate thumbnail", "重新產生縮圖"},
     {"Nothing here matches \"%s\".", "找不到符合「%s」的項目。"},
     {"Library rows", "資源庫列數"},
     {"Library at the top", "資源庫置於上方"},
