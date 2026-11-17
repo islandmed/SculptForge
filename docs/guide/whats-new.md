@@ -5,6 +5,18 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.7
+
+```features
+date: unreleased
+tagline: Circle shapes for Mask, Select and Cut, Space slides a selection, exact slider values, a portable copy and Python scripting.
+highlight: Circle and ellipse shapes for Mask, Select and Cut
+highlight: Hold Space to slide a selection while you draw it
+highlight: Type an exact value on any slider
+highlight: A portable copy on a USB stick that carries your settings, brushes and library
+highlight: Python scripting in the app
+```
+
 ## Version 0.13.6
 
 ```features

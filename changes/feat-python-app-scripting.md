@@ -2,7 +2,6 @@
 whats_new: **Python scripting in the app**: turn it on in **Edit > Preferences > Scripts**, then the console's **Python** mode runs
   Python against the open scene (loops, conditions, every command), and `.py` files in your Scripts folder are listed
   under **File > Script**. Each line or script is one undo step. Scripts are programs: only run ones you trust.
-highlight: Python scripting in the app
 added: **Python scripting in the app** (Edit > Preferences > Scripts, off by default): the console's Python mode and `.py` script
   files (the Scripts folder, listed under File > Script, and Run script file) run Python with the same `sculptforge`
   module as pipelines, against the open scene: `sf.document()`, `sf.run("command", ...)`, Parts, the mesh and selection
