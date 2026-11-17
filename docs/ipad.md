@@ -3,7 +3,7 @@
 The same app as on the desktop and on Android tablets, built for every iPad that runs iPadOS 16 or later (the base iPad
 from its 5th generation, every iPad Air, mini and Pro since). Milestone 1: it installs from TestFlight, opens a starter
 mesh, sculpts with a finger or the Apple Pencil (pressure and tilt), navigates with two fingers, undoes, and saves and
-opens projects. Members get the TestFlight builds first.
+opens projects. Members get the TestFlight builds, by invitation.
 
 ## Build
 
@@ -61,4 +61,5 @@ while sculpting). Next: the increased-memory-limit entitlement (an App ID capabi
 
 ## Testers
 
-TestFlight testers are members first: the **Members** external group in App Store Connect, filled from the member list.
+TestFlight builds are for members only, by email invitation (an internal group, or the **Members** external group filled
+from the member list); there is never a public TestFlight link.

@@ -188,10 +188,11 @@ cloud signing, exports with destination *upload* (no third-party tools) and uses
    reads them, only from this environment; delete the .p8 from the computer afterwards.
 7. **The first upload:** run the workflow as above. About 15-30 minutes after it ends, App Store Connect > the app >
    TestFlight lists the build (the app declares no non-exempt encryption, so there is no export question to answer).
-8. **Testers, members first:** TestFlight > External Testing > **+** group `Members`; fill in Test Information (feedback
-   email, a short description and, where it asks, a privacy policy URL: the site has none yet, a site-lane page comes
-   first), add the build (the first one goes to
-   Apple's beta review, about a day), then add members by email. No public link until the owner decides.
+8. **Testers: members only, by invitation (owner rule).** No public TestFlight link, ever. Testers are invited by email
+   from the members list, by the owner or input in App Store Connect: an internal group (team members), or TestFlight >
+   External Testing > **+** group `Members` with email invites only. Test Information: feedback email, a short
+   description and the privacy policy URL https://sculptforge.app/privacy.html. The first external build goes to Apple's
+   beta review (about a day).
 
 If the key leaks: revoke it on the same page (step 4) and add a new one; nothing else holds it.
 

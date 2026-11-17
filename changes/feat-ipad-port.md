@@ -1,7 +1,7 @@
 ---
 added: **iPad (early, for testers)**: SculptForge builds for iPadOS 16 and later, with the Apple Pencil's pressure and tilt,
   the touch layout, saving to *On My iPad > SculptForge* and opening through the Files picker (docs/ipad.md). Members get
-  the TestFlight builds first. On the iPad's graphics (OpenGL ES 3.0) face group colours, the texture preview and baked
+  the TestFlight builds, by invitation. On the iPad's graphics (OpenGL ES 3.0) face group colours, the texture preview and baked
   normal maps don't show yet, and the panels say so.
 testers:
   - Desktop, any OS: nothing changes; the Groups switch and a textured Part look as before.
