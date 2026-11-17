@@ -1217,7 +1217,7 @@ scoop_push() {
     gitp clone -q --depth 1 "https://github.com/$SCOOP_BUCKET.git" "$work/scoop" ||
         die "can't clone $SCOOP_BUCKET" "check gh auth status, run again"
     mkdir -p "$work/scoop/bucket" && cp "$1" "$work/scoop/bucket/sculptforge.json"
-    (cd "$work/scoop" && git add bucket/sculptforge.json && commit -m "sculptforge $V" && gitp push -q origin HEAD) ||
+    (cd "$work/scoop" && git checkout -q -B main && git add bucket/sculptforge.json && commit -m "sculptforge $V" && gitp push -q origin HEAD:main) ||
         die "pushing sculptforge $V to $SCOOP_BUCKET failed" "check gh auth status, run again"
     ok "Scoop bucket at $V"
 }
