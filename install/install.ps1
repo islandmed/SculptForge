@@ -35,6 +35,8 @@ if ($Portable) {
   if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
   Expand-Archive $zip -DestinationPath $tmp -Force
   Move-Item (Join-Path $tmp "SculptForge-$v-windows-x86_64") $dest
+  # This is an install, not a stick: settings stay per-user, as with the installer (portable.txt would move them into the folder).
+  Remove-Item -LiteralPath (Join-Path $dest 'bin\portable.txt') -Force -ErrorAction SilentlyContinue
   $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut(
     (Join-Path ([Environment]::GetFolderPath('Programs')) 'SculptForge.lnk'))
   $shortcut.TargetPath = Join-Path $dest 'bin\sculptforge.exe'

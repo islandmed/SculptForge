@@ -114,6 +114,7 @@ add_library(sculptforge_core STATIC
   src/core/FileReplace.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
+  src/core/DataDir.cpp
   src/core/Image.cpp
   src/core/ImageTo3D.cpp
   src/core/Splats.cpp
@@ -1487,6 +1488,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
+    # A portable copy keeps its data beside the program (src/core/DataDir.h): the real program, copied to a folder with
+    # spaces with portable.txt, saves a value and the crash log there and nothing under the machine's own folders; the
+    # folder moved, it finds the value; without the marker it is per-user again. Needs no window.
+    add_test(NAME portable_data COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
+             -DDIR=${CMAKE_CURRENT_BINARY_DIR}/portable-data-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/portable_data.cmake)
     # A Threads value saved in Preferences reaches the shared pool at the next start (#184; the 0.12.5 fix never ran in the
     # real app, the App's Document started the pool at 16 first). Starts the app twice, offscreen.
     if(NOT WIN32 AND Python3_Interpreter_FOUND)

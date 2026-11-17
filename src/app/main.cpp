@@ -7,10 +7,12 @@
 #include "app/CrashLog.h"
 #include "app/OptimisticBench.h"
 #include "app/StartupSplashWindow.h"
+#include "app/UserData.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/BenchPack.h"
 #include "core/Benchmark.h"
+#include "core/DataDir.h"
 #include "core/ExitWatchdog.h"
 #include "core/Wavelet.h"
 #include "core/FocusDetail.h"
@@ -25,6 +27,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -97,6 +101,8 @@ void usage() {
         "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
         "  --splash-shot out.png    The start-up splash as a PNG (size from --size, default 1440x810) and exit\n"
         "  --splash-selftest        Open the splash by each way the window system allows, check its picture, exit\n"
+        "  --portable-selftest [V]  Say where this copy keeps its data (portable: a portable.txt or data/ folder beside\n"
+        "                           the program), save V there if given, print what is saved, exit\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
         "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
         "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
@@ -144,6 +150,7 @@ void isolateSettings() {
 #else
     setenv("XDG_DATA_HOME", d.c_str(), 1);
     setenv("XDG_CONFIG_HOME", d.c_str(), 1);
+    setenv("SF_USER_DATA_DIR", d.c_str(), 1);   // (a portable copy's data/ folder gives way to it: core/DataDir.h)
     setenv("HOST_XDG_DATA_HOME", d.c_str(), 1); // in a Flatpak, the Blender bridge folder (io/BlenderBridge.h)
     setenv("SF_AI_LIVE_DIR", d.c_str(), 1);     // live mode's socket (link/AiLink.h): never the user's window's
 #if defined(__APPLE__)
@@ -199,6 +206,43 @@ int finishIsolated(int code) {
 }
 
 static bool g_uiServe = false; // --ui-serve: runMain runs once per script in one process
+
+// --portable-selftest [VALUE]: the data folder this run uses (tests/portable_data.cmake starts the real program from a
+// folder with spaces, moves the folder and starts it again), a value kept in it across runs.
+static int portableSelfTest(const char* value) {
+    const sf::DataLocation& loc = sf::dataLocation();
+    const std::string dir = sf::userDataDir();
+    if (dir.empty()) {
+        std::fprintf(stderr, "portable-selftest: no data folder\n");
+        return 1;
+    }
+    const std::filesystem::path file = std::filesystem::path(std::u8string(dir.begin(), dir.end())) / "portable-selftest.txt";
+    if (value && *value) std::ofstream(file, std::ios::binary | std::ios::trunc) << value;
+    std::ifstream in(file, std::ios::binary);
+    const std::string kept((std::istreambuf_iterator<char>(in)), {});
+    std::printf("portable=%d\nread-only=%d\ndata=%s\nvalue=%s\n", loc.portable ? 1 : 0, loc.readOnly ? 1 : 0, dir.c_str(), kept.c_str());
+    return 0;
+}
+
+// A portable copy (a portable.txt or data/ folder beside the program: core/DataDir.h) on a computer that has SculptForge
+// settings of its own: once, before anything reads or writes its data folder, ask whether to copy them in. A copy,
+// never a move, and nothing is written to the computer's own folder. Windowed runs only (the dialog stays out of tests,
+// renders and agents); the answer, either way, is remembered in data/.import-offered.
+static void offerPortableImport() {
+    if (!sf::importAvailable()) return;
+    const int answer = sf::dialogs::choose(
+        "SculptForge (portable)",
+        "This is a portable copy: its settings, brushes and layouts stay in the data folder next to the program.\n\n"
+        "SculptForge found settings on this computer. Copy them into the portable copy? Your installed copy is not changed.",
+        "Import my settings and brushes", "Start fresh", nullptr);
+    if (answer < 0) return; // (no dialog could be shown: ask again on a run that can)
+    if (answer == 1) {
+        std::string summary, error;
+        if (sf::importInstalledData(summary, error)) std::fprintf(stderr, "sculptforge: %s\n", summary.c_str());
+        else std::fprintf(stderr, "sculptforge: import failed: %s\n", error.c_str());
+    }
+    sf::markImportOffered();
+}
 
 // One run of the app: the whole of main, also each script of the warm UI test server (--ui-serve, UiServe.cpp).
 static int runMain(int argc, char** argv) {
@@ -259,6 +303,7 @@ static int runMain(int argc, char** argv) {
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
         else if (a == "--splash-shot") options.splashShotPath = next();
+        else if (a == "--portable-selftest") return portableSelfTest(i + 1 < argc ? argv[i + 1] : nullptr);
         else if (a == "--splash-selftest") return sf::splash::selfTest(); // (SDL_VIDEO_DRIVER=dummy in the test run)
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
@@ -362,6 +407,9 @@ static int runMain(int argc, char** argv) {
         options.width *= options.supersample;
         options.height *= options.supersample;
     }
+    if (options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() && options.timelapsePath.empty() &&
+        !options.benchmark && options.demo.empty() && crashTest.empty() && !automatedRun())
+        offerPortableImport();
     sf::crashlog::start(logDir); // after isolateSettings: a UI test logs into its own folder
     { // studio mode: the network policy, brush shares and packs (after isolateSettings: tests install into their folder)
         const char* base = SDL_GetBasePath();

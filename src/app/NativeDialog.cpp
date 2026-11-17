@@ -235,6 +235,27 @@ bool message(SDL_MessageBoxFlags flags, const char* title, const char* text, SDL
     return SDL_ShowSimpleMessageBox(flags, title, text, window);
 }
 
+int choose(const char* title, const char* text, const char* first, const char* second, SDL_Window* window) {
+    if (intercept(Kind::Message, nullptr, nullptr)) return -1;
+    SDL_MessageBoxButtonData buttons[2] = {};
+    buttons[0].flags = SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+    buttons[0].buttonID = 0;
+    buttons[0].text = second;
+    buttons[1].flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+    buttons[1].buttonID = 1;
+    buttons[1].text = first;
+    SDL_MessageBoxData data = {};
+    data.flags = SDL_MESSAGEBOX_INFORMATION;
+    data.window = window;
+    data.title = title;
+    data.message = text;
+    data.numbuttons = 2;
+    data.buttons = buttons;
+    int id = -1;
+    if (!SDL_ShowMessageBox(&data, &id)) return -1;
+    return id == 1 ? 1 : 0;
+}
+
 bool openUrl(const char* url) {
     if (intercept(Kind::Url, nullptr, nullptr)) {
         SDL_Log("  (url: %s)", url ? url : "");

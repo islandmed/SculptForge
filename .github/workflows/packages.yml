@@ -560,9 +560,17 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "silent install exited $($p.ExitCode)" }
           $j = Get-Content "$dir\bin\installer.json" -Raw | ConvertFrom-Json
           if ($j.check_updates -ne $true) { throw "installer.json after a silent install: $($j | ConvertTo-Json -Compress) (want check_updates true)" }
+          if (Test-Path "$dir\bin\portable.txt") { throw 'the installer wrote bin\portable.txt: an install must stay per-user' }
           $u = Start-Process "$dir\Uninstall.exe" -ArgumentList '/S', "_?=$dir" -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "silent uninstall exited $($u.ExitCode)" }
           if (Test-Path "$dir\bin\installer.json") { throw 'the uninstaller left bin\installer.json behind' }
+      - name: Portable marker (portable.txt beside the zip's sculptforge.exe, so its data stays in its own folder; the installer is untouched)
+        shell: pwsh
+        run: |
+          python tools/release/add_portable_marker.py (Get-Item build\SculptForge-*-windows-*.zip).FullName
+          if ($LASTEXITCODE -ne 0) { throw "cannot add portable.txt to the .zip" }
+          python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); sys.exit(0 if any(x.endswith('/bin/portable.txt') for x in n) else 1)" (Get-Item build\SculptForge-*-windows-*.zip).FullName
+          if ($LASTEXITCODE -ne 0) { throw "the .zip has no bin/portable.txt" }
       - name: Signing - the installer, for SignPath
         if: env.SIGN == 'true'
         shell: pwsh

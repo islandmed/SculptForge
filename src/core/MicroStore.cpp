@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/MicroStore.h"
 
+#include "core/DataDir.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -74,6 +75,7 @@ void MicroStore::assign(size_t n, int16_t v) {
 
 std::string MicroStore::swapFolder() {
     if (const char* d = std::getenv("SF_MICRO_SWAP_DIR"); d && *d) return d;
+    if (dataLocation().portable) return portableCacheDir("micro", ""); // a portable copy writes nowhere else (core/DataDir.h)
     if (const char* x = std::getenv("XDG_CACHE_HOME"); x && *x) return std::string(x) + "/sculptforge";
     if (const char* h = std::getenv("HOME"); h && *h) {
 #if defined(__APPLE__)

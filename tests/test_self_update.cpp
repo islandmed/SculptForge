@@ -545,6 +545,10 @@ TEST(self_update_windows_helper) {
     CHECK(s.find("Get-FileHash") < s.find("Expand-Archive")); // the hash is checked again before anything changes
     CHECK(s.find("Expand-Archive") < s.find("Move-Item -LiteralPath $root -Destination $old"));
     CHECK(s.find("$p.ExitCode -ne 0") != std::string::npos); // rollback when the new one fails
+    // A portable copy's data/ folder comes along before the new version starts; a copy without the marker stays per-user.
+    CHECK(s.find("Copy-Item -LiteralPath (Join-Path $oldBin 'data')") != std::string::npos);
+    CHECK(s.find("Copy-Item -LiteralPath (Join-Path $oldBin 'data')") < s.find("Start-Process -FilePath $exe -PassThru"));
+    CHECK(s.find("Remove-Item -LiteralPath (Join-Path $newBin 'portable.txt')") != std::string::npos);
     in.kind = InstallKind::WindowsInstaller;
     const std::string i = windowsHelperScript(in, d, 1234, false);
     CHECK(i.find("\"/S /D=$root\"") != std::string::npos && i.find("Get-FileHash") < i.find("Start-Process"));

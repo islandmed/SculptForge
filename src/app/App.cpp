@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <csignal>
+#include "core/DataDir.h"
 #include "core/ExitWatchdog.h"
 #include "app/App.h"
 #include "app/BooleanPreview.h"
@@ -294,6 +295,10 @@ bool App::init(const AppOptions& options) {
     }
     if (!headless && options.demo.empty() && !sharedWindow_) gpuChoiceStarted(); // (the chosen card works)
     if (!gpuNotice.empty()) status_ = gpuNotice;
+    if (const std::string note = portableFallbackNote(); !note.empty()) { // a portable copy on a read-only stick: said once
+        status_ = note;
+        SDL_Log("%s", note.c_str());
+    }
     timer.step("renderer");
     splashCheckpoint();
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)

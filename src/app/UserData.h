@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "core/DataDir.h"
+
 #include <SDL3/SDL.h>
 
 #include <cstdlib>
@@ -12,7 +14,7 @@
 namespace sf {
 
 // The user data folder (settings, the log, imgui.ini), with its trailing separator; "" when there is none. It is
-// SDL_GetPrefPath's, unless SF_USER_DATA_DIR names another: isolateSettings (main.cpp) sets it for UI tests, renders
+// SDL_GetPrefPath's (or a portable copy's data/ folder: core/DataDir.h), unless SF_USER_DATA_DIR names another: isolateSettings (main.cpp) sets it for UI tests, renders
 // and agent runs. On Windows SDL asks the shell for %APPDATA% and ignores the variable isolateSettings set, so every
 // Windows UI test shared the runner's real settings and read the ones an earlier test left (0.11.2: support_card
 // found another test's "supporter").
@@ -33,6 +35,11 @@ inline std::string userDataDir() {
         std::filesystem::create_directories(dir, ec);
         if (ec) return std::string();
         const std::u8string s = (dir / "").u8string(); // (the trailing separator, as SDL_GetPrefPath has it)
+        return std::string(s.begin(), s.end());
+    }
+    const DataLocation& where = dataLocation(); // a portable copy (core/DataDir.h) keeps everything in its own data/ folder
+    if (where.portable) {
+        const std::u8string s = (std::filesystem::path(std::u8string(where.dir.begin(), where.dir.end())) / "").u8string();
         return std::string(s.begin(), s.end());
     }
     std::string dir;
