@@ -111,6 +111,58 @@ TEST(micro_divide_counts_and_memory) {
     CHECK(!microDivide(doc.mesh, 2, err)); // one micro level per Part
 }
 
+// Drawing above the stored level (close-ups, TierBudgets::microDrawAbove): the points of a finer level lie on the
+// surface the stored grid defines (stored points unchanged, in-between points within the stored cell's own sag of
+// the flat micro triangle), and a shared base edge gives the same bits from both triangles at every drawn point.
+TEST(micro_draw_above_stored_level_is_seamless) {
+    Document doc = microDoc(3);
+    microNoise(doc.mesh, 0.02f, 6.0f, 3); // a bumpy surface: in-between heights really interpolate
+    const MicroMesh& mm = *doc.mesh.micro;
+    // The renderer's shading grid (the stored normals the pull uses), as MicroRenderer builds it.
+    std::vector<uint32_t> shading(size_t(mm.baseTriangles) * mm.samples, 0);
+    {
+        MicroShader shader;
+        std::vector<uint32_t> written;
+        shader.shade(doc.mesh, {}, true, written, [&](uint32_t tri) { return shading.data() + size_t(tri) * mm.samples; });
+        CHECK(written.size() == mm.baseTriangles);
+    }
+    const uint32_t* sg = shading.data();
+    const int level = mm.level + 2;
+    const uint32_t md = 1u << level, sc = md / mm.n;
+    size_t checked = 0;
+    float worstOff = 0.0f;
+    const float microEdge = mm.baseEdge / float(mm.n);
+    for (uint32_t t = 0; t < mm.baseTriangles; t += 7) {
+        for (uint32_t j = 0; j <= md; j += 3)
+            for (uint32_t i = 0; i + j <= md; i += 5) {
+                const glm::vec3 p = microDrawPoint(doc.mesh, t, level, i, j, sg), flat = microDrawPoint(doc.mesh, t, level, i, j);
+                if (i % sc == 0 && j % sc == 0) CHECK(p == microPoint(doc.mesh, t, i / sc, j / sc)); // stored points: the same bits
+                const float wc[3] = {float(md - i - j) / float(md), float(i) / float(md), float(j) / float(md)};
+                CHECK(glm::distance(flat, microPointAt(doc.mesh, t, wc)) < 1e-6f); // no pull = the flat micro triangle (the CPU's surface)
+                worstOff = std::max(worstOff, glm::distance(p, flat));
+            }
+        for (int e = 0; e < 3; ++e) { // the shared edge from both sides, at every drawn point
+            const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(e)];
+            CHECK(nb != MicroMesh::kNone);
+            if (nb == MicroMesh::kNone) continue;
+            const uint32_t t2 = nb >> 2, e2 = nb & 3;
+            for (uint32_t k = 0; k <= md; ++k) {
+                uint32_t i, j, i2, j2;
+                MicroMesh::edgePoint(e, k, md, i, j);
+                MicroMesh::edgePoint(int(e2), md - k, md, i2, j2);
+                const glm::vec3 a = microDrawPoint(doc.mesh, t, level, i, j, sg), b = microDrawPoint(doc.mesh, t2, level, i2, j2, sg);
+                CHECK(a == b);
+                CHECK(microDrawPoint(doc.mesh, t, level, i, j) == microDrawPoint(doc.mesh, t2, level, i2, j2));
+                ++checked;
+            }
+        }
+    }
+    CHECK(checked > 1000);
+    // The pull leaves the flat micro triangle, but by less than a micro edge's worth over a bumpy sphere.
+    CHECK(worstOff < microEdge);
+    CHECK(worstOff > 0.0f);
+}
+
 TEST(micro_divide_needs_top_level) {
     Document doc = makeDoc(makeBenchSphere(20000));
     std::string err;

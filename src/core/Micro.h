@@ -199,6 +199,15 @@ int microLevelFor(const Mesh& m, size_t targetTriangles);
 
 // The micro surface point at grid point (i, j) of base triangle t (reads the stored displacement).
 glm::vec3 microPoint(const Mesh& m, uint32_t tri, uint32_t i, uint32_t j);
+// What the renderer draws at grid point (i, j) of `level` on base triangle t (render/MicroRenderer.cpp posAt; the
+// same operations in the same order): at or below the stored level a stored point; above it (close-ups past the
+// stored resolution, TierBudgets::microDrawAbove) the linear mix of the three displaced stored corners of the micro
+// triangle holding it, pulled towards the corners' tangent planes (`shading`: the renderer's shading grid, the
+// stored normals; null = no pull, the flat micro triangle). Corner terms in one order on both sides of a shared
+// base edge: bit-identical seams.
+glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading = nullptr);
+// The normal in a shading grid value (encodeShade's octahedral bytes, as the shaders decode it).
+glm::vec3 decodeShadeNormal(uint32_t v);
 // The micro surface at barycentric weights of base triangle t (displacement interpolated on the micro triangle
 // holding the point), with its geometric normal.
 glm::vec3 microPointAt(const Mesh& m, uint32_t tri, const float w[3], glm::vec3* normal = nullptr);
