@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.4:</strong> saves on Windows retry instead of failing, and a short note from the members (<a href="https://sculptforge.app/guide/whats-new.html#version-0134">how it works</a>)
+  <strong>New in 0.13.5:</strong> a plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data (<a href="https://sculptforge.app/guide/whats-new.html#version-0135">how it works</a>)
 </p>
 
 <p align="center">

@@ -8,12 +8,19 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.5
 
 ```features
-date: unreleased
+date: 2026-11-16
 tagline: A plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data.
 highlight: Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit
 highlight: Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails
 highlight: AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it
 ```
+
+- **Blender 5.3 supported**: the Blender bridge is tested on Blender 4.2 LTS, 5.2 and 5.3.
+- **AI tools read the scene as data**: an AI agent connected to SculptForge now gets every result as structured
+  numbers (triangles, bounds, Parts, undo depth, time) and can read the scene, its Parts and the undo history without
+  a tool call.
+- **Batch and checkpoints for AI agents**: an agent can run a list of commands as one undo step that rolls back whole
+  if one fails, and name moments in the undo history to come back to.
 
 ## Version 0.13.4
 

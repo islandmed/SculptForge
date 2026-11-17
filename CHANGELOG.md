@@ -6,6 +6,32 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-11-16
+
+### Added
+- Blender 5.3 supported by the Blender bridge (tested on Blender 4.2 LTS, 5.2 and 5.3 in CI).
+- **Structured MCP results and scene resources** (`sculptforge-cli --mcp`): every `tools/call` result carries
+  `structuredContent` (`ok`, `message`, `ms`, the active Part's `triangles`, `vertices` and `bounds`, `parts`,
+  `activePart`, `undoDepth`, `canRedo`, scene totals) next to the text line, and `tools/list` gives every tool an
+  `outputSchema`. Resources `sculptforge://scene`, `sculptforge://parts`, `sculptforge://part/{index}` (levels, micro
+  level, materials) and `sculptforge://history` are read-only (no undo step), listed by `resources/list` and
+  `resources/templates/list`. A studio policy that hides "info" tools hides the numbers and resources too, and reads
+  go into the audit log.
+- **Transactions for AI agents** (headless MCP server): `batch` runs up to 64 commands as one undo step and, at the
+  first error, rolls back everything it did (the scene is exactly as before) and reports which command failed and why,
+  with each command's result; `checkpoint_save`, `checkpoint_restore` and `checkpoint_list` name places in the undo
+  history and walk back or forward to them, across Parts, without copying the scene. Every command in a batch passes
+  the studio policy and the audit log as if called alone. `undo` and `redo` take a whole batch or restore at once.
+
+### Changed
+- **Studio membership** (Help > Support SculptForge, and the website): Studio is a personalized quote for the whole
+  studio; the Founding Studio price is retired. **Get a quote** on the card opens the studio page, where the quote
+  button asks for your team size, platforms and pipeline.
+
+### Security
+- Plugin sandbox runtime updated (security fix): wasmtime 50.0.1 to 50.0.2 (#219), which fixes a guest-triggered host
+  abort and unbounded host memory growth.
+
 ## [0.13.4] - 2026-11-15
 
 ### Added
