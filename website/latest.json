@@ -1,11 +1,11 @@
 {
-  "version": "0.13.5",
+  "version": "0.13.6",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit",
-    "Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails",
-    "AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it"
+    "Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail",
+    "Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window",
+    "A public benchmark you can run in one command"
   ],
   "support": {
     "founding": {
