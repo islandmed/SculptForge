@@ -164,6 +164,15 @@ if they don't, and the workflow passes the version as the parameter `version`. `
 </artifact-configuration>
 ```
 
+These two need parameters and metadata restrictions, which SignPath's free trial does not offer ("The element 'parameters' cannot
+be used because the corresponding feature is not available with your current subscription type"). On the trial keep the
+configurations without them (`binaries`: the `<zip-file>` with `<pe-file-set>`, the two `<include>` lines and
+`<for-each><authenticode-sign/></for-each>`, no `<parameters>` and no `product-*` attributes; `installer`: `<zip-file><pe-file
+path="SculptForge-*.exe"><authenticode-sign/></pe-file></zip-file>`) and leave the repository variable `SIGNPATH_PARAMS` unset:
+the workflow then sends no parameters, and tools/ci/check_pe_metadata.ps1 alone keeps the product name and version right.
+Once the Foundation's OSS subscription is active, paste the XML above and set `SIGNPATH_PARAMS=1` (the workflow then passes
+`version`). Both together, never one without the other: a `${version}` configuration given no parameter is refused.
+
 (No third-party DLL is shipped: SDL and every other dependency are linked into the exes. Upstream binaries must never go
 to SignPath under our subscription.)
 
@@ -184,7 +193,7 @@ The plumbing around the signatures (verify_signed.ps1, check_pe_metadata.ps1) is
 Actions > Signing self-test (a throwaway self-signed certificate). Then the dry run: Actions > Packages > Run workflow on a branch with *sign_test* ticked (it must end `Windows: test-signed`);
 only after that, and the release policy's first approved request, is `SIGNING=signpath` set on the repository.
 
-Variables: `SIGNING`, `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
+Variables: `SIGNING`, `SIGNPATH_PARAMS` (`1` with the versioned configurations), `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
 `SIGNPATH_TEST_POLICY_SLUG`, `SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
 secret, read only by the two signing steps, which run only when `SIGN` is true; the workflow never runs on pull requests or
 `t0/**`; release.yml passes it to the `--rebuild` call of packages.yml). Pinned action, token and gating are enforced by
