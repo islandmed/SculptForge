@@ -799,7 +799,7 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
   add_library(sculptforge_pyhost MODULE src/python/AppHost.cpp src/python/Bindings.cpp)
   # No core of its own: every core function it calls is the app's (src/python/CoreCalls.h), so it takes only the core's
   # headers, and the linker refuses a call that bypasses that (no undefined symbols).
-  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed glm::glm)
+  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed glm::glm ${CMAKE_DL_LIBS}) # (dladdr/dlopen: libdl on older glibc)
   target_include_directories(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_INCLUDE_DIRECTORIES>)
   target_compile_definitions(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_COMPILE_DEFINITIONS>)
   target_compile_definitions(sculptforge_pyhost PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")

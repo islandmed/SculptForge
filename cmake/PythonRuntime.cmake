@@ -24,6 +24,9 @@ function(sf_install_python_runtime RUNTIME DEST)
     install(DIRECTORY "${RUNTIME}/Lib" "${RUNTIME}/DLLs" DESTINATION ${DEST}/python ${drop})
     install(FILES "${RUNTIME}/LICENSE.txt" DESTINATION ${DEST}/python OPTIONAL)
   elseif(APPLE)
+    # The build folder's bundle has the runtime staged in it as a link to the unpacked runtime (CMakeLists.txt), and
+    # installing the bundle copies that link: drop it, so the package holds the trimmed runtime itself.
+    install(CODE "file(REMOVE_RECURSE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/SculptForge.app/Contents/Resources/python\")")
     install(DIRECTORY "${RUNTIME}/lib" DESTINATION SculptForge.app/Contents/Resources/python USE_SOURCE_PERMISSIONS ${drop})
   else()
     install(DIRECTORY "${RUNTIME}/lib" DESTINATION ${DEST}/python USE_SOURCE_PERMISSIONS ${drop})
