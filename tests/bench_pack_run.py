@@ -27,7 +27,10 @@ manifest["scenes"] = [dict(s, divide=d, triangles=5632 * 4 ** d) for s, d in zip
 (pack / "pack.json").write_text(json.dumps(manifest, indent=2) + "\n")
 digest = make_pack.pack_hash(pack)
 
-env = {"SDL_VIDEO_DRIVER": "offscreen", "SF_NO_UPDATE_CHECK": "1", "PATH": "/usr/bin:/bin"}
+# Windows keeps its environment (SystemRoot, and the PATH that finds the Mesa/EGL DLLs); elsewhere a bare PATH.
+env = dict(os.environ, SDL_VIDEO_DRIVER="offscreen", SF_NO_UPDATE_CHECK="1")
+if os.name != "nt":
+    env = {"SDL_VIDEO_DRIVER": "offscreen", "SF_NO_UPDATE_CHECK": "1", "PATH": "/usr/bin:/bin"}
 out = work / "results.json"
 out.unlink(missing_ok=True)
 run = subprocess.run([app, "--benchmark-pack", str(pack), "--out", str(out), "--benchmark-seconds", "1"],
