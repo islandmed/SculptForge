@@ -823,6 +823,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
+    if (name == "invert_twist") return app_.uiPrefs_.invertTwist ? 1.0 : 0.0;
     if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
     if (name == "maya_live") return app_.uiPrefs_.mayaLive ? 1.0 : 0.0;
     if (name == "maya_live_sends") return double(app_.mayaLiveSends_);

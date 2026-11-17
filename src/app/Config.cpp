@@ -119,6 +119,7 @@ Json toJson(const UiPrefs& p) {
     j.set("orbitAtPointer", p.orbitAtPointer);
     j.set("mouseOrbitSpeed", p.mouseOrbitSpeed);
     j.set("invertZoom", p.invertZoom);
+    j.set("invertTwist", p.invertTwist);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("twoKeyWindow", p.twoKeyWindow);
     j.set("quickRemesh", p.quickRemesh);
@@ -229,6 +230,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.orbitAtPointer = j["orbitAtPointer"].asBool(p.orbitAtPointer);
     p.mouseOrbitSpeed = clampMouseOrbitSpeed(float(j["mouseOrbitSpeed"].asNumber(p.mouseOrbitSpeed)));
     p.invertZoom = j["invertZoom"].asBool(p.invertZoom);
+    p.invertTwist = j["invertTwist"].asBool(p.invertTwist);
     p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
     p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);

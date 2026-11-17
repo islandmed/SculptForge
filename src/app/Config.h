@@ -65,6 +65,7 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    bool invertTwist = false; // two-finger twist rolls the view against the fingers (touch and trackpad, Preferences > Input)
     float twoKeyWindow = 0.4f; // seconds for the second key of a two-key shortcut (0.35 to 1, Preferences > Input)
     float keyNavSpeed = 1.0f; // the pan and zoom keys' speed, times 0.1 to 5 (Preferences > Input)
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for

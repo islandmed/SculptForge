@@ -1926,6 +1926,9 @@ constexpr Entry kSpanish[] = {
     {"Invert zoom", "Invertir zoom"},
     {"Turn zoom drags around (the mouse wheel stays as it is).",
      "Invierte los arrastres de zoom (la rueda del ratón no cambia)."},
+    {"Invert twist", "Invertir torsión"},
+    {"Roll the view against your fingers when you twist two fingers on a touch screen or trackpad. Off: the view rolls with them. A rotation lock (Turntable, X or Z axis) ignores the twist.",
+     "Balancea la vista en contra de tus dedos al torcer dos dedos en una pantalla táctil o trackpad. Desactivado: la vista gira con ellos. Un bloqueo de rotación (plataforma giratoria, eje X o Z) ignora la torsión."},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "
      "middle of the view. On with Maya keys (choosing a style sets it), off with the others.",
      "La rueda del ratón acerca hacia el punto del modelo bajo el puntero, que se queda bajo él, en vez del centro "
