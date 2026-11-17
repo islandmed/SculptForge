@@ -8,6 +8,7 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
+#include "core/Texture.h"
 #include "core/TierConfig.h"
 
 #include <IconsLucide.h>
@@ -237,6 +238,11 @@ void App::runSaveRender() {
 // Material: Save Render with its size, shape and format.
 void App::applyViewEffects() {
     const TierConfig tier = currentTierConfig();
+    if (!perTriangleNoted_ && !Renderer::perTriangleViews() &&
+        (renderSettings_.showFaceGroups || (renderSettings_.showTexture && hasTexture(doc_.mesh)))) {
+        perTriangleNoted_ = true;
+        status_ = tr("Face group colours and textures are not shown with this device's graphics (OpenGL ES 3.0) yet.");
+    }
 #ifdef SF_GLES
     const bool headroom = false; // (phones and tablets: off unless chosen)
 #else

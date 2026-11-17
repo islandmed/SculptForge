@@ -588,6 +588,7 @@ void App::drawPalette_Color() {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Texture##show"), &renderSettings_.showTexture);
         ui::HelpAction(*this, "view.texture");
+        if (renderSettings_.showTexture) perTriangleNote();
     }
 }
 

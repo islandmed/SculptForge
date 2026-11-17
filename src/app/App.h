@@ -913,6 +913,9 @@ private:
     bool facegroupMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void facegroupMouseUp();
     void drawFaceGroupsSection();
+    // Under a face group or texture toggle: why it shows nothing on the OpenGL ES 3.0 tier (Renderer::perTriangleViews).
+    void perTriangleNote();
+    bool perTriangleNoted_ = false; // (the status line said it once this session)
     // Cut (PanelCut.cpp, core/Cut.h): Ctrl+Shift with a Cut shape. Line, Lasso and Rectangle are dragged; Polyline
     // is clicked point by point (click the first point to close it, double-click or Enter to end it open, Esc drops it).
     void cutMouseUp();
@@ -3220,6 +3223,7 @@ private:
     bool focusKeepsDrawing(double now) const; // the window has focus and was just used (not: the pointer is over it)
     static constexpr double kFocusedActiveSeconds = 2.0;
     bool windowFocused_ = false; // keyboard focus (SDL_EVENT_WINDOW_FOCUS_GAINED / _LOST)
+    bool inBackground_ = false;  // the iPad app is in the background: no frames (SDL_EVENT_WILL_ENTER_BACKGROUND)
     double lastInputAt_ = -1e9;  // seconds (SDL clock) of the last key, mouse or pen event
     uint64_t frameKey() const;          // changes when a poller changed what the window shows
     double activeUntil_ = 0.0;          // seconds: keep drawing until then (after input: hover, tooltips)

@@ -345,6 +345,7 @@ void App::drawTextureMapContents() {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Show texture"), &renderSettings_.showTexture);
         ui::HelpAction(*this, "view.texture");
+        perTriangleNote();
     }
 
     // UV view: the texture (or a dark square) with the UV layout over it, v = 0 at the bottom.

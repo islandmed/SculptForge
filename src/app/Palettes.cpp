@@ -802,6 +802,7 @@ void App::drawPalette_Render() {
     ui::HelpAction(*this, "view.mask");
     ImGui::Checkbox(tr("Show Face Groups##render"), &renderSettings_.showFaceGroups);
     ui::HelpAction(*this, "view.facegroups");
+    if (renderSettings_.showFaceGroups) perTriangleNote();
     if (ImGui::Checkbox(tr("Floor grid##render"), &renderSettings_.floorGrid))
         uiPrefs_.floorGrid = renderSettings_.floorGrid; // (a preference: on in every session until turned off)
     ui::HelpAction(*this, "view.floor_grid");
@@ -1047,6 +1048,7 @@ void App::drawPalette_Tool() {
         ImGui::SameLine();
         ImGui::Checkbox(tr("Groups##display"), &renderSettings_.showFaceGroups);
         ui::HelpAction(*this, "view.facegroups");
+        if (renderSettings_.showFaceGroups) perTriangleNote();
         if (ImGui::Checkbox(tr("Backface culling##display"), &renderSettings_.backfaceCulling))
             uiPrefs_.backfaceCulling = renderSettings_.backfaceCulling; // the default for the next session
         ui::HelpText("Backface culling", nullptr,

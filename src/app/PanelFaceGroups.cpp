@@ -56,7 +56,13 @@ void App::facegroupMouseUp() {
         runCommand("invert_visibility");
 }
 
+void App::perTriangleNote() {
+    if (Renderer::perTriangleViews()) return;
+    ImGui::TextDisabled("%s", tr("Not shown with this device's graphics (OpenGL ES 3.0) yet."));
+}
+
 void App::drawFaceGroupsSection() {
+    perTriangleNote();
     ImGui::Checkbox(tr("Show face groups"), &renderSettings_.showFaceGroups);
     ImGui::SameLine();
     const Mesh& m = doc_.mesh;
