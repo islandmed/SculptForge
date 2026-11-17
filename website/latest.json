@@ -1,11 +1,11 @@
 {
-  "version": "0.13.4",
+  "version": "0.13.5",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar",
-    "A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it",
-    "Membership links in the app carry a small source tag, so we can see which one helps"
+    "Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit",
+    "Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails",
+    "AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it"
   ],
   "support": {
     "founding": {
