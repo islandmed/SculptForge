@@ -592,8 +592,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Invert visible", "反轉可見狀態"},
     {"Hide", "隱藏"},
     {"Show", "顯示"},
-    {"Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\nCtrl+Shift+drag hides outside the rectangle or lasso (Alt: inside).",
-     "Ctrl+Shift+按一下群組可將其隔離；加按 Alt 可將其隱藏；在背景按一下則顯示全部。\nCtrl+Shift+拖曳可隱藏矩形或套索範圍外的內容（加按 Alt 則隱藏範圍內的內容）。"},
+    {"Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\nCtrl+Shift+drag hides outside the rectangle, lasso or circle (Alt: inside).", "Ctrl+Shift+按一下群組以隔離它，+Alt 以隱藏它，在背景上以顯示全部。\nCtrl+Shift+拖曳隱藏矩形、套索或圓形的外側（Alt: 內側）。"},
     // --- Layers, paint, texture ---
     {"New paint layer", "新增繪製圖層"},
     {"Delete layer", "刪除圖層"},
@@ -2165,8 +2164,7 @@ constexpr Entry kTraditionalChinese[] = {
      "的「筆刷」分頁），並附縮圖。"},
     // --- PanelMasking.cpp (tools/i18n/coverage.py) ---
     {"Shapes", "形狀"},
-    {"Lasso Mask and Rectangle Mask mask only what faces you: the far side and folds turned away stay as they are.",
-     "Lasso Mask 與 Rectangle Mask 只遮罩面向你的部分：背面與背向你的皺褶保持不變。"},
+    {"Lasso Mask, Rectangle Mask and Circle Mask mask only what faces you: the far side and folds turned away stay as they are.", "Lasso Mask、Rectangle Mask 與 Circle Mask 只遮罩面向你的部分: 遠側與背向的摺痕維持原狀。"},
     {"Mask by", "遮罩依據"},
     {"By peaks", "依凸起"},
     {"Mask ridges, peaks and sharp edges (replaces the mask; uses the mask strength)",
@@ -3258,10 +3256,7 @@ constexpr Entry kTraditionalChinese[] = {
      "micro triangles of the visible Parts' micro levels (Geometry > Micro).",
      "可見且可雕刻的三角面數（可見部件，不含隱藏部分）以及整個場景的三角面數。微細分：可見部件微細分層級中的微三角面"
      "（幾何 > 微細分）。"},
-    {"Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl held, to pick Mask "
-     "Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).",
-     "按住 Ctrl：遮罩筆刷（Ctrl+Shift：選取筆刷）。按一下，或按住 Ctrl 再按 B，即可選擇 Mask Pen、Lasso Mask 或 "
-     "Rectangle Mask（Select Rectangle 或 Select Lasso）。"},
+    {"Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl held, to pick Mask Pen, Lasso Mask, Rectangle Mask or Circle Mask (Select Rectangle, Lasso or Circle).", "按住 Ctrl: 遮罩筆刷（Ctrl+Shift: 選取筆刷）。按一下，或按住 Ctrl 按 B，以挑選 Mask Pen、Lasso Mask、Rectangle Mask 或 Circle Mask（Select Rectangle、Lasso 或 Circle）。"},
     {"Ctrl held: the mask's stroke, Dots (Mask Pen), Lasso or Rect (Ctrl+Shift: the selection's). Click with Ctrl "
      "held to choose.",
      "按住 Ctrl：遮罩的筆畫，Dots (Mask Pen)、Lasso 或 Rect（Ctrl+Shift：選取的筆畫）。按住 Ctrl 再按一下即可選擇。"},
@@ -5396,6 +5391,14 @@ constexpr Entry kTraditionalChinese[] = {
      "每張圖片約 2 分鐘、20 點數（文字為 10 點）。快速且全面好用。"},
     {"Best results: a single object on a plain or transparent background.",
      "最佳效果：單一物件，搭配純色或透明背景。"},
+    // --- Circle shapes (#213) ---
+    {"Draw from corner", "從角落繪製"},
+    {"Keep round", "保持正圓"},
+    {"Always a perfect circle. Shift while dragging flips it for that drag (Select and Cut already hold Shift: letting go of it flips).", "一律是正圓。拖曳時按 Shift 會在該次拖曳反轉（Select 與 Cut 已按住 Shift: 放開即反轉）。"},
+    {"The press and the cursor are opposite corners of the circle's box, not its centre. Cut Circle: Alt at the press turns it on for one drag.", "按下點與游標是圓形方框的對角，不是圓心。Cut Circle: 按下時按 Alt 會在該次拖曳開啟。"},
+    {"Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形（按下時按 Alt: 從角落）: Away 在 Part 上切出貫通圓孔，In 做出深度為 Depth 的凹槽，Add 加上圓形凸台，Clip 把外側壓到其邊緣上。拖曳中放開 Shift 以保持正圓。"},
+    {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形以保留內側並隱藏其餘；加上 Alt 以隱藏內側。拖曳中放開 Shift 以保持正圓。"},
+    {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+從圓心拖曳圓形並遮罩其內一切；Ctrl+Alt+拖曳解除遮罩。拖曳時按 Shift 保持正圓；用 Tool > Masking 的選項從角落拖曳。包含遠側。"},
 };
 
 } // namespace

@@ -43,20 +43,21 @@ alpha you have selected, and a **Drag Stamp** stroke masks with dabs along the p
 
 On macOS, <kbd>Cmd</kbd> works wherever this guide says <kbd>Ctrl</kbd>.
 
-## Mask with a lasso or rectangle
+## Mask with a lasso, rectangle or circle
 
 To mask a large or sharply outlined area in one go, pick a mask selection shape. Holding
 <kbd>Ctrl</kbd> turns the brush on the left shelf into the mask brush: with <kbd>Ctrl</kbd> held, click the brush
-tile (or press <kbd>B</kbd>) to pick **Mask Pen**, **Lasso Mask** or **Rectangle Mask**, or click the stroke tile to pick
-the stroke (**Dots**, **Lasso** or **Rect**). The same shapes sit at the top of **Tool > Masking**:
+tile (or press <kbd>B</kbd>) to pick **Mask Pen**, **Lasso Mask**, **Rectangle Mask** or **Circle Mask**, or click the stroke tile to pick
+the stroke (**Dots**, **Lasso**, **Rect** or **Circle**). The same shapes sit at the top of **Tool > Masking**:
 
 | Shape | <kbd>Ctrl</kbd> + drag |
 |---|---|
 | **Mask Pen** (default) | Paints the mask with the brush, as described above. |
 | **Lasso Mask** | Draws a free-hand outline that closes back to where you started. Everything inside is masked. |
 | **Rectangle Mask** | Draws a rectangle. Everything inside is masked. |
+| **Circle Mask** | Draws a circle or ellipse from its centre: the press is the centre, the cursor sets the width and the height. Everything inside is masked. |
 
-With **Lasso Mask** or **Rectangle Mask**:
+With **Lasso Mask**, **Rectangle Mask** or **Circle Mask**:
 
 1. Hold <kbd>Ctrl</kbd> and drag around the area. The drag can start on the model or on the background. The
    shape is drawn as you drag, white with a dark veil.
@@ -71,7 +72,14 @@ shape as you see it, including vertices on the far side of the model. Hidden par
 A shape that covers none of the model clears the mask instead. **Mask Strength** sets how much a selection masks or
 unmasks, and each selection is one undo step. A lasso that crosses itself leaves out the areas it encloses twice.
 
-Turn on **Front faces only** (under the shape buttons, shown for Lasso Mask and Rectangle Mask) to mask only what
+**Circle Mask** drags out an ellipse, so it can be wider than it is tall or the other way round. Press
+<kbd>Shift</kbd> while dragging to keep it a perfect circle (let go to get the ellipse back). Under the shape buttons,
+**Draw from corner** makes the press and the cursor opposite corners of the circle's box instead of its centre, and
+**Keep round** makes every drag a circle (<kbd>Shift</kbd> then flips it for that drag). <kbd>Alt</kbd> keeps its job
+here: it unmasks. The shape goes through the same selection as a lasso, so symmetry, **Mask Strength** and
+**Front faces only** work the same.
+
+Turn on **Front faces only** (under the shape buttons, shown for Lasso Mask, Rectangle Mask and Circle Mask) to mask only what
 faces you: the far side of the model and folds turned away from you are left as they are. It follows the mirror
 image too when symmetry is on.
 

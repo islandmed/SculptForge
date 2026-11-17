@@ -1,0 +1,135 @@
+# Cut Circle (#213): Ctrl+Shift+drag from the centre cuts a round or elliptic hole; Alt at the press draws it from a corner;
+# letting go of Shift mid-drag keeps it round; Away, In, Add and Clip work with it; one undo step per cut.
+run new_sphere subdivisions=5
+input_style classic
+key x
+remember triangles full
+expect_value hide_shape == 2
+
+# Tool > Cut lists it next to the other shapes and shows the circle options only for it.
+click "Cut"
+expect_not "Keep round##circle"
+click "Cut Circle##cut.circle"
+expect_value hide_shape == 8
+expect "Draw from corner##circle"
+expect "Keep round##circle"
+shot cut_circle_panel
+
+# Away: a hole through the sphere.
+hold ctrl+shift
+drag_path 0.5 0.5 0.72 0.64 keep
+expect_value selection_shown == 1
+shot cut_circle_dragging
+release
+hold none
+wait 0.2
+expect_value can_undo == 1
+expect_value hidden == 0
+expect_value triangles != $full
+shot cut_circle_away
+key ctrl+z
+expect_value triangles == $full
+
+# Alt at the press: from a corner, a smaller circle than the same drag from the centre, so more of the sphere stays.
+hold ctrl+shift
+drag_path 0.3 0.3 0.7 0.7
+hold none
+wait 0.2
+remember triangles centre_cut
+key ctrl+z
+hold ctrl+shift+alt
+drag_path 0.3 0.3 0.7 0.7
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_corner
+key ctrl+z
+expect_value triangles == $full
+
+# Shift let go mid-drag keeps it round.
+hold ctrl+shift
+drag_path 0.5 0.5 0.72 0.64 keep
+hold ctrl
+shot cut_circle_round
+release
+hold none
+wait 0.2
+expect_value can_undo == 1
+key ctrl+z
+
+# Space (#214) slides the circle before the cut: the size stays, the hole lands where it was slid to.
+hold ctrl+shift
+drag_path 0.4 0.45 0.55 0.6 keep
+remember selection_x0 x0
+remember selection_w w0
+key_down space
+drag_path 0.55 0.6 0.75 0.75 keep
+expect_value selection_x0 > $x0
+expect_value selection_w < $w0+1
+expect_value selection_w > $w0-1
+key_up space
+release
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_space_moved
+key ctrl+z
+expect_value triangles == $full
+
+# In: a round pocket; Add: a round boss; Clip presses the outside flat onto the rim. Each is one undo step.
+click "In##cut.in"
+hold ctrl+shift
+drag_path 0.5 0.5 0.7 0.7
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_in
+key ctrl+z
+click "Add##cut.add"
+hold ctrl+shift
+drag_path 0.5 0.5 0.7 0.7
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_add
+key ctrl+z
+click "Clip##cut.clip"
+hold ctrl+shift
+drag_path 0.5 0.5 0.7 0.7
+hold none
+wait 0.2
+expect_value can_undo == 1
+shot cut_circle_clip
+key ctrl+z
+click "Away##cut.away"
+expect_value triangles == $full
+
+# The Ctrl+Shift brush picker lists it; Select Rectangle hides again.
+hold ctrl+shift
+click "##tile.brush"
+wait 0.1
+expect "Cut Circle##held.cut.circle"
+hover_window 0.5 0.8
+shot cut_circle_brush_picker
+click "Cut Rectangle##held.cut.rect"
+expect_value hide_shape == 5
+click "##tile.brush"
+click "Cut Circle##held.cut.circle"
+hold none
+expect_value hide_shape == 8
+
+# The stroke popup's Shapes row latches Select with it: a plain drag cuts a circle, no key held.
+hover_window 0.5 0.5
+key g
+expect_value stroke_popup_open == 1
+stroke_popup_item cut_circle
+shot hover_cut_circle
+stroke_popup_item cut_circle click
+expect_value stroke_latch == 3
+expect_value hide_shape == 8
+key escape
+hover_model 0.5 0.5
+view_drag 0.5 0.5 0.66 0.66
+wait 0.2
+expect_value can_undo == 1
+expect_value triangles != $full

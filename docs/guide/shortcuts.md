@@ -264,11 +264,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Blur / sharpen the mask | <kbd>Ctrl</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click the model |
 | Invert the mask | <kbd>Ctrl</kbd>+click the background |
 | Clear the mask | <kbd>Ctrl</kbd>+drag on the background with something masked (with **Mask Pen**), or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> |
-| Mask inside a lasso or rectangle | <kbd>Ctrl</kbd>+drag with **Lasso Mask** or **Rectangle Mask** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
+| Mask inside a lasso, rectangle or circle | <kbd>Ctrl</kbd>+drag with **Lasso Mask**, **Rectangle Mask** or **Circle Mask** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
 | Isolate a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click it (again: invert the visibility; with something hidden already: hide it) |
 | Hide a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+click it |
 | Show everything | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background |
-| Hide outside a rectangle or lasso | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **Select Rectangle** or **Select Lasso** in **Tool > Visibility** |
+| Hide outside a rectangle, lasso or circle | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **Select Rectangle**, **Select Lasso** or **Select Circle** in **Tool > Visibility** |
 | Select a Part | <kbd>Alt</kbd>+click it in the view (<kbd>Shift</kbd>+<kbd>Alt</kbd>+click, or a triple-click on another Part: select and frame it) |
 | Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style; the view stays put) |
 | Move, scale or rotate with the Gizmo | <kbd>W</kbd>, <kbd>E</kbd> or <kbd>R</kbd>, then drag a handle; hold <kbd>Shift</kbd> to snap (15 degrees, the grid, 10%) |

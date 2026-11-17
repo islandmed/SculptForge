@@ -1,0 +1,168 @@
+# Circle Mask (#213): Ctrl+drag draws a circle or ellipse from its centre and masks inside it; Ctrl+Alt unmasks; Shift
+# while dragging keeps it round; Draw from corner and Keep round in Tool > Masking; the Ctrl brush and stroke pickers and
+# the stroke popup offer it; one undo step per selection.
+run new_sphere subdivisions=5
+input_style classic
+key x
+expect_value symmetry_x == 0
+expect_value masked == 0
+
+# The shape sits with the other mask shapes at the top of Tool > Masking, with Ctrl-hover help, and its options show.
+click "Masking"
+expect_not "Draw from corner##circle"
+click "Circle Mask##mask.circle"
+expect_value mask_shape == 7
+expect "Draw from corner##circle"
+expect "Keep round##circle"
+hold ctrl
+hover "Circle Mask##mask.circle"
+expect_help "circle"
+hold none
+shot circle_mask_panel
+
+# Ctrl+drag from the middle toward the lower right: the press is the centre, so the ellipse is wider than tall.
+hold ctrl
+drag_path 0.5 0.5 0.72 0.64 keep
+expect_value selection_shown == 1
+shot circle_mask_drawing
+release
+hold none
+expect_value selection_shown == 0
+expect_value masked > 200
+expect_value can_undo == 1
+remember masked ellipse
+shot circle_mask_ellipse
+
+# Ctrl+Alt on the same drag unmasks exactly what it masked.
+hold ctrl+alt
+drag_path 0.5 0.5 0.72 0.64
+hold none
+expect_value masked == 0
+key ctrl+z
+expect_value masked == $ellipse
+key ctrl+z
+expect_value masked == 0
+
+# Shift pressed while dragging keeps it a circle (the longer way, the cursor's distance from the centre): more is masked.
+hold ctrl
+drag_path 0.5 0.5 0.72 0.64 keep
+hold ctrl+shift
+shot circle_mask_round
+release
+hold none
+expect_value masked > $ellipse
+remember masked round
+key ctrl+z
+
+# Keep round does the same on every drag, and Shift then turns it back into the ellipse.
+click "Keep round##circle"
+hold ctrl
+drag_path 0.5 0.5 0.72 0.64
+hold none
+expect_value masked == $round
+key ctrl+z
+hold ctrl
+drag_path 0.5 0.5 0.72 0.64 keep
+hold ctrl+shift
+release
+hold none
+expect_value masked == $ellipse
+key ctrl+z
+click "Keep round##circle"
+
+# Draw from corner: the press and the cursor are opposite corners of the box, so the same drag masks a smaller circle.
+hold ctrl
+drag_path 0.3 0.3 0.7 0.7
+hold none
+remember masked from_centre
+key ctrl+z
+click "Draw from corner##circle"
+hold ctrl
+drag_path 0.3 0.3 0.7 0.7 keep
+shot circle_mask_corner
+release
+hold none
+expect_value masked > 100
+expect_value masked < $from_centre
+key ctrl+z
+click "Draw from corner##circle"
+
+# Space (#214) slides the circle: its size (the press to the cursor) stays, its centre moves; let go and it sizes again.
+hold ctrl
+drag_path 0.4 0.45 0.55 0.6 keep
+expect_value selection_shown == 1
+remember selection_x0 x0
+remember selection_w w0
+remember selection_h h0
+key_down space
+drag_path 0.55 0.6 0.75 0.75 keep
+expect_value selection_x0 > $x0
+expect_value selection_w < $w0+1
+expect_value selection_w > $w0-1
+expect_value selection_h < $h0+1
+expect_value selection_h > $h0-1
+shot circle_mask_space_moved
+key_up space
+release
+hold none
+expect_value masked > 100
+expect_value can_undo == 1
+key ctrl+z
+expect_value masked == 0
+
+# A click without dragging masks nothing new: on the background it inverts, as with the other shapes.
+hold ctrl
+drag_path 1.4 0.5 1.4 0.5
+hold none
+expect_value masked > 1000
+key ctrl+z
+expect_value masked == 0
+
+# A circle that covers none of the model clears the mask instead (undo brings it back).
+hold ctrl
+drag_path 0.5 0.5 0.72 0.64
+hold none
+expect_value masked > 200
+hold ctrl
+drag_path 1.5 0.5 1.62 0.6
+hold none
+expect_value masked == 0
+key ctrl+z
+expect_value masked == $ellipse
+click "Clear##mask"
+
+# The Ctrl brush and stroke pickers list it.
+hold ctrl
+click "##tile.stroke"
+wait 0.1
+expect "Circle##held.mask.circle"
+hover_window 0.5 0.8
+shot circle_mask_stroke_picker
+click "Circle##held.mask.circle"
+hold none
+expect_value mask_shape == 7
+click "Mask Pen##mask.pen"
+expect_value mask_shape == 0
+hold ctrl
+key ctrl+b
+wait 0.1
+expect "Circle Mask##held.mask.circle"
+click "Circle Mask##held.mask.circle"
+hold none
+expect_value mask_shape == 7
+
+# The stroke popup's Shapes row latches Mask with it: a plain drag masks a circle, no key held.
+click "Mask Pen##mask.pen"
+hover_window 0.5 0.5
+key g
+expect_value stroke_popup_open == 1
+stroke_popup_item mask_circle
+shot hover_mask_circle
+stroke_popup_item mask_circle click
+expect_value stroke_latch == 2
+expect_value mask_shape == 7
+key escape
+hover_model 0.5 0.5
+view_drag 0.5 0.5 0.7 0.7
+expect_value masked > 100
+expect_value can_undo == 1

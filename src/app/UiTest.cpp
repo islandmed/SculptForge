@@ -47,8 +47,8 @@
 //                            keep: leave the button down (a shot mid-drag), then `release`
 //   gizmo_hover HANDLE       move the mouse onto a Transform gizmo handle (it lights up, for screenshots)
 //   stroke_popup_item ITEM [click] [S]  glide onto an item of the open stroke popup (dots drag_stamp slide_stamp spray
-//                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect cut_line cut_lasso cut_rect
-//                            cut_polyline, or outside: just right of the panel); click: press and let go;
+//                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect mask_circle cut_line cut_lasso
+//                            cut_rect cut_circle cut_polyline, or outside: just right of the panel); click: press and let go;
 //                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
@@ -206,7 +206,7 @@
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
-//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
+//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle)
 //                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
 //                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on), threads (the shared pool's size), profile_threads (the saved profile's, for the next start),
@@ -1049,8 +1049,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ai_link_state") return double(app_.aiLinkStateValue()); // live mode (PanelAiLink.cpp)
     if (name == "ai_client_lines") return g_aiClient ? double(g_aiClient->count()) : 0.0;
     if (name == "undo_ai") return app_.doc_.undo.canUndo() && app_.doc_.undo.undoLabel().rfind("AI: ", 0) == 0 ? 1.0 : 0.0;
-    if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect
-    if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect
+    if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle
+    if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle
     if (name.rfind("phone_", 0) == 0) {
         const bool on = app_.phone_ && app_.phone_->running();
         const link::PhoneLinkStatus st = on ? app_.phone_->status() : link::PhoneLinkStatus{};
@@ -2760,8 +2760,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         static const char* kItems[] = {"dots",      "drag_stamp", "slide_stamp", "spray",    "lazy",
                                        "add",       "sub",        "smooth",      "mask",     "select",
-                                       "mask_pen",  "mask_lasso", "mask_rect",   "cut_line", "cut_lasso",
-                                       "cut_rect",  "cut_polyline"};
+                                       "mask_pen",  "mask_lasso", "mask_rect",   "mask_circle", "cut_line",
+                                       "cut_lasso", "cut_rect",   "cut_circle",  "cut_polyline"};
         static_assert(std::size(kItems) == size_t(kStrokePopupItems));
         int item = w[1] == "outside" ? -2 : -1;
         for (int i = 0; i < int(std::size(kItems)); ++i)
