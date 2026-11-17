@@ -262,6 +262,7 @@ test_mesh_maps              mesh
 test_mesh_preview           mesh
 test_ink                    sculpt
 test_micro                  mesh
+test_micro_history          sculpt
 test_micro_mask_grab        mesh
 test_multires*              mesh
 test_part*                  mesh
