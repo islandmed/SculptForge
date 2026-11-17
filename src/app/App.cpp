@@ -1315,6 +1315,9 @@ int App::run() {
                 if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain && strokeDraining()) {
                     if (std::string(drain) == "none") { // (the frames of a stroke's end alone, to compare)
                         sm.drainQueued = true;
+                    } else if (std::string(drain) == "save") { // (Ctrl+S: the file must hold the finished stroke)
+                        const std::string path = (std::filesystem::temp_directory_path() / "sf-measure-drain.sfproj").string();
+                        runInteractive([this, path] { runCommand("save_project", {{"path", path}}); });
                     } else if (std::string(drain) == "stroke") {
                         onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT); // (on the circle: on the model)
                         onMouseUp();
@@ -1376,9 +1379,21 @@ int App::run() {
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
                 else if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain) {
                     // The queued Ctrl+Z took the whole stroke back; the held click became a stroke of its own after it.
-                    const bool none = std::string(drain) == "none", undo = !none && std::string(drain) != "stroke";
-                    const bool ok = sm.drainQueued && (none || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
-                    std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n", none ? "nothing" : undo ? "Ctrl+Z" : "a click",
+                    const bool none = std::string(drain) == "none", save = std::string(drain) == "save";
+                    const bool undo = !none && !save && std::string(drain) != "stroke";
+                    bool saved = true;
+                    if (save) { // the saved file, opened again, is the finished stroke's mesh, bit for bit
+                        Document reread;
+                        std::string error;
+                        const std::string path = (std::filesystem::temp_directory_path() / "sf-measure-drain.sfproj").string();
+                        saved = loadProject(path, reread, error) && meshStateHash(reread.mesh) == meshStateHash(doc_.mesh);
+                        if (!saved) std::printf("drain: the saved file differs from the mesh%s%s\n", error.empty() ? "" : ": ", error.c_str());
+                        std::filesystem::remove(path);
+                    }
+                    const bool ok = sm.drainQueued && saved && (!save || sm.drainWorstFrame < 0.05) && // (saving never holds a frame up)
+                                    (none || save || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
+                    std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n",
+                                none ? "nothing" : save ? "Ctrl+S" : undo ? "Ctrl+Z" : "a click",
                                 sm.drainQueued ? "waited" : "did NOT wait", sm.drainWorstFrame * 1000.0, ok ? "ok" : "FAILED");
                     if (!ok) return 1;
                 } else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;

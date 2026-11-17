@@ -1513,6 +1513,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ui_stroke_drain_undo COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_drain_undo PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=undo;SF_PREDICTIVE_STROKE=1")
+    # And Ctrl+S: the file, opened again, is the finished stroke, bit for bit, and no frame waits on the stroke meanwhile.
+    add_test(NAME ui_stroke_drain_save COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_save PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=save;SF_PREDICTIVE_STROKE=1")
     add_test(NAME ui_stroke_drain_click COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_drain_click PROPERTIES LABELS ui TIMEOUT 60
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=stroke;SF_PREDICTIVE_STROKE=1")
