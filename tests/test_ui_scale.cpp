@@ -19,7 +19,7 @@ bool near(float a, float b, float eps = 0.01f) { return std::abs(a - b) < eps; }
 #ifdef SF_IOS
 TEST(ui_scale_automatic_is_half_again_for_fingers_on_the_ipad) {
     CHECK(near(automaticUiScale(2.0f, 2.0f), 1.5f)); // a Retina iPad: points, then the touch factor (UiScale.h)
-    CHECK(near(automaticUiScale(0.0f, 1.0f), 1.5f));
+    CHECK(near(automaticUiScale(0.0f, 1.0f), 1.0f)); // SDL couldn't tell: 100 %, as everywhere
 }
 #else
 TEST(ui_scale_automatic_follows_the_display) {
