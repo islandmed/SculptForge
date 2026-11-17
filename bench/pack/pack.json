@@ -1,0 +1,32 @@
+{
+  "schema": "sculptforge-bench-pack/1",
+  "name": "SculptForge bench pack",
+  "version": 1,
+  "stroke_set": "pack/1",
+  "scenes": [
+    {
+      "id": "creature-floor",
+      "title": "Creature head, 5.8 million triangles: the entry level every supported computer should carry",
+      "file": "creature-head.sfproj",
+      "divide": 5,
+      "tier": "floor",
+      "triangles": 5767168
+    },
+    {
+      "id": "creature-standard",
+      "title": "Creature head, 23 million triangles: a mid-range computer",
+      "file": "creature-head.sfproj",
+      "divide": 6,
+      "tier": "standard",
+      "triangles": 23068672
+    },
+    {
+      "id": "creature-high",
+      "title": "Creature head, 92 million triangles: a workstation (needs about 14 GB of free memory)",
+      "file": "creature-head.sfproj",
+      "divide": 7,
+      "tier": "high",
+      "triangles": 92274688
+    }
+  ]
+}

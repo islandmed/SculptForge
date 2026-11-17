@@ -9,6 +9,7 @@
 #include "app/StartupSplashWindow.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
+#include "core/BenchPack.h"
 #include "core/Benchmark.h"
 #include "core/ExitWatchdog.h"
 #include "core/Wavelet.h"
@@ -108,12 +109,15 @@ void usage() {
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
         "  --benchmark core-100m    The same at 100 million micro triangles\n"
         "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
+        "  --benchmark-pack DIR     The scene pack (the folder with pack.json, from sculptforge.app/benchmarks): its scenes\n"
+        "                           from the entry level up, the standard strokes on each; add --out results.json (no video\n"
+        "                           unless --benchmark-video)\n"
         "  --benchmark-script T.sfui  Play a take (a UI test script's strokes, orbits, keys and waits) in real time\n"
         "                           with the HUD; writes an MP4 and a per-frame CSV (frame ms, stroke lag) and exits.\n"
         "                           A project to open goes after it: --benchmark-script take.sfui head.sfproj\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
-        "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
+        "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here); --out is the same\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
         "  --benchmark-vsync        Keep vertical sync on (default off: frame times are not capped)\n"
         "  --benchmark-seconds S    Length of each scripted stroke (default 6)\n"
@@ -276,12 +280,16 @@ static int runMain(int argc, char** argv) {
             options.benchmark = true;
             options.benchmarkScene = "file:" + next();
         }
+        else if (a == "--benchmark-pack") { // the downloadable scene pack (docs/benchmark.md "The scene pack")
+            options.benchmark = true;
+            options.benchmarkScene = "pack:" + next();
+        }
         else if (a == "--benchmark-script") { // a take in real time (BenchTake.cpp)
             options.benchmark = true;
             options.benchmarkScript = next();
         }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
-        else if (a == "--benchmark-out") options.benchmarkOut = next();
+        else if (a == "--benchmark-out" || a == "--out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();
         else if (a == "--benchmark-no-video") options.benchmarkNoVideo = true;
         else if (a == "--benchmark-vsync") options.benchmarkVsync = true;
@@ -327,6 +335,14 @@ static int runMain(int argc, char** argv) {
         std::string error;
         if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
             std::fprintf(stderr, "standard-1b: %s\n", error.c_str());
+            return 1;
+        }
+    }
+    if (options.benchmarkScene.rfind("pack:", 0) == 0) { // the pack first: a missing or damaged one is a message, not a window
+        sf::BenchPack pack;
+        std::string error;
+        if (!sf::loadBenchPack(options.benchmarkScene.substr(5), pack, error)) {
+            std::fprintf(stderr, "--benchmark-pack: %s\n", error.c_str());
             return 1;
         }
     }

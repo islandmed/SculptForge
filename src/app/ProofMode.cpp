@@ -27,6 +27,8 @@
 #include "core/Benchmark.h"
 #include "core/BrushAlpha.h"
 #include "core/HardwareProfile.h"
+#include "core/HardwareTier.h"
+#include "core/TierConfig.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -136,6 +138,20 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
         return {s};
     }
     return {};
+}
+
+std::vector<ProofMeshSize> proofPackScenes(std::shared_ptr<const BenchPack> pack) {
+    std::vector<ProofMeshSize> out;
+    for (const BenchPackScene& scene : pack->scenes) {
+        ProofMeshSize s;
+        s.millions = scene.triangles / 1e6;
+        s.label = scene.id;
+        s.tier = scene.tier;
+        s.bytesPerTriangle = 150; // like the heads: mesh, BVH, levels, GPU buffers, history
+        s.tryBuild = [pack, scene](Mesh& m, std::string& error) { return buildBenchPackScene(*pack, scene, m, error); };
+        out.push_back(std::move(s));
+    }
+    return out;
 }
 
 namespace {
@@ -358,6 +374,7 @@ struct PhaseResult {
 
 struct SizeResult {
     std::string label;
+    std::string tier; // a scene pack scene's tier label
     size_t triangles = 0, vertices = 0;
     double buildSeconds = 0;
     double firstFrameSeconds = 0; // build start to the first frame showing the mesh
@@ -370,7 +387,8 @@ struct SizeResult {
     long long drmKb = -1, drmBeforeKb = -1; // the most drmUsedKb() showed, and before the build
     std::vector<PhaseResult> phases;
     MemoryCheck memory;  // free memory before the build
-    std::string skipped; // not built: too little free memory (benchmarkSkippedMessage)
+    std::string skipped; // not built: too little free memory (benchmarkSkippedMessage), or a pack scene that wouldn't build (failed)
+    bool failed = false; // a pack scene that wouldn't build
 };
 
 } // namespace
@@ -379,7 +397,8 @@ struct ProofState {
     enum class Stage { Intro, Announce, Build, Settle, Phase, Finish, Results };
     Stage stage = Stage::Intro;
     bool cli = false, video = true, vsync = false;
-    std::string scene; // "standard-15m", "standard-33m", "standard", or empty (the sphere sizes)
+    std::string scene; // "standard-15m", "standard-33m", "standard", "pack:<dir>" (a scene pack), or empty (the sphere sizes)
+    std::shared_ptr<const BenchPack> pack; // the scene pack of a pack: scene
     int sceneChoice = 0; // the Intro's choice: 0 standard-15m, 1 standard-33m, 2 standard, 3 spheres
     double strokeSeconds = 6.0;
     std::string jsonPath, videoPath;
@@ -457,7 +476,14 @@ std::vector<ProofMeshSize> parseSizes(const std::string& list) {
 
 bool App::proofSkippedScenes() const {
     if (!proof_) return false;
+    // A scene pack leaves out what the computer has no memory for (the result says so, and it still counts); only a
+    // scene that wouldn't build is a failure (exit 1, below).
+    if (proof_->pack) return false;
     return std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return !r.skipped.empty(); });
+}
+
+bool App::proofFailed() const {
+    return proof_ && std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return r.failed; });
 }
 
 void App::startProofMode() {
@@ -465,14 +491,28 @@ void App::startProofMode() {
     auto p = std::make_shared<ProofState>();
     p->cli = options_.benchmark;
     p->video = !options_.benchmarkNoVideo;
+    if (options_.benchmarkScene.rfind("pack:", 0) == 0 && options_.benchmarkVideo.empty()) p->video = false; // (a pack run writes one JSON; --benchmark-video asks for the clip)
     p->vsync = options_.benchmarkVsync;
     p->strokeSeconds = std::max(1.0f, options_.benchmarkStrokeSeconds);
     // The CLI's scene, or for Help > Benchmark the standard 15M scene (the Intro offers the others).
     p->scene = options_.benchmarkScene;
     if (p->scene.empty() && !p->cli && options_.benchmarkSizes.empty()) p->scene = "standard-15m";
     p->sceneChoice = p->scene == "standard-33m" ? 1 : p->scene == "standard" ? 2 : p->scene.empty() ? 3 : 0;
-    p->sizes = !p->scene.empty() ? proofStandardScene(p->scene)
-               : options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
+    if (p->scene.rfind("pack:", 0) == 0) { // --benchmark-pack DIR (main checked the pack before the window opened)
+        auto pack = std::make_shared<BenchPack>();
+        std::string error;
+        if (loadBenchPack(p->scene.substr(5), *pack, error)) {
+            p->pack = pack;
+            p->sizes = proofPackScenes(pack);
+        } else {
+            std::fprintf(stderr, "benchmark pack: %s\n", error.c_str());
+            p->error = error;
+            p->scene.clear();
+        }
+    } else {
+        p->sizes = !p->scene.empty() ? proofStandardScene(p->scene)
+                   : options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
+    }
     if (p->sizes.empty()) p->sizes = proofDefaultSizes(availableMemoryBytes());
     const std::string stamp = fileStamp();
     std::filesystem::path dir = std::filesystem::current_path();
@@ -491,7 +531,7 @@ void App::startProofMode() {
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"orbit", 0.0f, 10.0},
                      {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
-    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds); // (a pack too: kProofPackStrokeSet)
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
                       {"still", -1.0f, 0.6}};
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
@@ -830,6 +870,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     reinterpret_cast<const char*>(gl::GetString(GL_VERSION));
             p.hardware = describeHardware();
             p.hardware.set("gpu", p.gpu);
+            // The same, split for the results page: the renderer, and the driver as the OpenGL version string reports it
+            // (Mesa and NVIDIA put their release in it), and the hardware tier SculptForge put this computer in.
+            p.hardware.set("gpu_name", std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))));
+            p.hardware.set("driver", std::string(reinterpret_cast<const char*>(gl::GetString(GL_VERSION))));
+            p.hardware.set("hw_tier", std::string(hwTierName(currentTierConfig().hwTier)));
             int ww = 0, wh = 0;
             SDL_GetWindowSize(window_, &ww, &wh);
             Json win = Json::array();
@@ -855,6 +900,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (!memory.enough) {
             SizeResult r;
             r.label = s.label;
+            r.tier = s.tier;
             r.memory = memory;
             r.skipped = benchmarkSkippedMessage(s.label, memory);
             SDL_Log("Benchmark: %s", r.skipped.c_str());
@@ -869,9 +915,27 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
         const size_t tris = size_t(s.millions * 1e6);
-        Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
+        Mesh m;
+        std::string buildError;
+        const bool built = s.tryBuild ? s.tryBuild(m, buildError) : (m = s.build ? s.build(tris) : makeBenchSphere(tris), true);
+        if (!built) { // a pack scene that won't build: said in the result, which then isn't a complete one
+            SizeResult r;
+            r.label = s.label;
+            r.tier = s.tier;
+            r.skipped = buildError;
+            r.failed = true;
+            SDL_Log("Benchmark: %s", r.skipped.c_str());
+            std::fprintf(stderr, "benchmark: %s\n", r.skipped.c_str());
+            p.error += (p.error.empty() ? "" : "; ") + r.skipped;
+            p.results.push_back(r);
+            p.hudTitle = r.skipped;
+            ++p.sizeIndex;
+            p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
+            break;
+        }
         SizeResult r;
         r.label = s.label;
+        r.tier = s.tier;
         r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
@@ -1058,7 +1122,15 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         settings.set("video", p.video);
         settings.set("pointer_hz", kPointerHz);
         settings.set("stroke_seconds", p.strokeSeconds);
-        if (!p.scene.empty()) {
+        if (p.pack) { // a scene pack: which one (the hash is of pack.json and every scene file), and the strokes it played
+            settings.set("scene", "pack-" + std::to_string(p.pack->version));
+            settings.set("stroke_set", kProofPackStrokeSet);
+            Json pk = Json::object();
+            pk.set("name", p.pack->name);
+            pk.set("version", p.pack->version);
+            pk.set("sha256", p.pack->sha256);
+            settings.set("pack", pk);
+        } else if (!p.scene.empty()) {
             settings.set("scene", p.scene);
             settings.set("stroke_set", kProofStrokeSet);
         }
@@ -1079,6 +1151,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             }
             Json run = Json::object();
             run.set("label", r.label);
+            if (!r.tier.empty()) run.set("tier", r.tier);
             run.set("triangles", double(r.triangles));
             run.set("vertices", double(r.vertices));
             run.set("build_seconds", std::round(r.buildSeconds * 100) / 100);
@@ -1174,7 +1247,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (!p.error.empty()) root.set("notes", p.error);
         {
             std::ofstream f(std::filesystem::path(std::u8string(p.jsonPath.begin(), p.jsonPath.end())));
-            f << root.dump(true) << "\n";
+            // (A pack result is pasted into an issue form, whose text box holds 65,536 characters: no indentation.)
+            f << root.dump(!p.pack) << "\n";
             if (!f) p.error += (p.error.empty() ? "" : "; ") + ("couldn't write " + p.jsonPath);
         }
         // A summary on the terminal too.

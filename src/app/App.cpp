@@ -1579,6 +1579,7 @@ int App::run() {
     }
     finishProject();
     if (take_) return takeExitCode_;
+    if (options_.benchmark && proofFailed()) return 1; // (--benchmark-pack: a scene that wouldn't build)
     return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
 }
 
