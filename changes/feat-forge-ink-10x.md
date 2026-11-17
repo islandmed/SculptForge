@@ -2,7 +2,7 @@
 added: Micro close-ups: in smooth shading the viewport can draw up to two levels finer than the stored micro grid when the
   camera is close (three on Extreme tier hardware), the surface between stored points following the model's curvature, with
   no new data in memory or on disk and within the usual triangle budget; flat shading shows the stored grid as before, and
-  picks and brushes are unchanged. Head-on, the default view looks the same as before; measured on the floor tier's
+  picks and brushes are unchanged. Head-on it softens the stored creases by at most 10 of 255 levels, with no seam; measured on the floor tier's
   billion-triangle Focus Detail scene (x3): 240 px stroke p99 156 -> 116 ms, orbit 62.7 -> 72.0 fps, memory unchanged
   (2.2 GB). SF_TIER_MICRO_DRAW_ABOVE sets the extra levels (0 = as before). Credit: Aymen G on Discord (idea).
 testers:
