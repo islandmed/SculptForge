@@ -380,7 +380,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ui::TileLiftScope lift; // the tile lifts on hover; the layout stays
     lift.lift = ui::BeginTileLift(p0, p1);
     dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), theme::rounding(4.0f * s));
-    ImTextureID tex = type >= 0 ? app.thumbnails().brush(type) : ImTextureID(0);
+    ImTextureID tex = type >= 0 ? app.brushThumbnail(type) : ImTextureID(0);
     if (a.id == "draw.paint") { // the Paint brush's own preview (Pickers.cpp)
         BrushItem paint;
         paint.kind = BrushItem::Kind::Paint;
@@ -3089,7 +3089,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         if (ImGui::IsItemHovered()) dl->AddRectFilled(a, b, theme::u32(theme::buttonHover, 0.55f), theme::rounding(4.0f * s));
         const float capH = (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 2.0f * s;
         const float pic = size.y - capH;
-        ImTextureID tex = found >= 0 ? thumbs_.recipe(doc_.brushes[size_t(found)]) : ImTextureID(0);
+        ImTextureID tex = found >= 0 ? recipeThumbnail(doc_.brushes[size_t(found)]) : ImTextureID(0);
         const ImVec2 c((a.x + b.x) * 0.5f, a.y + pic * 0.5f);
         if (tex) dl->AddImageRounded(tex, ImVec2(c.x - pic * 0.5f, a.y), ImVec2(c.x + pic * 0.5f, a.y + pic), ImVec2(0, 0), ImVec2(1, 1),
                                      IM_COL32_WHITE, theme::rounding(4.0f * s));
@@ -3168,6 +3168,14 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                                                 : layout_.bottomShelf;
             if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
             noteLayoutChanged();
+        }
+        // The brush's thumbnail shows its alpha and stroke (#208): made again from the alpha file as it is now.
+        const int typeSlot = brushTypeOfAction(item);
+        const bool recipeSlot = item.rfind("brush.recipe.", 0) == 0;
+        const int recipeFound = recipeSlot ? findBrushForSlot(doc_, item.substr(13), std::string()) : -1;
+        if ((typeSlot >= 0 || recipeFound >= 0) && ImGui::MenuItem(tr("Regenerate thumbnail"))) {
+            if (typeSlot >= 0) regenerateBrushThumbnail(typeSlot);
+            else regenerateRecipeThumbnail(doc_.brushes[size_t(recipeFound)]);
         }
         if (shelf == kShelfBottom && ImGui::BeginMenu(tr("Brush set"))) { // also the Brush palette's (#143)
             drawBrushSetMenu();
@@ -3530,7 +3538,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         ImVec2 a, b;
         ui::TileLiftScope lift;
         const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, brushLabel(BrushType(ctrlBrush)), s, a, b);
-        if (ImTextureID tex = thumbs_.brush(ctrlBrush)) {
+        if (ImTextureID tex = brushThumbnail(ctrlBrush)) {
             squareIn(a, b, 2.0f * s);
             ImGui::GetWindowDrawList()->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
         }
@@ -3556,7 +3564,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     ui::TileLiftScope lift;
     const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
+    ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? recipeThumbnail(*recipe) : brushThumbnail(int(brush_));
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.36f;
     if (tex) {

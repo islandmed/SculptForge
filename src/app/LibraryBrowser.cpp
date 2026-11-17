@@ -442,9 +442,9 @@ ImTextureID LibraryBrowser::thumbnail(App& app, const AssetEntry& e) {
     case AssetKind::Primitive:
         return t.primitive(e.index);
     case AssetKind::BrushType:
-        return t.brush(e.index);
+        return app.brushThumbnail(e.index);
     case AssetKind::Recipe:
-        return e.index >= 0 && e.index < int(app.doc_.brushes.size()) ? t.recipe(app.doc_.brushes[size_t(e.index)])
+        return e.index >= 0 && e.index < int(app.doc_.brushes.size()) ? app.recipeThumbnail(app.doc_.brushes[size_t(e.index)])
                                                                       : ImTextureID(0);
     case AssetKind::Alpha:
         return t.alpha(builtinAlpha(e.index));
@@ -583,6 +583,11 @@ void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
         if (e.kind == AssetKind::AlphaFile && ImGui::MenuItem(tr("Add to alpha pool")))
             app.runCommand("brush_alpha_pool", {{"path", e.path}});
     }
+    if (e.kind == AssetKind::BrushType && e.index != kPaintBrush && ImGui::MenuItem(tr("Regenerate thumbnail")))
+        app.regenerateBrushThumbnail(e.index);
+    if (e.kind == AssetKind::Recipe && e.index >= 0 && e.index < int(app.doc_.brushes.size()) &&
+        ImGui::MenuItem(tr("Regenerate thumbnail")))
+        app.regenerateRecipeThumbnail(app.doc_.brushes[size_t(e.index)]);
     if (!e.path.empty() && e.kind != AssetKind::Up) {
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Show in file manager"))) {

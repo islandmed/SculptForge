@@ -5,6 +5,8 @@
 // strokes, so every way of picking a brush (shelf, pickers, keys, the Library, scripts, Ctrl-held brushes) behaves
 // the same without each of them knowing about it.
 #include "app/App.h"
+#include "app/AssetLibrary.h"
+#include "app/BrushPreview.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
 
@@ -54,6 +56,38 @@ BrushToolSettings App::liveBrushSettings() const {
     s.pressureSize = penSize_;
     s.pressureStrength = penStrength_;
     return s;
+}
+
+bool App::thumbnailLook(const std::string& key, BrushToolSettings& out) const {
+    if (key == brushSettingsKey_) out = liveBrushSettings();
+    else if (!brushSettings_.peek(key, out)) return false;
+    return hasAlphaLook(out);
+}
+
+ImTextureID App::brushThumbnail(int brushType) {
+    BrushToolSettings look;
+    const bool has = brushType != kPaintBrush && brushType >= 0 && brushType < int(BrushType::Count) &&
+                     thumbnailLook(brushSettingsKey(brushName(BrushType(brushType))), look);
+    return thumbs_.brush(brushType, has ? &look : nullptr);
+}
+
+ImTextureID App::recipeThumbnail(const BrushRecipe& recipe) {
+    BrushToolSettings look;
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    return thumbs_.recipe(recipe, has ? &look : nullptr);
+}
+
+void App::regenerateBrushThumbnail(int brushType) {
+    BrushToolSettings look;
+    const bool has = brushType != kPaintBrush && brushType >= 0 && brushType < int(BrushType::Count) &&
+                     thumbnailLook(brushSettingsKey(brushName(BrushType(brushType))), look);
+    thumbs_.regenerateBrush(brushType, has ? &look : nullptr);
+}
+
+void App::regenerateRecipeThumbnail(const BrushRecipe& recipe) {
+    BrushToolSettings look;
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    thumbs_.regenerateRecipe(recipe, has ? &look : nullptr);
 }
 
 void App::applyBrushSettings(const BrushToolSettings& in) {

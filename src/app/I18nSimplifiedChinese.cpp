@@ -801,6 +801,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Use as VDM", "用作 VDM"},
     {"Show in file manager", "在文件管理器中显示"},
     {"Refresh thumbnail", "刷新缩略图"},
+    {"Regenerate thumbnail", "重新生成缩略图"},
     {"Nothing here matches \"%s\".", "找不到符合“%s”的项目。"},
     {"Library rows", "资源库行数"},
     {"Library at the top", "资源库置于上方"},

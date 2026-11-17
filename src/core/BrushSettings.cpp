@@ -122,6 +122,14 @@ bool BrushSettingsStore::savedFor(const std::string& key, BrushToolSettings& out
     return true;
 }
 
+bool BrushSettingsStore::peek(const std::string& key, BrushToolSettings& out) const {
+    if (const auto it = session_.find(key); it != session_.end()) {
+        out = it->second;
+        return true;
+    }
+    return savedFor(key, out);
+}
+
 void BrushSettingsStore::store(const std::string& key, const BrushToolSettings& s) {
     saved_[key] = s;
     session_[key] = s;

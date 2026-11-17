@@ -2970,7 +2970,14 @@ private:
     // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
 public:
     std::string currentBrushKey() const; // "builtin:Clay", "custom:Clay Slab"
+    // Brush thumbnails with the brush's own alpha and stroke type (#208): the live settings for the brush in use, else
+    // what it used this session or saved; a brush with no alpha gets the plain thumbnail.
+    ImTextureID brushThumbnail(int brushType);
+    ImTextureID recipeThumbnail(const BrushRecipe& recipe);
+    void regenerateBrushThumbnail(int brushType);
+    void regenerateRecipeThumbnail(const BrushRecipe& recipe);
     BrushToolSettings liveBrushSettings() const;
+    bool thumbnailLook(const std::string& key, BrushToolSettings& out) const;
     void applyBrushSettings(const BrushToolSettings& s);
     void saveBrushSettings();  // Brush > Save Brush Settings
     void resetBrushSettings(); // Brush > Reset Brush to Default

@@ -1,0 +1,69 @@
+# #208: a brush's thumbnail (shelf slot, picker, Brush panel) shows its alpha pressed into the ball in the brush's own
+# stroke type, so brushes that differ only by alpha tell apart at a glance; right-click > Regenerate thumbnail makes it again.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+expect_value brush_looks == 0
+
+# Four brushes: scales as a Drag Stamp, rivets with Dots, cracks as a Spray, an alpha image with Dots, and a plain one.
+run brush_create name="Scales Stamp" depth=0.3
+wait 0.2
+run brush_set_alpha name=scales
+click "Stroke##palette.stroke"
+click "Drag Stamp##stroke"
+key escape
+wait 0.2
+run brush_create name="Rivet Dots" depth=0.3
+wait 0.2
+run brush_set_alpha name=rivets
+click "Stroke##palette.stroke"
+click "Dots##stroke"
+key escape
+wait 0.2
+run brush_create name="Crack Spray" depth=0.3
+wait 0.2
+run brush_set_alpha name=cracks
+click "Stroke##palette.stroke"
+click "Spray##stroke"
+key escape
+wait 0.2
+run brush_create name="Grit Dots" depth=0.3
+wait 0.2
+run brush_set_alpha path=$SCRIPT_DIR/data/packs/demo/alphas/Grit.png
+click "Stroke##palette.stroke"
+click "Dots##stroke"
+key escape
+wait 0.2
+run brush_create name="Plain Slab" depth=0.3
+wait 0.2
+run brush_set_alpha name=round
+wait 0.2
+
+# The picker asks for each brush's own look (nothing for the plain one).
+key b
+wait_idle 60
+wait 0.5
+expect_value brush_looks >= 4
+shot alpha-thumbnails
+
+# Right-click > Regenerate thumbnail on a shelf slot.
+key escape
+click "##addbrush"
+click "Scales Stamp"
+click "##addbrush"
+click "Rivet Dots"
+click "##addbrush"
+click "Crack Spray"
+click "##addbrush"
+click "Grit Dots"
+wait_idle 60
+right_click "Scales Stamp##brush.recipe.Scales Stamp"
+click "Regenerate thumbnail"
+expect_value thumbnails_regenerated == 1
+wait_idle 60
+wait 0.5
+shot shelf-slots
+
+# HiDPI.
+ui_scale 200
+wait_idle 60
+shot alpha-thumbnails-hidpi
