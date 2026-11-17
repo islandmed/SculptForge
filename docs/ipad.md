@@ -28,6 +28,9 @@ and takes screenshots on a base iPad and on the biggest iPad Pro (`tools/ci/ios-
   switch: face group colours, the texture preview and baked normal maps (they need a geometry shader and `gl_PrimitiveID`),
   and the wireframe's fade of sub-pixel edges. `SF_GLES_LEVEL=300` runs the tier on any driver, desktop GL included:
   `ui_render_matrix_es30` draws every shading mode on every mesh path that way in T0.
+- **Landscape, full screen** for now: the tablet layout comes with portrait.
+- **No memberships in the app:** no membership card, prices or links to join (App Store rules); members join on the
+  website and their perks come with their account.
 - **Pencil and touch:** SDL's pen events (pressure, tilt, roll; hover on the Pencils that have it), the same path as
   Android's styluses; the touch layout, palm rejection and the 1.5x touch scale are Android's.
 - **Files:** settings, the log and autosaves in the app's Library; **Save** writes to the app's Documents folder, which the

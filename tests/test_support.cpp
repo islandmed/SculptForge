@@ -255,9 +255,25 @@ TEST(support_card_links_match_the_website) {
     CHECK(page.find("founding.json") != std::string::npos);
 }
 
+// The iPad build (App Store guideline 3.1.1): no way to buy a membership from the app. Every link the cards, buttons or
+// the guide could open towards one is a purchase link, and the build that sets SF_IOS has the memberships off.
+TEST(support_ipad_has_no_purchase_path) {
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kSupportUrl, "https://checkout.stripe.com/c/pay"})
+        CHECK(membershipPurchaseLink(url));
+    CHECK(membershipPurchaseLink(supportPageUrl("help-menu")));
+    for (const char* url : {kDiscordUrl, kTermsUrl, "https://sculptforge.app/privacy.html", "https://sculptforge.app/guide/"})
+        CHECK(!membershipPurchaseLink(url));
+#ifdef SF_IOS
+    CHECK(!kInAppMembership);
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl}) CHECK(!supportLinkAllowed(url));
+#else
+    CHECK(kInAppMembership);
+#endif
+}
+
 TEST(support_card_opens_only_its_fixed_links) {
     for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
-        CHECK(url[0] == '\0' || supportLinkAllowed(url));
+        CHECK(url[0] == '\0' || supportLinkAllowed(url) == kInAppMembership); // (the iPad opens none: Support.h)
     for (const char* url : {"", "https://sculptforge.app/terms.html.evil.example", "https://sculptforge.app/terms.htm",
                             "file:///etc/passwd", "https://buy.stripe.com/", "javascript:alert(1)"})
         CHECK(!supportLinkAllowed(url));
@@ -271,7 +287,7 @@ TEST(support_card_opens_only_its_fixed_links) {
         CHECK(u.size() > tag.size() + 1 && u.compare(u.size() - tag.size() - 1, std::string::npos, "?" + tag) == 0); // the only query
         CHECK(u.find('?') == u.size() - tag.size() - 1 && u.find('&') == std::string::npos && u.find('#') == std::string::npos);
         const std::string base = u.substr(0, u.find('?'));
-        CHECK(supportLinkAllowed(u));
+        CHECK(supportLinkAllowed(u) == kInAppMembership);
         CHECK(!supportLinkAllowed(base));                                 // untagged
         CHECK(!supportLinkAllowed(base + "?client_reference_id=other"));  // another tag
         CHECK(!supportLinkAllowed(base + "?client_reference_id=" + kSupportSourceTag + "&email=a@b.c")); // extra params

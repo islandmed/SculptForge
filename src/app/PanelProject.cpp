@@ -1053,7 +1053,7 @@ void App::drawUpdateBanner() {
                 close = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button(tr("Become a member"))) openSupportPage("update-banner");
+            if (kInAppMembership && ImGui::Button(tr("Become a member"))) openSupportPage("update-banner");
             ImGui::SameLine();
             if (ImGui::Button(tr("Later"))) close = true;
             ImGui::SameLine();

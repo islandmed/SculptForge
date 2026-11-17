@@ -6,6 +6,9 @@
 # CMake re-runs when a guide file is added, removed or edited.
 function(embed_guide output dir)
   file(GLOB pages CONFIGURE_DEPENDS RELATIVE ${dir} ${dir}/*.md)
+  if(SF_IOS) # (the iPad: no memberships in the app, src/app/Support.h kInAppMembership)
+    list(REMOVE_ITEM pages support.md)
+  endif()
   file(GLOB images CONFIGURE_DEPENDS RELATIVE ${dir} ${dir}/images/*.jpg ${dir}/images/*.png
        ${dir}/images/*/*.jpg ${dir}/images/*/*.png) # images/<chapter>/ folders too
   list(SORT pages)

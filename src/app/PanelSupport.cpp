@@ -47,6 +47,7 @@ const FoundingMembers& foundingMembers() {
 }
 
 void App::openSupportPage(const char* source) {
+    if (!kInAppMembership) return; // (the iPad: Support.h; every button that calls this is hidden there too)
     ++supportPageRequests_;
     const std::string url = supportPageUrl(source);
     if (!interactive()) { // UI tests, renders and demos never start a browser
@@ -131,7 +132,7 @@ void App::drawSupportersSection() {
         ImGui::EndChild();
     }
     ImGui::TextWrapped("%s", kFreeReleaseNote);
-    if (ImGui::Button(tr("Support SculptForge##about"))) openSupportPage("about");
+    if (kInAppMembership && ImGui::Button(tr("Support SculptForge##about"))) openSupportPage("about");
 }
 
 void App::chooseNewLook(bool tryIt) {
@@ -518,8 +519,10 @@ void App::drawSupportUi() {
             ImGui::SameLine(0.0f, 14.0f * s);
             drawSocialRow("welcome", ImVec2(ImGui::GetCursorScreenPos().x, guideMid)); // centred on the button
             ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - rightW));
-            if (ImGui::Button(tr("Support SculptForge##welcome"), ImVec2(0.0f, btnH))) showSupportCard(SupportCardReason::Manual); // the memberships
-            ImGui::SameLine();
+            if (kInAppMembership) { // (the iPad: no memberships in the app, Support.h)
+                if (ImGui::Button(tr("Support SculptForge##welcome"), ImVec2(0.0f, btnH))) showSupportCard(SupportCardReason::Manual); // the memberships
+                ImGui::SameLine();
+            }
             if (ImGui::Button(tr("Close##welcome"), ImVec2(0.0f, btnH))) showWelcome_ = false;
             welcomeCloseRect_ = ImVec4(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y, ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y);
         }

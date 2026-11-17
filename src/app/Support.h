@@ -57,8 +57,25 @@ inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/a
 inline constexpr const char* kStudioPageUrl = "https://sculptforge.app/studios.html#membership";
 // The membership terms (refunds, cancelling): the page website/support.html and studios.html link to.
 inline constexpr const char* kTermsUrl = "https://sculptforge.app/terms.html";
+// The iPad build has no purchase path at all (App Store guideline 3.1.1; input 11-17): no membership card, appeal or
+// member card, no "Support SculptForge" or "Become a member" button, and no link to the membership page or a checkout
+// (NativeDialog's openUrl refuses them, the embedded guide's links included). Members join on the website; their perks
+// come with their account, never bought in the app.
+#ifdef SF_IOS
+inline constexpr bool kInAppMembership = false;
+#else
+inline constexpr bool kInAppMembership = true;
+#endif
+// A link that leads to buying a membership: the membership and studio pages, a checkout, the old donate page.
+inline bool membershipPurchaseLink(std::string_view url) {
+    for (const char* part : {"sculptforge.app/support", "sculptforge.app/studios", "sculptforge.app/donate", "buy.stripe.com",
+                             "checkout.stripe.com"})
+        if (url.find(part) != std::string_view::npos) return true;
+    return false;
+}
 // The fixed links the membership cards may open (App::openSupportLink refuses anything else).
 inline bool supportLinkAllowed(std::string_view url) {
+    if (!kInAppMembership) return false;
     for (const char* u : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
         if (u[0] != '\0' && url == u) return true;
     return false;

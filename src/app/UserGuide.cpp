@@ -1445,7 +1445,7 @@ void UserGuide::drawPage(App& app) {
         if (bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         ImGui::SetCursorScreenPos(ImVec2(origin.x, ImGui::GetCursorScreenPos().y));
-        if (ImGui::Button(tr("Support SculptForge##whats_new"))) app.openSupportPage("whats-new");
+        if (kInAppMembership && ImGui::Button(tr("Support SculptForge##whats_new"))) app.openSupportPage("whats-new");
         y = ImGui::GetCursorScreenPos().y - origin.y;
     }
     ImGui::SetCursorScreenPos(start);

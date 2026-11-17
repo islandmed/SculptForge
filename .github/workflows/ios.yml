@@ -7,7 +7,8 @@ name: iPad
 
 on:
   push:
-    branches: [main, 'feat/ipad-port']
+    branches: [main, staging, 'feat/ipad-port']
+    tags: ['v*']
     paths:
       - 'packaging/ios/**'
       - 'scripts/ios-*.sh'
@@ -19,8 +20,6 @@ on:
       - 'src/app/main.cpp'
       - 'CMakeLists.txt'
       - 'cmake/**'
-  schedule:
-    - cron: '37 9 * * *' # daily on main: a change to the shared code that breaks the iPad build shows the next day
   workflow_dispatch:
     inputs:
       testflight:

@@ -123,6 +123,7 @@ bool App::supportCardOpen() const { return supportCard_ && !supportCard_->closin
 
 
 void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
+    if (!kInAppMembership) return; // (the iPad: Support.h)
     // A studio build is a Studio member's: no membership card in it (core/StudioProfile.h).
     const SupportCardReason reason =
         isStudioBuild() ? SupportCardReason::None : supportCardDue(supportCardPrefs_, firstRun, testMode);
@@ -137,6 +138,7 @@ void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
 }
 
 void App::showSupportCard(SupportCardReason reason) {
+    if (!kInAppMembership) return;
     supportCard_.reset(new SupportCard);
     supportCard_->reason = reason;
     supportCard_->openedAt = nowSeconds();
@@ -544,7 +546,7 @@ void App::drawSupportPrefs() {
                      "and the member builds are on.",
                      "Preferences > Support");
     }
-    if (ImGui::Button(tr("Show the memberships"), ImVec2(-1, 0))) showSupportCard(SupportCardReason::Manual);
+    if (kInAppMembership && ImGui::Button(tr("Show the memberships"), ImVec2(-1, 0))) showSupportCard(SupportCardReason::Manual);
 }
 
 // --- The small card at good moments ---
@@ -635,6 +637,7 @@ void App::startupUpdateMoment() {
 }
 
 void App::launchAppeal() {
+    if (!kInAppMembership) return;
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
     if (!appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
     appealPending_ = true;
@@ -670,6 +673,7 @@ void App::memberSignInFinished(bool member) {
 }
 
 void App::drawMemberCard() {
+    if (!kInAppMembership) return;
     if (memberCard_ == MemberMoment::None && !memberVerifying_) return;
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
@@ -774,7 +778,7 @@ void App::drawMemberCard() {
 // The appeal card: the app's own mark, one headline, one line, "Become a member" and "Not now". Bottom centre like the
 // small card; never modal, never takes focus.
 void App::drawAppealCard() {
-    if (!appealOpen_) return;
+    if (!appealOpen_ || !kInAppMembership) return;
     const float s = uiScale_;
     const CanvasRect c = canvasRect();
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 16.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
@@ -817,7 +821,7 @@ void App::drawAppealCard() {
 // --- The top bar's heart ---
 
 bool App::drawSupportHeart(ImVec2 at, float size, ImDrawList* dl) {
-    if (studioMembership()) return false; // (a Studio member's own build)
+    if (studioMembership() || !kInAppMembership) return false; // (a Studio member's own build; the iPad)
     const bool member = supportCardPrefs_.supporter || memberSignedIn();
     ImGui::SetCursorScreenPos(at);
     const bool clicked = ImGui::InvisibleButton(member ? "Member##topbar.member" : "Support SculptForge##topbar.heart",

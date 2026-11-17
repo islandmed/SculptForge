@@ -3,6 +3,7 @@
 #include "app/NativeDialog.h"
 
 #include "app/OpenUrl.h"
+#include "app/Support.h"
 
 #include <atomic>
 #include <chrono>
@@ -255,6 +256,10 @@ bool openUrl(const char* url) {
         return false;
     }
     if (!url) return SDL_OpenURL(url);
+    if (!kInAppMembership && membershipPurchaseLink(url)) { // (the iPad: no way to buy from the app, Support.h)
+        SDL_Log("open url: %s is not opened on this device (memberships are on the website)", url);
+        return false;
+    }
     { // the same URL at most once per 2 s (a double click, a key repeat, two handlers for one button)
         static sf::opener::Debounce debounce;
         static std::mutex mutex;

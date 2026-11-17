@@ -86,7 +86,8 @@ constexpr TourSlide kSlides[] = {
      "members get betas and early builds, vote on what we build next and ask for the brushes and alphas they want.",
      nullptr, nullptr},
 };
-constexpr int kSlideCount = int(std::size(kSlides));
+// (the iPad: without the last slide, the memberships; Support.h kInAppMembership)
+constexpr int kSlideCount = int(std::size(kSlides)) - (kInAppMembership ? 0 : 1);
 
 } // namespace
 
@@ -227,7 +228,7 @@ void App::drawQuickTour() {
         ImGui::Spacing();
         const float textTop = ImGui::GetCursorPosY();
         ImGui::TextWrapped("%s", slide.text);
-        if (last) {
+        if (last && kInAppMembership) {
             ImGui::Spacing();
             ImGui::TextDisabled("%s", kSupportUrl + 8); // "sculptforge.app/support.html"
         }
@@ -237,7 +238,7 @@ void App::drawQuickTour() {
         ImGui::Separator();
         ImGui::Spacing();
         const ImVec4 accent = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-        if (last) {
+        if (last && kInAppMembership) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
             if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage("quick-tour");
             ImGui::PopStyleColor();
