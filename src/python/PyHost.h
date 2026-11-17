@@ -30,7 +30,7 @@ struct CoreCalls;
 
 namespace python {
 
-constexpr int kHostAbi = 3;
+constexpr int kHostAbi = 4;
 
 // A direct change to a document's data from Python (doc.mask = ...).
 enum class Edit { Mask, Colors, FaceGroups, Hidden };
@@ -86,6 +86,8 @@ public:
     virtual Status runLine(const std::string& line) = 0; // one console line, as Python's own prompt takes it
     virtual void cancelLine() = 0;                       // drop a block typed so far
     virtual Status runFile(const std::string& path) = 0; // a .py file, as __main__
+    // Source already read (bytes, as on disk), run as __main__ of `path`: what was checked is what runs (Run at start-up).
+    virtual Status runSource(const std::string& source, const std::string& path) = 0;
     virtual std::vector<std::string> complete(const std::string& text) = 0; // names that continue `text`
     virtual std::string version() const = 0;                                // "3.13.9"
     // The interface scripts declared (P2). uiRevision() changes whenever it does (cheap: no Python runs).

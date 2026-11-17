@@ -219,10 +219,15 @@ void PythonScripting::setEnabled(bool on) {
 }
 
 namespace {
-std::string fileSha256(const std::string& path) {
+bool readBytes(const std::string& path, std::string& out) {
     std::ifstream f(fsPath(path), std::ios::binary);
-    if (!f) return {};
-    return sha256Hex(std::string((std::istreambuf_iterator<char>(f)), {}));
+    if (!f) return false;
+    out.assign(std::istreambuf_iterator<char>(f), {});
+    return true;
+}
+std::string fileSha256(const std::string& path) {
+    std::string bytes;
+    return readBytes(path, bytes) ? sha256Hex(bytes) : std::string();
 }
 } // namespace
 
@@ -268,7 +273,9 @@ void PythonScripting::runStartupScripts(bool again) {
     for (const auto [path, sha] : std::vector(startup_)) {
         const std::u8string name8 = fsPath(path).filename().u8string();
         const std::string name(name8.begin(), name8.end());
-        const std::string now = inScriptsFolder(path) ? fileSha256(path) : std::string();
+        // Read once: the bytes hashed are the bytes run (the file changing after the check changes nothing now).
+        std::string bytes;
+        const std::string now = inScriptsFolder(path) && readBytes(path, bytes) ? sha256Hex(bytes) : std::string();
         if (now.empty()) {
             app_.status_ = "Run at start-up: " + name + " isn't in the Scripts folder any more, so it didn't run";
             app_.console_.print(Console::Kind::Error, app_.status_);
@@ -278,7 +285,8 @@ void PythonScripting::runStartupScripts(bool again) {
             app_.console_.print(Console::Kind::Error, app_.status_);
         } else {
             app_.console_.print(Console::Kind::Info, "Run at start-up: " + std::string(name.begin(), name.end()));
-            if (runFile(path) == Result::Unavailable) return;
+            if (afterStartupCheck) afterStartupCheck(path);
+            if (run([&] { return host_->runSource(bytes, path); }) == Result::Unavailable) return;
         }
     }
 }

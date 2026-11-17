@@ -103,7 +103,8 @@ p.button("cleanup.run")
   listed there with its off switch (ticked scripts gone from the folder stay listed); only files directly in the
   Scripts folder (canonical path check, at tick time and at start); remembered with the file's SHA-256 in python.json; a
   mismatch doesn't run, says why in the status bar and the console, and Preferences offers Trust this version (one
-  click; it doesn't run it then); Python off or the policy's never: nothing runs. tests/ui/python_startup.sfui.
+  click; it doesn't run it then); Python off or the policy's never: nothing runs. The file is read once: the bytes
+  hashed are the bytes run (Host::runSource), so a change after the check can't run. tests/ui/python_startup.sfui.
 - Floor tier: nothing per frame unless a script panel is on screen; a script action costs what any action costs.
 
 ## P3: other toolkits

@@ -136,18 +136,42 @@ def _push(line):
 def _cancel():
     _console.resetbuffer()
 
+def _script_failed(e, path):
+    if isinstance(e, SystemExit):
+        return 0 if e.code in (None, 0) else 1
+    tb = e.__traceback__
+    while tb is not None and tb.tb_frame.f_code.co_filename != path:
+        tb = tb.tb_next
+    traceback.print_exception(type(e), e, tb if tb is not None else e.__traceback__)
+    return 1
+
 def _run_file(path):
     try:
         runpy.run_path(path, run_name="__main__")
         return 0
-    except SystemExit as e:
-        return 0 if e.code in (None, 0) else 1
     except BaseException as e:
-        tb = e.__traceback__
-        while tb is not None and tb.tb_frame.f_code.co_filename != path:
-            tb = tb.tb_next
-        traceback.print_exception(type(e), e, tb if tb is not None else e.__traceback__)
-        return 1
+        return _script_failed(e, path)
+
+# Bytes the app already read and checked, run as runpy runs a file: a fresh __main__ module, sys.argv[0] = path.
+def _run_source(source, path):
+    import sys, types
+    main, argv0 = sys.modules.get("__main__"), sys.argv[0] if sys.argv else None
+    try:
+        code = compile(source, path, "exec", dont_inherit=True)
+        mod = types.ModuleType("__main__")
+        mod.__dict__.update(__file__=path, __cached__=None, __loader__=None, __package__=None, __spec__=None)
+        sys.modules["__main__"] = mod
+        if sys.argv:
+            sys.argv[0] = path
+        exec(code, mod.__dict__)
+        return 0
+    except BaseException as e:
+        return _script_failed(e, path)
+    finally:
+        if main is not None:
+            sys.modules["__main__"] = main
+        if argv0 is not None:
+            sys.argv[0] = argv0
 
 # sf.ui (P2): the interface a script declares, drawn by SculptForge (app/PanelPython.cpp). Ids are lower-case words
 # with dots; an action's app id is "script.py.<id>". Declaring again replaces (a panel keeps the values its
@@ -360,6 +384,10 @@ public:
     Status runLine(const std::string& line) override { return call("_push", line); }
     void cancelLine() override { call("_cancel"); }
     Status runFile(const std::string& path) override { return call("_run_file", path); }
+    Status runSource(const std::string& source, const std::string& path) override {
+        py::gil_scoped_acquire gil; // (py::bytes is made with the GIL held; call() takes it again, recursively)
+        return call("_run_source", py::bytes(source), path);
+    }
     std::vector<std::string> complete(const std::string& text) override {
         py::gil_scoped_acquire gil;
         try {

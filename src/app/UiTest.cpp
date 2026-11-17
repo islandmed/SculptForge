@@ -258,6 +258,7 @@
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
 //   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
+//   python_startup append TEXT  the same, adding the line TEXT to each script between its check and its run
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
@@ -3576,9 +3577,20 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
-    case StepVerb::PythonStartup:
-        run([this] { app_.python().runStartupScripts(true); });
+    case StepVerb::PythonStartup: { // python_startup [append TEXT]: TEXT is added to each script after its check
+        const std::string append = w.size() > 2 && w[1] == "append" ? restOf(lineText_, 2) + "\n" : std::string();
+        run([this, append] {
+            PythonScripting& py = app_.python();
+            if (!append.empty())
+                py.afterStartupCheck = [append](const std::string& path) {
+                    const std::filesystem::path p(std::u8string(path.begin(), path.end()));
+                    std::ofstream(p, std::ios::binary | std::ios::app) << append;
+                };
+            py.runStartupScripts(true);
+            py.afterStartupCheck = nullptr;
+        });
         break;
+    }
     case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused ($SCRIPT_DIR as for run)
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
