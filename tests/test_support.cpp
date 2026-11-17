@@ -229,16 +229,16 @@ TEST(support_card_links_match_the_website) {
     CHECK(page.find("data-yearly=\"" + bare(kSupportUrlMemberYearly) + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
-    // Retired: the Insider tier, one-time payments and the monthly pack, and Studio's per-artist price (owner 11-06: a flat
-    // $300 / month for any number of artists, Founding Studio a flat $150); the old wording that contradicts it is gone.
+    // Retired: the Insider tier, one-time payments and the monthly pack, Studio's per-artist price and its $300 flat rate
+    // (owner 11-16: Studio is a personalized quote, Founding Studio a flat $150); the old wording that contradicts it is gone.
     for (const std::string& p : {page, studios})
         for (const char* old : {"Insider", "One-time", "one-time", "$20", "monthly pack", "pack every month", "whole company",
-                                "no seat count", "5 custom items", "10 artists", "$25"}) {
+                                "no seat count", "5 custom items", "10 artists", "$25", "$300"}) {
             if (p.find(old) != std::string::npos) std::printf("  retired wording on the site: \"%s\"\n", old);
             CHECK(p.find(old) == std::string::npos);
         }
     for (const std::string& p : {page, studios})
-        for (const char* now : {"$300", "Founding Studio", "$150", "3 custom items", "no outside connections", "any number of artists"}) {
+        for (const char* now : {"Personalized quote", "Get a quote", "Founding Studio", "$150", "3 custom items", "no outside connections", "any number of artists"}) {
             if (p.find(now) == std::string::npos) std::printf("  missing on the site: \"%s\"\n", now);
             CHECK(p.find(now) != std::string::npos);
         }
