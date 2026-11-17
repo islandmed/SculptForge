@@ -371,6 +371,99 @@ TEST(micro_tiles_park_beyond_the_budget_and_come_back) {
     CHECK(tileSnapshot(*doc.mesh.micro->tiles) == one);
 }
 
+// The tile path's promises, measured on the surface the tiles describe (heightAt on a grid of points under the brush):
+// a cut (inverted Standard) lowers and never raises; nothing moves outside the brush; the X mirror of a symmetric
+// stroke matches; the surface stays closed across base edges (the shared-edge test above). GeomInvariants.h's rules
+// for the base cage, applied to the micro surface a tiled dab writes.
+TEST(micro_tiles_invariant_cut_only_local_and_symmetric) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    const MicroMesh& mm0 = *doc.mesh.micro;
+    const float r = 0.02f;
+    CHECK(MicroTiles::depthFor(mm0.baseEdge / float(mm0.n), r, 0.0f) >= 2);
+    // sample points: rays from the front onto a grid around the dab centre, 3 r wide (inside and outside the brush)
+    struct Sample { uint32_t tri; glm::vec3 w; glm::vec3 p; };
+    std::vector<Sample> samples;
+    for (int y = -12; y <= 12; ++y)
+        for (int x = -12; x <= 12; ++x) {
+            RayHit hit;
+            const glm::vec3 o(float(x) * 0.25f * r, float(y) * 0.25f * r, 5.0f);
+            if (!doc.bvh.raycast(doc.mesh, o, glm::vec3(0, 0, -1), hit)) continue;
+            const glm::uvec3 tr = doc.mesh.triangles[hit.triangle];
+            const glm::vec3 a = doc.mesh.positions[tr.x], b = doc.mesh.positions[tr.y], c = doc.mesh.positions[tr.z];
+            const glm::vec3 v0 = b - a, v1 = c - a, v2 = hit.position - a;
+            const float d00 = glm::dot(v0, v0), d01 = glm::dot(v0, v1), d11 = glm::dot(v1, v1), d20 = glm::dot(v2, v0), d21 = glm::dot(v2, v1);
+            const float den = d00 * d11 - d01 * d01;
+            glm::vec3 w;
+            w.y = (d11 * d20 - d01 * d21) / den, w.z = (d00 * d21 - d01 * d20) / den, w.x = 1.0f - w.y - w.z;
+            samples.push_back({hit.triangle, w, hit.position});
+        }
+    CHECK(samples.size() > 500);
+    auto heights = [&] {
+        std::vector<float> h(samples.size());
+        const MicroMesh& mm = *doc.mesh.micro;
+        for (size_t k = 0; k < samples.size(); ++k) h[k] = mm.tiles->heightAt(mm, samples[k].tri, samples[k].w);
+        return h;
+    };
+    const std::vector<float> before = heights();
+    // 1. cut-only: an inverted Standard stroke never raises a point, lowers under the centre, moves nothing outside r
+    {
+        Symmetry sym;
+        sym.x = false;
+        CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+        for (int i = 0; i < 4; ++i) {
+            DabParams p = dabAt(glm::vec3(0.001f * float(i), 0, 1), r, 1.0f);
+            p.invert = true;
+            doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, p, sym);
+        }
+        UndoRecord rec = doc.sculptor.endStroke();
+        CHECK(rec.micro != nullptr && !rec.micro->tileKeys.empty());
+        const std::vector<float> after = heights();
+        float maxRise = 0, maxSink = 0, outside = 0;
+        for (size_t k = 0; k < samples.size(); ++k) {
+            const float d = after[k] - before[k];
+            maxRise = std::max(maxRise, d), maxSink = std::min(maxSink, d);
+            if (glm::length(glm::vec2(samples[k].p.x, samples[k].p.y)) > 1.3f * r) outside = std::max(outside, std::abs(d));
+        }
+        std::printf("tiles cut: max rise %.1f units, max sink %.1f, outside the brush %.1f\n", double(maxRise), double(maxSink), double(outside));
+        CHECK(maxRise <= 0.0f);
+        CHECK(maxSink < -0.5f * 0.06f * r / doc.mesh.micro->step);
+        CHECK(outside == 0.0f);
+        doc.undo.push(std::move(rec));
+        CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+        CHECK(heights() == before);
+    }
+    // 2. symmetry: with X symmetry the surface at (x, y) and (-x, y) changes alike
+    {
+        Symmetry sym;
+        sym.x = true;
+        CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+        for (int i = 0; i < 4; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.6f * r + 0.001f * float(i), 0.002f * float(i), 1), r, 1.0f), sym);
+        doc.undo.push(doc.sculptor.endStroke());
+        const std::vector<float> after = heights();
+        float worst = 0, biggest = 0;
+        size_t pairs = 0;
+        for (size_t k = 0; k < samples.size(); ++k) {
+            const glm::vec3& p = samples[k].p;
+            if (std::abs(p.x) < 1e-6f) continue;
+            // the mirror sample: the closest one to (-x, y)
+            size_t best = samples.size();
+            float bd = 1e30f;
+            for (size_t m = 0; m < samples.size(); ++m) {
+                const float dd = glm::length(glm::vec2(samples[m].p.x + p.x, samples[m].p.y - p.y));
+                if (dd < bd) bd = dd, best = m;
+            }
+            if (best == samples.size() || bd > 0.02f * r) continue;
+            const float d1 = after[k] - before[k], d2 = after[best] - before[best];
+            worst = std::max(worst, std::abs(d1 - d2)), biggest = std::max(biggest, std::abs(d1));
+            ++pairs;
+        }
+        std::printf("tiles symmetry: %zu pairs, largest change %.1f units, worst mirror difference %.2f\n", pairs, double(biggest), double(worst));
+        CHECK(pairs > 200 && biggest > 10.0f);
+        CHECK(worst <= 0.02f * biggest + 1.0f); // the mirror matches to the quantization step and the sample pairing
+    }
+}
+
 // Without the store (the default), nothing changes: no tiles appear and the step records none.
 TEST(micro_tiles_absent_by_default) {
     Document doc = microDoc(4);
