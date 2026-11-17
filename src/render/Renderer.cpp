@@ -3910,6 +3910,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const size_t budget = triangleBudget(settings);
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
+    s.micro->flatShading = flat; // (flat shading draws the stored grid, nothing above it: MicroRenderer::maxDrawLevel)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
 }
