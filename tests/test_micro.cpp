@@ -628,6 +628,40 @@ TEST(micro_tiles_absent_by_default) {
     CHECK(doc.mesh.micro->tiles == nullptr || !MicroTiles::enabled());
 }
 
+// On Mesa's OpenGL over D3D12 (WSL, Windows on ARM) the first tiled frame removes the device: with SF_MICRO_TILES=1 a stroke
+// there keeps writing the plain micro levels (no store, no tiles), as it does on every GPU with the flag off.
+TEST(micro_tiles_fall_back_to_plain_levels_on_d3d12) {
+    const auto setTiles = [](const char* v) {
+#ifdef _WIN32
+        _putenv_s("SF_MICRO_TILES", v ? v : "");
+#else
+        if (v) setenv("SF_MICRO_TILES", v, 1);
+        else unsetenv("SF_MICRO_TILES");
+#endif
+    };
+    const char* old = std::getenv("SF_MICRO_TILES");
+    const std::string saved = old ? old : "";
+    CHECK(!MicroTiles::gpuSupported("D3D12 (NVIDIA GeForce RTX 3060)"));
+    CHECK(!MicroTiles::gpuSupported("D3D12 (Qualcomm(R) Adreno(TM) X1-85 GPU)"));
+    CHECK(MicroTiles::gpuSupported("NVIDIA GeForce RTX 3060/PCIe/SSE2"));
+    CHECK(MicroTiles::gpuSupported("llvmpipe (LLVM 19.1.7, 256 bits)"));
+    CHECK(MicroTiles::gpuSupported("Apple M1 Pro"));
+    setTiles("1");
+    MicroTiles::setGpu("D3D12 (NVIDIA GeForce RTX 3060)");
+    CHECK(!MicroTiles::enabled());
+    Document plain = microDoc(4);
+    const std::vector<uint16_t> before = plain.mesh.micro->triRange;
+    UndoRecord r = fineStroke(plain);
+    CHECK(plain.mesh.micro->tiles == nullptr && r.micro != nullptr && r.micro->tileKeys.empty());
+    CHECK(plain.mesh.micro->triRange != before); // (the stroke landed on the stored level)
+    MicroTiles::setGpu("NVIDIA GeForce RTX 3060/PCIe/SSE2");
+    CHECK(MicroTiles::enabled());
+    Document tiled = microDoc(4);
+    fineStroke(tiled);
+    CHECK(tiled.mesh.micro->tiles != nullptr);
+    setTiles(old ? saved.c_str() : nullptr);
+}
+
 TEST(micro_divide_needs_top_level) {
     Document doc = makeDoc(makeBenchSphere(20000));
     std::string err;

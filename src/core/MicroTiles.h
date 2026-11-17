@@ -35,6 +35,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace sf {
@@ -63,8 +64,12 @@ struct MicroTiles {
         std::array<int16_t, kSamples> delta{};
     };
 
-    // Off unless SF_MICRO_TILES=1 (read when a stroke starts).
+    // Off unless SF_MICRO_TILES=1 (read when a stroke starts), and off on a GPU that can't draw them (setGpu).
     static bool enabled();
+    // Whether the GL renderer (GL_RENDERER) can draw tiles. Not Mesa's OpenGL over D3D12 (WSL, Windows on ARM): its
+    // first tiled frame removes the device, so strokes there keep writing the plain micro levels.
+    static bool gpuSupported(std::string_view glRenderer);
+    static void setGpu(std::string_view glRenderer); // (Renderer::init)
     // The resident budget for a new store (SF_MICRO_TILES_RESIDENT_MB, else a quarter of the tier's resident cache cap).
     static size_t defaultResidentBudget();
 

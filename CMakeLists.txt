@@ -1303,7 +1303,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
     # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
     # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage).
-    # ui_micro_tiles_closeup(_1440, _2880, labelled below): the same on the first tiled frame (Removing Device, every run).
+    # ui_micro_tiles_closeup(_1440, _2880, labelled below): the same on the first tiled frame (Removing Device, every run);
+    # tiles now fall back to the plain levels on a D3D12 renderer (MicroTiles::setGpu), so there the script finds no tiles.
     foreach(t ui_micro_levels ui_micro_mask_kelvin ui_micro_tiles_closeup)
       if(TEST ${t})
         set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
