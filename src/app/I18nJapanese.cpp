@@ -6561,6 +6561,16 @@ constexpr Entry kJapanese[] = {
      "スクリプト"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "このフォルダー内の .py ファイルはファイル > スクリプトの下に一覧表示されます。その site-packages フォルダーにインストールしたパッケージはインポートできます。"},
+    {"Run at start-up",
+     "起動時に実行"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "チェックしたスクリプトは SculptForge の起動時に毎回実行され（Python がオンのとき）、追加したボタンやパネルが表示されます。変更されたスクリプトは、もう一度チェックするまで実行されません。"},
+    {"Trust this version",
+     "このバージョンを信頼"},
+    {"changed, didn't run",
+     "変更あり、未実行"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "起動時に実行するよう選んだ後にスクリプトが変更されたため、実行されませんでした。変更内容を確認し、信頼できる場合は、今後の起動時に実行されます（今は実行しません）。"},
 };
 
 } // namespace

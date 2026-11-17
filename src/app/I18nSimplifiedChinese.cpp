@@ -5423,6 +5423,16 @@ constexpr Entry kSimplifiedChinese[] = {
      "脚本"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "此文件夹中的 .py 文件会列在文件 > 脚本下。安装到其 site-packages 文件夹的包可以导入。"},
+    {"Run at start-up",
+     "启动时运行"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "勾选的脚本会在每次启动 SculptForge 时运行（需开启 Python），让它们添加的按钮和面板都在。脚本有改动后，要再勾选一次才会运行。"},
+    {"Trust this version",
+     "信任此版本"},
+    {"changed, didn't run",
+     "已更改，未运行"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "此脚本在你选择启动时运行之后已更改，所以没有运行。请检查更改内容；如果你信任它，之后每次启动都会运行（现在不会运行）。"},
 };
 
 } // namespace
