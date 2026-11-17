@@ -1,0 +1,25 @@
+name: Signing self-test
+
+# The checks around Windows code signing (tools/ci/verify_signed.ps1, check_pe_metadata.ps1) run against a throwaway
+# self-signed certificate, with no SignPath and no secret: they must accept a validly signed file and refuse tampered,
+# foreign and unsigned ones (docs/releasing.md "Windows code signing"). Maintainer's dispatch only.
+
+on:
+  workflow_dispatch:
+  push: # TEMP-PUSH-TRIGGER (removed before READY)
+    branches: [ci/signpath-windows]
+    paths: ['.github/workflows/signing-selftest.yml', 'tools/ci/**']
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: Signing checks
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Sign a copy with a throwaway certificate and run the checks
+        shell: pwsh
+        run: ./tools/ci/selftest_signing.ps1
