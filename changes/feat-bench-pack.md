@@ -1,6 +1,5 @@
 ---
 whats_new: **Benchmark scene pack**: download a pack of our own sculpts and run `sculptforge --benchmark-pack bench-pack --out results.json` on any computer; the result lists your hardware and the frame times, so computers can be compared.
-highlight: A public benchmark you can run in one command
 added: **Benchmark scene pack** (`sculptforge --benchmark-pack DIR --out FILE`): the scenes in a downloadable pack
   (`bench/pack`, our own Creature Head divided to 5.8, 23 and 92 million triangles, the first of them the entry-level
   "floor" test) get the standard strokes, and one JSON result records the hardware (CPU, GPU, driver, RAM, OS, hardware

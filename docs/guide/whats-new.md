@@ -5,6 +5,16 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.6
+
+```features
+date: unreleased
+tagline: Insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run.
+highlight: Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail
+highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window
+highlight: A public benchmark you can run in one command
+```
+
 ## Version 0.13.5
 
 ```features
