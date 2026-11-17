@@ -58,7 +58,9 @@ void App::facegroupMouseUp() {
 
 void App::perTriangleNote() {
     if (Renderer::perTriangleViews()) return;
+    ImGui::PushTextWrapPos(0.0f); // (wrapped at the panel's edge)
     ImGui::TextDisabled("%s", tr("Not shown with this device's graphics (OpenGL ES 3.0) yet."));
+    ImGui::PopTextWrapPos();
 }
 
 void App::drawFaceGroupsSection() {
