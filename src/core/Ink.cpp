@@ -6,6 +6,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 #include <limits>
 #include <atomic>
