@@ -22,7 +22,8 @@ case $platform in
       x86_64) unpack "$(fetch x86_64-unknown-linux-gnu c0ccda275948c79996e46993c2c5476ff5cca606dee530f1dea712179131b348)" "$out" ;;
       aarch64) unpack "$(fetch aarch64-unknown-linux-gnu baa3d107d17e4328448e30c3c9c83cca0eb41ca7a37c10982e14d46a5c3db07d)" "$out" ;;
       *) echo "python-runtime.sh: no runtime for $(uname -m)" >&2; exit 1 ;;
-    esac ;;
+    esac
+    strip --strip-unneeded "$out"/python/lib/libpython3.*.so.* ;; # (the "stripped" build keeps its local symbols)
   windows)
     unpack "$(fetch x86_64-pc-windows-msvc 76e0a9749c4deeb975a4b6b36d54be4e43f0c2a4c654bedab5d2e4d62dbc3006)" "$out" ;;
   macos)
@@ -39,6 +40,7 @@ case $platform in
       done
     lib=$(cd "$out/python/lib" && ls libpython3*.dylib | head -1)
     install_name_tool -id "@rpath/$lib" "$out/python/lib/$lib"
+    strip -x "$out/python/lib/$lib" # local symbols (the "stripped" build keeps them): about 1 MB less in the dmg
     rm -rf "$out/arm64" "$out/x86_64" ;;
   *) echo "usage: python-runtime.sh linux|windows|macos OUT_DIR" >&2; exit 2 ;;
 esac
