@@ -13,6 +13,7 @@
     "bin": [
         "bin\\sculptforge-cli.exe"
     ],
+    "persist": "bin\\data",
     "shortcuts": [
         [
             "bin\\sculptforge.exe",

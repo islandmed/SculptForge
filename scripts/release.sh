@@ -536,6 +536,7 @@ import json, re
 m = json.load(open("packaging/scoop/sculptforge.json", encoding="utf-8"))
 a = m["architecture"]["64bit"]
 assert re.fullmatch(r"[0-9a-f]{64}", a["hash"]) and a["url"].endswith("windows-x86_64.zip") and a["extract_dir"]
+assert m["persist"] == "bin\\data", "the portable .zip keeps its data in bin\\data (portable.txt): Scoop must persist it across updates"
 assert m["version"] in a["url"] and m["bin"] and m["shortcuts"] and m["checkver"] and m["autoupdate"]["architecture"]["64bit"]["hash"]["url"]
 PY
     # omarchy
