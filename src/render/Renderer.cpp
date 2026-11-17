@@ -360,6 +360,8 @@ vec4 shadeAt(int i, int j) {
 }
 #else
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
+#endif
+#ifdef TILES
 // Adaptive Detail tiles (render/MicroTilePages.h): on a tiled slot the stored normal tilts by the tiles' surface
 // gradient, interpolated from the page's slopes like the shading grid (so it does not depend on the drawn level),
 // and detail finer than the stored grid catches the light.
@@ -425,7 +427,7 @@ void microFetch() {
     }
     w = clamp(w, 0.0, 1.0);
     vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
-#ifndef FOCUS
+#ifdef TILES
     if (vTilePage >= 0) n = normalize(n) - tileGradient();
 #endif
     vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
@@ -1144,7 +1146,7 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | ((features & kFocus) ? kFocus : kTiles);
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
@@ -1153,9 +1155,10 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     };
     if (p.failed) return simpler(); // (not every frame again)
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
+    if (features & kMicro)
+        prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : (features & kTiles) ? "#define MICRO\n#define TILES\n" : "#define MICRO\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
-    if (features & kPrim) prefix += "#define PRIM\n";
+    if ((features & kPrim) && !(features & kMicro)) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
@@ -3934,7 +3937,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
-                                       (s.micro && s.micro->focus() ? kFocus : 0));
+                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);

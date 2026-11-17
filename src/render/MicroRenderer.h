@@ -79,6 +79,8 @@ public:
     const MicroTilePages* tilePages() const { return tilePages_.get(); }
     // The tile pages want one more frame (MicroTilePages::wantsFrame).
     bool tilePagesWantFrame() const { return tilePages_ && tilePages_->wantsFrame(); }
+    // Tile pages to draw: the plain program's TILES variant (without pages the draw is the program without tiles).
+    bool tilePagesOn() const { return tilePages_ && tilePages_->pages() > 0; }
 
 private:
     friend class MicroFocus;

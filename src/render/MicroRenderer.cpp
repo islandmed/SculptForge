@@ -54,7 +54,7 @@ flat out int vPage; // the page whose full shading to use (-1: the coarse shadin
 uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
-#ifndef FOCUS
+#ifdef TILES
 // Adaptive Detail tiles (render/MicroTilePages.h): per slot a delta page (uTilePages: page + 1, 0 = none) of
 // uTileSamples values at level uTilePageLevel (-1 = no pages), whole units of uStep along the base's Phong normal.
 uniform usamplerBuffer uTilePages;
@@ -189,7 +189,7 @@ vec3 posBase(int i, int j) {
     pull += n2 * (w2 * dot(f - q2, n2));
     return f - pull * 0.75;
 }
-#ifndef FOCUS
+#ifdef TILES
 int tileIndex(int i, int j, int m) { return j * (m + 1) - (j * (j - 1)) / 2 + i; }
 int tileValue(int I, int J) { return texelFetch(uTilePool, gTilePage * uTileSamples + tileIndex(I, J, 1 << uTilePageLevel)).r; }
 // The drawn point plus its tiles' delta (MicroTiles::pageValue) along the base's Phong normal at the page point's
@@ -247,7 +247,8 @@ void main() {
     gPage = int(pg & 0x7FFFFFFFu) - 1;
     vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
     gShadePage = vPage;
-#else
+#endif
+#ifdef TILES
     vTilePage = -1;
     vTileGi = vTileGj = vec3(0.0);
     if (uTilePageLevel >= 0) gTilePage = int(texelFetch(uTilePages, slot).r) - 1;
@@ -267,7 +268,7 @@ void main() {
         float d0 = dispAt(I0, J0) * uStep;
         vIJ = vec2(float(I0), float(J0));
         vec3 q0 = bp + nrm * d0;
-#ifndef FOCUS
+#ifdef TILES
         if (gTilePage >= 0) { // the corner's delta (the page's corner: weights exactly 1, 0, 0)
             int M = 1 << uTilePageLevel;
             int tv = tileValue(int(ij.x) * M, int(ij.y) * M);
