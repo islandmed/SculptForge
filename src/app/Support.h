@@ -45,7 +45,7 @@ inline constexpr SocialLink kSocialLinks[] = {
 inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLinks[0]));
 
 // Two memberships: Member ($5 / month or $48 / year) and Studio (a personalized quote for the whole studio, any number
-// of artists, owner 11-16; the first 5 studios pay a flat $150 as Founding Studios). The same Stripe checkout links as website/support.html
+// of artists, owner 11-16; no Founding Studio price either: studios reach out). The same Stripe checkout links as website/support.html
 // and studios.html (tests/test_support.cpp checks they match). An empty yearly link hides the yearly choice in the
 // app and on the site. The card's Studio button opens the studio page (its own build is set up by email first).
 // Each checkout link carries ?client_reference_id=app-card (kSupportSourceTag: lowercase letters, digits and dashes
@@ -54,13 +54,12 @@ inline constexpr int kSocialCount = int(sizeof(kSocialLinks) / sizeof(kSocialLin
 inline constexpr const char* kSupportSourceTag = "app-card";
 inline constexpr const char* kSupportUrlMember = "https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card";   // $5 / month
 inline constexpr const char* kSupportUrlMemberYearly = "https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card"; // $48 / year
-inline constexpr const char* kSupportUrlStudio = "https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204?client_reference_id=app-card";   // Founding Studio, $150 / month
 inline constexpr const char* kStudioPageUrl = "https://sculptforge.app/studios.html#membership";
 // The membership terms (refunds, cancelling): the page website/support.html and studios.html link to.
 inline constexpr const char* kTermsUrl = "https://sculptforge.app/terms.html";
 // The fixed links the membership cards may open (App::openSupportLink refuses anything else).
 inline bool supportLinkAllowed(std::string_view url) {
-    for (const char* u : {kSupportUrlMember, kSupportUrlMemberYearly, kSupportUrlStudio, kStudioPageUrl, kTermsUrl})
+    for (const char* u : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
         if (u[0] != '\0' && url == u) return true;
     return false;
 }
