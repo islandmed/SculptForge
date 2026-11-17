@@ -771,6 +771,16 @@ constexpr Entry kTraditionalChinese[] = {
     {"Multithreading", "多執行緒"},
     {"Predictive Strokes", "預測筆畫"},
     {"Draft Strokes", "草稿筆畫"},
+    {"Keep Strokes Editable", "保持筆畫可編輯"},
+    {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
+     "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
+     "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
+     "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
+     "sit on it. Off when memory is low.",
+     "在微細分層級上，每一筆都會保留構成它的筆觸點，之後可以移動、變更或移除，其上的筆畫會精確跟"
+     "隨。每一筆的雕刻與復原都與先前完全相同。會移動基底的筆畫（大型 Standard、Clay"
+     "、Inflate 筆刷，以及在基底上的 Move）或使用模板的筆畫，會把觸及的筆畫固定在原"
+     "處；一筆上方疊了 20 筆後也會被固定。記憶體不足時關閉。"},
     {"%d threads", "%d 個執行緒"},
     {"Memory", "記憶體"},
     {"Hardware profile", "硬體設定檔"},

@@ -149,10 +149,9 @@ void App::registerPerformanceUiActions() {
         },
         [this] { return uiPrefs_.keepStrokesEditable; },
         "On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or taken out later "
-        "and the strokes over it follow exactly as if it had always been that way. The stroke itself sculpts exactly "
-        "as before and its undo step is the same. A stroke that moves the base (big Standard, Clay and Inflate "
-        "brushes, Move on the base) or uses the Stencil fixes the strokes it reaches in place; so does an older stroke "
-        "once 20 others sit on it. Off when memory is low.");
+        "and the strokes over it follow exactly. Each stroke sculpts and undoes exactly as before. Strokes that move "
+        "the base (big Standard, Clay and Inflate brushes, Move on the base) or use the Stencil fix the strokes they "
+        "reach in place; so does a stroke once 20 others sit on it. Off when memory is low.");
     add("perf.fast_big_brushes", "Fast Big Brushes (Experimental)",
         [this] {
             uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
