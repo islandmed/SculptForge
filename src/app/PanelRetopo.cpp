@@ -257,7 +257,7 @@ void App::drawTargetQuads(bool compact) {
 void App::drawVoxelResolution(bool compact) {
     voxelResolution_ = std::clamp(voxelResolution_, kVoxelResolutionMin, kVoxelResolutionMax);
     // Two thirds of the travel for 32-512 (the everyday range keeps its precision), a sixth each for 528-2048 and
-    // 2112-4096. Ctrl+click types a number.
+    // 2112-4096. Ctrl+click or a double-click types a number.
     if (!compact) ImGui::SetNextItemWidth(-1);
     const bool grab = !compact && beginShelfGrab();
     float t = voxelSliderFromResolution(voxelResolution_);
@@ -267,11 +267,19 @@ void App::drawVoxelResolution(bool compact) {
     if (ui::SliderInside("##voxres", &t, 0.0f, 1.0f, label.c_str(), ImGuiSliderFlags_NoInput)) voxelResolution_ = voxelResolutionFromSlider(t);
     if (grab) {
         endShelfGrab("##voxresgrab", "widget.voxel_resolution", "Voxel Resolution");
-    } else if (ImGui::IsItemHovered() && ui::CtrlHeld() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        voxelResolution_ = before; // (the click doesn't move it)
-        ImGui::ClearActiveID();
-        voxelResolutionTyped_ = before;
-        ImGui::OpenPopup("##voxrestype");
+    } else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        // Ctrl+click or a double-click types a number, like every slider (the first click of a double-click moved it:
+        // that one is put back).
+        static int beforeClick = 0;
+        const bool dbl = ImGui::GetIO().MouseClickedCount[0] == 2;
+        if (!ui::CtrlHeld() && !dbl) {
+            beforeClick = before;
+        } else {
+            voxelResolution_ = ui::CtrlHeld() ? before : beforeClick; // (a Ctrl+click doesn't move it)
+            ImGui::ClearActiveID();
+            voxelResolutionTyped_ = voxelResolution_;
+            ImGui::OpenPopup("##voxrestype");
+        }
     }
     ui::HelpText("Resolution", nullptr,
                  "Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x "
@@ -286,6 +294,8 @@ void App::drawVoxelResolution(bool compact) {
         if (ImGui::IsItemDeactivatedAfterEdit() || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             voxelResolution_ = std::clamp(voxelResolutionTyped_, kVoxelResolutionMin, kVoxelResolutionMax);
             ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            ImGui::CloseCurrentPopup(); // Esc cancels in one press (the field's own Esc only ends the typing)
         }
         ImGui::EndPopup();
     }

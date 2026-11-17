@@ -202,11 +202,54 @@ sf_imgui_patch("            // Words that cannot possibly fit within an entire l
 file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new "${SF_IMGUI_DRAW}")
 configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp COPYONLY)
 
+# imgui_widgets.cpp is built from a copy too: a slider takes a double-click to type an exact value, as ImGui's drag
+# numbers already do (Ctrl+click stays; typed values clamp as before, only with ImGuiSliderFlags_AlwaysClamp). The first click of the
+# double-click moved the value to where it landed; that one is put back first, so Esc leaves the value as it was.
+file(READ ${imgui_SOURCE_DIR}/imgui_widgets.cpp SF_IMGUI_WIDGETS)
+function(sf_imgui_widgets_patch from to)
+  string(FIND "${SF_IMGUI_WIDGETS}" "${from}" at)
+  if(at EQUAL -1)
+    message(FATAL_ERROR "imgui_widgets.cpp changed; update its patches in cmake/Dependencies.cmake:\n${from}")
+  endif()
+  string(REPLACE "${from}" "${to}" patched "${SF_IMGUI_WIDGETS}")
+  set(SF_IMGUI_WIDGETS "${patched}" PARENT_SCOPE)
+endfunction()
+sf_imgui_widgets_patch("        // Tabbing or CTRL+click on Slider turns it into an input box
+        const bool clicked = hovered && IsMouseClicked(0, ImGuiInputFlags_None, id);
+        const bool make_active = (clicked || g.NavActivateId == id);
+        if (make_active && clicked)
+            SetKeyOwner(ImGuiKey_MouseLeft, id);
+        if (make_active && temp_input_allowed)
+            if ((clicked && g.IO.KeyCtrl) || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
+                temp_input_is_active = true;
+"
+"        // Tabbing, CTRL+click or double-click on Slider turns it into an input box (SculptForge: the double-click)
+        static ImGuiID sf_click_id = 0;
+        static ImU64 sf_click_value = 0;
+        const bool clicked = hovered && IsMouseClicked(0, ImGuiInputFlags_None, id);
+        const bool double_clicked = clicked && g.IO.MouseClickedCount[0] == 2 && sf_click_id == id;
+        const bool make_active = (clicked || g.NavActivateId == id);
+        if (make_active && clicked)
+            SetKeyOwner(ImGuiKey_MouseLeft, id);
+        if (clicked && !double_clicked)
+        {
+            sf_click_id = id;
+            memcpy(&sf_click_value, p_data, DataTypeGetInfo(data_type)->Size);
+        }
+        if (double_clicked && temp_input_allowed)
+            memcpy(p_data, &sf_click_value, DataTypeGetInfo(data_type)->Size);
+        if (make_active && temp_input_allowed)
+            if ((clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
+                temp_input_is_active = true;
+")
+file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new "${SF_IMGUI_WIDGETS}")
+configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp COPYONLY)
+
 add_library(imgui STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
   ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
-  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)

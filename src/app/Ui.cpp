@@ -835,7 +835,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     }
     dl->ChannelsMerge();
     // The value, exactly, while pointing at it or dragging (the label inside may round it or be clipped).
-    if (hover > 0.0f && (ImGui::IsItemHovered() || active) && !CtrlHeld() && format) {
+    if (hover > 0.0f && (ImGui::IsItemHovered() || active) && !CtrlHeld() && format && !ImGui::TempInputIsActive(ImGui::GetItemID())) {
         const char* f = tr(format);
         const char* spec = ImParseFormatFindStart(f);
         if (*spec) {

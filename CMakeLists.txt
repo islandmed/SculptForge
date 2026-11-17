@@ -1222,6 +1222,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Guide Strength, Target Quads and Level dropped on a shelf (tests/ui/shelf_slider_drop.sfui), and plain slider drags (slider_drag).
     sculptforge_ui_test(shelf_slider_drop_1440 shelf_slider_drop --size 1440x900)
     sculptforge_ui_test(shelf_slider_drop_2880 shelf_slider_drop --size 2880x1800)
+    # A double-click types an exact value on every slider and drag number (tests/ui/slider_exact.sfui), at the review sizes.
+    sculptforge_ui_test(slider_exact_1440 slider_exact --size 1440x900)
+    sculptforge_ui_test(slider_exact_2880 slider_exact --size 2880x1800)
     # Forge Deck prototype (tests/ui/deck.sfui), at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(deck_1440 deck --size 1440x900)
     sculptforge_ui_test(deck_2880 deck --size 2880x1800)

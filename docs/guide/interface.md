@@ -304,8 +304,10 @@ and Intensity on the first; **AI Brush**, **Front**, symmetry, **Pressure > Stre
 Size**, and the **ActiveTris / TotalTris** count on the second. In the SculptForge layout these are in the
 **Sculpt** menu (AI Brush, Front, pressure) and **View** menu (Library).
 
-Size and Intensity are sliders with the label inside: drag along them, or
-<kbd>Ctrl</kbd>+click to type a value.
+Size and Intensity are sliders with the label inside: drag along them, or double-click (or
+<kbd>Ctrl</kbd>+click; a pen's double-tap too) to type a value. This works on every slider and drag number in the
+panels, the top bar and Brush Lab: <kbd>Enter</kbd> applies, <kbd>Esc</kbd> cancels, <kbd>Tab</kbd> goes on to the next
+field, and a number past the slider's ends is moved to the end.
 
 ### Left shelf
 

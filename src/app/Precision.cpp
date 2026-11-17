@@ -100,7 +100,8 @@ std::string App::drawSizeStatus() const {
 }
 
 void App::drawSizeSlider(const char* id, const char* helpPath, const char* help) {
-    ui::SliderInside(id, &radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, drawSizeLabel().c_str(), ImGuiSliderFlags_Logarithmic);
+    ui::SliderInside(id, &radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, drawSizeLabel().c_str(),
+                    ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp); // (a typed number stays in 0.5-800)
     if (ImGui::IsItemActivated()) { // where the ring shows: the surface point last under the cursor, if still in view
         const CanvasRect c = canvasRect();
         ImVec2 at;
