@@ -1303,7 +1303,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
     # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
     # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage).
-    foreach(t ui_micro_levels ui_micro_mask_kelvin)
+    # ui_micro_tiles_closeup(_1440, _2880, labelled below): the same on the first tiled frame (Removing Device, every run).
+    foreach(t ui_micro_levels ui_micro_mask_kelvin ui_micro_tiles_closeup)
       if(TEST ${t})
         set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
       endif()
@@ -1328,6 +1329,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Adaptive Detail tiles drawn, before/after at three zooms (tests/ui/micro_tiles_closeup.sfui): the READY shots.
     sculptforge_ui_test(micro_tiles_closeup_1440 micro_tiles_closeup --size 1440x900)
     sculptforge_ui_test(micro_tiles_closeup_2880 micro_tiles_closeup --size 2880x1800)
+    if(TEST ui_micro_tiles_closeup_1440)
+      set_tests_properties(ui_micro_tiles_closeup_1440 ui_micro_tiles_closeup_2880 PROPERTIES LABELS "ui;no_d3d12")
+    endif()
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # Space slides a Mask / Select / Cut shape while it is dragged out (tests/ui/selection_space.sfui, #214), at the review sizes.
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
