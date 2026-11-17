@@ -25,7 +25,7 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew omarchy replies social status (--stage: bump stage)
+# Steps: bump check ci tag release site aur brew scoop omarchy replies social status (--stage: bump stage)
 # bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
 # promoting: only checks main already has it); check then verifies everything the later steps need, so a release
 # either stops in seconds before the tag or runs through to the end.
@@ -36,7 +36,7 @@
 # SCULPTFORGE_PRERELEASE "beta.N" (the app says "X.Y.Z Beta N"; CHANGELOG, CITATION, metainfo and the home page stay
 # at the stable release). release.yml publishes the beta in the private repository $INSIDERS_REPO (members are
 # invited by hand) and posts it in #members; nothing public: no GitHub pre-release here, no update feed entry, no
-# site, AUR, Homebrew, Omarchy, winget or issue replies. The stable release later is plain scripts/release.sh X.Y.Z,
+# site, AUR, Homebrew, Scoop, Omarchy, winget or issue replies. The stable release later is plain scripts/release.sh X.Y.Z,
 # which clears the prerelease.
 # Needs: gh logged in as islandmed (gh auth status), git, curl, python3, sha256sum (or shasum); run it from a clean
 # checkout of main. Pushes to main and the tag are made here, so only the release coordinator runs it, after
@@ -51,8 +51,11 @@ AUTHOR_EMAIL=232726012+islandmed@users.noreply.github.com # never a personal add
 # The AUR push (step aur) is on once this file exists on the releasing machine (packaging/arch/SUBMIT.md makes it).
 AUR_FLAG=${AUR_FLAG:-$HOME/Work/.sf/aur-publish}
 AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
+# Scoop (step scoop): packaging/scoop/sculptforge.json is the manifest; our own bucket gets a copy once this repository exists
+# (ScoopInstaller/Extras, once it accepts the manifest, updates itself from checkver/autoupdate).
+SCOOP_BUCKET=islandmed/scoop-sculptforge
 OMARCHY_PR=1800
-STEPS=(bump check ci tag release site aur brew omarchy replies social status)
+STEPS=(bump check ci tag release site aur brew scoop omarchy replies social status)
 
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
@@ -526,6 +529,14 @@ preflight() {
     [ -x tools/publish/setup-channels.sh ] || die "tools/publish/setup-channels.sh is missing or not executable" "git checkout origin/main -- tools/publish/setup-channels.sh"
     gh_file islandmed/homebrew-tap Casks/sculptforge.rb | grep '^ *version "' >/dev/null ||
         die "can't read Casks/sculptforge.rb in islandmed/homebrew-tap" "check gh auth status and that the tap exists (YES=1 tools/publish/setup-channels.sh brew sets it up)"
+    # scoop
+    python3 - <<'PY' || die "packaging/scoop/sculptforge.json is not a valid manifest (version, 64bit url + 64-hex hash + extract_dir, bin, shortcuts, checkver, autoupdate)" "restore it from origin/main, commit"
+import json, re
+m = json.load(open("packaging/scoop/sculptforge.json", encoding="utf-8"))
+a = m["architecture"]["64bit"]
+assert re.fullmatch(r"[0-9a-f]{64}", a["hash"]) and a["url"].endswith("windows-x86_64.zip") and a["extract_dir"]
+assert m["version"] in a["url"] and m["bin"] and m["shortcuts"] and m["checkver"] and m["autoupdate"]["architecture"]["64bit"]["hash"]["url"]
+PY
     # omarchy
     pr=$(gh pr view "$OMARCHY_PR" -R omacom/omarchy-pkgs --json state,headRepositoryOwner,headRefName \
         -q '.state + " " + .headRepositoryOwner.login + " " + .headRefName' 2>/dev/null || true)
@@ -1157,6 +1168,57 @@ step_brew() {
     gh_file islandmed/homebrew-tap Casks/sculptforge.rb | grep -F "sha256 \"$sum\"" >/dev/null ||
         die "the cask doesn't carry the checksum computed here ($sum)" "compare Casks/sculptforge.rb in islandmed/homebrew-tap with $dmg's real checksum and fix it"
     ok "Homebrew cask at $V ($sum)"
+}
+
+step_scoop() {
+    release_ready
+    on_main
+    local zip="SculptForge-$V-windows-x86_64.zip" sum m=packaging/scoop/sculptforge.json
+    sum=$(asset_sha "$zip")
+    if python3 - "$V" "$sum" "$m" <<'PY'
+import json, sys
+v, s, p = sys.argv[1:]
+m = json.load(open(p, encoding="utf-8"))
+sys.exit(0 if m["version"] == v and m["architecture"]["64bit"]["hash"] == s else 1)
+PY
+    then
+        ok "$m already at $V"
+    else
+        python3 - "$V" "$sum" "$m" <<'PY'
+import json, sys
+v, s, p = sys.argv[1:]
+m = json.load(open(p, encoding="utf-8"))
+a = m["architecture"]["64bit"]
+m["version"] = v
+a["url"] = f"https://github.com/islandmed/SculptForge/releases/download/v{v}/SculptForge-{v}-windows-x86_64.zip"
+a["hash"] = s
+a["extract_dir"] = f"SculptForge-{v}-windows-x86_64"
+open(p, "w", encoding="utf-8").write(json.dumps(m, indent=4) + "\n")
+PY
+        git add "$m"
+        commit -m "Scoop manifest at $V"
+        push_main
+        ok "$m at $V ($sum)"
+    fi
+    scoop_push "$m"
+}
+
+# scoop_push MANIFEST: the manifest to our own bucket when it exists (off until the repository is created).
+scoop_push() {
+    if ! gh repo view "$SCOOP_BUCKET" >/dev/null 2>&1; then
+        echo "   Scoop bucket off ($SCOOP_BUCKET absent; ScoopInstaller/Extras updates itself once it accepts the manifest)"
+        return
+    fi
+    if gh_file "$SCOOP_BUCKET" bucket/sculptforge.json | grep -qF "\"version\": \"$V\""; then
+        ok "Scoop bucket already at $V"; return
+    fi
+    rm -rf "$work/scoop"
+    gitp clone -q --depth 1 "https://github.com/$SCOOP_BUCKET.git" "$work/scoop" ||
+        die "can't clone $SCOOP_BUCKET" "check gh auth status, run again"
+    mkdir -p "$work/scoop/bucket" && cp "$1" "$work/scoop/bucket/sculptforge.json"
+    (cd "$work/scoop" && git add bucket/sculptforge.json && commit -m "sculptforge $V" && gitp push -q origin HEAD) ||
+        die "pushing sculptforge $V to $SCOOP_BUCKET failed" "check gh auth status, run again"
+    ok "Scoop bucket at $V"
 }
 
 step_omarchy() {
