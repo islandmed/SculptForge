@@ -33,7 +33,7 @@ licenses require.
 | [usrsctp](https://github.com/sctplab/usrsctp) | commit fec583d (libdatachannel's fork) | BSD 3-Clause License | SCTP for WebRTC data channels (part of libdatachannel's build). |
 | [plog](https://github.com/SergiusTheBest/plog) | commit 94899e0 | MIT License | Logging inside libdatachannel (switched off). |
 | [Mbed TLS](https://github.com/Mbed-TLS/mbedtls) | 3.6.7 | Apache License 2.0 | DTLS for the WebRTC face feed and AES-GCM for its encrypted connection message. Fetched at build time, linked statically. |
-| [Wasmtime](https://github.com/bytecodealliance/wasmtime) | 50.0.1 | Apache License 2.0 with LLVM Exception | The sandbox that runs plugins (core/Plugin.h). Its C API release archive, fetched at build time (SHA-256 pinned), linked statically. Its Rust dependencies are under MIT and/or Apache-2.0 licenses, as listed in its Cargo.lock at the v50.0.1 tag. |
+| [Wasmtime](https://github.com/bytecodealliance/wasmtime) | 50.0.2 | Apache License 2.0 with LLVM Exception | The sandbox that runs plugins (core/Plugin.h). Its C API release archive, fetched at build time (SHA-256 pinned), linked statically. Its Rust dependencies are under MIT and/or Apache-2.0 licenses, as listed in its Cargo.lock at the v50.0.2 tag. |
 
 Tools that are **not** included but that SculptForge can download for you on request (it says what, from where
 and how big, and checks a pinned SHA-256 before use) and runs as separate programs, for splat training
