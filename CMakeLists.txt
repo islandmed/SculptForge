@@ -739,6 +739,15 @@ VIAddVersionKey FileDescription 'SculptForge installer'
 VIAddVersionKey CompanyName 'The SculptForge contributors'
 VIAddVersionKey LegalCopyright 'Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later.'")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\SculptForge.lnk' '$INSTDIR\\\\bin\\\\sculptforge.exe'")
+# The "Check for updates once a day" page before the files are copied (packaging/windows/update-check.nsh): its choice goes
+# to bin\installer.json, which the app applies once per installer run (core/UpdateCheck.h). CPack puts
+# CPACK_NSIS_PAGE_COMPONENTS between the Start Menu page and the install page (the installer has no components).
+# (NSIS wants backslashes in !include; CPack stores the value unescaped, so each is doubled, as for CPACK_NSIS_CREATE_ICONS_EXTRA.)
+string(REPLACE "/" "\\\\" SF_UPDATE_NSH "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/update-check.nsh")
+string(APPEND CPACK_NSIS_DEFINES "\n!include '${SF_UPDATE_NSH}'")
+set(CPACK_NSIS_PAGE_COMPONENTS "Page custom SfUpdatePage SfUpdatePageLeave")
+set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "!insertmacro SfWriteInstallerJson")
+set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "!insertmacro SfRemoveInstallerJson")
 # macOS disk image
 set(CPACK_DMG_VOLUME_NAME "SculptForge")
 if(APPLE)
@@ -1119,6 +1128,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(prefs_updates_1440 prefs_updates --size 1440x900) # the installer's update-check box lands on this switch
+    sculptforge_ui_test(prefs_updates_2880 prefs_updates --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
     file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)
     foreach(script ${SCULPTFORGE_PERF_TESTS})
