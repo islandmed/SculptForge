@@ -314,7 +314,8 @@ bool App::hardwareCalibrating() const { return hwProfile_ && hwProfile_->calibra
 void App::drawHardwareProfileOverlay() {
     // The first-run card is for people: benchmarks, takes and demos run without it (a take's stroke would land on it).
     const bool scripted = options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty();
-    if (hwProfile_ && !hwProfile_->calibrator && hwProfile_->tierCard && !scripted) drawTierCard();
+    // (after the first-run Welcome and the membership card: never on top of their buttons)
+    if (hwProfile_ && !hwProfile_->calibrator && hwProfile_->tierCard && !scripted && !showWelcome_ && !supportCardOpen()) drawTierCard();
     if (!hwProfile_ || !hwProfile_->calibrator) return;
     HwProfileUi& hw = *hwProfile_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
