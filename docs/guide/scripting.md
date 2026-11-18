@@ -210,8 +210,8 @@ under a virtual display such as Xvfb (`xvfb-run sculptforge ...`).
 
 ## Python
 
-SculptForge has a Python module, `sculptforge`, with the same commands plus NumPy access to the mesh. Install it
-with `pip install sculptforge` (see [The Python package](python-package.md)); it is also included in the VFX
+SculptForge has a Python module, `sculptforge`, with the same commands plus NumPy access to the mesh. It is coming
+to PyPI as `sculptforge` (see [The Python package](python-package.md)); it is also included in the VFX
 Reference Platform builds and the Rez package (see [For studios](studios.md)), and when building from source,
 configure CMake with `-DSCULPTFORGE_BUILD_PYTHON=ON`.
 

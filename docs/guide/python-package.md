@@ -1,18 +1,18 @@
 # The Python package
 
 > **In short:**
-> - `pip install sculptforge`, then `import sculptforge as sf`: the sculpting engine in your own Python, no app needed.
+> - `import sculptforge as sf`: the sculpting engine in your own Python, no app needed (coming to PyPI as `sculptforge`).
 > - Build procedural assets, batch-convert folders of models, and test your pipeline, with loops, functions and NumPy.
 > - Every editor command, Parts, layers, masks, face groups, paint and selection sets; imports and exports OBJ, PLY,
 >   FBX, glTF/GLB, STL and USD.
 > - Runs in your process with no window, no network and no port. Same input, same output, byte for byte.
 
-From SculptForge 0.13.8 the engine is on PyPI for CPython 3.12, 3.13 and 3.14 on Windows x64, macOS (Apple silicon and
+The package is coming to PyPI (`pip install sculptforge`), with wheels for CPython 3.12, 3.13 and 3.14 on Windows x64, macOS (Apple silicon and
 Intel, macOS 11 or later) and Linux (x86_64 and aarch64, glibc 2.28 or later: Ubuntu 20.04, Debian 11, RHEL 8 and
 newer). It is the same `sculptforge` module that runs [inside the app](python.md), without the open scene.
 
 ```sh
-python -m pip install sculptforge
+python -m pip install sculptforge     # once it is on PyPI; until then, from a source checkout: python -m pip install .
 ```
 
 Use a virtual environment (`python -m venv .venv`) per project, as with any package. NumPy comes with it.
