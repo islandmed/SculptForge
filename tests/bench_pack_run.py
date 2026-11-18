@@ -75,6 +75,7 @@ assert not submit.validate(d2)
 # A pack that was altered, and one that isn't there.
 data = (pack / "creature-head.sfproj").read_bytes()
 (pack / "creature-head.sfproj").unlink()
+(work / "no.json").unlink(missing_ok=True)  # (a rerun in the same build dir: the last run's file must not count)
 bad = subprocess.run([app, "--benchmark-pack", str(pack), "--out", str(work / "no.json")], capture_output=True, text=True, env=env, timeout=60)
 assert bad.returncode == 1 and "creature-head.sfproj" in bad.stderr and not (work / "no.json").exists(), (bad.returncode, bad.stderr)
 (work / "no.json").unlink(missing_ok=True)
