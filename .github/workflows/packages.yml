@@ -732,7 +732,7 @@ jobs:
         run: |
           v=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
           ls -l wheelhouse
-          n=$(ls wheelhouse/sculptforge-$v-cp31[234]-*.whl | wc -l)
+          n=$(ls wheelhouse/sculptforge-$v-cp31[234]-*.whl | wc -l | tr -d " ") # (BSD wc pads with spaces)
           [ "$n" = 3 ] || { echo "::error::expected 3 wheels of sculptforge $v, found $n"; exit 1; }
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -756,7 +756,7 @@ jobs:
           merge-multiple: true
           pattern: 'pywheels-*'
       - run: |
-          n=$(ls dist/*.whl | wc -l)
+          n=$(ls dist/*.whl | wc -l | tr -d " ")
           [ "$n" = 12 ] || { echo "::error::expected 12 wheels (4 platforms x 3 Pythons), found $n"; exit 1; }
           cd dist && sha256sum * > ../SHA256SUMS.wheels.txt && cat ../SHA256SUMS.wheels.txt
       - uses: actions/upload-artifact@v7
