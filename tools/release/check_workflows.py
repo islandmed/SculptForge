@@ -91,7 +91,9 @@ def paths(body, key):
 
 def check_signing(pk):
     """packages.yml reads exactly one secret: the SignPath token, in job windows, in steps that run only when
-    SIGN == 'true' (repository variable SIGNING=signpath, on main, staging or a tag), never on pull_request or t0/**."""
+    SIGN == 'true' (repository variable SIGNING=signpath, on staging or a tag), never on pull_request or t0/**. A signing
+    request may fail without failing the job (continue-on-error on the action step, release policy only: the unsigned
+    build ships, never a stuck release); a signature that came back must still verify."""
     errs = []
     names = set(re.findall(r"secrets\.(\w+)", pk))
     if names - {"SIGNPATH_API_TOKEN"}:
@@ -110,9 +112,11 @@ def check_signing(pk):
             errs.append(f"packages.yml: job {job} uses SIGNPATH_API_TOKEN / the signing action (only job windows may)")
             continue
         sign = [l for l in lines if re.match(r"^      SIGN:", l)]
-        if len(sign) != 1 or "vars.SIGNING == 'signpath'" not in sign[0] or "refs/heads/main" not in sign[0] \
-                or "refs/heads/staging" not in sign[0] or "pull_request" in sign[0] or "t0/" in sign[0]:
-            errs.append("packages.yml: job windows needs env SIGN limited to vars.SIGNING == 'signpath' on main, staging and tags")
+        if len(sign) != 1 or "vars.SIGNING == 'signpath'" not in sign[0] or "refs/heads/main" in sign[0] \
+                or "refs/heads/staging" not in sign[0] or "startsWith(github.ref, 'refs/tags/v')" not in sign[0] \
+                or "pull_request" in sign[0] or "t0/" in sign[0]:
+            errs.append("packages.yml: job windows needs env SIGN limited to vars.SIGNING == 'signpath' on staging and tags (not main: "
+                        "no approval for a run that is never released)")
         # SignPath's test policy (self-signed certificate: worse than unsigned for users) is only for a maintainer's dispatch
         for l in lines:
             if re.search(r"test-signing|SIGNPATH_TEST_POLICY_SLUG|sign_test", l) and not l.lstrip().startswith("#") \
@@ -130,8 +134,9 @@ def check_signing(pk):
             toks = [l.strip() for l in st.splitlines() if SIGNPATH in l]
             if len(toks) != 1 or not re.fullmatch(r"api-token:\s*\$\{\{\s*secrets\.SIGNPATH_API_TOKEN\s*\}\}", toks[0]):
                 errs.append("packages.yml: SIGNPATH_API_TOKEN must only be the api-token: input of a signing step")
-            if not re.search(r"^\s+(- )?if:\s*env\.SIGN == 'true'\s*$", st, re.M):
-                errs.append("packages.yml: a step with SIGNPATH_API_TOKEN isn't limited by `if: env.SIGN == 'true'`")
+            if not re.search(r"^\s+(- )?if:\s*env\.SIGN == 'true'(\s*&&\s*steps\.[\w-]+\.outcome == 'success')?\s*$", st, re.M):
+                errs.append("packages.yml: a step with SIGNPATH_API_TOKEN isn't limited by `if: env.SIGN == 'true'` "
+                            "(optionally `&& steps.<id>.outcome == 'success'`, nothing wider)")
             if not re.search(r"uses:\s*signpath/github-action-submit-signing-request@[0-9a-f]{40}\b", st):
                 errs.append("packages.yml: SIGNPATH_API_TOKEN goes only to signpath/github-action-submit-signing-request, pinned by SHA")
             if re.search(r"(^|[\s;])set\s+-[a-wyz]*x|ACTIONS_STEP_DEBUG|\becho\b.*TOKEN", st):
@@ -142,8 +147,16 @@ def check_signing(pk):
             errs.append("packages.yml: every SignPath signing step must be followed by tools/ci/verify_signed.ps1 (a failed signature fails the job)")
         if "title=Windows signing" not in body or "GITHUB_STEP_SUMMARY" not in body:
             errs.append("packages.yml: job windows has no 'Windows: signed/unsigned' summary and notice (scripts/release.sh --stage prints it)")
-        if re.search(r"continue-on-error:\s*true", body):
-            errs.append("packages.yml: job windows must not continue-on-error (a failed signing must fail the job)")
+        # continue-on-error only on a SignPath request, only for the release policy (the test dry run must fail loudly)
+        for st in re.split(r"\n(?=      - )", body):
+            coe = re.findall(r"^\s+continue-on-error:\s*(.*?)\s*(#.*)?$", st, re.M)
+            if not coe:
+                continue
+            if st.startswith("      - ") and "signpath/github-action-submit-signing-request@" in st \
+                    and coe == [("${{ env.SIGN_TEST != 'true' }}", coe[0][1])]:
+                continue
+            errs.append("packages.yml: job windows may continue-on-error only on a SignPath request step, as "
+                        "${{ env.SIGN_TEST != 'true' }} (a signature that came back and doesn't verify must fail the job)")
         if re.search(r"name:\s*windows\w", body):
             errs.append("packages.yml: an artifact named windows* is taken for a package (job sums, release.yml)")
     return errs
@@ -345,7 +358,7 @@ SIGNED = PACKAGES.replace("  sums:", f"""  windows:
     permissions:
       id-token: write
     env:
-      SIGN: ${{{{ vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v')) }}}}
+      SIGN: ${{{{ vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v')) }}}}
     steps:
       - {SIGN_IF}
         id: in
@@ -508,6 +521,20 @@ def self_test():
         "signing without the variable": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("vars.SIGNING == 'signpath' && ", "")}, 1),
         "signing on pull requests": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "    branches: [main, staging]\n", "    branches: [main, staging]\n  pull_request:\n")}, 1),
+        "signing on main": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "(github.ref == 'refs/heads/staging'", "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'")}, 1),
+        "signing request may time out": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF}\n".format(SIGN_IF=SIGN_IF),
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF}\n        id: sb\n        continue-on-error: ${{{{ env.SIGN_TEST != 'true' }}}} # x\n".format(SIGN_IF=SIGN_IF))
+            .replace("      - {SIGN_IF}\n        run: ./tools".format(SIGN_IF=SIGN_IF), "      - {SIGN_IF} && steps.sb.outcome == 'success'\n        run: ./tools".format(SIGN_IF=SIGN_IF))}, 0),
+        "signing test request may time out": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF}\n".format(SIGN_IF=SIGN_IF),
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF}\n        continue-on-error: true\n".format(SIGN_IF=SIGN_IF))}, 1),
+        "signing verify may fail": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      - {SIGN_IF}\n        run: ./tools".format(SIGN_IF=SIGN_IF), "      - {SIGN_IF}\n        continue-on-error: ${{{{ env.SIGN_TEST != 'true' }}}}\n        run: ./tools".format(SIGN_IF=SIGN_IF))}, 1),
+        "signing gate widened": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF}\n".format(SIGN_IF=SIGN_IF),
+            "      - name: Signing - SignPath signs the binaries\n        {SIGN_IF} || github.event_name == 'push'\n".format(SIGN_IF=SIGN_IF))}, 1),
         "signing in another job": ({"release.yml": GOOD, "packages.yml": SIGNED.replace("  windows:\n", "  winx:\n")}, 1),
         "signing job can go red-less": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "  windows:\n", "  windows:\n    continue-on-error: true\n")}, 1),

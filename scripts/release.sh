@@ -693,17 +693,46 @@ stage_flaky_summary() {
 }
 # --stage: the batch with the bump on top goes through staging (CI there, STAGE_WITH here); main fast-forwards to it
 # and packages.yml builds the packages of X.Y.Z on the push to staging, which the release then promotes.
-# signing_state RUN: prints "Windows: signed (SignPath, <subject>)" or "Windows: unsigned (SIGNING off)", the notice the Windows job of
-# packages.yml leaves (check-run annotation "Windows signing"). Fails when the repository variable SIGNING is signpath and the packages
-# are not signed (verify_staged.py --require-signed refuses them at promotion too).
+# signing_line RUN: the notice the Windows job of packages.yml leaves (check-run annotation "Windows signing"): "Windows: signed
+# (SignPath, <subject>)", "Windows: partly signed (...)", "Windows: unsigned (<why>)" or "Windows: test-signed (...)"; empty if none.
+signing_line() {
+    local jid
+    jid=$(gh run view "$1" -R "$REPO" --json jobs -q '.jobs[] | select(.name | contains("Windows x64")) | .databaseId' 2>/dev/null | head -1)
+    [ -z "$jid" ] || gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1
+}
+# signing_state RUN: prints that line. Fails only on the test certificate (never in a release; verify_staged.py refuses it too).
+# With SIGNING=signpath an unsigned or partly signed run still ships (SignPath approval not given within SIGNPATH_TIMEOUT, never a
+# stuck train): a warning here, and step status puts it in the release checklist.
 signing_state() {
-    local jid line="" want
-    jid=$(gh run view "$1" -R "$REPO" --json jobs -q '.jobs[] | select(.name | startswith("Windows x64")) | .databaseId' 2>/dev/null | head -1)
-    [ -z "$jid" ] || line=$(gh api "repos/$REPO/check-runs/$jid/annotations" -q '.[] | select(.title == "Windows signing") | .message' 2>/dev/null | head -1)
+    local line want
+    line=$(signing_line "$1" || true)
     want=$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)
     ok "${line:-Windows: signing state unknown (no note in the Windows job: its packages were reused from an earlier run?)}"
     case "$line" in "Windows: test-signed"*) return 1 ;; esac # SignPath's self-signed test certificate never goes into a release
-    [ "$want" != signpath ] || case "$line" in "Windows: signed"*) ;; *) return 1 ;; esac
+    [ "$want" != signpath ] || case "$line" in "Windows: signed"*) ;; *)
+        printf '   warning: %s\n' "$V's Windows packages are not fully signed (above): they ship as they are; the release checklist (step status) says so" ;; esac
+}
+# signpath_watch RUN: with SIGNING=signpath, while RUN (Packages on staging, or Release from a tag with --rebuild) runs, wakes input
+# once per SignPath request its Windows job starts (the binaries, then the installer): the release policy waits for the
+# maintainer's approval in SignPath (as hello@) up to SIGNPATH_TIMEOUT (default 30 min), then that part ships unsigned. One API
+# read every 90 s, only while RUN is in progress; started in the background next to gh_watch and stopped after it.
+signpath_watch() {
+    local run=$1 org mins seen="" step until
+    [ "$(gh variable get SIGNING -R "$REPO" 2>/dev/null || true)" = signpath ] || return 0
+    org=$(gh variable get SIGNPATH_ORGANIZATION_ID -R "$REPO" 2>/dev/null || true)
+    mins=$(( $(gh variable get SIGNPATH_TIMEOUT -R "$REPO" 2>/dev/null || echo 1800) / 60 ))
+    while :; do
+        step=$(gh run view "$run" -R "$REPO" --json status,jobs -q 'if .status == "completed" then "DONE" else
+            (.jobs[] | select(.name | contains("Windows x64")) | .steps[]? | select(.status == "in_progress" and (.name | startswith("Signing - SignPath signs"))) | .name) end' 2>/dev/null | head -1) || step=""
+        [ "$step" = DONE ] && return 0
+        if [ -n "$step" ] && ! grep -qxF "$step" <<<"$seen"; then
+            seen+="$step"$'\n'
+            until=$(date -d "+$mins min" +%H:%M 2>/dev/null || date -v+"${mins}"M +%H:%M 2>/dev/null || echo "in $mins min")
+            herdr agent prompt input "SignPath approval needed for SculptForge $V (${step#Signing - SignPath signs }): approve the request waiting in https://app.signpath.io/Web/$org/SigningRequests as hello@ by $until, else that part of $V's Windows build ships unsigned (run https://github.com/$REPO/actions/runs/$run)" >/dev/null 2>&1 || true
+            echo "   SignPath: ${step#Signing - SignPath signs } waits for approval (until $until); input was woken" >&2
+        fi
+        sleep 90
+    done
 }
 step_stage() {
     local sha c with=${STAGE_WITH-}
@@ -750,7 +779,10 @@ step_stage() {
         return 0
     fi
     echo "   waiting for Packages run $id on staging (every platform's package) ..." >&2
+    local sw
+    signpath_watch "$id" & sw=$!
     gh_watch "$id" >/dev/null 2>&1 || true
+    kill "$sw" 2>/dev/null || true
     if [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" != success ]; then
         infra_retry "$id" || true # a setup-step flake: rerun once (logged); a second failure is reported below with job and step
     fi
@@ -760,7 +792,7 @@ step_stage() {
             "fix it on top of ${sha:0:8} (main is already there), then $(resume stage)"
     fi
     ok "Packages run $id built every package for ${sha:0:8}"
-    signing_state "$id" || die "the Windows packages of run $id are not release-signed (SIGNING=signpath wants \"Windows: signed\"; a test-signed run never ships)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
+    signing_state "$id" || die "the Windows packages of run $id carry SignPath's TEST certificate (never in a release)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
     echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
 }
 
@@ -888,10 +920,13 @@ step_release() {
         done
         [ -n "$id" ] || die "no Release run for $T after 5 minutes" "gh workflow run release.yml -R $REPO --ref $T -f tag=$T"
         echo "   waiting for Release run $id (https://github.com/$REPO/actions/runs/$id) ..."
+        local sw=""
+        [ $MODE != rebuild ] || { signpath_watch "$id" & sw=$!; } # --rebuild: the packages (and their signing) are built in this run
         gh_watch "$id" >/dev/null 2>&1 ||
             { infra_retry "$id" && [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion)" = success ]; } ||
             die "Release run $id failed: $(run_failed_where "$id") (https://github.com/$REPO/actions/runs/$id)" \
                 "read the failed job; a runner hiccup: gh run rerun $id --failed -R $REPO; a real bug: fix on main, delete the tag (git push origin :$T; git tag -d $T) and release $V again from step check"
+        [ -z "$sw" ] || kill "$sw" 2>/dev/null || true
     fi
     release_ready
     local n
@@ -1274,6 +1309,23 @@ step_social() {
 # A beta's #testers checklist (step bump writes it, step status names it): one place both checkouts see.
 testers_file() { echo "${SF_TESTERS_DIR:-$HOME/Work/.sf/state/release-testers}/release-testers-$V.md"; }
 
+# release_signing_note: the release checklist's Windows line, from the run whose packages $T shipped (staging's Packages run, or
+# the Release run with --rebuild). Not fully signed under SIGNING=signpath (an approval not given in time) = an UNSIGNED line to act on.
+release_signing_note() {
+    local run line
+    if [ $MODE = rebuild ]; then
+        run=$(gh run list -R "$REPO" -w release.yml -b "$T" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+    else
+        run=$(staged_run "$(git rev-parse HEAD)" 2>/dev/null || true)
+    fi
+    line=$( [ -z "$run" ] || signing_line "$run" || true)
+    case "$line" in
+        "") echo "   Windows:  signing state unknown (see the Windows job of the run that built $V)" ;;
+        "Windows: signed"*|*"SIGNING off"*) echo "   Windows:  ${line#Windows: }" ;;
+        *) echo "   Windows:  NOT FULLY SIGNED this release: ${line#Windows: }"
+           echo "             say so in the release notes and #announcements (\"the Windows build of $V is not code-signed\"); the next release signs again" ;;
+    esac
+}
 step_status() {
     if [ -n "$PRE" ]; then
         echo "   Beta:     https://github.com/$INSIDERS_REPO/releases/tag/$T (members only; nothing public)"
@@ -1292,6 +1344,7 @@ step_status() {
     winget=$(gh pr view 464465 -R microsoft/winget-pkgs --json state -q .state 2>/dev/null || echo unknown)
     echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"
     echo "   Release:  https://github.com/$REPO/releases/tag/$T"
+    release_signing_note
     echo "   Replies:  sfmonitor posts release-replies-$V.md (after reading it). Then update the handoff note."
 }
 
