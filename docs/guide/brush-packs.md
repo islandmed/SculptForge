@@ -73,7 +73,9 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 Flatten and Trim. The plane is taken where the stroke starts and held for the whole stroke, so you can drag across a
 curved form and leave one flat facet; start the next stroke on another side for the next facet, and where two meet you
 get a crisp bevel. It only cuts: everything above the plane comes down to it and nothing below it is ever raised, so
-it never adds clay (use Flatten when you want dips filled).
+it never adds clay (use Flatten when you want dips filled). On a steep ridge or a sharp crest the cut stops short of any
+triangle it would turn inside out, so a very steep flank can be left partly cut instead of folding into spiky shards;
+subdivide first, or cut it from the side in two strokes.
 
 Where two planes cross, the crease is as straight as the mesh allows (about a polygon wide); for razor-sharp
 crossings, subdivide first or turn on Dynamic topology. The edge is hard with a thin smoothed band (about two or three

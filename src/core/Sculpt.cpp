@@ -291,7 +291,13 @@ float samplePattern(BrushRecipe::Pattern pattern, const glm::vec3& p) {
 constexpr float kMaxDragSqueeze = 0.35f;
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
 constexpr int kRelaxRounds = 2;
-constexpr size_t kLimitVerts = 12000; // (the flip limiter costs a look at every vertex of the region, a few per dab: only for a small brush's)
+// What a dab leaves a triangle (limitFolds): the cosine of how far its normal may turn, and the share of its area it keeps, for a
+// sliver and for a sound triangle. Nudge: 14 and 41 degrees, a quarter and a fiftieth. Crisp Flatten flattens whole flanks, so a
+// sound triangle may turn up to 90 degrees from the way it faced (which is all a fold is), a sliver 60.
+constexpr FoldLimits kNudgeFoldLimits{0.97f, 0.75f, 0.25f, 0.02f};
+constexpr FoldLimits kCrispFoldLimits{0.5f, 0.0f, 0.1f, 0.1f};
+constexpr size_t kLimitVerts = 12000;
+constexpr size_t kCrispLimitVerts = 150000; // (a crisp dab's limit looks at the whole region once: the biggest brushes go without) // (the flip limiter costs a look at every vertex of the region, a few per dab: only for a small brush's)
 constexpr float kRelaxStep = 0.1f; // (a dab that moves less than this share of the brush radius relaxes in proportion: slow strokes place many)
 
 // Weighted sums over a brush region: per-block partials added in block order, so the result doesn't
@@ -1468,7 +1474,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
     // (Tendril is left as it was: the app pulls its tip under the cursor in many tiny steps, and a pulled horn folds into its own
     // pinch, smooth to the eye; relaxing it there made a crossing fold where it did not.)
-    if (type == BrushType::Nudge && verts_.size() <= kLimitVerts) limitFolds(mesh, scratch_);
+    if (type == BrushType::Nudge && verts_.size() <= kLimitVerts) limitFolds(mesh, scratch_, kNudgeFoldLimits, 0);
     displaceAll(mesh, verts_, scratch_);
     if (type == BrushType::Nudge) {
         std::vector<float> w(verts_.size());
@@ -1490,12 +1496,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 //    corners' offsets scaled back until it does not. A scaled corner moves less than its neighbours, which can squeeze
 //    theirs in turn, so the check follows the limited vertices outward until the squeeze is gentle. A stroke that folds
 //    nothing is never touched.
-constexpr float kFoldKeepSliver = 0.25f, kFoldKeepSound = 0.02f; // (the area a dab leaves a triangle)
-constexpr float kFoldCosSliver = 0.97f, kFoldCosSound = 0.75f;   // (14 and 41 degrees)
 constexpr float kFoldSliver = 0.2f, kFoldSound = 0.6f;         // (triangle quality: 1 is equilateral)
 constexpr int kFoldPasses = 200;
 
-void Sculptor::limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d) {
+void Sculptor::limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d, const FoldLimits& lim, uint32_t refStamp) {
     if (dynTopo_.active() || mesh.triangles.empty() || verts_.empty()) return; // (the remesher repairs its own squashed triangles)
     // (In double: a sliver's shape is the difference of nearly equal positions, and single precision noise in it would make
     // the two halves of a mirrored stroke come out differently.)
@@ -1506,6 +1510,7 @@ void Sculptor::limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d) {
     for (size_t i = 0; i < n; ++i) foldSlot_[verts_[i]] = uint32_t(i);
     foldScale_.resize(n);
     foldD_.assign(d.begin(), d.begin() + std::ptrdiff_t(n));
+    const auto refPos = [&](uint32_t u) { return refStamp && crispStamp_[u] == refStamp ? crispOrigin_[u] : pos[u]; };
     const auto qualityOf = [](const dvec3& e1, const dvec3& e2, double area) { // (1 is equilateral)
         return 2.0 * 1.7320508075688772 * area / std::max(glm::dot(e1, e1) + glm::dot(e2, e2) + glm::dot(e2 - e1, e2 - e1), 1e-40);
     };
@@ -1529,16 +1534,22 @@ void Sculptor::limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d) {
             if (!any) continue;
             const dvec3 e1 = dvec3(pos[c[1]]) - dvec3(pos[c[0]]), e2 = dvec3(pos[c[2]]) - dvec3(pos[c[0]]);
             const dvec3 d1 = dd[1] - dd[0], d2 = dd[2] - dd[0];
+            // (the way it faced and its area at the reference: where it is now, or, for a stroke that moves points over several
+            // dabs, where it was when the stroke found it, so the turns of many dabs add up)
             const dvec3 a0 = glm::cross(e1, e2);
-            const double area = glm::length(a0);
+            const double areaNow = glm::length(a0);
+            if (areaNow < 1e-24) continue;
+            dvec3 aRef = a0;
+            if (refStamp) aRef = glm::cross(dvec3(refPos(c[1])) - dvec3(refPos(c[0])), dvec3(refPos(c[2])) - dvec3(refPos(c[0])));
+            const double area = glm::length(aRef);
             if (area < 1e-24) continue;
-            const dvec3 nrm0 = a0 / area;
+            const dvec3 nrm0 = aRef / area;
             // How far its normal may turn in a dab, and how much of its area it must keep, depend on its shape: a sound
             // triangle (quality 1 is equilateral) can be tilted a good way (a plane brush tilts a whole falloff ring) and
             // squeezed hard, a sliver's normal swings for a tiny move.
-            const double soft = soften(qualityOf(e1, e2, area));
-            const double cosLimit = glm::mix(double(kFoldCosSliver), double(kFoldCosSound), soft);
-            const double keepArea = glm::mix(double(kFoldKeepSliver), double(kFoldKeepSound), soft);
+            const double soft = soften(qualityOf(e1, e2, areaNow));
+            const double cosLimit = glm::mix(double(lim.cosSliver), double(lim.cosSound), soft);
+            const double keepArea = glm::mix(double(lim.keepSliver), double(lim.keepSound), soft);
             const auto fine = [&](double tau) {
                 const dvec3 a = glm::cross(e1 + d1 * tau, e2 + d2 * tau);
                 const double up = glm::dot(a, nrm0);
@@ -1583,11 +1594,17 @@ void Sculptor::limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d) {
                     const glm::vec3 d1 = (slot[1] == ~0u ? glm::vec3(0.0f) : foldD_[slot[1]]) - d0;
                     const glm::vec3 d2 = (slot[2] == ~0u ? glm::vec3(0.0f) : foldD_[slot[2]]) - d0;
                     const glm::vec3 e1 = pos[c[1]] - pos[c[0]], e2 = pos[c[2]] - pos[c[0]];
-                    const glm::vec3 a0 = glm::cross(e1, e2), a1 = glm::cross(e1 + d1, e2 + d2);
+                    glm::vec3 a0 = glm::cross(e1, e2);
+                    const glm::vec3 a1 = glm::cross(e1 + d1, e2 + d2);
+                    if (glm::length(a0) < 1e-20f) continue;
+                    if (refStamp) {
+                        const auto rp = [&](uint32_t u) { return crispStamp_[u] == refStamp ? crispOrigin_[u] : pos[u]; };
+                        a0 = glm::cross(rp(c[1]) - rp(c[0]), rp(c[2]) - rp(c[0]));
+                    }
                     const float area = glm::length(a0);
                     if (area < 1e-20f) continue;
                     const float up = glm::dot(a1, a0) / area;
-                    if (up >= kFoldCosSliver * glm::length(a1) && up >= kFoldKeepSliver * area) continue;
+                    if (up >= lim.cosSliver * glm::length(a1) && up >= lim.keepSliver * area) continue;
                     for (int k = 0; k < 3; ++k)
                         if (slot[k] != ~0u) out.push_back(slot[k]);
                 }
@@ -1920,6 +1937,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         crispStamp_.resize(mesh.vertexCount(), 0);
         crispDone_.resize(mesh.vertexCount(), 0.0f);
         crispFacing_.resize(mesh.vertexCount(), 0.0f);
+        crispOrigin_.resize(mesh.vertexCount(), glm::vec3(0.0f));
     }
     // A big region on a locked crisp plane takes the adaptive path's normals, as the built-in plane brushes do
     // (Sculpt.h, analyticNormals): a point the plane takes has its normal, and the band's turn toward it by the share
@@ -1958,6 +1976,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         dragScale = std::min(1.0f, kMaxDragSqueeze / std::max(r.drag * strokeLen * slope, 1e-12f));
     }
     scratch_.resize(verts_.size());
+    if (crispMax) crispPrevDone_.resize(verts_.size());
     poolFor(verts_.size(), [&](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
         const uint32_t v = verts_[i];
@@ -1968,7 +1987,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         // of that height), so every dab of the stroke asks the same of it.
         float h0 = h, facing = glm::dot(nrm[v], areaNormal);
         if (crispMax) {
-            if (crispStamp_[v] != stamp) crispStamp_[v] = stamp, crispDone_[v] = 0.0f, crispFacing_[v] = facing;
+            if (crispStamp_[v] != stamp) crispStamp_[v] = stamp, crispDone_[v] = 0.0f, crispFacing_[v] = facing, crispOrigin_[v] = x;
             h0 = h / std::max(1.0f - crispDone_[v], 1e-3f);
             facing = crispFacing_[v];
         }
@@ -2026,6 +2045,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             const bool side = r.plane == BrushRecipe::Plane::Flatten || (r.plane == BrushRecipe::Plane::Fill) == (h0 < 0.0f);
             const float want = side ? std::clamp(planePull * f * fill * r.planeAmount, 0.0f, 1.0f) : 0.0f;
             const float done = crispDone_[v];
+            crispPrevDone_[i] = done;
             if (want > done) {
                 const float step = (want - done) / std::max(1.0f - done, 1e-6f);
                 d -= areaNormal * (h * step);
@@ -2060,6 +2080,22 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         scratch_[i] = d;
     }
     });
+    if (crispMax && verts_.size() <= kCrispLimitVerts) {
+        // A cut pulls each point straight to the plane by how much the tip, the facing and the wall band say, and across a steep
+        // flank (a ridge, a lump's side) neighbours ask very different pulls: the high one lands below the lower one and the
+        // triangle between them turns over, a shard standing in the facet's edge. Where a point's move would turn one of its
+        // triangles right over, it goes only as far as keeps it facing the way it did, and the stroke remembers how far it got
+        // (the next dab carries on from there).
+        foldWas_.assign(scratch_.begin(), scratch_.begin() + std::ptrdiff_t(verts_.size()));
+        limitFolds(mesh, scratch_, kCrispFoldLimits, stamp);
+        for (size_t i = 0; i < verts_.size(); ++i) {
+            if (scratch_[i] == foldWas_[i]) continue;
+            const float was = glm::length(foldWas_[i]), kept = glm::length(scratch_[i]);
+            const float share = was > 0.0f ? kept / was : 0.0f;
+            const uint32_t v = verts_[i];
+            crispDone_[v] = crispPrevDone_[i] + (crispDone_[v] - crispPrevDone_[i]) * share;
+        }
+    }
     if (crispMax) { // (most of a locked stroke's region is as far as this dab asks already: only the moves)
         crispMovedVerts_.clear();
         crispMoved_.clear();

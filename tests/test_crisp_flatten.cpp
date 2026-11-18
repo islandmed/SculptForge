@@ -617,3 +617,153 @@ TEST(crisp_flatten_invariant_crossing_planes_leave_a_clean_seam) {
     CHECK(nProud == 0);
     CHECK(spikes == 0);
 }
+
+namespace {
+
+// Hameron's case (0.13.7, #members): a dense organic mesh WITHOUT micro detail, deep strokes across its ridges, and the
+// cut leaves thin shards along the flattened edges. The fixture: an icosphere pushed out into a rounded block with sharp
+// ridged lumps on it (a crest every ~0.7 units, 0.2 high), so a stroke that starts in a trough meets material a full
+// brush radius above its plane.
+Mesh organicMesh(int subdiv) {
+    Mesh m = makeIcosphere(subdiv);
+    for (glm::vec3& x : m.positions) {
+        const glm::vec3 d = glm::normalize(x);
+        const float box = std::pow(std::pow(std::abs(d.x), 6.0f) + std::pow(std::abs(d.y), 6.0f) + std::pow(std::abs(d.z), 6.0f), -1.0f / 6.0f);
+        const float ridge = 1.0f - std::abs(std::sin(4.0f * d.x + 1.3f * d.y) * std::cos(3.0f * d.z + 2.0f * d.y)); // (crests where |sin|=0)
+        x = d * (0.55f * (1.0f + 0.7f * (box - 1.0f)) + 0.2f * ridge * ridge);
+    }
+    m.recomputeAllNormals();
+    return m;
+}
+
+// What a stroke left, per vertex and triangle: vertices standing out of their ring (umbrella over mean edge > 0.6 and 3x the
+// ring's median: tools/qa/closeup.py's rule), and sliver triangles (quality 4*sqrt(3)*area / sum of squared edges < 0.08:
+// the thin shards).
+struct Shape { std::vector<uint8_t> spike, sliver; std::vector<float> k; };
+Shape shapeOf(const Mesh& m) {
+    Shape s;
+    s.spike.assign(m.vertexCount(), 0);
+    s.sliver.assign(m.triangles.size(), 0);
+    std::vector<float> k(m.vertexCount(), 0.0f);
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        auto ring = m.neighbors(v);
+        if (ring.empty()) continue;
+        glm::vec3 c(0.0f);
+        float e = 0.0f;
+        for (uint32_t u : ring) c += m.positions[u], e += glm::distance(m.positions[u], m.positions[v]);
+        c /= float(ring.size());
+        e /= float(ring.size());
+        k[v] = e > 0.0f ? glm::distance(m.positions[v], c) / e : 0.0f;
+    }
+    s.k = k;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        if (k[v] <= 0.6f) continue;
+        std::vector<float> nb;
+        for (uint32_t u : m.neighbors(v)) nb.push_back(k[u]);
+        if (nb.empty()) continue;
+        std::sort(nb.begin(), nb.end());
+        s.spike[v] = k[v] > 3.0f * nb[nb.size() / 2];
+    }
+    for (size_t i = 0; i < m.triangles.size(); ++i) {
+        const glm::uvec3 t = m.triangles[i];
+        const glm::vec3 a = m.positions[t.x], b = m.positions[t.y], c = m.positions[t.z];
+        const float area = 0.5f * glm::length(glm::cross(b - a, c - a));
+        const float e2 = glm::dot(b - a, b - a) + glm::dot(c - b, c - b) + glm::dot(a - c, a - c);
+        s.sliver[i] = 4.0f * 1.7320508f * area / std::max(e2, 1e-20f) < 0.08f;
+    }
+    return s;
+}
+int countOf(const std::vector<uint8_t>& v) { return int(std::count(v.begin(), v.end(), uint8_t(1))); }
+
+// A stroke's damage on a fixed topology: spikes and slivers it made (not there before), triangles turned right around.
+struct Shards { int spikes = 0, slivers = 0, folded = 0, marginal = 0; };
+Shards shardsAfter(const Mesh& m, const Shape& was, const std::vector<glm::vec3>& before) {
+    Shards out;
+    const Shape now = shapeOf(m);
+    // (new: not a crest that was nearly one already and tipped over the line because a neighbour dropped a little)
+    for (size_t v = 0; v < now.spike.size(); ++v) {
+        if (!now.spike[v] || now.k[v] <= was.k[v] + 0.25f) continue;
+        ++out.marginal;
+        out.spikes += now.k[v] > 1.0f; // (shard grade: a whole edge out of its ring; a vertex at 0.6 to 0.75 is a small bump in a wall)
+    }
+    for (size_t i = 0; i < now.sliver.size(); ++i) {
+        out.slivers += now.sliver[i] && !was.sliver[i];
+        const glm::uvec3 t = m.triangles[i];
+        const glm::vec3 n1 = glm::cross(m.positions[t.y] - m.positions[t.x], m.positions[t.z] - m.positions[t.x]);
+        const glm::vec3 n0 = glm::cross(before[t.y] - before[t.x], before[t.z] - before[t.x]);
+        out.folded += glm::dot(n0, n1) < 0.0f;
+    }
+    return out;
+}
+
+// A stroke from `a` to `b` over the form (a great circle on the unit sphere, dabs projected onto the surface), `radius` wide.
+std::vector<DabParams> sweepDabs(const Mesh& m, BVH& bvh, glm::vec3 a, glm::vec3 b, float radius) {
+    std::vector<DabParams> dabs;
+    a = glm::normalize(a), b = glm::normalize(b);
+    const float ang = std::acos(std::clamp(glm::dot(a, b), -1.0f, 1.0f));
+    const int n = std::max(2, int(ang * 0.55f / (0.1f * radius)));
+    for (int i = 0; i <= n; ++i) {
+        const float t = float(i) / float(n);
+        const glm::vec3 dir = glm::normalize(glm::mix(a, b, t));
+        RayHit hit;
+        if (!bvh.raycast(m, dir * 3.0f, -dir, hit)) continue;
+        const glm::vec3 c = hit.position;
+        DabParams p = dabAt(c, -dir, radius, 1.0f);
+        p.strokeDelta = dabs.empty() ? glm::vec3(0.0f) : c - dabs.back().center;
+        dabs.push_back(p);
+    }
+    return dabs;
+}
+
+struct SweepCase { glm::vec3 a, b; };
+const SweepCase kSweeps[] = {
+    {{1, 0.15f, 0.2f}, {0.2f, 0.9f, 0.3f}}, {{0.1f, 1, 0.2f}, {-0.8f, 0.5f, 0.6f}}, {{0.3f, -0.2f, 1}, {1, 0.4f, 0.2f}},
+    {{-1, 0.2f, 0.3f}, {-0.3f, -0.9f, 0.3f}}, {{0.6f, 0.6f, 0.6f}, {-0.5f, 0.7f, 0.5f}}, {{0.9f, -0.4f, -0.2f}, {0.2f, 0.1f, -1}},
+};
+
+} // namespace
+
+// Every stroke over the ridges (two brush sizes, six sweeps from fresh, then all of them on one mesh): no triangle turns
+// inside out, and no new sliver or shard-grade spike stands in the cut's edge. (Without the fold limit: 25 to 68 triangles a stroke, 255 over the twelve.)
+TEST(crisp_flatten_invariant_deep_strokes_over_ridges_leave_no_shards) {
+    const BrushRecipe r = builtin("Crisp Flatten");
+    Shards worst, total;
+    float deepest = 0.0f;
+    auto add = [&](Shards& to, const Shards& s) { to.spikes += s.spikes, to.slivers += s.slivers, to.folded += s.folded, to.marginal += s.marginal; };
+    auto strokeOnce = [&](Document& d, const SweepCase& sw, float radius) {
+        const std::vector<glm::vec3> start = d.mesh.positions;
+        const Shape was = shapeOf(d.mesh);
+        recipeStroke(d, r, sweepDabs(d.mesh, d.bvh, sw.a, sw.b, radius));
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) deepest = std::max(deepest, glm::distance(start[v], d.mesh.positions[v]) / radius);
+        return shardsAfter(d.mesh, was, start);
+    };
+    const Mesh base = organicMesh(6);
+    Document one = makeDoc(Mesh(base));
+    for (const float radius : {0.15f, 0.3f})
+        for (const SweepCase& sw : kSweeps) {
+            Document fresh = makeDoc(Mesh(base));
+            add(worst, strokeOnce(fresh, sw, radius)); // (each from the untouched form)
+            add(total, strokeOnce(one, sw, radius));   // (each on what the ones before left)
+        }
+    std::printf("  organic (%zu verts), fresh strokes: new spikes %d (+%d marginal), new slivers %d, folded %d; stacked: %d (+%d), %d, %d; deepest cut %.2f radii\n",
+                base.vertexCount(), worst.spikes, worst.marginal, worst.slivers, worst.folded, total.spikes, total.marginal, total.slivers, total.folded, deepest);
+    CHECK(deepest > 0.8f); // (the fixture does cut deep: a stroke starting in a trough meets a crest a radius above its plane)
+    CHECK(worst.folded == 0 && total.folded == 0);
+    CHECK(worst.slivers == 0 && total.slivers == 0);
+    CHECK(worst.spikes == 0 && total.spikes == 0);
+}
+
+// With Dynamic topology the surface is remeshed under the brush (the fold limit leaves that to the remesher): the cut
+// still stays a cut, and what it leaves is measured, not promised.
+TEST(crisp_flatten_dynamic_topology_over_ridges_measured) {
+    Document d = makeDoc(organicMesh(5));
+    d.sculptor.dyntopo.enabled = true;
+    const BrushRecipe r = builtin("Crisp Flatten");
+    const int before = countOf(shapeOf(d.mesh).sliver);
+    for (const float radius : {0.15f, 0.3f})
+        for (const SweepCase& sw : kSweeps) recipeStroke(d, r, sweepDabs(d.mesh, d.bvh, sw.a, sw.b, radius));
+    const Shape now = shapeOf(d.mesh);
+    std::printf("  organic with dyntopo: %zu verts, slivers %d -> %d, spikes %d\n", d.mesh.vertexCount(), before, countOf(now.sliver),
+                countOf(now.spike));
+    for (const glm::vec3& x : d.mesh.positions) CHECK(std::isfinite(x.x + x.y + x.z));
+}

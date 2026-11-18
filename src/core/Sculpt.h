@@ -213,6 +213,10 @@ inline double lapMs(std::chrono::steady_clock::time_point& t) {
 
 // Applies brush dabs to a mesh, keeping normals and the BVH in sync and
 // recording the original positions of every touched vertex for undo.
+// How far limitFolds lets a dab turn a triangle: the cosine of the turn and the share of its area it keeps, for a sliver and for a
+// sound triangle.
+struct FoldLimits { float cosSliver, cosSound, keepSliver, keepSound; };
+
 class Sculptor {
 public:
     // Strokes write into sculpt layer `layer` (-1 = base). Returns false if the
@@ -396,6 +400,7 @@ private:
     // wear the edge's band down to a cliff), as the Layer brush does with its height.
     std::vector<uint32_t> crispStamp_; // (the stroke id's low 32 bits, as layerStamp_: 12 bytes a vertex in all)
     std::vector<float> crispDone_;
+    std::vector<glm::vec3> crispOrigin_; // (where the stroke found it)
     std::vector<float> crispFacing_; // (the vertex normal's dot with the plane's, when the stroke found it)
     std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
     std::vector<glm::vec3> crispMoved_;
@@ -459,11 +464,13 @@ private:
 
     // The drag brushes (Sculpt.cpp, limitFolds / relaxDrag): `d`, the offsets of verts_, scaled down where they would turn a
     // triangle over or squash it to a sliver; and the vertices slid back toward the middle of their neighbours after the dab.
-    void limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d);
+    void limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d, const FoldLimits& lim, uint32_t refStamp);
     void relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lambda, int rounds);
     std::vector<uint32_t> foldSlot_;
     std::vector<float> foldScale_;
     std::vector<glm::vec3> foldD_;
+    std::vector<glm::vec3> foldWas_;     // (Crisp Flatten: the offsets before the limit)
+    std::vector<float> crispPrevDone_;   // (Crisp Flatten: each region vertex's pull before this dab)
 
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
