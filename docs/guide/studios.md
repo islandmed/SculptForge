@@ -171,7 +171,7 @@ Each artist gets everything in Member, and the studio gets:
 - **A pinned version:** you choose when to move. Security fixes are backported to the current release and one
   long-term support (LTS) line, and your studio is always on one of those two.
 - **An offline signed installer** with checksums for IT.
-- **Support:** a first response within 2 business days (a response, not a fix), up to 3 custom items a month
+- **Support:** a first response within 12 hours (a response, not a fix), up to 3 custom items a month
   (bigger features are quoted separately), your requests first on the roadmap, and a private Discord channel.
 
 Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Join at
