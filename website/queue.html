@@ -98,7 +98,6 @@
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Shelves for every option: drag any toggle, button or setting (e.g. Preferences &gt; Input &gt; Orbit around the pointer) onto a shelf and arrange them; alongside My Panel</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: iPad (or other tablet) as a native pressure-sensitive pen input for SculptForge on a Windows/Linux PC; answered 11-14: like a Wacom-style pen tablet feature; the hard part is Apple&#x27;s pressure-sensitivity drivers; no rush, and an iPadOS app alone would solve it for him</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: My Panel: drag individual checkboxes, sliders and displays (e.g. Backface culling, the subdivision level display, Mask by cavity) into it, and drop My Panel into a tray instead of only the Edit dropdown</span><span class="st">Queued</span></li>
-            <li><span class="badge">Member request</span><span class="idea">📦 Files &amp; Pipeline: Portable-data mode: settings, brushes and layout stored in the portable folder, so a USB stick carries the whole workbench</span><span class="st">Queued</span></li>
         </ul>
         <p class="member-cta"><a class="btn primary" href="support.html">Become a member</a></p>
       </div>
@@ -119,7 +118,6 @@
             <tr><td>🧩 Parts &amp; Scene: Numbered duplicates (Head.01) instead of &quot;copy copy&quot;</td><td class="st">Building</td></tr>
             <tr><td>🖌️ Brushes: Crisp-edge flatten</td><td class="st">Building</td></tr>
             <tr><td>⚡ Performance: Faster Quad Remesh at high polygon counts</td><td class="st">Building</td></tr>
-            <tr><td>⌨️ Interface: Double-click any slider/knob to type an exact value (consistent everywhere)</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Python scripting inside the regular app&#x27;s console and scripts (loops, conditions); today the flat command language only, while the sculptforge Python module ships in studio/VFX Platform builds and source builds</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Script-made buttons and panels: a script as a shelf button or a My Panel entry (today no script can add UI; saved scripts run via File &gt; Script &gt; Run script file...)</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Bones and skin weights as USD skeletons, posing first</td><td class="st">Designing</td></tr>
@@ -194,11 +192,9 @@
             <tr><td>🖌️ Brushes: Brush thumbnails that show the brush&#x27;s alpha, plus a Regenerate thumbnail right-click</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: Local subdivide: subdivide only a masked/lasso/face-group area with the existing Subdivide method (N levels), seamless transition to the untouched mesh, optional soft fade at the mask edge; not Voxel Remesh; for fine engraving on a 500k-poly figure; related to Adaptive Detail (Micro)</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: Default Sphere as a Quad Sphere (cube-projected, even quads) instead of the triangulated icosphere, so sculpting doesn&#x27;t make spiky triangles</td><td class="st">Queued</td></tr>
-            <tr><td>🎭 Masking &amp; Face Groups: Cut Circle: cut the mesh with a circle/ellipse shape (resizable, free or locked round), next to Cut Line/Lasso/Rectangle/Polyline</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: 2D drawing tools in Model space: line, curve, circle, square, triangle and polyline to start</td><td class="st">Queued</td></tr>
             <tr><td>👁️ View &amp; Camera: XY and YZ grids in Model space, next to the XZ floor grid</td><td class="st">Queued</td></tr>
             <tr><td>👁️ View &amp; Camera: Snap to grid (with the XY/YZ/XZ grids in Model space)</td><td class="st">Queued</td></tr>
-            <tr><td>🎭 Masking &amp; Face Groups: Hold Space while drawing a mask/select/cut shape (rectangle, lasso, line) to slide it into place instead of redrawing</td><td class="st">Queued</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Blender Bridge: send a posed object (with its armature/bones) to SculptForge as it looks in Blender, not the rest pose</td><td class="st">Queued</td></tr>
             <tr><td>👁️ View &amp; Camera: Fixed floor grid: an option to keep the grid on the world floor (Y=0) instead of following the model&#x27;s lowest point, (the floor plane is edge-on in Front/Side views, so it looks like a line; the XY/YZ grids give a visible plane there), as a steady reference for building (e.g. statuettes, miniatures)</td><td class="st">Queued</td></tr>
             <tr><td>🧩 Parts &amp; Scene: Parametric primitives with settings (e.g. segments) that give clean low-resolution meshes: cube, sphere, plane and more; answered 11-14: settings stay editable (parametric) until validated and promoted to a normal sculptable mesh; asked for a sketch of the settings panel</td><td class="st">Queued</td></tr>
@@ -219,7 +215,6 @@
             <tr><td>🖌️ Brushes: Move variants: (1) move without tearing polygons, (2) move only the connected surface, (3) parallel move (rigid translate), (4) elastic move; part of his feedback that Standard/Clay/Crease/Clay Rock feel wrong</td><td class="st">Queued</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Add your own HDRI environments from the Material panel (a button), not only via a folder in the SCULPTFORGE_HDRI_PATH variable</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Preview window for the clicked mesh: a small window showing the Part you clicked</td><td class="st">Queued</td></tr>
-            <tr><td>🧩 Parts &amp; Scene: Insert (Append &gt; Insert on the model) on meshes that keep their subdivision levels, instead of refusing; today needs a mesh without levels (Freeze Levels first)</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Choose which tray a palette opens in when you click its name in the Classic top bar (it opens in the left tray; he works from the right one)</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Italian interface language (today English, Español, Traditional/Simplified Chinese, Japanese); English makes settings hard for Italian users</td><td class="st">Queued</td></tr>
             <tr><td>📦 Files &amp; Pipeline: A general &#x27;Export FBX&#x27; in the File menu next to &#x27;Export FBX for Unreal&#x27; (today the general FBX is only the export_fbx command)</td><td class="st">Queued</td></tr>
@@ -230,6 +225,7 @@
             <tr><td>⌨️ Interface: Shortcut editor: warn when a key is already used (no silent reassign) + per-shortcut reset button <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
             <tr><td>⌨️ Interface: Pan left/right/up/down as separate bindable keys (for game pads / analog sticks; zoom in/out keys exist) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
             <tr><td>⌨️ Interface: Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Portable-data mode: settings, brushes and layout stored in the portable folder, so a USB stick carries the whole workbench <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>Generate a cavity map <span class="tag">member</span></td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
             <tr><td>Deformation panel expansion</td><td class="st">Shipped<span class="detail">in 0.11.14</span></td></tr>
             <tr><td>X/Y/Z orbit lock</td><td class="st">Shipped<span class="detail">in 0.11.13</span></td></tr>
@@ -247,6 +243,10 @@
             <tr><td>🧩 Parts &amp; Scene: Mesh Boolean: live Union/Subtract/Intersect preview + Make Boolean Mesh (new mesh, sources untouched), weld and face group options</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🖌️ Brushes: Smooth-peaks brush: smooths only the high points (peaks), valleys untouched</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Save a project with only some Parts (e.g. only the visible ones) to slim the file after working on different versions</td><td class="st">Shipped<span class="detail">in 0.12.6</span></td></tr>
+            <tr><td>🎭 Masking &amp; Face Groups: Cut Circle: cut the mesh with a circle/ellipse shape (resizable, free or locked round), next to Cut Line/Lasso/Rectangle/Polyline</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
+            <tr><td>🎭 Masking &amp; Face Groups: Hold Space while drawing a mask/select/cut shape (rectangle, lasso, line) to slide it into place instead of redrawing</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
+            <tr><td>⌨️ Interface: Double-click any slider/knob to type an exact value (consistent everywhere)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
+            <tr><td>🧩 Parts &amp; Scene: Insert (Append &gt; Insert on the model) on meshes that keep their subdivision levels, instead of refusing; today needs a mesh without levels (Freeze Levels first)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>Light rotation on one axis</td><td class="st">Already in the app<span class="detail">PBR shading &gt; Rotation</span></td></tr>
             <tr><td>Duplicate Part shortcut</td><td class="st">Already in the app<span class="detail">Ctrl+Shift+D</span></td></tr>
             <tr><td>Constant detail for dynamic topology</td><td class="st">Already in the app<span class="detail">Draw &amp; Tablet &gt; Constant detail</span></td></tr>
