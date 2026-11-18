@@ -5,7 +5,7 @@ Python package: build procedural assets, batch-process models, and test and auto
 functions instead of shell scripts.
 
 ```sh
-pip install sculptforge
+pip install sculptforge     # once it is on PyPI; until then see the guide: https://sculptforge.app/guide/python-package.html
 ```
 
 ```python
