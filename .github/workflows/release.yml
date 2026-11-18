@@ -217,6 +217,7 @@ jobs:
           github-token: ${{ github.token }}
       - id: wheels
         name: Wheels against their recorded SHA-256 and attestations
+        continue-on-error: true # (a failed check leaves ok unset, so publish releases the app without the wheels)
         env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
@@ -228,6 +229,8 @@ jobs:
           if [ "$HAVE" != true ]; then echo "::warning::no wheel checksums in run $RUN: this release has no Python wheels"; echo "ok=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           python3 tools/release/verify_staged.py wheels wheel-sums/SHA256SUMS.wheels.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
           echo "ok=true" >> "$GITHUB_OUTPUT"
+      - if: steps.wheels.outcome == 'failure'
+        run: echo "::warning::the Python wheels failed their checksum or attestation check (see above), so this release has no wheels"
 
   smoke:
     name: Smoke test ${{ matrix.name }}

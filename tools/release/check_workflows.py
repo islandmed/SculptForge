@@ -252,6 +252,11 @@ def check(files):
         body = "\n".join(rj.get(job, []))
         if not re.search(r"needs:.*\bverify\b", body) or "verify_staged.py" not in body:
             errs.append(f"release.yml: job {job} must need verify and re-check the checksums (verify_staged.py)")
+    # The wheels never hold the app (packages.yml jobs wheels/wheel-sums): verify's check of them may fail alone.
+    vbody = "\n".join(rj.get("verify", []))
+    wstep = re.search(r"\n      - id: wheels\n(.*?)(?=\n      - |\Z)", vbody, re.S)
+    if wstep and "continue-on-error: true" not in wstep.group(1):
+        errs.append("release.yml: job verify's step wheels must be continue-on-error (the wheels never hold the app release)")
     if "pypi" in rj and (re.search(r"secrets\.", "\n".join(rj["pypi"])) or environment(rj["pypi"]) != "pypi"):
         errs.append("release.yml: job pypi must be in `environment: pypi` and read no secret (Trusted Publishing only)")
     for job, lines in rj.items():
@@ -531,6 +536,14 @@ def self_test():
             "signing-binaries-unsigned", "windows-unsigned")}, 1),
         "signing intermediate attested nowhere": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "signing-binaries-unsigned", "binaries-unsigned")}, 1),
+        "wheels check may fail alone": ({"release.yml": GOOD.replace(
+            "      - run: python3 tools/release/verify_staged.py dist sums\n",
+            "      - run: python3 tools/release/verify_staged.py dist sums\n      - id: wheels\n        continue-on-error: true\n"
+            "        run: python3 tools/release/verify_staged.py wheels s\n", 1)}, 0),
+        "wheels check holds the app": ({"release.yml": GOOD.replace(
+            "      - run: python3 tools/release/verify_staged.py dist sums\n",
+            "      - run: python3 tools/release/verify_staged.py dist sums\n      - id: wheels\n"
+            "        run: python3 tools/release/verify_staged.py wheels s\n", 1)}, 1),
         "pypi good": ({"release.yml": GOOD + PYPI}, 0),
         "pypi without verify": ({"release.yml": GOOD + PYPI.replace("verify_staged.py", "x.py")}, 1),
         "pypi with a token": ({"release.yml": GOOD + PYPI.replace("packages-dir: dist", "password: ${{ secrets.PYPI_TOKEN }}")}, 1),
