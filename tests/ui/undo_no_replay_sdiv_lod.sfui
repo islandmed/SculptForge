@@ -1,10 +1,10 @@
 # gh#184 (0.13.8: "after undoing, the next new stroke re-shows the undone strokes"), on a mesh over the triangle budget:
-# the coarse levels, the stroke thread's uploads and the still-frame budget are the big-mesh paths. After undo, while the
+# the coarse levels and the still-frame budget are the big-mesh draw paths (the stroke thread is not in play: the UI test loop places
+# dabs at once, interactiveStrokes_ is only set by App::run; a stroke-thread test needs a loop that runs pumpStroke). After undo, while the
 # next stroke runs and after it, the view must be the mesh as it is (view_stale: against the same mesh sent up whole).
 run ui_look look=classic layout=classic
 env SF_TRIANGLE_BUDGET 40000
 env SF_STILL_FRAME_MS 0.001
-env SF_BACKGROUND_DABS 1
 run new_sphere subdivisions=3
 run subdiv_divide
 run subdiv_divide
