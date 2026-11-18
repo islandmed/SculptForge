@@ -114,7 +114,9 @@ bool glHealthy() {
 void resetGlobals() {
     setBakeListener({});
     setMeshMapRequester({});
-    setCurrentTierConfig(TierConfig{});
+    TierConfig fresh; // (the defaults with the SF_TIER_* overrides, as a new process starts)
+    applyTierBudgetEnv(fresh.budgets);
+    setCurrentTierConfig(fresh);
     setAvailableMemoryOverride(0);
     setLanguage(Language::English);
     setPacksSafeMode(false);

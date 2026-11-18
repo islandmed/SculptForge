@@ -27,6 +27,7 @@
 #include "render/MicroFocus.h"
 #include "render/GL.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -56,6 +57,18 @@ public:
     bool viewMoving = false;
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
+    // Levels a cluster may draw ABOVE the stored one (TierBudgets::microDrawAbove; 0 = the stored level caps the draw,
+    // as before 0.13.5): the vertex shader evaluates the Phong base at the finer point and the height linear between
+    // the stored grid points (an exact integer sum, so both sides of a shared edge agree to the bit), so a close-up
+    // past the stored resolution shows a smooth surface instead of the stored facets. Never past kMaxDrawLevel (the
+    // patch index buffers are 16-bit), and the triangle budget still rules.
+    int drawAbove = 0;
+    // Flat shading shows the stored grid itself: nothing above level_ (11-17 artist-qa: neighbouring clusters drawn one
+    // level apart above the stored grid read as a seam in flat shading, ~10 px facets next to the stored ones with a
+    // dark column between; smooth shading, which interpolates the stored normals, never showed it). Set per draw.
+    bool flatShading = false;
+    static constexpr int kMaxDrawLevel = 8;
+    int maxDrawLevel() const { return flatShading ? level_ : std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
     // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
     const MicroFocus* focus() const { return focus_.get(); }
     MicroFocus* focus() { return focus_.get(); }
@@ -120,8 +133,8 @@ private:
     std::vector<int8_t> want_;
     struct Uniforms {
         GLuint program = 0;
-        GLint slotBase = -1, chunkSlot = -1, level = -1, n = -1, samples = -1, clusterShift = -1, step = -1, unrolled = -1,
-              corners = -1;
+        GLint slotBase = -1, chunkSlot = -1, level = -1, stored = -1, n = -1, samples = -1, clusterShift = -1, step = -1,
+              unrolled = -1, corners = -1;
     } u_;
     std::unique_ptr<MicroFocus> focus_;
 };

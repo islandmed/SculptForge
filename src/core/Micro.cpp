@@ -269,6 +269,55 @@ Cell cellAt(const float wc[3], uint32_t n) {
 
 } // namespace
 
+glm::vec3 decodeShadeNormal(uint32_t v) {
+    const float x = float(v & 255u) / 255.0f * 2.0f - 1.0f, y = float((v >> 8) & 255u) / 255.0f * 2.0f - 1.0f;
+    glm::vec3 n(x, y, 1.0f - std::abs(x) - std::abs(y));
+    const float t = std::max(-n.z, 0.0f);
+    n.x += n.x >= 0.0f ? -t : t;
+    n.y += n.y >= 0.0f ? -t : t;
+    const float len = glm::length(n);
+    return len > 0.0f ? n / len : glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading) {
+    const MicroMesh& mm = *m.micro;
+    if (level <= mm.level) {
+        const uint32_t sc = mm.n >> level;
+        return microPoint(m, tri, i * sc, j * sc);
+    }
+    const uint32_t sh = uint32_t(level - mm.level), s = 1u << sh, msk = s - 1;
+    const uint32_t I = i >> sh, J = j >> sh, fi = i & msk, fj = j & msk;
+    if (fi == 0 && fj == 0) return microPoint(m, tri, I, J);
+    struct Corner {
+        uint32_t i, j, w, key;
+    } c[3];
+    if (fi + fj <= s) c[0] = {I, J, s - fi - fj, 0}, c[1] = {I + 1, J, fi, 0}, c[2] = {I, J + 1, fj, 0};
+    else c[0] = {I + 1, J + 1, fi + fj - s, 0}, c[1] = {I, J + 1, s - fi, 0}, c[2] = {I + 1, J, s - fj, 0};
+    MicroTriangle T;
+    T.set(m, tri, mm.n);
+    for (Corner& k : c) { // the corner's weights towards the base vertices in index order (both triangles beside an edge agree)
+        const uint32_t cnt[3] = {mm.n - k.i - k.j, k.i, k.j};
+        k.key = cnt[T.slot[0]] * (mm.n + 1) + cnt[T.slot[1]];
+    }
+    if (c[0].key < c[1].key) std::swap(c[0], c[1]);
+    if (c[1].key < c[2].key) std::swap(c[1], c[2]);
+    if (c[0].key < c[1].key) std::swap(c[0], c[1]);
+    const float inv = 1.0f / float(s);
+    const float w0 = float(c[0].w) * inv, w1 = float(c[1].w) * inv, w2 = float(c[2].w) * inv;
+    const glm::vec3 q0 = microPoint(m, tri, c[0].i, c[0].j), q1 = microPoint(m, tri, c[1].i, c[1].j), q2 = microPoint(m, tri, c[2].i, c[2].j);
+    glm::vec3 f = q0 * w0;
+    f += q1 * w1;
+    f += q2 * w2;
+    if (!shading) return f;
+    const uint32_t* g = shading + size_t(tri) * mm.samples;
+    const glm::vec3 n0 = decodeShadeNormal(g[MicroMesh::index(c[0].i, c[0].j, mm.n)]), n1 = decodeShadeNormal(g[MicroMesh::index(c[1].i, c[1].j, mm.n)]),
+                    n2 = decodeShadeNormal(g[MicroMesh::index(c[2].i, c[2].j, mm.n)]);
+    glm::vec3 pull = n0 * (w0 * glm::dot(f - q0, n0));
+    pull += n1 * (w1 * glm::dot(f - q1, n1));
+    pull += n2 * (w2 * glm::dot(f - q2, n2));
+    return f - pull * 0.75f;
+}
+
 glm::vec3 microPointAt(const Mesh& m, uint32_t tri, const float wc[3], glm::vec3* normal) {
     const MicroMesh& mm = *m.micro;
     MicroTriangle T;

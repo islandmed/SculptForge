@@ -38,7 +38,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
         return true;
     }
-    // render_cell NAME mode=... [min=F] [size=PX]
+    // render_cell NAME mode=... [min=F] [size=PX] [target=X,Y,Z distance=D: a close-up, the camera D from that point]
     if (w.size() < 3) {
         error = "'render_cell' needs NAME mode=lit|pbr|flat|wire";
         return false;
@@ -46,10 +46,19 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     std::string mode;
     double floor = kRenderCoverageFloor;
     int size = 256;
+    float distance = 0.0f; // 0 = frame the scene
+    glm::vec3 target(0.0f);
     for (size_t i = 2; i < w.size(); ++i) {
         if (w[i].rfind("mode=", 0) == 0) mode = w[i].substr(5);
         else if (w[i].rfind("min=", 0) == 0) floor = std::strtod(w[i].c_str() + 4, nullptr);
         else if (w[i].rfind("size=", 0) == 0) size = std::clamp(std::atoi(w[i].c_str() + 5), 64, 1024);
+        else if (w[i].rfind("distance=", 0) == 0) distance = std::max(float(std::strtod(w[i].c_str() + 9, nullptr)), 0.0f);
+        else if (w[i].rfind("target=", 0) == 0) {
+            if (std::sscanf(w[i].c_str() + 7, "%f,%f,%f", &target.x, &target.y, &target.z) != 3) {
+                error = "'render_cell': target wants X,Y,Z";
+                return false;
+            }
+        }
         else {
             error = "'render_cell': unknown argument '" + w[i] + "'";
             return false;
@@ -60,7 +69,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         return false;
     }
     const std::string name = w[1];
-    steps_.push_back([this, line, name, mode, floor, size](float t) {
+    steps_.push_back([this, line, name, mode, floor, size, distance, target](float t) {
         if (t == 0.0f) return false; // a settled frame
         App& app = app_;
         const RenderSettings saved = app.renderSettings_;
@@ -80,6 +89,11 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         cam.pitch = glm::radians(20.0f);
         const AABB bounds = app.sceneBounds();
         if (bounds.valid()) cam.frame(bounds);
+        if (distance > 0.0f) { // a close-up: looking down -z at `target` from `distance` away (the micro levels' draw-above path)
+            cam.yaw = cam.pitch = 0.0f;
+            cam.target = target;
+            cam.distance = distance;
+        }
         Image img;
         img.width = img.height = size;
         std::string err;

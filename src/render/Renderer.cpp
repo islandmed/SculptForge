@@ -2405,6 +2405,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
         s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
+        s.micro->drawAbove = currentTierConfig().budgets.microDrawAbove; // close-ups past the stored level (SF_TIER_MICRO_DRAW_ABOVE)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
@@ -3909,6 +3910,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const size_t budget = triangleBudget(settings);
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
+    s.micro->flatShading = flat; // (flat shading draws the stored grid, nothing above it: MicroRenderer::maxDrawLevel)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
 }

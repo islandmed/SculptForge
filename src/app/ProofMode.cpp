@@ -123,8 +123,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                               }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
         return {s};
     }
-    if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
-        const int millions = name == "core-100m" ? 100 : 200;
+    if (const int millions = coreSceneMillions(name)) { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
         const ProofMeshSize s{double(millions), std::to_string(millions) + "M micro", [millions](size_t) {
                                   std::string err;
                                   const std::string path = core200mScenePath(err, {}, millions); // (main wrote it first)
@@ -269,6 +268,10 @@ struct PhaseSpec {
     BrushType brush = BrushType::Standard;
     float strength = 0.35f;
     float pathScale = 1.0f; // the figure eight's size (Move drags the surface along: a smaller one)
+    // > 0: a CLOSE-UP (radiusPx 0, no stroke): the camera this fraction of the model's size from the surface point under
+    // the view's centre, turning +-10 degrees over the phase. Where micro levels draw past their stored resolution
+    // (TierBudgets::microDrawAbove) and where Adaptive Detail will store its finest tiles: the 10x scoreboard's row.
+    float closeUp = 0.0f;
 };
 
 // The standard scenes' stroke set (kProofStrokeSet): the same figure eight with each brush in turn, on one mesh.
@@ -280,7 +283,8 @@ std::vector<PhaseSpec> standardPhases(double seconds) {
             {"smooth", 60.0f, seconds, BrushType::Smooth, 0.5f},
             {"240 px brush", 240.0f, seconds, BrushType::Clay, 0.35f},
             {"orbit", 0.0f, 3.0},
-            {"still", -1.0f, 0.6}};
+            {"still", -1.0f, 0.6},
+            {"close-up", 0.0f, 4.0, BrushType::Standard, 0.35f, 1.0f, 1.0f / 400.0f}};
 }
 
 const char* proofBrushName(BrushType b) {
@@ -408,6 +412,7 @@ struct ProofState {
     std::vector<PhaseSpec> phases;
     std::vector<SizeResult> results;
     double stageStart = 0, lastFrame = 0, lastSample = 0;
+    float closeYaw = 0.0f; // a close-up phase: the yaw it turns about
     // The stroke
     float cx = 0, cy = 0, R = 0;
     struct Sample {
@@ -530,7 +535,8 @@ void App::startProofMode() {
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"orbit", 0.0f, 10.0},
-                     {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
+                     {"still", -1.0f, 0.6}, // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
+                     {"close-up", 0.0f, 4.0, BrushType::Standard, 0.35f, 1.0f, 1.0f / 400.0f}};
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds); // (a pack too: kProofPackStrokeSet)
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
                       {"still", -1.0f, 0.6}};
@@ -765,6 +771,14 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             }
             std::fprintf(stderr, "bench references: %zu, %.1f MB of textures\n", doc_.references.size(),
                          double(referenceGpuBytes(doc_.references)) / double(1 << 20));
+        }
+        if (spec.closeUp > 0.0f) { // the surface point under the view's centre, the camera closeUp x the model's size from it
+            RayHit hit;
+            const AABB bounds = sceneBounds();
+            const float size = bounds.valid() ? glm::length(bounds.extent()) : 1.0f;
+            if (pick(c.x + c.w * 0.5f, c.y + c.h * 0.5f, hit)) camera_.target = hit.position;
+            camera_.distance = std::max(size * spec.closeUp, 1e-5f);
+            p.closeYaw = camera_.yaw;
         }
         if (spec.radiusPx > 0) {
             brush_ = spec.brush;
@@ -1011,7 +1025,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             proofGpuMs_.clear();
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
-        if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
+        if (spec.closeUp > 0.0f) { // close-up: a slow turn of +-10 degrees about the surface point
+            camera_.yaw = p.closeYaw + 0.1745f * float(std::sin(6.2831853 * u));
+            perf_.framesStill = 0;
+        } else if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
         } else if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
             perf_.framesStill = 0;

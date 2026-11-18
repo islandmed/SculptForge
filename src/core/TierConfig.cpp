@@ -115,7 +115,13 @@ Json tierConfigJson(const TierConfig& c) {
 
 namespace {
 std::mutex g_mutex;
-TierConfig g_config;
+// The config before any hardware profile is applied (tests, the CLI): the defaults with the SF_TIER_* overrides, so an
+// override reaches a run that never builds a profile (11-17: SF_TIER_MICRO_DRAW_ABOVE=0 was ignored by --ui-test).
+TierConfig g_config = [] {
+    TierConfig c;
+    applyTierBudgetEnv(c.budgets);
+    return c;
+}();
 std::atomic<uint64_t> g_revision{0};
 } // namespace
 

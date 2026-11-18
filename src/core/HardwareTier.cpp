@@ -144,6 +144,7 @@ TierBudgets budgetsForTier(HwTier t) {
         b.focusGpuPoolMB = 2048;
         b.focusUpdateMs = 6.0;
         b.maxTextureSize = 16384;
+        b.microDrawAbove = 3;
         break;
     }
     return b;
@@ -169,6 +170,7 @@ const std::vector<TierBudgetField>& tierBudgetFields() {
             SF_FIELD(focusGpuPoolMB, U64, "Focus Detail GPU pool (MB)"),
             SF_FIELD(focusUpdateMs, Double, "Focus Detail work per frame (ms)"),
             SF_FIELD(focusLookaheadSeconds, Double, "Focus Detail brush look-ahead (s)"),
+            SF_FIELD(microDrawAbove, Int, "micro levels drawn above the stored one (close-ups)"),
             SF_FIELD(stillFrameMs, Double, "still frame GPU time before preview detail (ms)"),
             SF_FIELD(stillDelaySeconds, Double, "rest before full detail (s)"),
             SF_FIELD(motionBudgetFraction, Double, "triangle budget share while moving"),

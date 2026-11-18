@@ -1,0 +1,42 @@
+# Close-ups of a Micro level past its stored resolution (TierBudgets::microDrawAbove, render/MicroRenderer.cpp posAt):
+# a Micro 4 sphere (49k base triangles: stored cells 1/1200 of the model) with pore noise, seen from mid distance (nothing
+# changes there), then with the camera at 1/100, 1/250 and 1/500 of the model's size, where the stored micro triangles
+# used to show as facets. Shots for the
+# before/after pair (before: SF_TIER_MICRO_DRAW_ABOVE=0) at --size 1440x900 and 2880x1800; sizes in the file names come
+# from the caller's --ui-out folder.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+run micro_divide level=4
+run micro_noise amplitude=0.0006 scale=60
+run micro_noise amplitude=0.0004 scale=500 seed=2
+wait_idle 120
+camera 25 15
+key f
+wait_idle 30
+shot micro-mid
+# the camera looks down -z from (0, 0, distance) past its target: the target on the sphere's front (radius 1, noise < 0.0035)
+camera 0 0
+look 0 0 1
+# 1/100 of the model (diameter 2): about ten stored cells across the view
+camera_distance 0.02
+wait_idle 60
+shot micro-close-100
+click "Flat shading##view.flat_shading"
+wait_idle 30
+shot micro-close-100-flat
+click "Flat shading##view.flat_shading"
+# 1/250: three or four stored cells across the view (facets or smooth)
+camera_distance 0.008
+wait_idle 60
+shot micro-close-250
+click "Flat shading##view.flat_shading"
+wait_idle 30
+shot micro-close-250-flat
+click "Flat shading##view.flat_shading"
+# 1/500: two stored cells across the view
+camera_distance 0.004
+wait_idle 60
+shot micro-close-500
+click "Flat shading##view.flat_shading"
+wait_idle 30
+shot micro-close-500-flat

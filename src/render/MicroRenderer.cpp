@@ -36,7 +36,8 @@ uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges),
 uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
 uniform usamplerBuffer uLevels; // per cluster: the level it draws
-uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
+uniform samplerBuffer uShade;   // this chunk's shading grids (the fragment stage's; here for the micro-level Phong pull)
+uniform int uSlotBase, uChunkSlot, uLevel, uStored, uN, uSamples; // uStored: the stored level (uLevel may be above it)
 #ifdef FOCUS
 // Focus Detail (render/MicroFocus.h; its own program, so levels in memory run the plain shader): uDisp holds per
 // slot a record (the coarse grid, uCN segments, then the inner points of the three edges at full resolution, uRecord
@@ -44,6 +45,7 @@ uniform int uSlotBase, uChunkSlot, uLevel, uN, uSamples;
 uniform int uCN, uCSamples, uRecord, uCShift;
 uniform usamplerBuffer uPages;
 uniform isamplerBuffer uPool;
+uniform samplerBuffer uPoolShade; // the pages' full shading grids (gShadePage >= 0: this tile's is in)
 flat out int vPage; // the page whose full shading to use (-1: the coarse shading)
 #endif
 // > 0: a plain (not instanced) draw with this many corners per base triangle, each corner's grid point packed
@@ -64,6 +66,7 @@ int localSlot;
 int sampleIndex(int i, int j) { return j * (uN + 1) - (j * (j - 1)) / 2 + i; }
 #ifdef FOCUS
 int gPage;
+int gShadePage;
 int coarsePoint(int i, int j) { return texelFetch(uDisp, localSlot * uRecord + j * (uCN + 1) - (j * (j - 1)) / 2 + i).r; }
 // A record's grid point, as FocusDetail upsamples (core/FocusDetail.cpp, upsample: the same integer sums).
 int coarseAt(int I, int J) {
@@ -84,16 +87,37 @@ int coarseAt(int I, int J) {
     int q = sum + s / 2;
     return q >= 0 ? q >> uCShift : -((-q + s - 1) >> uCShift);
 }
-float dispAt(int I, int J) {
-    if (gPage >= 0) return float(texelFetch(uPool, gPage * uSamples + sampleIndex(I, J)).r);
-    return float(coarseAt(I, J));
+int dispI(int I, int J) {
+    if (gPage >= 0) return texelFetch(uPool, gPage * uSamples + sampleIndex(I, J)).r;
+    return coarseAt(I, J);
 }
 #else
-float dispAt(int I, int J) { return float(texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r); }
+int dispI(int I, int J) { return texelFetch(uDisp, localSlot * uSamples + sampleIndex(I, J)).r; }
 #endif
-vec3 microPos(int I, int J) {
-    float inv = 1.0 / float(uN);
-    float wc[3] = float[3](float(uN - I - J) * inv, float(I) * inv, float(J) * inv);
+float dispAt(int I, int J) { return float(dispI(I, J)); }
+// The shading normal stored at grid point (I, J) (MicroShader, encodeShade: octahedral in two bytes; the fragment
+// stage's octNormal decodes it the same way). Focus Detail: only a tile with its page's shading in has one per
+// stored point; a vec3(0) says "none" and the pull below is skipped.
+vec3 octNormalV(vec2 v) {
+    vec2 e = v * 2.0 - 1.0;
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
+}
+vec3 shadeNormal(int I, int J) {
+#ifdef FOCUS
+    if (gShadePage < 0) return vec3(0.0);
+    return octNormalV(texelFetch(uPoolShade, gShadePage * uSamples + sampleIndex(I, J)).xy);
+#else
+    return octNormalV(texelFetch(uShade, localSlot * uSamples + sampleIndex(I, J)).xy);
+#endif
+}
+// The micro surface at barycentric weights wc (corner order c0, c1, c2) and height d: the Phong-tessellated base
+// point plus d along the interpolated normal (the weights are read in ascending vertex-index order, so a point on a
+// shared edge is the same operations in the same order on both sides: bit-identical).
+vec3 microSurf(float wc[3], float d) {
     float w0 = wc[ord[0]], w1 = wc[ord[1]], w2 = wc[ord[2]];
     vec3 f = P[0] * w0;
     f += P[1] * w1;
@@ -107,8 +131,51 @@ vec3 microPos(int I, int J) {
     vec3 s = f - pull * 0.75;
     float len = length(nn);
     vec3 n = len > 1e-20 ? nn / len : vec3(0.0, 0.0, 1.0);
-    float d = dispAt(I, J) * uStep;
     return s + n * d;
+}
+vec3 microPos(int I, int J) { // stored grid point (I, J)
+    float inv = 1.0 / float(uN);
+    float wc[3] = float[3](float(uN - I - J) * inv, float(I) * inv, float(J) * inv);
+    return microSurf(wc, dispAt(I, J) * uStep);
+}
+// A grid point (i, j) of the DRAWN level (m = 2^uLevel segments). At or below the stored level it is a stored point.
+// Above it (close-ups: drawAbove) the point lies in a stored micro triangle: the linear mix of its three displaced
+// corners, pulled towards the corners' tangent planes (the stored shading normals) the way the base is Phong-
+// tessellated (shape factor 3/4), so the stored grid shows no facets however close the view gets. The three corner
+// terms are summed in ONE order on both sides of a shared base edge (sorted by the corner's weights towards the base
+// vertices in index order, which both triangles compute alike), so a shared edge gets identical bits whatever a
+// compiler fuses. The CPU twin is microDrawPoint (core/Micro.h); tests compare them.
+int cornerKey(int I, int J) {
+    int cnt[3] = int[3](uN - I - J, I, J);
+    return cnt[ord[0]] * (uN + 1) + cnt[ord[1]];
+}
+vec3 posAt(int i, int j) {
+    if (uLevel <= uStored) {
+        int sc = uN >> uLevel;
+        return microPos(i * sc, j * sc);
+    }
+    int sh = uLevel - uStored, s = 1 << sh, msk = s - 1;
+    int I = i >> sh, J = j >> sh, fi = i & msk, fj = j & msk;
+    if (fi == 0 && fj == 0) return microPos(I, J);
+    ivec2 c[3];
+    int wi[3];
+    if (fi + fj <= s) { c[0] = ivec2(I, J); c[1] = ivec2(I + 1, J); c[2] = ivec2(I, J + 1); wi[0] = s - fi - fj; wi[1] = fi; wi[2] = fj; }
+    else { c[0] = ivec2(I + 1, J + 1); c[1] = ivec2(I, J + 1); c[2] = ivec2(I + 1, J); wi[0] = fi + fj - s; wi[1] = s - fi; wi[2] = s - fj; }
+    int k[3] = int[3](cornerKey(c[0].x, c[0].y), cornerKey(c[1].x, c[1].y), cornerKey(c[2].x, c[2].y));
+    if (k[0] < k[1]) { ivec2 tc = c[0]; c[0] = c[1]; c[1] = tc; int tw = wi[0]; wi[0] = wi[1]; wi[1] = tw; int tk = k[0]; k[0] = k[1]; k[1] = tk; }
+    if (k[1] < k[2]) { ivec2 tc = c[1]; c[1] = c[2]; c[2] = tc; int tw = wi[1]; wi[1] = wi[2]; wi[2] = tw; int tk = k[1]; k[1] = k[2]; k[2] = tk; }
+    if (k[0] < k[1]) { ivec2 tc = c[0]; c[0] = c[1]; c[1] = tc; int tw = wi[0]; wi[0] = wi[1]; wi[1] = tw; }
+    float inv = 1.0 / float(s);
+    float w0 = float(wi[0]) * inv, w1 = float(wi[1]) * inv, w2 = float(wi[2]) * inv;
+    vec3 q0 = microPos(c[0].x, c[0].y), q1 = microPos(c[1].x, c[1].y), q2 = microPos(c[2].x, c[2].y);
+    vec3 f = q0 * w0;
+    f += q1 * w1;
+    f += q2 * w2;
+    vec3 n0 = shadeNormal(c[0].x, c[0].y), n1 = shadeNormal(c[1].x, c[1].y), n2 = shadeNormal(c[2].x, c[2].y);
+    vec3 pull = n0 * (w0 * dot(f - q0, n0));
+    pull += n1 * (w1 * dot(f - q1, n1));
+    pull += n2 * (w2 * dot(f - q2, n2));
+    return f - pull * 0.75;
 }
 ivec2 edgePoint(int e, int k, int m) {
     if (e == 0) return ivec2(k, 0);
@@ -130,6 +197,7 @@ void main() {
     uint pg = texelFetch(uPages, slot).r;
     gPage = int(pg & 0x7FFFFFFFu) - 1;
     vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
+    gShadePage = vPage;
 #endif
     if (uLevel == 0) {
         // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
@@ -164,7 +232,8 @@ void main() {
         P[k] = texelFetch(uBase, vi * 2).xyz;
         Nn[k] = texelFetch(uBase, vi * 2 + 1).xyz;
     }
-    int m = 1 << uLevel, sc = uN >> uLevel;
+    int m = 1 << uLevel;
+    float toStored = float(uN) / float(m); // drawn grid units -> stored grid units (exact: powers of two)
     int i = int(ij.x), j = int(ij.y);
     int edge = -1, k = 0;
     if (j == 0 && i > 0 && i < m) { edge = 0; k = i; }
@@ -179,12 +248,12 @@ void main() {
     int stepE = 1 << (uLevel - elevel);
     int r = k % stepE;
     if (edge >= 0 && r != 0) {
-        ivec2 a = edgePoint(edge, k - r, m) * sc, b = edgePoint(edge, k - r + stepE, m) * sc;
-        pos = mix(microPos(a.x, a.y), microPos(b.x, b.y), float(r) / float(stepE));
+        ivec2 a = edgePoint(edge, k - r, m), b = edgePoint(edge, k - r + stepE, m);
+        pos = mix(posAt(a.x, a.y), posAt(b.x, b.y), float(r) / float(stepE));
     } else {
-        pos = microPos(i * sc, j * sc);
+        pos = posAt(i, j);
     }
-    vIJ = vec2(float(i * sc), float(j * sc));
+    vIJ = vec2(float(i), float(j)) * toStored;
     vec4 p = uView * vec4(pos, 1.0);
 #ifdef FLAT
     vViewPos = p.xyz;
@@ -364,7 +433,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     pending_.assign((size_t(nt) + 63) / 64, 0);
     stale_.assign(pending_.size(), 0);
     pendingCount_ = staleCount_ = 0;
-    ensurePatches(mm.level);
+    ensurePatches(std::min(mm.level + std::max(drawAbove, 0), kMaxDrawLevel));
 }
 
 void MicroRenderer::uploadBase(const Mesh& mesh) {
@@ -766,6 +835,8 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     const bool eyeInside = glm::all(glm::greaterThanEqual(cull.eye, box_.min - grow)) && glm::all(glm::lessThanEqual(cull.eye, box_.max + grow));
     cull.backfaces = closed_ && !eyeInside && !cull.ortho;
     want_.resize(clusters);
+    const int maxDraw = maxDrawLevel(); // (drawAbove may have changed since the sync)
+    ensurePatches(maxDraw);
     std::vector<uint8_t> visible(clusters);
     const float h = std::max(viewport.w, 1.0f);
     const bool ortho = proj[3][3] == 1.0f;
@@ -782,7 +853,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         for (uint32_t c = 0; c < clusters; ++c) {
             const float ratio = pxEdge[c] / target;
             int l = ratio <= 1.0f ? 0 : int(std::ceil(std::log2(ratio)));
-            l = std::clamp(l, 0, level_);
+            l = std::clamp(l, 0, maxDraw);
             want_[c] = int8_t(l);
             if (visible[c]) total += size_t(std::min(size, baseTriangles_ - (c << clusterShift_))) << (2 * l);
         }
@@ -792,6 +863,17 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     size_t total = choose(target);
     for (int it = 0; it < 24 && budget && total > budget; ++it) total = choose(target *= 1.4142f);
     lastTargetPx = target;
+    if (static const bool dbg = std::getenv("SF_MICRO_DRAW_DEBUG") != nullptr; dbg) { // (research: the levels chosen this frame)
+        int hist[kMaxDrawLevel + 1] = {};
+        for (uint32_t c = 0; c < clusters; ++c)
+            if (visible[c]) ++hist[want_[c]];
+        const char* ev = std::getenv("SF_TIER_MICRO_DRAW_ABOVE");
+        std::fprintf(stderr, "micro draw: stored %d drawAbove %d (tier %d, env %s) maxDraw %d target %.2f px total %zu budget %zu levels:", level_, drawAbove,
+                     currentTierConfig().budgets.microDrawAbove, ev ? ev : "-", maxDraw, double(target), total, budget);
+        for (int l = 0; l <= kMaxDrawLevel; ++l)
+            if (hist[l]) std::fprintf(stderr, " L%d=%d", l, hist[l]);
+        std::fprintf(stderr, "\n");
+    }
     for (uint32_t c = 0; c < clusters; ++c) levels_[c] = uint32_t(want_[c]);
     gl::BindBuffer(GL_TEXTURE_BUFFER, levelData_);
     gl::BufferSubData(GL_TEXTURE_BUFFER, 0, GLsizeiptr(levels_.size() * 4), levels_.data());
@@ -803,6 +885,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         u_.slotBase = at("uSlotBase");
         u_.chunkSlot = at("uChunkSlot");
         u_.level = at("uLevel");
+        u_.stored = at("uStored");
         u_.n = at("uN");
         u_.samples = at("uSamples");
         u_.step = at("uStep");
@@ -819,6 +902,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         gl::Uniform1i(at("uPoolShade"), 15);
     }
     gl::Uniform1i(u_.n, int(n_));
+    gl::Uniform1i(u_.stored, level_);
     gl::Uniform1i(u_.samples, int(samples_));
     gl::Uniform1f(u_.step, step_);
     gl::ActiveTexture(kUnitTris);
