@@ -94,3 +94,47 @@ click_here
 expect_value size_popup_open == 0
 expect_value draw_size == 60
 expect_value brush_type == 1
+
+# A pen (gh#184, Wacom on Linux: "resizing the brush size appeared to hang ... holding S and dragging my pen"): the
+# hovering pen follows as the mouse does, live, and a driver's stray mouse event elsewhere doesn't move the value; a
+# tap keeps it and sculpts nothing. Pressing straight down on the knob (a few pixels of drift) still drags it.
+brush_size 60
+pen_hover 0.4 0.5
+key s
+expect_value size_popup_open == 1
+pen_hover 0.6 0.5
+expect_value draw_size > 60
+remember draw_size followed
+expect_value size_ring_px >= $followed-1
+expect_value size_ring_px <= $followed+1
+mouse_move 0.9 0.9
+expect_value draw_size >= $followed-1
+expect_value draw_size <= $followed+1
+pen_hover 0.45 0.5
+expect_value draw_size < $followed-1
+remember draw_size kept
+snapshot
+pen_press 0.45 0.5
+pen_lift
+expect_value size_popup_open == 0
+expect_value draw_size >= $kept-1
+expect_value draw_size <= $kept+1
+expect_value moved == 0
+pen_hover 0.5 0.5
+remember draw_size s0
+key s
+pen_press 0.5 0.5 0.4
+pen_sample 0.55 0.5 0.4
+pen_sample 0.6 0.5 0.4
+pen_lift
+expect_value size_popup_open == 0
+expect_value draw_size > $s0
+# Intensity (U) follows the hovering pen too; Esc puts it back.
+pen_hover 0.4 0.5
+remember z_intensity pi0
+key u
+pen_hover 0.5 0.5
+expect_value z_intensity > $pi0
+key escape
+expect_value z_intensity == $pi0
+pen_out

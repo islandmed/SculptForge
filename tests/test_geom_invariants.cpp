@@ -640,3 +640,56 @@ TEST(clay_big_brush_invariant_builds_a_mound_not_a_ring) {
         }
     });
 }
+
+// gh#184 (Sharp Crease on a dense lip, X on): "one stroke was triggering other strokes in adjacent areas ... I did
+// undo a few strokes before". Side-by-side crease lines, two undone, then new lines where they were and beside them:
+// undo is exact, and every vertex a new stroke moves is inside one of its dabs or one of their X mirrors.
+TEST(sharp_crease_after_undo_moves_only_its_dabs_and_mirror) {
+    guarded("sharp_crease_after_undo_moves_only_its_dabs_and_mirror", [] {
+        Document d = denseSphere();
+        constexpr float kRadius = 0.05f;
+        auto line = [&](float x, std::vector<glm::vec3>* centers) {
+            d.sculptor.beginStroke(d.mesh, "Sharp Crease");
+            for (int i = 0; i < 12; ++i) {
+                DabParams p;
+                p.center = glm::normalize(glm::vec3(x, 0.3f - 0.05f * float(i), 1.0f));
+                p.viewDir = -p.center;
+                p.radius = kRadius, p.strength = 0.6f, p.pressure = 0.4f + 0.05f * float(i);
+                p.strokeDelta = glm::vec3(0.0f, -0.05f, 0.0f);
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::SharpCrease, p, kMirrorX);
+                if (centers) centers->push_back(p.center), centers->push_back(p.center * glm::vec3(-1.0f, 1.0f, 1.0f));
+            }
+            d.undo.push(d.sculptor.endStroke());
+        };
+        line(0.10f, nullptr);
+        const std::vector<glm::vec3> afterFirst = d.mesh.positions;
+        line(0.16f, nullptr);
+        line(0.22f, nullptr);
+        CHECK(d.undo.undo(d.mesh, d.bvh) && d.undo.undo(d.mesh, d.bvh));
+        CHECK(d.mesh.positions == afterFirst);
+        for (const float x : {0.16f, 0.13f, 0.22f}) {
+            const std::vector<glm::vec3> before = d.mesh.positions;
+            std::vector<glm::vec3> centers;
+            line(x, &centers);
+            size_t moved = 0, outside = 0;
+            float far = 0.0f;
+            for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+                if (d.mesh.positions[v] == before[v]) continue;
+                ++moved;
+                float nearest = 1e30f;
+                for (const glm::vec3& c : centers) nearest = std::min(nearest, glm::distance(before[v], c));
+                if (nearest > kRadius * 1.02f) ++outside, far = std::max(far, nearest / kRadius);
+            }
+            std::printf("    x=%.2f: %zu moved, %zu outside the dabs and their mirrors (farthest %.2f radii)\n", double(x), moved,
+                        outside, double(far));
+            CHECK(moved > 0);
+            CHECK(outside == 0);
+        }
+        // The three new ones undone and redone: the same positions.
+        const std::vector<glm::vec3> top = d.mesh.positions;
+        for (int i = 0; i < 3; ++i) CHECK(d.undo.undo(d.mesh, d.bvh));
+        CHECK(d.mesh.positions == afterFirst);
+        for (int i = 0; i < 3; ++i) CHECK(d.undo.redo(d.mesh, d.bvh));
+        CHECK(d.mesh.positions == top);
+    });
+}
