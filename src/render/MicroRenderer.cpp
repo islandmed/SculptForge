@@ -5,6 +5,7 @@
 
 #include "core/FocusDetail.h"
 #include "render/MicroFocus.h"
+#include "render/MicroTilePages.h"
 
 #include "core/ThreadPool.h"
 #include "core/TierConfig.h"
@@ -53,6 +54,17 @@ flat out int vPage; // the page whose full shading to use (-1: the coarse shadin
 uniform int uUnrolled;
 uniform int uCorners[48];
 uniform float uStep;
+#ifdef TILES
+// Adaptive Detail tiles (render/MicroTilePages.h): per slot a delta page (uTilePages: page + 1, 0 = none) of
+// uTileSamples values at level uTilePageLevel (-1 = no pages), whole units of uStep along the base's Phong normal.
+uniform usamplerBuffer uTilePages;
+uniform isamplerBuffer uTilePool;
+uniform samplerBuffer uTileSlope; // per page point: the delta's slopes along i and j (step units per page cell)
+uniform int uTilePageLevel, uTileSamples;
+flat out int vTilePage;          // the slot's delta page (-1: none): the fragment stage reads its slopes
+flat out vec3 vTileGi, vTileGj;   // slopes (i, j) -> the surface gradient on the base triangle's plane (mesh space)
+int gTilePage = -1;
+#endif
 flat out int vSlot;
 flat out int vEdges; // the base triangle's edges the wireframe draws (bit e: edge e; quad diagonals left out)
 out vec2 vIJ;
@@ -149,7 +161,7 @@ int cornerKey(int I, int J) {
     int cnt[3] = int[3](uN - I - J, I, J);
     return cnt[ord[0]] * (uN + 1) + cnt[ord[1]];
 }
-vec3 posAt(int i, int j) {
+vec3 posBase(int i, int j) {
     if (uLevel <= uStored) {
         int sc = uN >> uLevel;
         return microPos(i * sc, j * sc);
@@ -177,6 +189,43 @@ vec3 posAt(int i, int j) {
     pull += n2 * (w2 * dot(f - q2, n2));
     return f - pull * 0.75;
 }
+#ifdef TILES
+int tileIndex(int i, int j, int m) { return j * (m + 1) - (j * (j - 1)) / 2 + i; }
+int tileValue(int I, int J) { return texelFetch(uTilePool, gTilePage * uTileSamples + tileIndex(I, J, 1 << uTilePageLevel)).r; }
+// The drawn point plus its tiles' delta (MicroTiles::pageValue) along the base's Phong normal at the page point's
+// weights, normalized as microSurf does (corners in vertex order: both sides of a shared edge agree). A 0 delta
+// leaves today's point untouched. CPU twin: microDrawPoint(..., pageLevel).
+vec3 posAt(int i, int j) {
+    vec3 p = posBase(i, j);
+    if (gTilePage < 0) return p;
+    int sh = uTilePageLevel - uLevel, M = 1 << uTilePageLevel;
+    int I = i << sh, J = j << sh;
+    int v = tileValue(I, J);
+    if (v == 0) return p;
+    float inv = 1.0 / float(M);
+    float wc[3] = float[3](float(M - I - J) * inv, float(I) * inv, float(J) * inv);
+    vec3 nn = Nn[0] * wc[ord[0]];
+    nn += Nn[1] * wc[ord[1]];
+    nn += Nn[2] * wc[ord[2]];
+    float len = length(nn);
+    vec3 n = len > 1e-20 ? nn / len : vec3(0.0, 0.0, 1.0);
+    return p + n * (float(v) * uStep);
+}
+// The page's slopes (microTileSlopes: step units per page cell along i and j) -> the surface gradient on the base
+// triangle's plane, for the fragment stage: G = s.x * vTileGi + s.y * vTileGj (corners in corner order).
+void tileFrame(uvec4 t) {
+    vec3 c0 = texelFetch(uBase, int(t.x) * 2).xyz, c1 = texelFetch(uBase, int(t.y) * 2).xyz, c2 = texelFetch(uBase, int(t.z) * 2).xyz;
+    float M = float(1 << uTilePageLevel);
+    vec3 ei = (c1 - c0) / M, ej = (c2 - c0) / M;
+    float a11 = dot(ei, ei), a12 = dot(ei, ej), a22 = dot(ej, ej), det = a11 * a22 - a12 * a12;
+    if (abs(det) < 1e-30) return;
+    vTileGi = (ei * a22 - ej * a12) * (uStep / det);
+    vTileGj = (ej * a11 - ei * a12) * (uStep / det);
+    vTilePage = gTilePage;
+}
+#else
+vec3 posAt(int i, int j) { return posBase(i, j); }
+#endif
 ivec2 edgePoint(int e, int k, int m) {
     if (e == 0) return ivec2(k, 0);
     if (e == 1) return ivec2(m - k, k);
@@ -199,6 +248,12 @@ void main() {
     vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
     gShadePage = vPage;
 #endif
+#ifdef TILES
+    vTilePage = -1;
+    vTileGi = vTileGj = vec3(0.0);
+    if (uTilePageLevel >= 0) gTilePage = int(texelFetch(uTilePages, slot).r) - 1;
+    if (gTilePage >= 0) tileFrame(texelFetch(uTris, slot * 2));
+#endif
     if (uLevel == 0) {
         // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
         // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
@@ -212,7 +267,15 @@ void main() {
         int I0 = int(ij.x) * uN, J0 = int(ij.y) * uN;
         float d0 = dispAt(I0, J0) * uStep;
         vIJ = vec2(float(I0), float(J0));
-        vec4 p0 = uView * vec4(bp + nrm * d0, 1.0);
+        vec3 q0 = bp + nrm * d0;
+#ifdef TILES
+        if (gTilePage >= 0) { // the corner's delta (the page's corner: weights exactly 1, 0, 0)
+            int M = 1 << uTilePageLevel;
+            int tv = tileValue(int(ij.x) * M, int(ij.y) * M);
+            if (tv != 0) q0 = q0 + nrm * (float(tv) * uStep);
+        }
+#endif
+        vec4 p0 = uView * vec4(q0, 1.0);
 #ifdef FLAT
         vViewPos = p0.xyz;
 #endif
@@ -297,11 +360,12 @@ void MicroRenderer::release() {
     patches_.clear();
     if (emptyVao_) gl::DeleteVertexArrays(1, &emptyVao_), emptyVao_ = 0;
     focus_.reset();
+    tilePages_.reset();
     serial_ = 0;
     bytes_ = 0;
 }
 
-size_t MicroRenderer::gpuBytes() const { return bytes_ + (focus_ ? focus_->gpuBytes() : 0); }
+size_t MicroRenderer::gpuBytes() const { return bytes_ + (focus_ ? focus_->gpuBytes() : 0) + (tilePages_ ? tilePages_->gpuBytes() : 0); }
 
 void MicroRenderer::ensurePatches(int maxLevel) {
     while (int(patches_.size()) <= maxLevel) {
@@ -367,6 +431,13 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
         focus_->setup(mesh, nt);
     } else {
         focus_.reset();
+    }
+    // Adaptive Detail tiles: delta pages at the finest level a cluster may draw (plain program only).
+    if (!focus_) {
+        if (!tilePages_) tilePages_ = std::make_unique<MicroTilePages>();
+        tilePages_->setup(nt, tilePageLevel());
+    } else {
+        tilePages_.reset();
     }
     const uint32_t dispPer = focus_ ? focus_->recordPoints() : mm.samples, shadePer = focus_ ? focus_->shadePoints() : mm.samples;
     const uint32_t clusterSize = std::clamp(65536u >> (2 * mm.level), 16u, 1024u);
@@ -698,6 +769,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             focus_->syncAll(mesh, *this);
         } else {
             uploadDispTiles(mesh, scratch_, true);
+            if (tilePages_) tilePages_->sync(mesh, *this, scratch_, true);
             shadePending(mesh, true);
         }
     } else {
@@ -769,6 +841,11 @@ bool MicroRenderer::sync(Mesh& mesh) {
             std::vector<uint32_t> slots(scratch_.size());
             for (size_t i = 0; i < scratch_.size(); ++i) slots[i] = slotOf_[scratch_[i]];
             uploadDispTiles(mesh, slots, false);
+        }
+        if (tilePages_) { // (before the shading below: it reuses scratch_)
+            const bool relevel = tilePages_->pageLevel() != tilePageLevel(); // (drawAbove changed: pages at the new finest level)
+            if (relevel) tilePages_->setup(baseTriangles_, tilePageLevel());
+            tilePages_->sync(mesh, *this, scratch_, relevel || mm.allDirty || mm.rescaled);
         }
         // Bounds: the clusters whose base moved in full, those whose heights alone changed by their range.
         if (!scratch_.empty() || anyBase) {
@@ -900,6 +977,9 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         gl::Uniform1i(at("uPages"), 13);
         gl::Uniform1i(at("uPool"), 14);
         gl::Uniform1i(at("uPoolShade"), 15);
+        gl::Uniform1i(at("uTilePages"), 13); // (the plain program's: Adaptive Detail tiles)
+        gl::Uniform1i(at("uTilePool"), 14);
+        gl::Uniform1i(at("uTileSlope"), 15);
     }
     gl::Uniform1i(u_.n, int(n_));
     gl::Uniform1i(u_.stored, level_);
@@ -912,6 +992,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     gl::ActiveTexture(kUnitLevels);
     gl::BindTexture(GL_TEXTURE_BUFFER, levelTex_);
     if (focus_) focus_->bind(program, visible, want_);
+    if (tilePages_) tilePages_->bind(program, visible, want_, maxDraw);
     if (closed_) gl::Enable(GL_CULL_FACE);
     size_t drawn = 0;
     int boundChunk = -1;
@@ -957,6 +1038,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     gl::Disable(GL_CULL_FACE);
     gl::BindVertexArray(0);
     if (focus_) MicroFocus::unbind();
+    if (tilePages_) MicroTilePages::unbind();
     for (GLenum unit : {kUnitTris, kUnitBase, kUnitDisp, kUnitLevels, kUnitShade}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);

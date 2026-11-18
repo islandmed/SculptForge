@@ -105,6 +105,7 @@ constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_R16UI = 0x8234;
 constexpr GLenum GL_RED_INTEGER = 0x8D94;
 constexpr GLenum GL_R16I = 0x8233;
+constexpr GLenum GL_RG16F = 0x822F;
 constexpr GLenum GL_RGBA32UI = 0x8D70;
 constexpr GLbitfield GL_MAP_INVALIDATE_RANGE_BIT = 0x0004;
 constexpr GLbitfield GL_DEPTH_BUFFER_BIT = 0x0100;

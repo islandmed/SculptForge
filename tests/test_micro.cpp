@@ -322,6 +322,161 @@ TEST(micro_tiles_coarse_dab_leaves_fine_deltas) {
     CHECK(tileSnapshot(*doc.mesh.micro->tiles) == fine);
 }
 
+// Drawing Adaptive Detail tiles (render/MicroTilePages.h): the renderer adds each tiled triangle's delta page along
+// the Phong normal at every drawn level; microDrawPoint(..., pageLevel) is its CPU twin. The pages equal the tiles'
+// delta point by point, an untiled triangle draws today's bits, the drawn points stay seamless across tiled/untiled
+// and tiled/tiled base edges at every drawn level, and a point shared by two drawn levels is the same (no popping).
+TEST(micro_draw_above_stored_level_is_seamless_with_tiles) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    doc.undo.push(fineStroke(doc, 0.03f, 8));
+    doc.undo.push(fineStroke(doc, 0.015f, 6)); // a second, finer one over it (deeper tiles)
+    const MicroMesh& mm = *doc.mesh.micro;
+    const MicroTiles& tiles = *mm.tiles;
+    CHECK(tiles.alive() > 0);
+    std::vector<uint32_t> shading(size_t(mm.baseTriangles) * mm.samples, 0);
+    {
+        MicroShader shader;
+        std::vector<uint32_t> written;
+        shader.shade(doc.mesh, {}, true, written, [&](uint32_t tri) { return shading.data() + size_t(tri) * mm.samples; });
+    }
+    const uint32_t* sg = shading.data();
+    const int P = mm.level + 2; // the page level (stored + drawAbove on the floor)
+    const uint32_t M = 1u << P;
+    // The triangles with tiles and their neighbours.
+    std::vector<uint32_t> tiled, near;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t)
+        if (tiles.hasTiles(t)) tiled.push_back(t);
+    CHECK(!tiled.empty());
+    for (uint32_t t : tiled)
+        for (int e = 0; e < 3; ++e)
+            if (const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(e)]; nb != MicroMesh::kNone) near.push_back(nb >> 2);
+    near.insert(near.end(), tiled.begin(), tiled.end());
+    std::sort(near.begin(), near.end());
+    near.erase(std::unique(near.begin(), near.end()), near.end());
+    // 1. Pages == the CPU twin's point value == the rounded delta chain; some of it non-zero.
+    std::vector<int16_t> page(size_t(M + 1) * (M + 2) / 2);
+    size_t nonZero = 0;
+    for (uint32_t t : near) {
+        tiles.pageValues(t, M, page.data());
+        for (uint32_t j = 0; j <= M; j += 1)
+            for (uint32_t i = 0; i + j <= M; ++i) {
+                const int16_t v = page[MicroMesh::index(i, j, M)];
+                CHECK(v == tiles.pageValue(t, M, i, j));
+                CHECK(v == MicroTiles::pageRound(tiles.deltaAt(t, MicroTiles::pageWeights(M, i, j))));
+                nonZero += v != 0;
+            }
+        if (!tiles.hasTiles(t)) CHECK(std::all_of(page.begin(), page.end(), [](int16_t v) { return v == 0; }));
+    }
+    CHECK(nonZero > 100);
+    // 2. Seams and levels: at every drawn level up to P, each base edge of a tiled triangle gives the same bits from
+    // both sides; an untiled triangle draws exactly today's points; a coarse point drawn finer is the same point.
+    size_t tiledUntiled = 0, tiledTiled = 0, checks = 0, moved = 0;
+    for (int level = std::max(1, mm.level - 1); level <= P; ++level) {
+        const uint32_t md = 1u << level;
+        for (uint32_t t : near) {
+            const bool tt = tiles.hasTiles(t);
+            for (uint32_t j = 0; j <= md; j += (level >= P ? 3 : 1))
+                for (uint32_t i = 0; i + j <= md; i += (level >= P ? 5 : 1)) {
+                    const glm::vec3 a = microDrawPoint(doc.mesh, t, level, i, j, sg, P), b = microDrawPoint(doc.mesh, t, level, i, j, sg);
+                    if (!tt) CHECK(a == b);
+                    moved += a != b;
+                    if (level < P) CHECK(a == microDrawPoint(doc.mesh, t, level + 1, i * 2, j * 2, sg, P)); // no popping
+                }
+            if (!tt) continue;
+            for (int e = 0; e < 3; ++e) {
+                const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(e)];
+                if (nb == MicroMesh::kNone) continue;
+                const uint32_t t2 = nb >> 2, e2 = nb & 3;
+                (tiles.hasTiles(t2) ? tiledTiled : tiledUntiled) += 1;
+                for (uint32_t k = 0; k <= md; ++k) {
+                    uint32_t i, j, i2, j2;
+                    MicroMesh::edgePoint(e, k, md, i, j);
+                    MicroMesh::edgePoint(int(e2), md - k, md, i2, j2);
+                    CHECK(microDrawPoint(doc.mesh, t, level, i, j, sg, P) == microDrawPoint(doc.mesh, t2, level, i2, j2, sg, P));
+                    CHECK(microDrawPoint(doc.mesh, t, level, i, j, nullptr, P) == microDrawPoint(doc.mesh, t2, level, i2, j2, nullptr, P));
+                    ++checks;
+                }
+            }
+        }
+    }
+    CHECK(tiledUntiled > 0);
+    CHECK(tiledTiled > 0);
+    CHECK(checks > 1000);
+    CHECK(moved > 100); // the tiles really draw
+    // 3. Undo of both strokes: no tiles, no page values, today's points everywhere.
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->tiles->alive() == 0);
+    for (uint32_t t : near)
+        for (uint32_t k = 0; k <= M; k += 7) CHECK(microDrawPoint(doc.mesh, t, P, k, 0, sg, P) == microDrawPoint(doc.mesh, t, P, k, 0, sg));
+}
+
+// The tiles' light (microTileSlopes, render/MicroTilePages.h): the surface gradient a page's slopes give agrees from
+// both sides of a shared edge (per-triangle one-sided differences differed by ~20% there: a seam in the light), is 0
+// next to a triangle without tiles (it draws no tilt), and follows the delta inside.
+TEST(micro_tile_slopes_agree_across_shared_edges) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    doc.undo.push(fineStroke(doc, 0.03f, 8));
+    doc.undo.push(fineStroke(doc, 0.015f, 6));
+    const MicroMesh& mm = *doc.mesh.micro;
+    const MicroTiles& tiles = *mm.tiles;
+    const uint32_t M = 1u << (mm.level + 2);
+    const size_t S = size_t(M + 1) * (M + 2) / 2;
+    auto gradient = [&](uint32_t t, const std::vector<float>& sl, uint32_t i, uint32_t j) {
+        const glm::uvec3 v = doc.mesh.triangles[t];
+        const glm::vec3 c0 = doc.mesh.positions[v[0]];
+        const glm::vec3 ei = (doc.mesh.positions[v[1]] - c0) / float(M), ej = (doc.mesh.positions[v[2]] - c0) / float(M);
+        const float* s = sl.data() + size_t(MicroMesh::index(i, j, M)) * 2;
+        const float hi = s[0] * mm.step, hj = s[1] * mm.step;
+        const float a11 = glm::dot(ei, ei), a12 = glm::dot(ei, ej), a22 = glm::dot(ej, ej), det = a11 * a22 - a12 * a12;
+        return ei * ((hi * a22 - hj * a12) / det) + ej * ((hj * a11 - hi * a12) / det);
+    };
+    auto slopes = [&](uint32_t t) {
+        std::vector<int16_t> v(S);
+        std::vector<float> sl(S * 2);
+        tiles.pageValues(t, M, v.data());
+        microTileSlopes(doc.mesh, t, M, v.data(), sl.data());
+        return sl;
+    };
+    double maxG = 0.0, maxSeam = 0.0;
+    size_t shared = 0, besideUntiled = 0;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+        if (!tiles.hasTiles(t)) continue;
+        const std::vector<float> sl = slopes(t);
+        for (uint32_t j = 0; j <= M; ++j)
+            for (uint32_t i = 0; i + j <= M; ++i) maxG = std::max(maxG, double(glm::length(gradient(t, sl, i, j))));
+        for (int e = 0; e < 3; ++e) {
+            const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(e)];
+            if (nb == MicroMesh::kNone) continue;
+            const uint32_t t2 = nb >> 2, e2 = nb & 3;
+            const bool tiled2 = tiles.hasTiles(t2);
+            const std::vector<float> sl2 = tiled2 ? slopes(t2) : std::vector<float>();
+            for (uint32_t k = 0; k <= M; ++k) {
+                uint32_t i, j, i2, j2;
+                MicroMesh::edgePoint(e, k, M, i, j);
+                MicroMesh::edgePoint(int(e2), M - k, M, i2, j2);
+                const glm::vec3 g = gradient(t, sl, i, j);
+                if (!tiled2) {
+                    CHECK(g == glm::vec3(0.0f));
+                    ++besideUntiled;
+                    continue;
+                }
+                maxSeam = std::max(maxSeam, double(glm::length(g - gradient(t2, sl2, i2, j2))));
+                ++shared;
+            }
+        }
+    }
+    std::printf("  shared edge points %zu (beside untiled %zu): largest gradient %.4f, largest seam %.6f\n", shared, besideUntiled, maxG, maxSeam);
+    CHECK(shared > 100);
+    CHECK(besideUntiled > 100);
+    CHECK(maxG > 0.01);              // the delta really tilts the light
+    // Only the planes' tilt between the sides is left (the average is projected on each: ~1.7 degrees between neighbours
+    // of this 20k-triangle sphere, so ~3% of the gradient; the one-sided differences alone were 24%).
+    CHECK(maxSeam < maxG * 0.05);
+}
+
 // A resident budget: at the end of a stroke the least recently used tiles beyond it are parked (packed), the surface
 // reads the same, a later stroke and undo bring them back, and nothing is lost.
 TEST(micro_tiles_park_beyond_the_budget_and_come_back) {
@@ -471,6 +626,40 @@ TEST(micro_tiles_absent_by_default) {
     UndoRecord r = fineStroke(doc);
     CHECK(r.micro != nullptr && r.micro->tileKeys.empty());
     CHECK(doc.mesh.micro->tiles == nullptr || !MicroTiles::enabled());
+}
+
+// On Mesa's OpenGL over D3D12 (WSL, Windows on ARM) the first tiled frame removes the device: with SF_MICRO_TILES=1 a stroke
+// there keeps writing the plain micro levels (no store, no tiles), as it does on every GPU with the flag off.
+TEST(micro_tiles_fall_back_to_plain_levels_on_d3d12) {
+    const auto setTiles = [](const char* v) {
+#ifdef _WIN32
+        _putenv_s("SF_MICRO_TILES", v ? v : "");
+#else
+        if (v) setenv("SF_MICRO_TILES", v, 1);
+        else unsetenv("SF_MICRO_TILES");
+#endif
+    };
+    const char* old = std::getenv("SF_MICRO_TILES");
+    const std::string saved = old ? old : "";
+    CHECK(!MicroTiles::gpuSupported("D3D12 (NVIDIA GeForce RTX 3060)"));
+    CHECK(!MicroTiles::gpuSupported("D3D12 (Qualcomm(R) Adreno(TM) X1-85 GPU)"));
+    CHECK(MicroTiles::gpuSupported("NVIDIA GeForce RTX 3060/PCIe/SSE2"));
+    CHECK(MicroTiles::gpuSupported("llvmpipe (LLVM 19.1.7, 256 bits)"));
+    CHECK(MicroTiles::gpuSupported("Apple M1 Pro"));
+    setTiles("1");
+    MicroTiles::setGpu("D3D12 (NVIDIA GeForce RTX 3060)");
+    CHECK(!MicroTiles::enabled());
+    Document plain = microDoc(4);
+    const std::vector<uint16_t> before = plain.mesh.micro->triRange;
+    UndoRecord r = fineStroke(plain);
+    CHECK(plain.mesh.micro->tiles == nullptr && r.micro != nullptr && r.micro->tileKeys.empty());
+    CHECK(plain.mesh.micro->triRange != before); // (the stroke landed on the stored level)
+    MicroTiles::setGpu("NVIDIA GeForce RTX 3060/PCIe/SSE2");
+    CHECK(MicroTiles::enabled());
+    Document tiled = microDoc(4);
+    fineStroke(tiled);
+    CHECK(tiled.mesh.micro->tiles != nullptr);
+    setTiles(old ? saved.c_str() : nullptr);
 }
 
 TEST(micro_divide_needs_top_level) {

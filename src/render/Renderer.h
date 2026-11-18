@@ -307,6 +307,10 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
+    size_t microTilePages() const;
+    size_t microTilePageBytes() const;
+    bool microTilePagesWantFrame() const; // (MicroTilePages::wantsFrame: one more frame pages what came into view)
     // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
     void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
@@ -656,6 +660,7 @@ private:
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
     static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
+    static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;

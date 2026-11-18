@@ -96,5 +96,22 @@ render_cell "flat x Focus Detail, over the buffer limit" mode=flat
 render_cell "wire x Focus Detail, over the buffer limit" mode=wire
 gl_limits texels=0
 
+# --- Adaptive Detail tiles (SF_MICRO_TILES=1, render/MicroTilePages.h): a small stroke writes delta tiles finer than the
+# stored grid; they draw through per-slot delta pages at every level. Close-up on the stroke and a mid view.
+env SF_MICRO_TILES 1
+run new_sphere subdivisions=3
+run micro_divide level=3
+camera 0 0
+look 0 0 1
+camera_distance 0.5
+brush_size 12
+stroke 0.495 0.5 0.505 0.5
+wait 0.3
+expect_value micro_tiles > 0
+render_cell "Lit Sphere x Micro tiles, close-up" mode=lit target=0,0,1 distance=0.05
+render_cell "flat x Micro tiles, close-up" mode=flat target=0,0,1 distance=0.05
+render_cell "Lit Sphere x Micro tiles" mode=lit
+env SF_MICRO_TILES 0
+
 # What the matrix would have caught (see the PBR x Micro cells on 0.12.15): the same cells all pass here.
 expect_value render_coverage > 0.3

@@ -282,7 +282,109 @@ glm::vec3 decodeShadeNormal(uint32_t v) {
     return len > 0.0f ? n / len : glm::vec3(0.0f, 0.0f, 1.0f);
 }
 
-glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading) {
+namespace {
+// A triangle's page frame: its corners in corner order, and the page cell's edge vectors.
+struct PageFrame {
+    glm::vec3 ei, ej;
+    PageFrame(const Mesh& m, uint32_t tri, uint32_t M) {
+        const glm::uvec3 t = m.triangles[tri];
+        const glm::vec3 c0 = m.positions[t[0]];
+        ei = (m.positions[t[1]] - c0) / float(M), ej = (m.positions[t[2]] - c0) / float(M);
+    }
+    // Slopes (height per cell along i, j) -> the surface gradient on the triangle's plane, and back.
+    glm::vec3 gradient(glm::vec2 s) const {
+        const float a11 = glm::dot(ei, ei), a12 = glm::dot(ei, ej), a22 = glm::dot(ej, ej), det = a11 * a22 - a12 * a12;
+        if (std::abs(det) < 1e-30f) return glm::vec3(0.0f);
+        return ei * ((s.x * a22 - s.y * a12) / det) + ej * ((s.y * a11 - s.x * a12) / det);
+    }
+    glm::vec2 slopes(const glm::vec3& g) const { return {glm::dot(g, ei), glm::dot(g, ej)}; }
+};
+template <class Value> glm::vec2 pageStencil(Value&& v, int I, int J, int M) {
+    const float v0 = v(I, J);
+    const bool ip = I + 1 + J <= M, im = I > 0, jp = I + J + 1 <= M, jm = J > 0;
+    const float di = ip && im ? (v(I + 1, J) - v(I - 1, J)) * 0.5f : ip ? v(I + 1, J) - v0 : im ? v0 - v(I - 1, J) : 0.0f;
+    const float dj = jp && jm ? (v(I, J + 1) - v(I, J - 1)) * 0.5f : jp ? v(I, J + 1) - v0 : jm ? v0 - v(I, J - 1) : 0.0f;
+    return {di, dj};
+}
+} // namespace
+
+void microTileSlopes(const Mesh& m, uint32_t tri, uint32_t pageSegments, const int16_t* values, float* out) {
+    const MicroMesh& mm = *m.micro;
+    const MicroTiles& tiles = *mm.tiles;
+    const int M = int(pageSegments);
+    auto own = [&](int i, int j) { return float(values[MicroMesh::index(uint32_t(i), uint32_t(j), pageSegments)]); };
+    auto put = [&](int i, int j, glm::vec2 s) {
+        float* o = out + size_t(MicroMesh::index(uint32_t(i), uint32_t(j), pageSegments)) * 2;
+        o[0] = s.x, o[1] = s.y;
+    };
+    for (int J = 0; J <= M; ++J)
+        for (int I = 0; I + J <= M; ++I) put(I, J, pageStencil(own, I, J, M));
+    const PageFrame F(m, tri, pageSegments);
+    auto other = [&](uint32_t t, int I, int J) { // another triangle's surface gradient at its page point (I, J)
+        auto v = [&](int i, int j) { return float(tiles.pageValue(t, pageSegments, uint32_t(i), uint32_t(j))); };
+        return PageFrame(m, t, pageSegments).gradient(pageStencil(v, I, J, M));
+    };
+    // Shared edges: the average of both sides' gradients (0 next to a triangle without tiles: it draws none).
+    for (int e = 0; e < 3; ++e) {
+        const uint32_t nb = mm.edgeNeighbor.size() > size_t(tri) * 3 + 2 ? mm.edgeNeighbor[size_t(tri) * 3 + size_t(e)] : MicroMesh::kNone;
+        if (nb == MicroMesh::kNone) continue;
+        const uint32_t t2 = nb >> 2, e2 = nb & 3;
+        const bool tiled = tiles.hasTiles(t2);
+        for (int k = 1; k < M; ++k) {
+            uint32_t i, j, i2, j2;
+            MicroMesh::edgePoint(e, uint32_t(k), pageSegments, i, j);
+            if (!tiled) {
+                put(int(i), int(j), glm::vec2(0.0f));
+                continue;
+            }
+            MicroMesh::edgePoint(int(e2), pageSegments - uint32_t(k), pageSegments, i2, j2);
+            const glm::vec3 g = (F.gradient(pageStencil(own, int(i), int(j), M)) + other(t2, int(i2), int(j2))) * 0.5f;
+            put(int(i), int(j), F.slopes(g));
+        }
+    }
+    // Corners: the average over the triangles around the vertex.
+    const glm::uvec3 tv = m.triangles[tri];
+    const int cornerI[3] = {0, M, 0}, cornerJ[3] = {0, 0, M};
+    for (int q = 0; q < 3; ++q) {
+        glm::vec3 g(0.0f);
+        int count = 0;
+        bool untiled = false;
+        for (uint32_t t : m.vertexTriangles(tv[q])) {
+            if (!tiles.hasTiles(t)) {
+                untiled = true;
+                break;
+            }
+            const glm::uvec3 o = m.triangles[t];
+            const int q2 = o[0] == tv[q] ? 0 : o[1] == tv[q] ? 1 : 2;
+            g += t == tri ? F.gradient(pageStencil(own, cornerI[q], cornerJ[q], M)) : other(t, cornerI[q2], cornerJ[q2]);
+            ++count;
+        }
+        put(cornerI[q], cornerJ[q], untiled || count == 0 ? glm::vec2(0.0f) : F.slopes(g / float(count)));
+    }
+}
+
+namespace {
+glm::vec3 drawPointUntiled(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading);
+}
+
+glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading, int pageLevel) {
+    const glm::vec3 p = drawPointUntiled(m, tri, level, i, j, shading);
+    const MicroMesh& mm = *m.micro;
+    if (pageLevel < level || !mm.tiles || !mm.tiles->hasTiles(tri)) return p;
+    const uint32_t M = 1u << pageLevel, sh = uint32_t(pageLevel - level), ii = i << sh, jj = j << sh;
+    const int16_t v = mm.tiles->pageValue(tri, M, ii, jj);
+    if (v == 0) return p;
+    MicroTriangle T;
+    T.set(m, tri, mm.n);
+    const glm::vec3 w = MicroTiles::pageWeights(M, ii, jj);
+    const float wc[3] = {w.x, w.y, w.z};
+    glm::vec3 s, nn;
+    T.evalWeights(wc, s, nn);
+    return p + nn * (float(v) * mm.step);
+}
+
+namespace {
+glm::vec3 drawPointUntiled(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading) {
     const MicroMesh& mm = *m.micro;
     if (level <= mm.level) {
         const uint32_t sc = mm.n >> level;
@@ -320,6 +422,7 @@ glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uin
     pull += n2 * (w2 * glm::dot(f - q2, n2));
     return f - pull * 0.75f;
 }
+} // namespace
 
 glm::vec3 microPointAt(const Mesh& m, uint32_t tri, const float wc[3], glm::vec3* normal) {
     const MicroMesh& mm = *m.micro;

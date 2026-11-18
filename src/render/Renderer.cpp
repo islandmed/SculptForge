@@ -4,6 +4,7 @@
 #include "render/MicroRenderer.h"
 
 #include "core/LitSphere.h"
+#include "core/MicroTiles.h"
 #include "core/Tangents.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
@@ -361,6 +362,36 @@ vec4 shadeAt(int i, int j) {
 #else
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
 #endif
+#ifdef TILES
+// Adaptive Detail tiles (render/MicroTilePages.h): on a tiled slot the stored normal tilts by the tiles' surface
+// gradient, interpolated from the page's slopes like the shading grid (so it does not depend on the drawn level),
+// and detail finer than the stored grid catches the light.
+flat in int vTilePage;
+flat in vec3 vTileGi, vTileGj;
+uniform samplerBuffer uTileSlope;
+uniform int uTilePageLevel, uTileSamples;
+vec2 tileSlopeAt(int i, int j, int m) { return texelFetch(uTileSlope, vTilePage * uTileSamples + j * (m + 1) - (j * (j - 1)) / 2 + i).rg; }
+vec3 tileGradient() {
+    int m = 1 << uTilePageLevel;
+    vec2 g = vIJ * (float(m) / float(uN));
+    float fi = clamp(g.x, 0.0, float(m)), fj = clamp(g.y, 0.0, float(m));
+    int i0 = min(int(fi), m - 1), j0 = min(int(fj), m - 1);
+    if (i0 + j0 > m - 1) {
+        if (fi >= fj) i0 = m - 1 - j0;
+        else j0 = m - 1 - i0;
+    }
+    float a = fi - float(i0), b = fj - float(j0);
+    vec2 s;
+    if (a + b <= 1.0 || i0 + j0 + 2 > m) {
+        vec3 w = clamp(vec3(1.0 - a - b, a, b), 0.0, 1.0);
+        s = tileSlopeAt(i0, j0, m) * w.x + tileSlopeAt(i0 + 1, j0, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    } else {
+        vec3 w = clamp(vec3(1.0 - b, a + b - 1.0, 1.0 - a), 0.0, 1.0);
+        s = tileSlopeAt(i0 + 1, j0, m) * w.x + tileSlopeAt(i0 + 1, j0 + 1, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    }
+    return vTileGi * s.x + vTileGj * s.y;
+}
+#endif
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -397,6 +428,9 @@ void microFetch() {
     }
     w = clamp(w, 0.0, 1.0);
     vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
+#ifdef TILES
+    if (vTilePage >= 0) n = normalize(n) - tileGradient();
+#endif
     vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
     float c = dot(c3, w);
     gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
@@ -1115,6 +1149,7 @@ bool Renderer::init(std::string& error) {
         const auto str = [](GLenum n) { const GLubyte* v = gl::GetString(n); return v ? reinterpret_cast<const char*>(v) : "?"; };
         SDL_Log("GL vendor %s, GLSL %s, max samples %d, texture buffer %d texels, fragment uniforms %d", str(0x1F00),
                 str(0x8B8C), samples, texels, vecs);
+        MicroTiles::setGpu(str(0x1F01 /* GL_RENDERER */));
     }
     for (int f : {0, kPaint}) // the common ones up front, so a broken driver fails here rather than mid-session
         if (!meshProgram(f)) {
@@ -1177,7 +1212,7 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | ((features & kFocus) ? kFocus : kTiles);
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
@@ -1186,9 +1221,10 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     };
     if (p.failed) return simpler(); // (not every frame again)
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
+    if (features & kMicro)
+        prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : (features & kTiles) ? "#define MICRO\n#define TILES\n" : "#define MICRO\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
-    if (features & kPrim) prefix += "#define PRIM\n";
+    if ((features & kPrim) && !(features & kMicro)) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
@@ -1432,6 +1468,26 @@ size_t Renderer::microPendingShading() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
         if (s.micro) total += s.micro->pendingShading();
+    return total;
+}
+
+size_t Renderer::microTilePages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->pages();
+    return total;
+}
+
+bool Renderer::microTilePagesWantFrame() const {
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePagesWantFrame()) return true;
+    return false;
+}
+
+size_t Renderer::microTilePageBytes() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->gpuBytes();
     return total;
 }
 
@@ -4053,7 +4109,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
-                                       (s.micro && s.micro->focus() ? kFocus : 0));
+                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
