@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Fails unless every file given (paths or wildcards) has a valid Authenticode signature with a timestamp, and prints
 # each signer. packages.yml's Windows job runs it on everything SignPath signed (docs/releasing.md "Windows code signing").
-# -Test (SignPath's test policy, a self-signed "SculptForge Test" certificate): the signature must be present, intact and
-# the signer "SculptForge Test"; an untrusted root is expected there and a timestamp is not required. signtool verify /pa
-# is printed for the record (its failure on the untrusted root is expected and does not fail the job).
+# -Test (SignPath's test policy, a self-signed certificate: "Test certificate for 'SculptForge [OSS]'" in the OSS org,
+# "SculptForge Test" in the self-test): the signature must be present, intact and from one of those signers; an
+# untrusted root is expected there and a timestamp is not required. signtool verify /pa is printed for the record (its
+# failure on the untrusted root is expected and does not fail the job).
 param([Parameter(Mandatory)][string[]]$Path, [switch]$Test)
 $ErrorActionPreference = 'Stop'
 $files = @(Get-ChildItem -Path $Path -File)
@@ -15,7 +16,7 @@ foreach ($f in $files) {
     $s = Get-AuthenticodeSignature -FilePath $f.FullName
     $subject = if ($s.SignerCertificate) { $s.SignerCertificate.Subject } else { 'no signer' }
     if ($Test) {
-        $ok = $s.SignerCertificate -and $s.Status -in 'Valid', 'NotTrusted', 'UnknownError' -and $subject -like '*SculptForge Test*'
+        $ok = $s.SignerCertificate -and $s.Status -in 'Valid', 'NotTrusted', 'UnknownError' -and ($subject -like '*SculptForge Test*' -or $subject -like "*Test certificate for 'SculptForge*")
     } else {
         $ok = $s.Status -eq 'Valid' -and $s.TimeStamperCertificate
     }

@@ -455,7 +455,7 @@ jobs:
       # unsigned package under SIGNING=signpath). Only runs for main, staging and release tags sign: a dispatch from
       # another branch builds unsigned (it can never be promoted: staged_run.py wants a push to staging or main).
       # SIGN_TEST: a maintainer's workflow_dispatch with sign_test signs with the TEST policy instead (self-signed
-      # "SculptForge Test" certificate; the packages say "test-signed (not for release)" and can't be promoted).
+      # test certificate; the packages say "test-signed (not for release)" and can't be promoted).
       SIGN_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_test == true }}
       SIGN: ${{ (vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) }}
       SIGN_POLICY: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || vars.SIGNPATH_SIGNING_POLICY_SLUG }}
@@ -651,11 +651,14 @@ jobs:
         if: env.SIGN == 'true'
         shell: pwsh
         run: |
+          # every .exe, and the DLLs we built (the ones sent to SignPath); the Python and MSVC runtime DLLs ship as their makers
+          # signed them (or didn't) and never go to SignPath under our subscription
+          $ours = (Get-ChildItem signing\binaries -File).Name
           foreach ($pkg in 'zip', 'mcpb') {
             $dir = Join-Path $env:RUNNER_TEMP "check-$pkg"
             python -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" (Get-Item "build\SculptForge-*.$pkg").FullName $dir
             if ($LASTEXITCODE -ne 0) { throw "cannot unpack the .$pkg" }
-            ./tools/ci/verify_signed.ps1 -Test:($env:SIGN_TEST -eq 'true') -Path (Get-ChildItem $dir -Recurse -File -Include *.exe, *.dll).FullName
+            ./tools/ci/verify_signed.ps1 -Test:($env:SIGN_TEST -eq 'true') -Path (Get-ChildItem $dir -Recurse -File | Where-Object { $_.Extension -eq '.exe' -or $ours -contains $_.Name }).FullName
           }
       - name: Windows signing state (job summary and notice; release.sh --stage prints it)
         shell: pwsh
