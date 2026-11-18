@@ -1,0 +1,15 @@
+---
+whats_new: **Python package**: `pip install sculptforge` puts the sculpting engine in your own Python, for procedural assets, batch exports and pipeline tests, on Windows, macOS and Linux.
+added: **The Python package** (`pip install sculptforge`, CPython 3.12-3.14 on Windows x64, macOS universal2 and Linux
+  x86_64/aarch64): every command, the mesh, masks, face groups, paint, Parts, layers and selection sets as NumPy
+  arrays, type hints, `sculptforge.CommandError`. Saves and exports write to a temporary file and replace the target in
+  one step, so a failed or interrupted export never leaves a half-written file. Engine only: no window, no network, no
+  port. Guide: The Python package; examples in examples/python.
+changed: The `sculptforge` Python module is now a package (`sculptforge/` with the compiled `_core` and type stubs),
+  also in the VFX Reference Platform builds; `import sculptforge` is unchanged.
+testers:
+  - Any OS with Python 3.12, 3.13 or 3.14: `python -m venv v`, `v/bin/pip install sculptforge` (Windows:
+    `v\Scripts\pip`), then run examples/python/procedural_asset.py out: out/procedural.glb opens in the app with
+    bumps in a ring.
+  - Windows: the same with a path holding spaces and non-English letters (e.g. `C:\Users\Zoë\My Models`).
+---

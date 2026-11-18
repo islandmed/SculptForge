@@ -8,7 +8,12 @@
 #include <chrono>
 #include <random>
 
-#if defined(_WIN32)
+// SCULPTFORGE_HTTP=OFF (SF_NO_HTTP, the Python wheels): no transport, every request fails with the message below.
+#if defined(_WIN32) && !defined(SF_NO_HTTP)
+#define SF_HTTP_WINHTTP 1
+#endif
+
+#if defined(SF_HTTP_WINHTTP)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winhttp.h>
@@ -20,6 +25,13 @@
 namespace sf::ai {
 
 namespace {
+#if !defined(SF_HTTP_WINHTTP) && !defined(SF_HAVE_CURL)
+#if defined(SF_NO_HTTP)
+constexpr const char* kNoHttp = "This build of SculptForge has no HTTP support (built with SCULPTFORGE_HTTP=OFF, e.g. the Python package)";
+#else
+constexpr const char* kNoHttp = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
+#endif
+#endif
 std::atomic<uint64_t> gRequests{0};
 
 // Studio mode (core/NetworkPolicy.h): a URL off the studio's list is refused before anything is sent or counted.
@@ -35,7 +47,7 @@ uint64_t httpRequestCount() { return gRequests; }
 void resetHttpRequestCount() { gRequests = 0; }
 
 bool httpSupported() {
-#if defined(_WIN32) || defined(SF_HAVE_CURL)
+#if defined(SF_HTTP_WINHTTP) || defined(SF_HAVE_CURL)
     return true;
 #else
     return false;
@@ -135,7 +147,7 @@ HttpResponse httpPostNoRedirect(const std::string& url, const std::vector<std::s
     return r;
 }
 
-#if defined(_WIN32)
+#if defined(SF_HTTP_WINHTTP)
 
 namespace {
 
@@ -493,7 +505,7 @@ HttpResponse httpRequestStream(const std::string&, const std::string& url, const
     HttpResponse r;
     if (refused(url, r)) return r;
     ++gRequests;
-    r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
+    r.error = kNoHttp;
     return r;
 }
 
@@ -505,7 +517,7 @@ HttpResponse getOnce(const std::string&, const std::string& url, const std::vect
     if (HttpResponse no; refused(url, no)) return no; // studio mode, as in the real transports
     ++gRequests;
     HttpResponse r;
-    r.error = "This build of SculptForge has no HTTP support (libcurl was not found at build time)";
+    r.error = kNoHttp;
     return r;
 }
 
