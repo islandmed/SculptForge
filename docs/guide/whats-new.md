@@ -15,6 +15,21 @@ highlight: Hold Space to slide a selection while you draw it
 highlight: Type an exact value on any slider
 highlight: A portable copy on a USB stick that carries your settings, brushes and library
 highlight: Python scripting in the app
+title: Circles for Mask, Select, Cut
+line: Draw a circle or an ellipse from its centre to mask, select or cut a round area in one drag. Pick Circle Mask in the Mask tool (B), or Select Circle and Cut Circle in Tool > Cut.
+action: guide:masking.md
+title: Slide a selection as you draw
+line: Hold Space while you drag a rectangle, lasso or circle to move the whole shape, then let go to keep sizing it. It works for Mask, Select and Cut.
+action: guide:masking.md
+title: Type any value on a slider
+line: Double-click (or Ctrl+click) any slider or number, type the value and press Enter; Esc cancels. Now it works in every panel, the top bar and Brush Lab.
+action: guide:interface.md
+title: Your setup on a USB stick
+line: The Windows portable .zip keeps your settings, brushes and library in a folder next to the program, so your workbench follows you from PC to PC. Unzip it anywhere and run it.
+action: guide:installing.md#a-portable-copy-a-usb-stick
+title: Script SculptForge in Python
+line: Turn it on in Edit > Preferences > Scripts, then open the console and click Python: loops, conditions and every command, each run one undo step. Scripts are programs, so run only ones you trust.
+action: guide:python.md
 ```
 
 - **Brush thumbnails show the alpha**: a brush with an alpha shows it pressed into the ball in the brush's own stroke
@@ -48,6 +63,12 @@ tagline: Insert works on meshes with subdivision levels, heavy meshes no longer 
 highlight: Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail
 highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window
 highlight: A public benchmark you can run in one command
+title: Insert keeps every level
+line: Add a horn, an ear or any shape to a mesh that has subdivision levels: it becomes its own Part and every level keeps its detail. Parts > Append > Insert on the model.
+action: guide:parts.md
+title: No freeze after a heavy stroke
+line: On a very dense mesh, Undo, Save or a click right after a stroke no longer freezes the window.
+action: guide:sculpting.md
 ```
 
 - **Benchmark scene pack**: download a pack of our own sculpts and run `sculptforge --benchmark-pack bench-pack --out
@@ -63,10 +84,13 @@ highlight: A public benchmark you can run in one command
 
 ```features
 date: 2026-11-16
-tagline: A plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data.
-highlight: Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit
-highlight: Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails
-highlight: AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it
+tagline: Safer plugins, and AI agents that can run a list of commands as one undo step.
+highlight: Safer plugins: a plugin can no longer stop SculptForge or use up your memory without limit
+highlight: AI agents can run a list of commands as one undo step that rolls back whole if one fails
+highlight: AI agents can read the scene as plain numbers without changing it
+title: Safer plugins
+line: A plugin can no longer stop SculptForge or use up your memory, so trying one from a pack is safer. Plugins still have no access to your files or the network.
+action: guide:packs-and-macros.md#plugins
 ```
 
 - **Blender 5.3 supported**: the Blender bridge is tested on Blender 4.2 LTS, 5.2 and 5.3.
@@ -84,6 +108,9 @@ tagline: Saves on Windows retry instead of failing, and a short note from the me
 highlight: On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar
 highlight: A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it
 highlight: Membership links in the app carry a small source tag, so we can see which one helps
+title: Saves that don't give up
+line: On Windows, a save that meets a busy or read-only file tries again instead of failing, and if it still can't save, the status bar names the file.
+action: guide:projects.md
 ```
 
 - **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
