@@ -29,4 +29,5 @@ print([c["name"] for c in sf.commands()])       # every command, with its parame
 Wheels for CPython 3.12 to 3.14 on Windows x64, macOS (Apple silicon and Intel) and Linux (x86_64 and aarch64,
 glibc 2.28 or later). Guide: https://sculptforge.app/guide/python-package.html
 
-SculptForge is free software under the GNU General Public License v3.0 or later.
+SculptForge is free software under the GNU General Public License v3.0 or later, with the SculptForge Scripting
+Exception: your scripts and tools that use the package through its public API can be under any licence.

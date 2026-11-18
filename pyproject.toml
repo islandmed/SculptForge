@@ -9,8 +9,9 @@ name = "sculptforge"
 dynamic = ["version"]
 description = "SculptForge's sculpting engine for Python: commands, meshes as NumPy arrays, Parts, masks and exports"
 readme = "python/README.md"
-license = "GPL-3.0-or-later"
-license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+# (SPDX has no WITH form for a project-defined exception that PyPI accepts: the exception is its own LicenseRef.)
+license = "GPL-3.0-or-later AND LicenseRef-SculptForge-Scripting-Exception"
+license-files = ["LICENSE", "LICENSE-EXCEPTION.md", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.12"
 dependencies = ["numpy>=1.26"]
 keywords = ["sculpting", "3d", "mesh", "usd", "gltf", "pipeline"]

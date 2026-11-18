@@ -1,4 +1,8 @@
 ---
+whats_new: Scripts and tools that use SculptForge's Python API or command line can be under any licence (new scripting exception).
+added: **SculptForge Scripting Exception 1.0** (LICENSE-EXCEPTION.md): programs, scripts, add-ons and tools that use
+  SculptForge only through its Python API, command line, MCP server or plug-in SDK may be under any licence;
+  SculptForge itself stays GPL-3.0-or-later.
 whats_new: **Python package**: `pip install sculptforge` puts the sculpting engine in your own Python, for procedural assets, batch exports and pipeline tests, on Windows, macOS and Linux.
 added: **The Python package** (`pip install sculptforge`, CPython 3.12-3.14 on Windows x64, macOS universal2 and Linux
   x86_64/aarch64): every command, the mesh, masks, face groups, paint, Parts, layers and selection sets as NumPy

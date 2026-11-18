@@ -114,5 +114,8 @@ nothing on its own. Open only files you trust, as with any program.
 
 ## Licence
 
-SculptForge, including this package, is free software under the GNU General Public License v3.0 or later. Models you
-make with it are yours. [For studios](studios.md) explains what the licence means in a pipeline.
+SculptForge, including this package, is free software under the GNU General Public License v3.0 or later, with the
+**SculptForge Scripting Exception**: your scripts and tools that use the package through its public API (and
+programs that call `sculptforge-cli`) can be under any licence, closed or open, and you can ship them to clients and
+vendors. Only SculptForge itself, and changes you make to it, stay under the GPL. Models you make with it are yours.
+[For studios](studios.md) explains more.

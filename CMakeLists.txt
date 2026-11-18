@@ -683,7 +683,7 @@ if(MSVC)
   set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
   include(InstallRequiredSystemLibraries)
 endif()
-install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
+install(FILES LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)
 # A studio build: the profile's folder (packs, preferences, logo) where core/StudioProfile.h looks for it.
 if(SCULPTFORGE_STUDIO_PROFILE)
