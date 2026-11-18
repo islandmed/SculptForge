@@ -349,7 +349,7 @@ void App::drawSupportCard() {
          {"One quote for the whole studio: any number of artists, each with everything in Member",
           "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
           "Isolated: a private release channel, no outside connections",
-          "First response within 2 business days; up to 3 custom items a month", nullptr},
+          "First response within 12 hours; up to 3 custom items a month", nullptr},
          "Get a quote", "Get a quote##card.studio", kStudioPageUrl, "Tell us your team size, platforms and pipeline"},
     };
     const float gap = 22.0f * k, footer = 62.0f * k, tierH = 350.0f * k;
