@@ -4023,17 +4023,23 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
                      int(settings.motionProxy), int(settings.stroking), s.coarsePending.size(), gpuMsPerTriangle_);
-    if (coarse && !settings.motionProxy && !settings.stroking && s.coarsePending.empty()) {
-        constexpr double kStillDelay = 0.15;
-        double stillMs = 100.0;
-        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) stillMs = std::atof(e); // (tests)
+    if (coarse && s.coarsePending.empty()) { // (a stroke with the view still decides as at rest: coarseDraw, gh#184)
+        CoarseFrame f;
+        f.moving = settings.motionProxy;
+        f.stroking = settings.stroking;
+        f.stillSeconds = settings.stillSeconds;
+        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) f.stillFrameMs = std::atof(e); // (tests)
         // (no frame measured yet: the calibrated rate, else the budget as half a 60 Hz frame's worth of triangles)
         const double perTriangle = gpuMsPerTriangle_ > 0.0 ? gpuMsPerTriangle_
                                    : triangleRateM_ > 0.0 ? 1e-3 / triangleRateM_
                                                           : (1000.0 / 60.0 * 0.5) / double(std::max<size_t>(budget, 1));
-        if (double(s.drawnTriangles) * perTriangle > stillMs) previewOnly_ = true;
-        else if (settings.stillSeconds >= kStillDelay) coarse = false;
-        else stillWanted_ = true;
+        f.fullFrameMs = double(s.drawnTriangles) * perTriangle;
+        switch (coarseDraw(f)) {
+        case CoarseDraw::Full: coarse = false; break;
+        case CoarseDraw::Preview: previewOnly_ = true; break;
+        case CoarseDraw::UntilStill: stillWanted_ = true; break;
+        case CoarseDraw::Coarse: break;
+        }
     }
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),

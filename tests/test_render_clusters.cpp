@@ -618,6 +618,34 @@ TEST(coarse_still_frame_estimate_survives_a_slow_frame) {
     CHECK(nextGpuMsPerTriangle(0.0, 6.0, 0.5, top) > 0.0);
 }
 
+TEST(coarse_levels_not_drawn_for_a_stroke_with_the_view_still) {
+    // gh#184 (a 10.34M-triangle head, Sharp Crease): creases beside the brush faded out and back in as each stroke
+    // began. Every frame from the pen going down to the stroke's first upload drew the whole mesh coarse; on a mesh
+    // that size the dabs go to the stroke thread, so that took frames (over a second after an undo).
+    CoarseFrame rest;
+    rest.stillSeconds = 2.0;
+    rest.fullFrameMs = 20.0;
+    CHECK(coarseDraw(rest) == CoarseDraw::Full);
+    CoarseFrame stroke = rest;
+    stroke.stroking = true;
+    CHECK(coarseDraw(stroke) == CoarseDraw::Full); // was Coarse
+    // A stroke decides exactly as rest does: a full frame too slow for the still budget stays coarse ("Preview
+    // detail") either way, and a view that only just stopped waits for kStillDelay.
+    for (const bool stroking : {false, true}) {
+        CoarseFrame f = rest;
+        f.stroking = stroking;
+        f.fullFrameMs = 150.0;
+        CHECK(coarseDraw(f) == CoarseDraw::Preview);
+        f.fullFrameMs = 20.0;
+        f.stillSeconds = 0.05;
+        CHECK(coarseDraw(f) == CoarseDraw::UntilStill);
+        // The view moving is what coarse levels are for, stroke or not.
+        f.moving = true;
+        f.stillSeconds = 0.0;
+        CHECK(coarseDraw(f) == CoarseDraw::Coarse);
+    }
+}
+
 // A mesh shader variant a driver won't build falls back to a simpler one instead of leaving the mesh undrawn.
 // (Feature bits as in Renderer.h: paint 1, per-triangle data 2, texture 4, normal map 8, flat 16, micro 32, ghost 64, PBR 128.)
 TEST(mesh_shader_fallback_walks_down_to_a_plain_variant) {
