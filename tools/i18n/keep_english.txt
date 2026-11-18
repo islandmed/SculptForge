@@ -64,3 +64,4 @@ Experimental
 Forge Deck (prototype)##experimental.forge_deck
 Adds File > Forge Deck: your phone becomes a control pad for the session (brush tiles, Size, Intensity, Undo, Redo, Mirror) after you scan a QR code. The phone page loads over HTTPS and talks to this computer over an encrypted link: directly on the same Wi-Fi, or through an encrypted relay when the phone can't reach it. Off by default; even when on, the Deck is off every time the app starts.
 Python
+EXR

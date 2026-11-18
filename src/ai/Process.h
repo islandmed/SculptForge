@@ -25,10 +25,17 @@ public:
     // replaces environment variables for the child.
     bool start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
                const std::vector<std::pair<std::string, std::string>>& env, std::string& error);
+    // The child's whole environment ("NAME=value" entries) instead of ours plus `env`: the render bridge starts the
+    // user's own tools with a cleaned copy (no SF_* or secrets). Call before start(); `env` still adds to it.
+    void setEnvironment(std::vector<std::string> entries) {
+        fullEnv_ = std::move(entries);
+        hasFullEnv_ = true;
+    }
     // True while it runs; once it has ended, exitCode() is valid.
     bool running();
     int exitCode() const { return exitCode_; }
-    // Stops it (SIGTERM, then SIGKILL after `graceSeconds`; TerminateProcess on Windows) and waits.
+    // Stops it and everything it started (SIGTERM to its process group, then SIGKILL after `graceSeconds`; on
+    // Windows the whole job object it runs in) and waits.
     void kill(double graceSeconds = 2.0);
     // Waits for it to end; returns the exit code.
     int wait();
@@ -37,11 +44,14 @@ public:
     void detach();
 
 private:
+    std::vector<std::string> fullEnv_;
+    bool hasFullEnv_ = false;
     bool started_ = false;
     bool finished_ = false;
     int exitCode_ = -1;
 #if defined(_WIN32)
     void* process_ = nullptr;
+    void* job_ = nullptr; // kill-on-close job holding the child and its children (null if the job could not be made)
 #else
     int pid_ = -1;
 #endif
@@ -53,6 +63,9 @@ private:
 // False when nothing was sent.
 bool signalChildGroup(int pid, int sig);
 #endif
+
+// This process's environment as "NAME=value" entries.
+std::vector<std::string> currentEnvironment();
 
 // The full path of `name` on PATH (with .exe on Windows), or "" when it isn't there.
 std::string findOnPath(const std::string& name);

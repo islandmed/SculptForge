@@ -77,6 +77,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 
 33. [Baking normal and displacement maps](baking.md)
 34. [Exporting, Unreal and Bridge](exporting.md)
+    - [Render with your renderer](render-bridge.md)
 35. [Export presets](export-presets.md)
 36. [Working with Blender](blender.md)
 37. [Working with Maya](maya.md)
