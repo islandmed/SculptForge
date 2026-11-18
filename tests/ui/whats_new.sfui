@@ -60,7 +60,7 @@ expect_text "Circle shapes for Mask, Select and Cut, Space slides a selection, e
 expect_text "Version 0.13.6"
 expect_text "Insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run."
 expect_text "Version 0.13.5"
-expect_text "A plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data."
+expect_text "Safer plugins, and AI agents that can run a list of commands as one undo step."
 expect_value whats_new_contents == 6   # 3 versions in full, then the groups of older versions (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide
