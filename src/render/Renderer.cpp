@@ -4,7 +4,6 @@
 #include "render/MicroRenderer.h"
 
 #include "core/LitSphere.h"
-#include "core/MicroTiles.h"
 #include "core/Tangents.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
@@ -1149,7 +1148,6 @@ bool Renderer::init(std::string& error) {
         const auto str = [](GLenum n) { const GLubyte* v = gl::GetString(n); return v ? reinterpret_cast<const char*>(v) : "?"; };
         SDL_Log("GL vendor %s, GLSL %s, max samples %d, texture buffer %d texels, fragment uniforms %d", str(0x1F00),
                 str(0x8B8C), samples, texels, vecs);
-        MicroTiles::setGpu(str(0x1F01 /* GL_RENDERER */));
     }
     for (int f : {0, kPaint}) // the common ones up front, so a broken driver fails here rather than mid-session
         if (!meshProgram(f)) {

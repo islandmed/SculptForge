@@ -32,18 +32,10 @@ TileFrame TileFrame::of(int depth, uint32_t path) {
     return f;
 }
 
-namespace {
-bool gGpuSupported = true;
-}
-
 bool MicroTiles::enabled() { // (read at each stroke's start: a ui script's `env` step turns it on and off)
     const char* e = std::getenv("SF_MICRO_TILES");
-    return e && e[0] == '1' && gGpuSupported;
+    return e && e[0] == '1';
 }
-
-bool MicroTiles::gpuSupported(std::string_view glRenderer) { return glRenderer.rfind("D3D12", 0) != 0; }
-
-void MicroTiles::setGpu(std::string_view glRenderer) { gGpuSupported = gpuSupported(glRenderer); }
 
 size_t MicroTiles::defaultResidentBudget() {
     if (const char* e = std::getenv("SF_MICRO_TILES_RESIDENT_MB"); e && *e) return size_t(std::max(0L, std::atol(e))) << 20;
