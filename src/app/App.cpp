@@ -2022,6 +2022,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
+        ++penDiag_.wheel;
+        if (penInProximity_) ++penDiag_.wheelPenInRange;
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
             !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
@@ -2179,6 +2181,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     // side button) is not a new click, which would arm the menu again in the middle of the drag.
     if (button == SDL_BUTTON_RIGHT && rightClick_.down && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) return;
     dragFromPen_ = lastInputPen_;
+    pointerDragMoved_ = false;
     doc_.syncBvh();
     if (button == SDL_BUTTON_LEFT && erasing() && eraserAction() != PenAction::Invert && eraserAction() != PenAction::Smooth) {
         // The eraser end set to Erase mask or Nothing (Preferences > Tablet).
@@ -2365,7 +2368,23 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
-    if (!fromPen && penInProximity_) penLeft();
+    // A view drag a mouse button began (a compositor that maps the pen's barrel buttons to a right / middle click, KDE's
+    // tablet defaults, sends the click as the pointer's) is the pointer's to the end once the pointer moves it, as
+    // strayMouseMotion keeps a pen's drag the pen's: the pointer moves with the pen, so the pen's own samples between its
+    // events were a second path for the same drag. Each one reset the right click's slop, and the drag never began or was
+    // carried twice (#216). (A pointer that never moves, a driver's click only: the pen's samples are the drag.) The pen
+    // is not gone for that pointer (it would let go of the side buttons held), the drag goes by the pointer's position,
+    // not SDL's steps (which the pen's own mouse events may have moved on), and at the pen's view speed.
+    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll;
+    const bool pointerDrag = viewDrag && !dragFromPen_;
+    const bool withPen = !fromPen && pointerDrag && penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
+    if (!fromPen && penInProximity_ && !withPen) penLeft();
+    if (withPen) {
+        dx = x - mouseX_;
+        dy = y - mouseY_;
+    }
+    if (!fromPen && pointerDrag) pointerDragMoved_ = true;
+    if (fromPen && pointerDrag && pointerDragMoved_) return;
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
@@ -2418,13 +2437,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         }
     }
     // Preferences > Tablet > View speed: the pen's view drags (tip or side button) by its own amount per pixel.
-    if (fromPen && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
+    if ((fromPen || withPen) && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
         dx *= uiPrefs_.tablet.viewSpeed;
         dy *= uiPrefs_.tablet.viewSpeed;
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy, !fromPen); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !(fromPen || withPen)); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2627,6 +2646,7 @@ void App::onMouseUp() {
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
+    pointerDragMoved_ = false;
     penNavButton_ = 0;
 }
 

@@ -127,16 +127,19 @@ void PenDiagnostics::sampled(float p, bool touching) {
 std::string penReport(const std::vector<std::pair<std::string, std::string>>& facts, const PenDiagnostics& d) {
     std::string s;
     for (const auto& [name, value] : facts) s += name + ": " + value + "\n";
-    char buf[512];
+    char buf[640];
     std::snprintf(buf, sizeof buf,
                   "Pen events: proximity %llu, down %llu, up %llu, motion %llu, pressure %llu, other axes %llu, "
                   "buttons %llu\n"
                   "Lost pressure samples: %llu\nSystem mouse events while the pen was in range: %llu\n"
-                  "Touch events from the pen: %llu\nPressure after motion: %s\n",
+                  "Touch events from the pen: %llu\nPressure after motion: %s\n"
+                  "View input: wheel %llu (pen in range %llu), finger touches %llu, pinches %llu\n",
                   (unsigned long long)d.proximity, (unsigned long long)d.down, (unsigned long long)d.up,
                   (unsigned long long)d.motion, (unsigned long long)d.pressure, (unsigned long long)d.otherAxes,
                   (unsigned long long)d.buttons, (unsigned long long)d.lostSamples, (unsigned long long)d.strayMouse,
-                  (unsigned long long)d.penTouchEvents, d.axesAfterMotion ? "yes" : "not seen");
+                  (unsigned long long)d.penTouchEvents, d.axesAfterMotion ? "yes" : "not seen",
+                  (unsigned long long)d.wheel, (unsigned long long)d.wheelPenInRange, (unsigned long long)d.fingers,
+                  (unsigned long long)d.pinches);
     s += buf;
     if (d.lastPressure < 0.0f) s += "Last pressure: none yet\n";
     else {

@@ -3384,6 +3384,7 @@ private:
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
+    bool pointerDragMoved_ = false; // the pointer itself (not the pen) has moved the view drag a mouse button began (#216)
     bool firstDabPending_ = false;
     float lastStrokePressure_ = 1.0f; // pressure at the previous stroke sample (dabs in between interpolate)
     float penTiltX_ = 0.0f, penTiltY_ = 0.0f;

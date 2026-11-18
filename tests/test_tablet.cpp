@@ -363,6 +363,9 @@ TEST(pen_diagnostics_report) {
     CHECK(r.find("Last pressure: none yet") != std::string::npos);
     d.motion = 12;
     d.lostSamples = 3;
+    d.wheel = 7;
+    d.wheelPenInRange = 2;
+    d.fingers = 4;
     d.touchDown();
     d.sampled(0.25f, true);
     d.sampled(0.75f, true);
@@ -370,6 +373,7 @@ TEST(pen_diagnostics_report) {
     r = penReport({}, d);
     CHECK(r.find("motion 12,") != std::string::npos);
     CHECK(r.find("Lost pressure samples: 3") != std::string::npos);
+    CHECK(r.find("View input: wheel 7 (pen in range 2), finger touches 4, pinches 0") != std::string::npos);
     CHECK(r.find("Last pressure: 0.000") != std::string::npos);
     CHECK(r.find("Last stroke's pressure: 0.250 to 0.750") != std::string::npos);
 }

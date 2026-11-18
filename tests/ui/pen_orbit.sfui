@@ -96,3 +96,25 @@ expect_value moved_out > 0
 key ctrl+z
 pen_button 1 up
 key f
+
+# 5. A second side-button orbit starts from the view as it is: the first one's start state (the camera it began from, its
+#    pivot) was kept when the button's release ended it, so the next orbit snapped the view back and turned it about the
+#    old pivot: the view shifted and zoomed while the ring was elsewhere (#216, Wacom on Wayland).
+camera 0 0
+pen_move 0.4 0.5
+pen_button 1 down
+pen_move 0.5 0.5 0.5
+pen_button 1 up
+remember camera_yaw yawA
+remember camera_distance distA
+key f
+camera 0 0
+pen_move 0.4 0.5
+pen_button 1 down
+pen_move 0.5 0.5 0.5
+pen_button 1 up
+expect_value camera_yaw < $yawA+0.5
+expect_value camera_yaw > $yawA-0.5
+expect_value camera_distance < $distA+0.01
+expect_value camera_distance > $distA-0.01
+key f

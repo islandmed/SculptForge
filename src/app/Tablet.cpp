@@ -352,10 +352,10 @@ void App::penButton(int button, bool down, float x, float y) {
         if (drag_ != Drag::None) penNavButton_ = button;
     } else if (penNavButton_ == button) {
         if (a == PenAction::RightClick) rightClickRelease(); // a tap of the button: the QuickMenu, as the mouse's
-        if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom) {
-            drag_ = Drag::None;
-            dragFromPen_ = false;
-        }
+        // (The way the mouse's release ends it: the orbit's start state, the pivot it picked and the right click's
+        // slop are let go too. Without that the next orbit began from the view as this one began, or turned about
+        // its pivot: the view shifted and zoomed with the ring elsewhere, #216.)
+        if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom) onMouseUp();
         penNavButton_ = 0;
     }
 }
@@ -837,6 +837,18 @@ std::string App::tabletReport() const {
         SDL_free(mice);
     }
     facts.push_back({"Tablet devices", tablets.empty() ? "-" : tablets});
+    std::string touch;
+    if (SDL_TouchID* ids = SDL_GetTouchDevices(&n)) { // a tablet's touch surface shows up here too (#216)
+        static const char* const kinds[] = {"invalid", "touch screen", "trackpad", "trackpad (relative)"};
+        for (int i = 0; i < n; ++i) {
+            const char* name = SDL_GetTouchDeviceName(ids[i]);
+            const int t = int(SDL_GetTouchDeviceType(ids[i])) + 1;
+            touch += (touch.empty() ? "" : ", ") + std::string(name ? name : "?") + " (" + kinds[t >= 0 && t < 4 ? t : 0] + ")";
+        }
+        SDL_free(ids);
+    }
+    facts.push_back({"Touch devices", touch.empty() ? "-" : touch});
+    facts.push_back({"Palm rejection", uiPrefs_.tablet.palmRejection ? "on" : "off"});
     facts.push_back({"Mouse mode", uiPrefs_.tablet.mouseMode ? "on" : "off"});
     facts.push_back({"Classic pen timing", uiPrefs_.tablet.classicTiming ? "on" : "off"});
     return penReport(facts, penDiag_);
