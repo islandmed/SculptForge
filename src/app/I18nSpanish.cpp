@@ -931,13 +931,15 @@ constexpr Entry kSpanish[] = {
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
      "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
-     "sit on it. Off when memory is low.",
+     "sit on it. Off when memory is low."
+     " Experimental: a tester reports Move results can snap back with it on; we're checking.",
      "En un nivel micro, cada trazo conserva los toques de los que está hecho, así que después se "
      "puede mover, cambiar o quitar, y los trazos que tiene encima lo siguen exactamente. Cada trazo "
      "esculpe y se deshace exactamente como antes. Los trazos que mueven la base (los pinceles "
      "Standard, Clay e Inflate grandes, Move sobre la base) o usan la Plantilla fijan en su sitio los "
      "trazos que alcanzan; también queda fijado un trazo cuando tiene otros 20 encima. Desactivado "
-     "cuando queda poca memoria."},
+     "cuando queda poca memoria."
+     " Experimental: un probador informa de que los resultados de Move pueden deshacerse al activarlo; lo estamos revisando."},
     {"Live Move (Experimental)", "Mover en vivo (experimental)"},
     {"Background Preview (Experimental)", "Vista previa en segundo plano (experimental)"},
     {"Fast Upload (Experimental)", "Subida rápida (experimental)"},

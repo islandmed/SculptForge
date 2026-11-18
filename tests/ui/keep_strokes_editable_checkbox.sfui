@@ -9,6 +9,8 @@ expect "Keep Strokes Editable (Experimental)"
 hold ctrl
 hover "Keep Strokes Editable (Experimental)"
 expect_help "dabs it was made of"
+expect_help "Move results can snap back"
+shot kse_tooltip
 hold none
 click "Keep Strokes Editable (Experimental)"
 expect_value keep_strokes_editable == 1
