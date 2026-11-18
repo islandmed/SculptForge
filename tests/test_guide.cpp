@@ -256,6 +256,36 @@ TEST(guide_whats_new_groups) {
     CHECK(next.versions[0].version == "0.10.8" && !next.groups.empty() && next.groups[0].label == "0.10.1 to 0.10.5");
 }
 
+TEST(guide_whats_new_since) {
+    // After an update: the cards of every version newer than the last one seen, newest version first, capped at 8.
+    std::string md = "# What's new\n\nIntro.\n\n";
+    const struct { const char* ver; int cards; } versions[] = {{"0.13.8", 3}, {"0.13.7", 0}, {"0.13.6", 4}, {"0.13.5", 2}, {"0.13.4", 1}};
+    for (const auto& v : versions) {
+        md += std::string("## Version ") + v.ver + "\n\n```features\ndate: 2026-11-01\nhighlight: H" + v.ver + ": line\n";
+        for (int i = 0; i < v.cards; ++i)
+            md += std::string("title: ") + v.ver + " card " + std::to_string(i) + "\nline: One.\naction: look:new\n";
+        md += "```\n\n- A change.\n\n";
+    }
+    const guide::Document doc = parse(md);
+    const whatsnew::Page page = whatsnew::build(doc, "0.13.8");
+    // Last seen 0.13.5: 0.13.6, 0.13.7 and 0.13.8, the newest first, each version's lead card first.
+    const whatsnew::Since s = whatsnew::cardsSince(page, "0.13.5");
+    CHECK(s.versions == std::vector<std::string>({"0.13.8", "0.13.7", "0.13.6"}));
+    CHECK(s.cards.size() == 7 && s.cardVersions.size() == 7 && s.more == 1); // 0.13.7 has no cards: its highlight is "more"
+    CHECK(s.cards.size() == 7 && s.cards[0].title == "0.13.8 card 0" && s.cardVersions[2] == "0.13.8" && s.cardVersions[3] == "0.13.6");
+    // The cap: 2 cards of 7 shown, the other 5 and the cardless version's highlight are "more".
+    const whatsnew::Since capped = whatsnew::cardsSince(page, "0.13.5", 2);
+    CHECK(capped.cards.size() == 2 && capped.more == 6);
+    // A fresh install (nothing seen), the same version or a newer one (a downgrade): the newest version alone.
+    for (const char* seen : {"", "0.13.8", "0.14.0"}) {
+        const whatsnew::Since one = whatsnew::cardsSince(page, seen);
+        CHECK(one.versions == std::vector<std::string>({"0.13.8"}) && one.cards.size() == 3 && one.more == 0);
+    }
+    // Built as 0.13.7 (no cards of its own): since 0.13.5 the cards of 0.13.6 still show.
+    const whatsnew::Since mid = whatsnew::cardsSince(whatsnew::build(doc, "0.13.7"), "0.13.5");
+    CHECK(mid.versions.size() == 2 && mid.cards.size() == 4 && mid.cards[0].title == "0.13.6 card 0");
+}
+
 TEST(guide_whats_new_in_a_beta) {
     // A beta (0.11.0 Beta 1) is built as 0.11.0 (SCULPTFORGE_VERSION; the prerelease is a separate define) while its
     // section still says "date: unreleased": Help > What's New shows that section, and the stable app doesn't.

@@ -1381,6 +1381,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # Space slides a Mask / Select / Cut shape while it is dragged out (tests/ui/selection_space.sfui, #214), at the review sizes.
+    sculptforge_ui_test(whats_new_since_1440 whats_new_since --size 1440x900)
+    sculptforge_ui_test(whats_new_since_2880 whats_new_since --size 2880x1800)
+    sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
     sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.

@@ -25,7 +25,13 @@ namespace sf {
 using namespace card;
 
 struct App::WhatsNewPopup {
-    whatsnew::Version version;
+    whatsnew::Version version; // the newest version; its cards are the ones shown (all versions since SINCE when it is set)
+    std::string since;         // "0.13.5": the last version this user saw (empty: the newest version alone)
+    std::string title;
+    std::vector<std::string> cardVersions; // per card, with SINCE
+    int more = 0;                          // improvements left out of the cards
+    float scroll = 0.0f;                   // the cards' scroll (logical px) when they are more than a screen
+    bool ensureFocus = false;
     double openedAt = 0.0;
     bool closing = false;
     double closingAt = 0.0;
@@ -59,17 +65,34 @@ bool App::whatsNewOpen() const { return whatsNew_ && !whatsNew_->closing; }
 
 const whatsnew::Version* App::whatsNewVersion() const { return whatsNew_ ? &whatsNew_->version : nullptr; }
 
-void App::showWhatsNew() {
+int App::whatsNewMore() const { return whatsNew_ ? whatsNew_->more : 0; }
+
+bool App::whatsNewScrolled() const { return whatsNew_ && whatsNew_->scroll > 0.0f; }
+
+void App::showWhatsNew(const std::string& sinceVersion) {
     const guide::Document* doc = guide_.document("whats-new.md");
     // SF_WHATS_NEW_VERSION shows the window as of another version (UI tests keep checking 0.10.7's cards).
     const char* as = std::getenv("SF_WHATS_NEW_VERSION");
     const whatsnew::Page page = doc ? whatsnew::build(*doc, as && *as ? as : SCULPTFORGE_VERSION) : whatsnew::Page{};
-    if (page.versions.empty() || page.versions[0].cards.empty()) { // nothing to show as cards: the chapter
+    // After an update: every version since the last one seen (SF_WHATS_NEW_SINCE does the same for UI tests).
+    const char* sinceEnv = std::getenv("SF_WHATS_NEW_SINCE");
+    const std::string since = !sinceVersion.empty() ? sinceVersion : sinceEnv ? sinceEnv : "";
+    const whatsnew::Since gathered = whatsnew::cardsSince(page, since);
+    if (page.versions.empty() || gathered.cards.empty()) { // nothing to show as cards: the chapter
         guide_.open("whats-new.md");
         return;
     }
     whatsNew_.reset(new WhatsNewPopup);
     whatsNew_->version = page.versions[0];
+    whatsNew_->version.cards = gathered.cards;
+    whatsNew_->title = "What's new in " + page.versions[0].version;
+    if (gathered.versions.size() > 1) {
+        whatsNew_->since = since;
+        whatsNew_->title = "New since " + since + ": " + std::to_string(int(gathered.cards.size()) + gathered.more) + " new things";
+        whatsNew_->version.tagline = "Everything from " + gathered.versions.back() + " to " + gathered.versions.front() + ", newest first.";
+        whatsNew_->cardVersions = gathered.cardVersions;
+        whatsNew_->more = gathered.more;
+    }
     whatsNew_->openedAt = nowSeconds();
     whatsNew_->hover.assign(whatsNew_->version.cards.size(), 0.0f);
     redrawIn(0.0);
@@ -226,8 +249,7 @@ void App::drawWhatsNew() {
         const float ew = paint.spaced(boldUi, 11.5f, ImVec2(x, y - 1.0f * k), tc(accent, A), eyebrow.c_str(), 1.8f);
         if (!v.date.empty() && v.date != "unreleased")
             paint.text(boldUi, 11.5f, ImVec2(x + ew + 12.0f * k, y - 1.0f * k), tc(dim, A), v.date.c_str());
-        const std::string title = "What's new in " + v.version;
-        paint.text(titleFont, 30.0f, ImVec2(x, y + 15.0f * k), tc(ink, A), title.c_str());
+        paint.text(titleFont, 30.0f, ImVec2(x, y + 15.0f * k), tc(ink, A), pop.title.c_str());
         if (!v.tagline.empty())
             paint.text(bodyFont, 15.5f, ImVec2(x, y + 55.0f * k), tc(dim, A), v.tagline.c_str(), b.x - pad - x - 40.0f * k);
     }
@@ -258,6 +280,7 @@ void App::drawWhatsNew() {
                           (ImGui::IsKeyPressed(ImGuiKey_Tab) && !io.KeyShift);
         if (next) pop.focus = pop.focus < 0 ? 0 : (pop.focus + 1) % n;
         if (back) pop.focus = pop.focus < 0 ? n - 1 : (pop.focus + n - 1) % n;
+        pop.ensureFocus |= next || back;
     }
     int tried = -1;
     if (!pop.closing && pop.focus >= 0 &&
@@ -269,18 +292,50 @@ void App::drawWhatsNew() {
     const float footerH = 72.0f * k;
     const float top = a.y + 124.0f * k, bottom = b.y - footerH, innerW = size.x - pad * 2.0f, gap = 16.0f * k;
     const int rest = n - 1;
-    const float smallW = rest > 0 ? (innerW - gap * float(rest - 1)) / float(rest) : 0.0f;
+    const int cols = std::clamp(rest, 1, 4), rows = rest > 0 ? (rest + cols - 1) / cols : 0; // the small cards: up to 4 a row
+    const float smallW = rest > 0 ? (innerW - gap * float(cols - 1)) / float(cols) : 0.0f;
     const float smallPic = rest > 0 ? std::min(smallW * 0.5f, 132.0f * k) : 0.0f;
-    // The small row's height: its tallest text.
+    // The small cards' height: their tallest text.
     float smallText = 0.0f;
     for (int i = 1; i < n; ++i) {
         const auto& c = v.cards[size_t(i)];
         const float tw = smallW - 32.0f * k;
         smallText = std::max(smallText, paint.measure(headFont, 16.0f, c.title.c_str(), tw).y + 6.0f * k +
-                                            paint.measure(bodyFont, 13.5f, c.line.c_str(), tw).y);
+                                            paint.measure(pop.since.empty() ? bodyFont : boldUi, 13.5f, c.line.c_str(), tw).y);
     }
     const float smallH = rest > 0 ? smallPic + 16.0f * k + smallText + 14.0f * k + 30.0f * k + 16.0f * k : 0.0f;
-    const float heroH = std::max(120.0f * k, (bottom - top) - (rest > 0 ? smallH + gap : 0.0f));
+    // One row of small cards fits under the large one; more rows scroll (the large card keeps its own height).
+    const float heroH = rows > 1 ? 230.0f * k
+                                 : std::max(120.0f * k, (bottom - top) - (rest > 0 ? smallH + gap : 0.0f));
+    const float contentH = heroH + float(rows) * (smallH + gap);
+    const float maxScroll = std::max(0.0f, contentH - (bottom - top));
+    const bool scrolls = maxScroll > 0.0f;
+    const bool overCards = ImGui::IsMouseHoveringRect(ImVec2(a.x, top), ImVec2(b.x, bottom));
+    auto cardRect = [&](int i, float rise, ImVec2& p0, ImVec2& p1) {
+        const float y0 = top - pop.scroll * k;
+        if (i == 0) {
+            p0 = ImVec2(a.x + pad, y0 + rise);
+            p1 = ImVec2(b.x - pad, y0 + heroH + rise);
+        } else {
+            const int col = (i - 1) % cols, row = (i - 1) / cols;
+            p0 = ImVec2(a.x + pad + float(col) * (smallW + gap), y0 + heroH + gap + float(row) * (smallH + gap) + rise);
+            p1 = ImVec2(p0.x + smallW, p0.y + smallH);
+        }
+    };
+    if (scrolls && !pop.closing) {
+        if (overCards && io.MouseWheel != 0.0f) pop.scroll -= io.MouseWheel * 70.0f;
+        if (pop.ensureFocus && pop.focus >= 0) { // the keyboard's card scrolls into view
+            ImVec2 p0, p1;
+            pop.scroll = std::min(pop.scroll, maxScroll / k); // (positions below use the clamped value)
+            cardRect(pop.focus, 0.0f, p0, p1);
+            if (p1.y > bottom) pop.scroll += (p1.y - bottom + gap) / k;
+            else if (p0.y < top) pop.scroll -= (top - p0.y + gap) / k;
+        }
+        redrawIn(0.0);
+    }
+    pop.ensureFocus = false;
+    pop.scroll = scrolls ? std::clamp(pop.scroll, 0.0f, maxScroll / k) : 0.0f;
+    if (scrolls) ImGui::PushClipRect(ImVec2(a.x, top - 4.0f * k), ImVec2(b.x, bottom), true);
 
     auto tryButton = [&](const whatsnew::Card& c, int i, ImVec2 at, bool primary, float appear) {
         const bool guideLink = isGuideAction(c.action);
@@ -289,10 +344,15 @@ void App::drawWhatsNew() {
         const ImVec2 ls = paint.measure(boldUi, 14.0f, label);
         const float arrow = 14.0f * k;
         const ImVec2 c1(at.x + ls.x + arrow + 34.0f * k, at.y + 32.0f * k);
-        ImGui::SetCursorScreenPos(at);
-        ImGui::InvisibleButton(id.c_str(), ImVec2(c1.x - at.x, c1.y - at.y));
-        const bool hot = ImGui::IsItemHovered(), held = ImGui::IsItemActive();
-        if (ImGui::IsItemClicked()) tried = i;
+        // (a button scrolled out of the cards' area is only drawn: a clipped one would still take the click meant for the footer)
+        const bool usable = !scrolls || (at.y >= top && c1.y <= bottom);
+        bool hot = false, held = false;
+        if (usable) {
+            ImGui::SetCursorScreenPos(at);
+            ImGui::InvisibleButton(id.c_str(), ImVec2(c1.x - at.x, c1.y - at.y));
+            hot = ImGui::IsItemHovered(), held = ImGui::IsItemActive();
+            if (ImGui::IsItemClicked()) tried = i;
+        }
         if (primary) {
             glow(dl, at, c1, 16.0f * k, 10.0f * k, accent, (hot ? 0.8f : 0.45f) * appear, 6);
             dl->AddRectFilled(at, c1, tc(held ? accent : hot ? theme::accentHover : accent, appear), 16.0f * k);
@@ -348,13 +408,7 @@ void App::drawWhatsNew() {
         const float appear = easeOut((t - 0.05f - 0.05f * float(i)) / 0.22f) * A;
         const float rise = (1.0f - appear) * 14.0f * k - pop.hover[size_t(i)] * 3.0f * k;
         ImVec2 p0, p1;
-        if (i == 0) {
-            p0 = ImVec2(a.x + pad, top + rise);
-            p1 = ImVec2(b.x - pad, top + heroH + rise);
-        } else {
-            p0 = ImVec2(a.x + pad + float(i - 1) * (smallW + gap), top + heroH + gap + rise);
-            p1 = ImVec2(p0.x + smallW, p0.y + smallH);
-        }
+        cardRect(i, rise, p0, p1);
         const float r = 14.0f * k;
         const bool focused = pop.focus == i;
         const bool cardHot = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(p0, p1);
@@ -378,21 +432,38 @@ void App::drawWhatsNew() {
             const float textH = paint.measure(boldUi, 11.0f, "NEW").y + 12.0f * k + paint.measure(headFont, 24.0f, c.title.c_str(), w).y +
                                 10.0f * k + paint.measure(bodyFont, 16.0f, c.line.c_str(), w).y + 22.0f * k + 32.0f * k;
             float y = std::floor(p0.y + std::max(20.0f * k, (picH - textH) * 0.5f));
-            paint.spaced(boldUi, 11.0f, ImVec2(x, y), tc(accent, appear), "NEW", 1.8f);
+            const std::string tag = pop.since.empty() ? "NEW" : "NEW IN " + pop.cardVersions[size_t(i)];
+            paint.spaced(boldUi, 11.0f, ImVec2(x, y), tc(accent, appear), tag.c_str(), 1.8f);
             y += paint.measure(boldUi, 11.0f, "NEW").y + 12.0f * k;
             y += paint.text(headFont, 24.0f, ImVec2(x, y), tc(ink, appear), c.title.c_str(), w).y + 10.0f * k;
-            y += paint.text(bodyFont, 16.0f, ImVec2(x, y), tc(body, appear), c.line.c_str(), w).y + 22.0f * k;
+            y += paint.text(pop.since.empty() ? bodyFont : boldUi, 16.0f, ImVec2(x, y), tc(pop.since.empty() ? body : ink, appear),
+                            c.line.c_str(), w).y + 22.0f * k;
             tryButton(c, i, ImVec2(x, y), true, appear);
         } else { // picture on top
             picture(c, p0, ImVec2(p1.x, p0.y + smallPic), ImDrawFlags_RoundCornersTop, appear);
             const float x = p0.x + 16.0f * k, w = smallW - 32.0f * k;
             float y = p0.y + smallPic + 16.0f * k;
             y += paint.text(headFont, 16.0f, ImVec2(x, y), tc(ink, appear), c.title.c_str(), w).y + 6.0f * k;
-            paint.text(bodyFont, 13.5f, ImVec2(x, y), tc(dim, appear), c.line.c_str(), w);
-            tryButton(c, i, ImVec2(x, p1.y - 16.0f * k - 30.0f * k), false, appear);
+            paint.text(pop.since.empty() ? bodyFont : boldUi, 13.5f, ImVec2(x, y), tc(pop.since.empty() ? dim : body, appear),
+                       c.line.c_str(), w);
+            tryButton(c, i, ImVec2(x, p1.y - 16.0f * k - 30.0f * k), !pop.since.empty(), appear);
+            if (!pop.since.empty()) { // which version it came with
+                const std::string& ver = pop.cardVersions[size_t(i)];
+                const ImVec2 ts = paint.measure(boldUi, 11.0f, ver.c_str());
+                const ImVec2 q0(p0.x + 10.0f * k, p0.y + 10.0f * k), q1(q0.x + ts.x + 16.0f * k, q0.y + ts.y + 8.0f * k);
+                dl->AddRectFilled(q0, q1, col(0x060608, 0.72f * appear), 10.0f * k);
+                paint.text(boldUi, 11.0f, ImVec2(q0.x + 8.0f * k, q0.y + 4.0f * k), tc(accent, appear), ver.c_str());
+            }
         }
         dl->AddRect(p0, p1, focused ? tc(accent, appear) : tc(cardHot ? accent : line, (cardHot ? 0.45f : 0.10f) * appear), r, 0,
                     (focused ? 2.0f : 1.0f) * k);
+    }
+
+    if (scrolls) { // a thin bar on the right shows there is more below
+        ImGui::PopClipRect();
+        const float trackH = bottom - top, barH = std::max(30.0f * k, trackH * trackH / contentH);
+        const float y = top + (trackH - barH) * (pop.scroll * k / maxScroll);
+        dl->AddRectFilled(ImVec2(b.x - 16.0f * k, y), ImVec2(b.x - 12.0f * k, y + barH), tc(line, 0.28f * A), 2.0f * k);
     }
 
     // Footer: the full release notes and the Discord on the left, Close on the right.
@@ -423,6 +494,11 @@ void App::drawWhatsNew() {
         x += w0 + 4.0f * k;
         const auto [w1, d1] = pill("Join the Discord", "Join the Discord##whats_new", x, false);
         discord = d1;
+        if (pop.more > 0) { // the rest of the improvements since SINCE: the chapter
+            const std::string label = "and " + std::to_string(pop.more) + " more improvement" + (pop.more == 1 ? "" : "s");
+            const std::string id = label + "##whats_new.more";
+            notes |= pill(label.c_str(), id.c_str(), x + w1 + 4.0f * k, false).second;
+        }
         const ImVec2 cs = paint.measure(boldUi, 14.0f, "Close");
         close |= pill("Close", "Close##whats_new", b.x - pad - cs.x - 36.0f * k, true).second;
     }
