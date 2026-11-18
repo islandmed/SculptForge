@@ -257,6 +257,8 @@
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
+//   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
+//   python_startup append TEXT  the same, adding the line TEXT to each script between its check and its run
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
@@ -1872,7 +1874,7 @@ enum class StepVerb { None,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
-    GeneratorStub, Env, Run, RunFails, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
+    GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
@@ -1948,7 +1950,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"generator_stub", StepVerb::GeneratorStub},
         {"env", StepVerb::Env},
         {"run", StepVerb::Run},
-        {"run_fails", StepVerb::RunFails},
+        {"run_fails", StepVerb::RunFails}, {"python_startup", StepVerb::PythonStartup},
         {"first_run_language", StepVerb::FirstRunLanguage},
         {"support_card", StepVerb::SupportCard},
         {"member_card", StepVerb::MemberCard},
@@ -3572,6 +3574,20 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 if (app_.commandRunning()) return false;
             }
             return true;
+        });
+        break;
+    }
+    case StepVerb::PythonStartup: { // python_startup [append TEXT]: TEXT is added to each script after its check
+        const std::string append = w.size() > 2 && w[1] == "append" ? restOf(lineText_, 2) + "\n" : std::string();
+        run([this, append] {
+            PythonScripting& py = app_.python();
+            if (!append.empty())
+                py.afterStartupCheck = [append](const std::string& path) {
+                    const std::filesystem::path p(std::u8string(path.begin(), path.end()));
+                    std::ofstream(p, std::ios::binary | std::ios::app) << append;
+                };
+            py.runStartupScripts(true);
+            py.afterStartupCheck = nullptr;
         });
         break;
     }

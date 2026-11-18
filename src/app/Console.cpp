@@ -289,6 +289,10 @@ void Console::runStatements(App& app, std::vector<ScriptStatement> statements, s
 }
 
 void Console::update(App& app) {
+    if (!startupChecked_) { // Run at start-up scripts (app/Python.h), once the first frame is up; none: nothing loads
+        startupChecked_ = true;
+        app.python().runStartupScripts();
+    }
     if (app.python_ && app.python_->loaded()) app.python_->drainOutput(); // what a script's threads printed
     if (!resume_ || app.commandRunning()) return;
     Resume r = std::move(*resume_);

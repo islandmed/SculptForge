@@ -155,6 +155,9 @@ struct AppOptions {
 
 class Demo;
 class PythonScripting; // app/Python.h
+namespace python {
+struct UiPanel; // python/PyHost.h
+}
 struct LengthUnit; // core/Units.h
 struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
@@ -745,6 +748,7 @@ private:
     PythonScripting& python();     // made on first use (no file read, nothing loaded until a script runs)
     void drawPythonPrefs();        // Preferences > Scripts
     void drawPythonScripts();      // the Script palette's list of the Scripts folder
+    void drawPythonPanel(python::UiPanel& panel); // a script's panel (sf.ui.panel), a section of the Script palette
     void runPythonFile(const std::string& path);
     std::unique_ptr<PythonScripting> python_;
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now

@@ -58,6 +58,7 @@ struct Fixture {
     std::string out, err; // what Python printed, by stream
     int appRuns = 0;      // commands that went through the app's side
     std::string loadError;
+    std::vector<std::string> placed; // sf.ui.place calls
 
     Fixture() {
         SDL_SharedObject* lib = SDL_LoadObject(SF_PYHOST_PATH);
@@ -90,6 +91,10 @@ struct Fixture {
         };
         side.selectPart = [](Document& d, int i) { d.selectPart(i); };
         side.write = [this](bool error, const std::string& text) { (error ? err : out) += text; };
+        side.place = [this](const std::string& id, bool panel, python::Place where) {
+            placed.push_back((panel ? "panel:" : "action:") + id + "@" + std::to_string(int(where)));
+            return !(panel && where != python::Place::MyPanel);
+        };
         char error[512] = "";
         host = create(python::kHostAbi, &side, error, int(sizeof error));
         if (!host) loadError = error;
@@ -209,6 +214,28 @@ TEST(python_host_runs_script_files) {
     std::filesystem::remove_all(dir);
 }
 
+// Run at start-up runs the bytes it hashed, not the file as it is by then (app/Python.cpp runStartupScripts).
+TEST(python_host_runs_the_source_it_was_given) {
+    Fixture& f = py();
+    if (!f.host) return;
+    const auto dir = std::filesystem::temp_directory_path() / "sf_pyhost_source";
+    std::filesystem::create_directories(dir);
+    const std::string path = (dir / "start.py").string();
+    std::ofstream(path) << "raise SystemExit('the file on disk ran')\n";
+    f.clear();
+    CHECK(f.host->runSource("# -*- coding: utf-8 -*-\nprint('given', __name__, __file__ == " + std::string("r'") + path +
+                                "')\nimport sys; print('argv', sys.argv[0] == __file__)\n",
+                            path) == S::Ok);
+    CHECK(contains(f.out, "given __main__ True") && contains(f.out, "argv True"));
+    CHECK(!contains(f.err, "the file on disk ran"));
+    f.clear();
+    CHECK(f.host->runSource("x = 1\nraise ValueError('from the bytes')\n", path) == S::Error);
+    CHECK(contains(f.err, "line 2") && contains(f.err, "ValueError: from the bytes"));
+    CHECK(f.host->runSource("print('after')\n", path) == S::Ok); // __main__ and argv put back
+    CHECK(contains(f.out, "after"));
+    std::filesystem::remove_all(dir);
+}
+
 TEST(python_host_edits_are_undoable) {
     Fixture& f = py();
     if (!f.host) return;
@@ -269,6 +296,122 @@ TEST(python_host_completes_names) {
     bool run = false, script = false;
     for (const auto& n : names) run |= n.rfind("sf.run", 0) == 0 && n.find("script") == std::string::npos, script |= n.rfind("sf.run_script", 0) == 0;
     CHECK(run && script);
+}
+
+// sf.ui (P2): what a script declares reaches the app as plain data; actions and controls call back into Python.
+TEST(python_host_script_interface) {
+    Fixture& f = py();
+    if (!f.host) return;
+    f.registry.execute(f.doc, "new_sphere", {{"subdivisions", 1.0}});
+    const uint64_t rev = f.host->uiRevision();
+    f.clear();
+    CHECK(f.line("sf.ui.action('test.grow', 'Grow', lambda: sf.run('subdivide'), icon='sparkles', help='One level')") == S::Ok);
+    CHECK(f.line("p = sf.ui.panel('test', 'Test tools'); p.label('Hello'); p.separator(); p.button('test.grow')") == S::Ok);
+    CHECK(f.line("p.slider('res', 'Resolution', 64, 16, 256, integer=True); p.checkbox('flag', 'Flag', on_change=lambda v: print('flag', v))") == S::Ok);
+    CHECK(f.host->uiRevision() != rev);
+    python::UiState ui = f.host->ui();
+    CHECK(ui.actions.size() == 1 && ui.actions[0].id == "test.grow" && ui.actions[0].icon == "sparkles" && ui.actions[0].help == "One level");
+    CHECK(ui.panels.size() == 1 && ui.panels[0].title == "Test tools" && ui.panels[0].controls.size() == 5);
+    if (ui.panels.size() == 1 && ui.panels[0].controls.size() == 5) {
+        const auto& c = ui.panels[0].controls;
+        CHECK(c[0].kind == python::UiControl::Kind::Label && c[0].label == "Hello");
+        CHECK(c[2].kind == python::UiControl::Kind::Button && c[2].action == "test.grow" && c[2].label == "Grow");
+        CHECK(c[3].kind == python::UiControl::Kind::Slider && c[3].integer && c[3].value == 64 && c[3].max == 256);
+        CHECK(c[4].kind == python::UiControl::Kind::Checkbox && c[4].value == 0.0);
+    }
+    // The action runs its callback; a control's change is stored, then on_change hears it.
+    const size_t tris = f.doc.mesh.triangleCount();
+    CHECK(f.host->runAction("test.grow") == S::Ok && f.doc.mesh.triangleCount() == tris * 4);
+    CHECK(f.host->runAction("nope") == S::Error);
+    CHECK(f.host->setValue("test", "flag", 1.0) == S::Ok && contains(f.out, "flag True"));
+    CHECK(f.host->setValue("test", "res", 99.6) == S::Ok);
+    f.clear();
+    CHECK(f.line("print(sf.ui.value('test.res'), p['flag'])") == S::Ok && contains(f.out, "100 True"));
+    // Declaring the panel again (running the script again) keeps what the user set.
+    CHECK(f.line("p = sf.ui.panel('test', 'Test tools'); p.slider('res', 'Resolution', 64, 16, 256, integer=True)") == S::Ok);
+    ui = f.host->ui();
+    CHECK(ui.panels.size() == 1 && ui.panels[0].controls.size() == 1 && ui.panels[0].controls[0].value == 100);
+    // A callback that fails says why and leaves the app running.
+    CHECK(f.line("sf.ui.action('test.bad', 'Bad', lambda: 1/0)") == S::Ok);
+    f.clear();
+    CHECK(f.host->runAction("test.bad") == S::Error && contains(f.err, "ZeroDivisionError"));
+    // Ids, icons and callbacks are checked when declared.
+    CHECK(f.line("sf.ui.action('Bad Id', 'x', print)") == S::Error);
+    CHECK(f.line("sf.ui.action('ok.id', 'x', print, icon='nope')") == S::Error);
+    CHECK(f.line("sf.ui.action('ok.id', 'x', 'not callable')") == S::Error);
+    CHECK(f.line("p.slider('res', 'Again', 1, 0, 2)") == S::Error); // one control per id
+    // place: actions on shelves or in My Panel, panels only in My Panel.
+    f.placed.clear();
+    CHECK(f.line("sf.ui.place('test.grow', 'top'); sf.ui.place('test', 'my_panel')") == S::Ok);
+    CHECK(f.line("sf.ui.place('test', 'left')") == S::Error);
+    CHECK(f.placed.size() == 3 && f.placed[0] == "action:test.grow@0" && f.placed[1] == "panel:test@4");
+    CHECK(f.line("sf.ui.clear()") == S::Ok && f.host->ui().actions.empty());
+}
+
+// sf.ui.timer (P3): the app's loop asks when the next is due and runs the due ones on its own thread.
+TEST(python_host_timers) {
+    Fixture& f = py();
+    if (!f.host) return;
+    double in = 0.0;
+    CHECK(f.line("sf.ui.clear()") == S::Ok);
+    CHECK(!f.host->timerDue(in)); // none: the app's loop never wakes for Python
+    CHECK(f.line("ticks = []; t = sf.ui.timer(lambda: ticks.append(1), 10)") == S::Ok);
+    CHECK(f.host->timerDue(in) && in > 0.0 && in <= 0.011);
+    CHECK(f.host->runTimers() == S::Ok); // not due yet: nothing runs
+    f.clear();
+    CHECK(f.line("print(len(ticks))") == S::Ok && contains(f.out, "0"));
+    SDL_Delay(15);
+    CHECK(f.host->timerDue(in) && in <= 0.0);
+    CHECK(f.host->runTimers() == S::Ok);
+    f.clear();
+    CHECK(f.line("print(len(ticks))") == S::Ok && contains(f.out, "1"));
+    CHECK(f.line("sf.ui.cancel_timer(t)") == S::Ok && !f.host->timerDue(in));
+    // A failing callback is stopped, with a message.
+    CHECK(f.line("bad = sf.ui.timer(lambda: 1/0, 10)") == S::Ok);
+    SDL_Delay(15);
+    f.clear();
+    CHECK(f.host->runTimers() == S::Error && contains(f.err, "ZeroDivisionError") && contains(f.err, "stopped"));
+    CHECK(!f.host->timerDue(in));
+}
+
+// A new App in the same process (the warm UI test server makes one per script): the running Python serves it,
+// pointed at its scene, with a fresh console and sf.ui (CPython can't start twice in one process).
+TEST(python_host_serves_a_new_app) {
+    Fixture& f = py();
+    if (!f.host) return;
+    CHECK(f.line("sf.ui.action('old.one', 'Old', print); leftover = 1") == S::Ok);
+    SDL_SharedObject* lib = SDL_LoadObject(SF_PYHOST_PATH);
+    auto create = lib ? reinterpret_cast<SfPyHostCreate>(SDL_LoadFunction(lib, "sf_pyhost_create")) : nullptr;
+    CHECK(create != nullptr);
+    if (!create) return;
+    Document doc2;
+    CommandRegistry registry;
+    int runs = 0;
+    std::string out;
+    python::AppSide side;
+    side.build = SF_PYHOST_BUILD;
+    side.core = &python::directCoreCalls();
+    side.documentSize = sizeof(Document);
+    side.meshSize = sizeof(Mesh);
+    side.home = runtimeHome();
+    side.document = &doc2;
+    side.registry = &registry;
+    side.run = [&](const std::string& name, const Args& args) {
+        ++runs;
+        return registry.execute(doc2, name, args);
+    };
+    side.write = [&](bool, const std::string& text) { out += text; };
+    char error[512] = "";
+    python::Host* host2 = create(python::kHostAbi, &side, error, int(sizeof error));
+    CHECK(host2 != nullptr);
+    if (!host2) {
+        std::fprintf(stderr, "second host: %s\n", error);
+        return;
+    }
+    CHECK(host2->runLine("sf.run('new_sphere', subdivisions=1)") == S::Ok && runs == 1 && doc2.mesh.triangleCount() == 80);
+    CHECK(host2->runLine("print('leftover' in globals(), len(sf.ui._actions), doc is sf.document())") == S::Ok);
+    CHECK(out.find("False 0 True") != std::string::npos);
+    // (the fixture's own host belongs to the App before it; nothing calls it after this test)
 }
 
 #endif

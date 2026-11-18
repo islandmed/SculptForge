@@ -1,0 +1,72 @@
+# Run at start-up (app/Python.h), the one way a script runs without a click: only a ticked script in the Scripts
+# folder, and only while it is the file that was ticked. A changed script doesn't run; the status bar says why and
+# Preferences > Scripts trusts the new version with one click.
+run ui_look look=classic layout=classic        # the classic palette bar (Preferences##palette.preferences)
+run new_sphere subdivisions=2
+expect_value triangles == 320
+click "Preferences##palette.preferences"
+click "Scripts##preferences.scripts"
+click "Enable Python scripts##prefs.python"
+expect_value python_enabled == 1
+
+# A script in the Scripts folder, written from the console.
+key `
+click "Console/Python##console_mode1"
+type Console/##console "import os; folder = sf.scripts_folder(); os.makedirs(folder, exist_ok=True); grow = os.path.join(folder, 'grow.py')"
+key enter
+type Console/##console "print('folder:', folder is not None)"
+key enter
+expect_text "folder: True"
+type Console/##console "open(grow, 'w').write('import sculptforge as sf' + chr(10) + 'sf.run(' + repr('subdivide') + ')' + chr(10))"
+key enter
+key `
+# (the console click closed the Preferences drop-down; Scripts stays the open section)
+click "Preferences##palette.preferences"
+wait_real 2.5
+expect_text "Run at start-up"
+click "grow.py"
+shot python_startup_ticked
+
+# As at a launch: the ticked script runs.
+python_startup
+expect_value triangles == 1280
+
+# Changed since it was ticked: it doesn't run, and says so.
+key `
+type Console/##console "open(grow, 'a').write('sf.run(' + repr('subdivide') + ')' + chr(10))"
+key enter
+key `
+python_startup
+expect_value triangles == 1280
+expect_status "changed since you chose to run it at start-up"
+click "Preferences##palette.preferences"
+expect_text "changed, didn't run"
+shot python_startup_changed
+
+# One click trusts the new version (it doesn't run it now); the next start runs it.
+click "Trust this version"
+expect_value triangles == 1280
+python_startup
+expect_value triangles == 20480
+
+# A studio policy that says never: a ticked, trusted, unchanged script doesn't run at start-up either.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"python\":{\"scripts\":\"never\"}}"
+python_startup
+expect_value triangles == 20480
+run ui_policy json=""
+
+# Unticked: nothing runs.
+click "grow.py"
+python_startup
+expect_value triangles == 20480
+
+# What was checked is what runs: a script changed between its check and its run (here, a line added in between)
+# runs as it was checked (one subdivide fewer: 80 triangles, not 320).
+key `
+type Console/##console "open(grow, 'w').write('import sculptforge as sf' + chr(10) + 'sf.run(' + repr('new_sphere') + ', subdivisions=1)' + chr(10))"
+key enter
+key `
+click "Preferences##palette.preferences"
+click "grow.py"
+python_startup append sf.run('subdivide')
+expect_value triangles == 80

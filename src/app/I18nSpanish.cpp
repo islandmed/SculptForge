@@ -5899,8 +5899,8 @@ constexpr Entry kSpanish[] = {
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+arrastra un círculo desde su centro para conservar el interior y ocultar el resto; añade Alt para ocultar el interior. Suelta Shift mientras arrastras para mantenerlo redondo."},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+arrastra un círculo desde su centro y enmascara todo su interior; Ctrl+Alt+arrastra desenmascara. Shift mientras arrastras lo mantiene redondo; arrastra desde una esquina con la opción de Tool > Masking. El lado lejano queda incluido."},
     // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
-    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
-     "Un script de Python puede hacer cualquier cosa que pueda hacer un programa en este equipo. Ejecuta solo scripts en los que confíes. Los scripts se ejecutan solo cuando tú los ejecutas: nada de lo que abras puede iniciar uno."},
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one.",
+     "Un script de Python puede hacer cualquier cosa que pueda hacer un programa en este equipo. Ejecuta solo scripts en los que confíes. Los scripts se ejecutan solo cuando tú los ejecutas, o al iniciar si marcas uno abajo; nada de lo que abras puede iniciar uno."},
     {"Commands",
      "Comandos"},
     {"Enable Python scripts",
@@ -5919,6 +5919,16 @@ constexpr Entry kSpanish[] = {
      "Scripts"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "Los archivos .py de esta carpeta se listan en Archivo > Script. Los paquetes que instales en su carpeta site-packages se pueden importar."},
+    {"Run at start-up",
+     "Ejecutar al iniciar"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "Los scripts marcados se ejecutan cada vez que se inicia SculptForge (con Python activado), para que estén los botones y paneles que añaden. Un script que ha cambiado no se ejecuta hasta que vuelvas a marcarlo."},
+    {"Trust this version",
+     "Confiar en esta versión"},
+    {"changed, didn't run",
+     "cambió, no se ejecutó"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "El script cambió desde que elegiste ejecutarlo al iniciar, así que no se ejecutó. Revisa qué cambió; si confías en él, esto lo ejecuta al iniciar a partir de ahora (no lo ejecuta ahora)."},
 };
 
 } // namespace
