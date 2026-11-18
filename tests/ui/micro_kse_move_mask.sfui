@@ -1,0 +1,68 @@
+# A tester's report (Keep Strokes Editable on, an 80K base with a micro level): Move moved the surface and it snapped back
+# when the pen lifted (a mask was on the mesh); Tool > Masking > Adjust (Invert, Blur) did nothing on the micro level.
+# Move must keep what the drag left, with and without a mask near it, through an orbit; Adjust must change the micro
+# level's own mask (the one its brushes and the viewport use). tests/test_kse_move_mask.cpp holds the geometry.
+# (A 20K base at Micro 4: the same 5M micro triangles inside the UI budget.)
+run ui_look look=classic layout=classic
+action perf.keep_strokes_editable
+run new_sphere subdivisions=5
+run micro_divide level=4
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+
+# A stroke first (brushes work), then Move without a mask: the base cage moves and stays.
+brush_size 60
+stroke 0.40 0.45 0.60 0.45 0.5
+wait_idle 30
+click "Move##brush.move"
+brush_size 120
+snapshot
+stroke 0.50 0.50 0.58 0.42 0.6
+wait_idle 30
+remember moved_sum cage
+expect_value moved_sum > 0
+orbit 40 0
+wait_idle 30
+orbit -40 0
+wait_idle 30
+expect_value moved_sum == $cage
+
+# A mask beside the brush (the micro level's own): Move takes the grid's rule and stays too.
+brush_size 40
+hold ctrl
+stroke 0.66 0.62 0.67 0.63 0.4
+hold none
+wait_idle 30
+expect_value micro_masked > 0
+click "Move##brush.move"
+brush_size 120
+snapshot
+stroke 0.52 0.58 0.58 0.50 0.6
+wait_idle 30
+remember micro_moved grid
+expect_value micro_moved > 0
+orbit 40 0
+wait_idle 30
+orbit -40 0
+wait_idle 30
+expect_value micro_moved == $grid
+shot after-move
+
+# Adjust on the micro level's mask: Invert swaps masked and free, Blur softens the edge; undo steps back.
+remember micro_masked painted
+remember micro_mask_soft soft
+run mask_invert
+wait_idle 30
+expect_value micro_masked > $painted
+key ctrl+z
+wait_idle 30
+expect_value micro_masked == $painted
+run mask_blur iterations=2
+wait_idle 30
+expect_value micro_mask_soft > $soft
+shot after-blur
+key ctrl+z
+wait_idle 30
+expect_value micro_mask_soft == $soft

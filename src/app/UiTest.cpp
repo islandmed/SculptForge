@@ -142,6 +142,8 @@
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft
+//                            (micro grid points masked at least half / partly),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
 //                            and selection_w / selection_h (from there to the cursor), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
@@ -413,6 +415,7 @@
 #include "core/BrushLibrary.h"
 #include "core/CloseHoles.h"
 #include "core/ListSort.h"
+#include "core/Micro.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
@@ -1428,6 +1431,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "masked") {
         size_t n = 0;
         for (float v : m.mask) n += v > 0.5f;
+        return double(n);
+    }
+    if (name == "micro_moved") { // micro grid points whose height changed since `snapshot` (-1: no micro level or snapshot)
+        if (!m.micro || baseMicro_.size() != m.micro->disp.size()) return -1.0;
+        size_t n = 0;
+        const int16_t* d = m.micro->disp.data();
+        for (size_t i = 0; i < baseMicro_.size(); ++i) n += d[i] != baseMicro_[i];
+        return double(n);
+    }
+    if (name == "micro_masked" || name == "micro_mask_soft") { // micro grid points masked (>= half) / partly masked
+        if (!m.micro) return -1.0;
+        size_t n = 0;
+        for (uint8_t v : m.micro->mask) n += name == "micro_masked" ? v >= 128 : v > 2 && v < 253;
         return double(n);
     }
     if (name == "mask_soft") { // vertices partly masked (a blurred edge)
@@ -3975,6 +3991,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
         break;
     }
