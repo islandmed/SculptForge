@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.8
 
 ```features
-date: unreleased
+date: 2026-11-18
 tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
 highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
 highlight: Python scripts can add their own buttons and panels
@@ -22,6 +22,27 @@ title: Buttons and panels from Python
 line: A Python script can add its own panels of buttons, sliders and check boxes under File > Script, and actions to the command palette, shelves and My Panel.
 action: guide:python.md
 ```
+
+- Scripts and tools that use SculptForge's Python API or command line can be under any licence (new scripting
+  exception).
+- **Python package**: download the wheel for your platform from the release page and `pip install` it: the sculpting
+  engine in your own Python, for procedural assets, batch exports and pipeline tests (PyPI coming).
+- **Scripts can add buttons and panels**: a Python script can add actions (command palette, shelves, My Panel, keys)
+  and panels of labels, buttons, sliders and check boxes under **File > Script**. Scripts ticked under **Edit >
+  Preferences > Scripts > Run at start-up** bring theirs back at every start; a script that changed since you trusted
+  it does not run until you trust it again.
+- **Splats with view-dependent colour**: captures with spherical harmonics (SH 1-3) now show the sheen and highlights
+  that change as you orbit, as splat viewers do, and keep them when you turn and save them.
+- **What's New since your last version**: after an update the window shows the features of every version you skipped,
+  newest first (the first eight, then "and N more improvements"), each with its Try it button.
+- **Size and Intensity follow the pen**: press S (or U) with a pen in range and move it above the tablet; the size
+  follows live, a tap keeps it. Pressing straight down on the slider's knob still drags it.
+- **The guide stands out**: the User Guide window has its own colour now, with an edge, a strip and a lighter page, so
+  it no longer blends into the app.
+- **Smooth on a Micro level**: a big Smooth no longer leaves a diamond lattice of fine creases (after a big Flatten,
+  for example).
+- **Files with non-English names** open on Windows again: a model with a Japanese name, a folder in Cyrillic or
+  Korean, an emoji in the name no longer closes SculptForge.
 
 ## Version 0.13.7
 
