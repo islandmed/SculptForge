@@ -17,6 +17,7 @@
 #include "core/FigurePose.h"
 #include "core/Multires.h"
 #include "render/GL.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <cctype>
@@ -1086,8 +1087,8 @@ void App::drawInsertSetPicker() {
     bool open = true;
     const std::string title = std::string(tr("Insert set")) + "###insertset";
     if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing)) {
-        const auto set = std::filesystem::path(std::u8string(insertSet_.path.begin(), insertSet_.path.end())).lexically_normal();
-        std::string name = (set.has_filename() ? set.filename() : set.parent_path().filename()).string();
+        const auto set = pathFromUtf8(insertSet_.path).lexically_normal();
+        std::string name = pathToUtf8(set.has_filename() ? set.filename() : set.parent_path().filename());
         const BuiltinInsertSet* builtin = nullptr;
         for (const BuiltinInsertSet& b : builtinInsertSets())
             if (insertSet_.path == std::string(kBuiltinInsertSetPrefix) + b.id) builtin = &b;

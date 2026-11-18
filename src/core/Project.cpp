@@ -18,6 +18,7 @@
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "io/Zip.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <atomic>
@@ -914,7 +915,7 @@ constexpr size_t kMaxProjectParts = 100000;
 } // namespace
 
 bool isProjectPath(const std::string& path) {
-    std::string ext = fsPath(path).extension().string();
+    std::string ext = pathToUtf8(fsPath(path).extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext == kProjectExtension;
 }
@@ -1474,7 +1475,7 @@ bool loadProjectThumbnail(const std::string& path, Image& out, std::string& erro
 CommandResult openProjectCommand(Document& doc, const std::string& path) {
     std::string err;
     if (!loadProject(path, doc, err)) return {false, err};
-    std::string msg = "Opened project " + std::filesystem::path(path).filename().string() + " (";
+    std::string msg = "Opened project " + fileNameUtf8(path) + " (";
     // The Sculpt Timeline saved beside it, if it matches (only into the app's own scene: not thumbnails, scratch opens).
     const int histories = &doc == Timeline::historyDocument ? loadHistorySidecar(doc, path) : 0;
     if (doc.partCount() > 1) msg += std::to_string(doc.partCount()) + " Parts, ";

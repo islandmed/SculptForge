@@ -65,8 +65,10 @@
 #include "io/PlyIO.h"
 #include "io/StlIO.h"
 #include "io/UsdIO.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
+#include <exception>
 #include <cctype>
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
@@ -102,7 +104,7 @@ namespace {
 constexpr size_t kMaxSubdivideTriangles = 50'000'000;
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = extensionUtf8(path);
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext;
 }
@@ -248,7 +250,7 @@ CommandRegistry::CommandRegistry() {
              }
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
-             std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
+             std::string msg = "Opened " + fileNameUtf8(path);  // file name only: status shows in screen recordings
              const bool hasMesh = !objects.empty();
              if (hasMesh) {
                  size_t tris = 0, quads = 0, layers = 0;
@@ -1010,9 +1012,20 @@ CommandResult CommandRegistry::execute(Document& doc, const std::string& name, c
     // exporting never writes it.
     if (doc.extractPreview.id && name.rfind("extract", 0) != 0)
         doc.dropExtractPreview(!(name.rfind("save", 0) == 0 || name.rfind("export", 0) == 0));
-    CommandResult r = cmd->run(doc, args);
+    // A command that throws (a file name the system can't convert, a full disk, no memory) fails with the reason,
+    // never closes the app without a word (gh#223).
+    auto run = [&](const Args& a) -> CommandResult {
+        try {
+            return cmd->run(doc, a);
+        } catch (const std::exception& e) {
+            return {false, name + " failed: " + e.what()};
+        } catch (...) {
+            return {false, name + " failed"};
+        }
+    };
+    CommandResult r = run(args);
     if (!r.ok && anyOldValue(args)) // a name value an older version used: try today's; keep the first answer if it fails too
-        if (CommandResult again = cmd->run(doc, modernizedArgs(args, true)); again.ok) r = std::move(again);
+        if (CommandResult again = run(modernizedArgs(args, true)); again.ok) r = std::move(again);
     if (const std::string notice = doc.takeNotice(); !notice.empty() && r.ok) r.message += ". " + notice;
     return r;
 }

@@ -6,6 +6,7 @@
 #include "core/Document.h"
 #include "core/IndexBits.h"
 #include "core/ThreadPool.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <chrono>
@@ -969,7 +970,7 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     const std::string path = historySidecarPath(projectPath);
     std::error_code ec;
     if (saved == 0) {
-        std::filesystem::remove(path, ec); // a history from before would no longer match
+        std::filesystem::remove(pathFromUtf8(path), ec); // a history from before would no longer match
         return true;
     }
     w.pod(kVersion);
@@ -977,14 +978,14 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     file.insert(file.end(), body.begin(), body.end());
     const std::string tmp = path + ".tmp";
     {
-        std::ofstream f(std::filesystem::path(tmp), std::ios::binary | std::ios::trunc);
+        std::ofstream f(pathFromUtf8(tmp), std::ios::binary | std::ios::trunc);
         f.write(reinterpret_cast<const char*>(file.data()), std::streamsize(file.size()));
         if (!f) {
             if (error) *error = "Couldn't write " + tmp;
             return false;
         }
     }
-    std::filesystem::rename(tmp, path, ec);
+    std::filesystem::rename(pathFromUtf8(tmp), pathFromUtf8(path), ec);
     if (ec) {
         if (error) *error = "Couldn't write " + path + ": " + ec.message();
         return false;
@@ -994,7 +995,7 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
 
 int loadHistorySidecar(Document& doc, const std::string& projectPath, std::string* error) {
     const std::string path = historySidecarPath(projectPath);
-    std::ifstream f(std::filesystem::path(path), std::ios::binary);
+    std::ifstream f(pathFromUtf8(path), std::ios::binary);
     if (!f) return 0;
     std::vector<uint8_t> file((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     if (file.size() < 16 || std::memcmp(file.data(), kSidecarMagic, 8) != 0) {

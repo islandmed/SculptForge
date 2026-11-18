@@ -46,7 +46,8 @@ bool readFile(const fs::path& path, std::string& out, size_t limit) {
 bool writeFile(const fs::path& path, const std::string& data) {
     std::error_code ec;
     fs::create_directories(path.parent_path(), ec);
-    const fs::path tmp = path.string() + ".part";
+    fs::path tmp = path;
+    tmp += ".part";
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
         if (!f || !(f << data)) return false;

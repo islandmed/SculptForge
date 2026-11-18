@@ -17,6 +17,7 @@
 #include "io/GltfIO.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
+#include "core/Utf8Path.h"
 
 #include <stb_image.h>
 
@@ -421,7 +422,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
 // Reads the mesh in a model file for insert_mesh (#34): OBJ, PLY or GLB / glTF through the importers, every
 // object in it as one mesh. Nothing but the file itself is read.
 bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     bool ok = false;
     if (ext == ".obj") ok = loadObj(path, out, error);
@@ -443,7 +444,7 @@ bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
 }
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     return ext;
 }

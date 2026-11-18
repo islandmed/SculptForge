@@ -812,7 +812,7 @@ void App::requestQuit() {
 
 void App::openPathConfirmed(const std::string& path) {
     // Images go to the Image to 3D panel and brushes into the library: no scene change.
-    std::string ext = fsPath(path).extension().string();
+    std::string ext = utf8(fsPath(path).extension());
     for (auto& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
     if (capture::isVideoFile(path)) { // a phone video of an object: train a splat from it (PanelSplatTrain.cpp)
         runCommand("splat_train", {{"source", path}});

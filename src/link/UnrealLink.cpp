@@ -6,6 +6,7 @@
 #include "core/MapExport.h"
 #include "core/Texture.h"
 #include "link/Socket.h"
+#include "core/Utf8Path.h"
 
 #include <atomic>
 #include <cctype>
@@ -206,7 +207,7 @@ std::string unrealImportScript(const UnrealImport& im) {
     std::string fileExpr = pyString(im.fbxPath);
     if (!im.downloadUrl.empty()) {
         // The editor is on another computer: fetch the file from SculptForge into its temp folder.
-        const std::string name = std::filesystem::path(std::u8string(im.fbxPath.begin(), im.fbxPath.end())).filename().string();
+        const std::string name = fileNameUtf8(im.fbxPath);
         py += "import os, tempfile, urllib.request\n";
         py += "folder = os.path.join(tempfile.gettempdir(), 'sculptforge')\n";
         py += "os.makedirs(folder, exist_ok=True)\n";
@@ -410,7 +411,7 @@ bool sendToUnreal(const UnrealEndpoint& endpoint, const UnrealImport& import, st
         }
         const std::string token = newNodeId();
         send.downloadUrl = "http://" + ip + ":" + std::to_string(port) + "/" + token + "/" +
-                           std::filesystem::path(std::u8string(send.fbxPath.begin(), send.fbxPath.end())).filename().string();
+                           fileNameUtf8(send.fbxPath);
         server = std::thread([&http, &done, token, data = std::move(data)] { serveFileOnce(http, token, data, done); });
     }
     std::string output;

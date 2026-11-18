@@ -14,6 +14,7 @@
 
 #include "core/Json.h"
 #include "core/Timeline.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 
@@ -242,7 +243,7 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
                             std::to_string(job->height) + " -r " + std::to_string(job->fps) +
                             " -i - -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart " + quoted;
 #if defined(_WIN32)
-    job->ffmpeg = _popen(cmd.c_str(), "wb");
+    job->ffmpeg = _wpopen(pathFromUtf8(cmd).wstring().c_str(), L"wb"); // (wide: a file name outside the code page reaches ffmpeg whole)
 #else
     job->ffmpeg = popen(cmd.c_str(), "w");
 #endif

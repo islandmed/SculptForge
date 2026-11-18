@@ -11,6 +11,7 @@
 #include "cli/McpAttach.h"
 #include "cli/McpServer.h"
 #include "core/Benchmark.h"
+#include "core/Utf8Path.h"
 #include "core/AuditLog.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -136,6 +137,8 @@ int main(int argc, char** argv) {
                 return 1;
             }
             vars[kv.substr(0, eq)] = kv.substr(eq + 1);
+        } else if (a == "--acp-selftest") {
+            return sf::utf8CodePageSelfTest();
         } else if (a == "-l" || a == "--list") {
             for (const auto& c : registry.all()) {
                 std::printf("%-18s %s\n", c.name.c_str(), c.description.c_str());
