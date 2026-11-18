@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- SculptForge on Windows: per-monitor DPI awareness v2, so the UI is crisp at 125/150/175 % and rescales live
-     when the window moves to a monitor at another scale (#87). Merged into the linker's manifest (CMakeLists.txt). -->
+     when the window moves to a monitor at another scale (#87). UTF-8 as the process code page (Windows 10 1903+; older
+     Windows ignores it and the explicit UTF-8 conversions in core/Utf8Path.h still apply): argv, fopen, narrow
+     std::filesystem::path conversions and every *A call read and write UTF-8, so a file name in any language works
+     (gh#223: a Japanese name closed the app on a Japanese Windows). Merged into the linker's manifest (CMakeLists.txt). -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
   <asmv3:application>
     <asmv3:windowsSettings>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
     </asmv3:windowsSettings>
   </asmv3:application>
 </assembly>

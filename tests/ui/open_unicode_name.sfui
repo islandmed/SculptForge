@@ -1,0 +1,23 @@
+# gh#223: a model with a Japanese (or Cyrillic) name opens, the window title and the status line show the name, and the app
+# stays open (it closed on Windows before). Files are written to the working folder, opened again, and the title names them.
+# CMake runs this at 1440 and 2880 px wide (open_unicode_name_1440 / _2880).
+run new_sphere subdivisions=3
+run save_obj path=テスト.obj
+run new_plane
+run open path=テスト.obj
+expect_status Opened テスト.obj
+expect_title テスト.obj
+shot obj_japanese
+
+run save_project path=Модель.sfproj
+run new_plane
+run open path=Модель.sfproj
+expect_status Opened project Модель.sfproj
+expect_title Модель.sfproj
+shot project_cyrillic
+
+run export_glb path=テスト.glb
+run new_plane
+run open path=テスト.glb
+expect_status Opened テスト.glb
+shot glb_japanese

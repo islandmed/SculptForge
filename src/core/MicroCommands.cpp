@@ -8,6 +8,7 @@
 #include "core/Micro.h"
 #include "core/MicroHistory.h"
 #include "core/Multires.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <cctype>
@@ -166,7 +167,7 @@ void registerMicroCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
                  if (path.empty()) return {false, "Give path= (.exr or .png)"};
-                 std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+                 std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
                  std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
                  const std::string format = ext == ".png" ? "png" : "exr";
                  const bool vector = argString(a, "type", "scalar") == "vector";

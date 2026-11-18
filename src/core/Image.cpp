@@ -26,6 +26,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBI_WRITE_NO_STDIO
 #include "stb_image_write.h"
+#include "core/Utf8Path.h"
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
@@ -316,7 +317,7 @@ Image Image::withoutPlainBackground(bool* removed) const {
 }
 
 bool Image::isImagePath(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga" || ext == ".psd" ||
            ext == ".gif" || ext == ".hdr";

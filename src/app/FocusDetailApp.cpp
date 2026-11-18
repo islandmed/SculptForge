@@ -8,6 +8,7 @@
 
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
+#include "core/Utf8Path.h"
 
 #include <chrono>
 #include <cmath>
@@ -23,7 +24,7 @@ void App::openFocusDetail(const std::string& path) {
         return;
     }
     const size_t tris = microTriangleCount(m);
-    doc_.setMesh(std::move(m), std::filesystem::path(path).stem().string());
+    doc_.setMesh(std::move(m), stemUtf8(path));
     frameActivePart();
     char buf[160];
     std::snprintf(buf, sizeof buf, "Focus Detail: %.2f billion micro triangles; full detail loads where you look and sculpt",

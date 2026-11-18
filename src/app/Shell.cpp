@@ -22,6 +22,7 @@
 #include "core/Multires.h"
 #include "core/VertexPaint.h"
 #include "core/Texture.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -1288,7 +1289,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
     const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
     std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
-                                         : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                                         : fileNameUtf8(doc_.path);
     if (doc_.dirty()) name += " *";
     auto rightWidth = [&] {
         float w = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 8.0f * s + 10.0f * s + 2.0f * windowButtonW + 2.0f * s;
@@ -1949,7 +1950,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())) brush = doc_.brushes[size_t(doc_.activeBrush)].name;
         mods.push_back({ICON_LC_BRUSH, "brush", brush});
         std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
-                                             : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                                             : fileNameUtf8(doc_.path);
         if (doc_.dirty()) name += " *";
         mods.push_back({ICON_LC_FILE, "file", name});
         size_t tris = 0;

@@ -63,6 +63,7 @@
 #include "core/Script.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "core/Utf8Path.h"
 
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
@@ -3383,7 +3384,7 @@ void App::openFileDialog() {
 
 // Opens models, brushes or reference images based on the file type.
 void App::openPath(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = extensionUtf8(path);
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (Image::isImagePath(path)) {
         if (takeReferenceDrop(path)) return; // View > Reference images showing: it becomes one (ReferenceImages.cpp)
@@ -3531,7 +3532,7 @@ void App::processPendingFiles() {
             insertType_ = "mesh";
             insertMeshKey_ = "file";
             insertMeshValue_ = f.path;
-            status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
+            status_ = "Insert " + fileNameUtf8(f.path) +
                       ": drag on the model to place it. Esc or a brush stops.";
             break;
         case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
@@ -3651,7 +3652,7 @@ void App::updateUndoNotice() {
 void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
-                           : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                           : fileNameUtf8(doc_.path);
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.

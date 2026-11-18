@@ -806,7 +806,8 @@ bool saveHardwareProfile(const std::string& path, const HardwareProfile& profile
     const std::filesystem::path p(std::u8string(path.begin(), path.end()));
     std::error_code ec;
     if (p.has_parent_path()) std::filesystem::create_directories(p.parent_path(), ec);
-    const std::filesystem::path tmp = p.string() + ".tmp";
+    std::filesystem::path tmp = p;
+    tmp += ".tmp";
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
         if (!f) {

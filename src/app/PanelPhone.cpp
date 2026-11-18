@@ -10,6 +10,7 @@
 #include "core/AuditLog.h"
 
 #include "link/PhoneRtc.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 
@@ -43,7 +44,7 @@ std::string megabytes(double bytes) {
 // The file a splat capture trains from: its one video, else the folder of photos.
 std::string splatSource(const link::PhoneEvent& e) {
     if (e.files.size() == 1) {
-        std::string ext = fs::path(std::u8string(e.files[0].begin(), e.files[0].end())).extension().string();
+        std::string ext = pathToUtf8(fs::path(std::u8string(e.files[0].begin(), e.files[0].end())).extension());
         for (char& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".mp4" || ext == ".mov" || ext == ".m4v" || ext == ".webm" || ext == ".3gp") return e.files[0];
     }
@@ -200,7 +201,7 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
     case link::CaptureKind::Ply: {
         if (e.files.empty()) return;
         const std::string& file = e.files.front();
-        std::string ext = fs::path(std::u8string(file.begin(), file.end())).extension().string();
+        std::string ext = pathToUtf8(fs::path(std::u8string(file.begin(), file.end())).extension());
         for (char& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".spz") {
             status_ = "Splat received (" + where + "): .spz isn't supported yet; export .ply from the scanning app";

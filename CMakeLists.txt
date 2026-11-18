@@ -117,6 +117,7 @@ add_library(sculptforge_core STATIC
   src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
   src/core/FileReplace.cpp
+  src/core/Utf8Path.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/DataDir.cpp
@@ -619,8 +620,9 @@ if(SCULPTFORGE_BUILD_APP)
     # Per-monitor DPI v2 from the first instruction (a window moved between 100 % and 150 % monitors stays sharp
     # and SDL reports each monitor's scale); MSVC merges it into the manifest the linker writes. (SDL 3 also asks
     # for it at start-up; the manifest covers what runs before, and other toolchains rely on that.)
-    if(MSVC)
+    if(MSVC) # (the same manifest, UTF-8 code page included, for the command-line program: its argv and paths)
       target_sources(sculptforge PRIVATE packaging/windows/sculptforge.manifest)
+      target_sources(sculptforge-cli PRIVATE packaging/windows/sculptforge.manifest)
     endif()
   endif()
   if(APPLE)
@@ -927,6 +929,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
     add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
     set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
+  if(MSVC AND SCULPTFORGE_BUILD_APP) # the manifest's UTF-8 code page took effect, in the app and in the command-line program (gh#223)
+    add_test(NAME windows_utf8_codepage COMMAND sculptforge --acp-selftest)
+    add_test(NAME windows_utf8_codepage_cli COMMAND sculptforge-cli --acp-selftest)
   endif()
   if(TARGET sculptforge_pyhost) # Python scripting's host starts from the build folder (packages run it on their install)
     add_test(NAME python_selftest COMMAND sculptforge --python-selftest)
@@ -1391,6 +1397,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_1440 open_unicode_name --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_2880 open_unicode_name --size 2880x1800)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
     sculptforge_ui_test(paint_intensity_1440 paint_intensity --size 1440x900) # #164: the top bar's Intensity at 1440

@@ -6,6 +6,7 @@
 #include "app/Python.h"
 #include "app/Ui.h"
 #include "core/Script.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -302,7 +303,7 @@ void Console::update(App& app) {
 
 void Console::runFile(App& app, const std::string& path) {
     {
-        std::string ext = fsPath(path).extension().string();
+        std::string ext = pathToUtf8(fsPath(path).extension());
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
         if (ext == ".py") {
             app.runPythonFile(path);
@@ -321,7 +322,7 @@ void Console::runFile(App& app, const std::string& path) {
         print(Kind::Error, "Run script " + path + "   -> " + err);
         return;
     }
-    print(Kind::Info, "Running " + fsPath(path).filename().string() + " (" + std::to_string(statements.size()) + " statements)");
+    print(Kind::Info, "Running " + fileNameUtf8(path) + " (" + std::to_string(statements.size()) + " statements)");
     runStatements(app, std::move(statements), 0, true);
 }
 

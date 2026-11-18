@@ -4,6 +4,7 @@
 // subdiv_* commands: the classic Tool > Geometry subdivision levels for scripts, the console and the AI assistant.
 #include "core/Commands.h"
 #include "core/Multires.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <cctype>
@@ -18,7 +19,7 @@ using T = ParamSpec::Type;
 CommandResult result(bool ok, std::string message) { return {ok, std::move(message)}; }
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext;
 }
