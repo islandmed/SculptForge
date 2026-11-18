@@ -56,18 +56,26 @@ constexpr const char* kWebsite = "https://sculptforge.app/guide/";
 ImVec4 mix(const ImVec4& a, const ImVec4& b, float t) {
     return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t);
 }
+// The guide is a Learn pop-up (Theme.h Role): its page sits on the role surface, a step off the app's panels; Pop-up
+// colours: plain keeps the panel colours.
+ImVec4 pageBg() { return theme::rolePopups ? ui::RoleSurface(theme::Role::Learn) : theme::panelBg; }
+ImVec4 sideBg() { return theme::rolePopups ? mix(pageBg(), theme::shellBg, 0.5f) : theme::shellBg; } // the contents, a step under it
 bool lightPage() { return theme::panelBg.x + theme::panelBg.y + theme::panelBg.z > 1.5f; }
 ImU32 kText() { return theme::u32(theme::text); }
 ImU32 kStrong() { return theme::u32(theme::textBright); }
 ImU32 kHeading() { return theme::u32(theme::textBright); }
-ImU32 kDim() { return theme::u32(theme::textDim); }
+// Secondary text, nudged towards the body text until it is AA (4.5:1) on the page and the contents; Plain: as it was.
+ImU32 kDim() {
+    if (!theme::rolePopups) return theme::u32(theme::textDim);
+    return theme::u32(theme::readableOn(theme::readableOn(theme::textDim, pageBg(), theme::text, 4.5f), sideBg(), theme::text, 4.5f));
+}
 ImU32 kLink() { return theme::u32(lightPage() ? theme::accentHover : mix(theme::accent, ImVec4(1, 1, 1, 1), 0.2f)); }
 ImU32 kCode() { return theme::u32(mix(theme::accent, theme::text, 0.45f)); }
-ImU32 kCodeBg() { return theme::u32(mix(theme::panelBg, lightPage() ? ImVec4(1, 1, 1, 1) : ImVec4(0, 0, 0, 1), 0.25f)); }
+ImU32 kCodeBg() { return theme::u32(mix(pageBg(), lightPage() ? ImVec4(1, 1, 1, 1) : ImVec4(0, 0, 0, 1), 0.25f)); }
 ImU32 kInlineCodeBg() { return theme::u32(theme::frameHover); }
-ImU32 kRule() { return theme::u32(mix(theme::panelBg, theme::text, 0.14f)); }
-ImU32 kBox() { return theme::u32(mix(theme::panelBg, theme::text, 0.06f)); }     // callouts, cards
-ImU32 kBoxEdge() { return theme::u32(mix(theme::panelBg, theme::text, 0.16f)); } // their outline
+ImU32 kRule() { return theme::u32(mix(pageBg(), theme::text, 0.14f)); }
+ImU32 kBox() { return theme::u32(mix(pageBg(), theme::text, 0.06f)); }     // callouts, cards
+ImU32 kBoxEdge() { return theme::u32(mix(pageBg(), theme::text, 0.16f)); } // their outline
 constexpr ImU32 kHighlight = IM_COL32(0xf0, 0x88, 0x2e, 0x5a);
 
 // --- Where the guide's files come from: embedded, or SCULPTFORGE_GUIDE_DIR while writing it ---
@@ -578,6 +586,7 @@ const UserGuide::Texture* UserGuide::texture(const std::string& path) {
 // ---------------------------------------------------------------------------
 
 void UserGuide::draw(App& app) {
+    roleShown_ = false;
     if (!open_) return;
     const float s = app.uiScale_;
     const CanvasRect c = app.canvasRect();
@@ -588,8 +597,18 @@ void UserGuide::draw(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f * s, 8.0f * s));
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
     app.fillPanelHost(flags); // in a window of its own: fills it (PanelWindows.cpp)
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, theme::rolePopups ? std::max(2.0f, std::round(2.0f * s)) : 1.0f);
+    ui::PushRole(theme::Role::Learn);
+    // The frame around the page and the toolbar row carry more of the role's colour, so the window reads in a light look too.
+    if (theme::rolePopups) ImGui::PushStyleColor(ImGuiCol_WindowBg, ui::RoleSurface(theme::Role::Learn, -1.0f, 0.16f));
     const bool visible = ImGui::Begin(tr("User Guide"), &open_, flags);
-    ImGui::PopStyleVar();
+    if (theme::rolePopups) ImGui::PopStyleColor();
+    ui::PopRole();
+    ImGui::PopStyleVar(2);
+    if (visible) {
+        ui::RoleStrip(theme::Role::Learn);
+        roleShown_ = theme::rolePopups;
+    }
     if (!visible) {
         ImGui::End();
         return;
@@ -639,7 +658,7 @@ void UserGuide::draw(App& app) {
 
     drawToolbar(app);
     const float sideW = 262.0f * s;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::shellBg);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, sideBg());
     ImGui::BeginChild("##guide_side", ImVec2(sideW, 0), ImGuiChildFlags_None, ImGuiWindowFlags_None);
     if (query_[0]) drawSearchResults(app);
     else drawContents(app);
@@ -927,7 +946,7 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
         }
         h = th + (b.items.empty() ? 0.0f : 4.0f * s + ih) + pad * 1.6f;
         if (dl) {
-            const ImU32 bg = theme::u32(mix(theme::panelBg, ImGui::ColorConvertU32ToFloat4(col), b.items.empty() ? 0.08f : 0.10f));
+            const ImU32 bg = theme::u32(mix(pageBg(), ImGui::ColorConvertU32ToFloat4(col), b.items.empty() ? 0.08f : 0.10f));
             dl->AddRectFilled(o, ImVec2(o.x + width, o.y + h), bg, 6.0f * s);
             dl->AddRectFilled(o, ImVec2(o.x + bar, o.y + h), col, 6.0f * s, ImDrawFlags_RoundCornersLeft);
             float y = o.y + pad * 0.8f;
@@ -1033,7 +1052,7 @@ float UserGuide::drawBlock(App& app, const Block& b, int index, ImVec2 o, float 
             rowH = std::max(rowH, st.lineHeight) + padY * 2.0f;
             if (dl) {
                 const ImVec2 a(o.x, o.y + y), z(o.x + tableW, o.y + y + rowH);
-                dl->AddRectFilled(a, z, r == 0 ? theme::u32(theme::header) : r % 2 ? kBox() : theme::u32(theme::panelBg));
+                dl->AddRectFilled(a, z, r == 0 ? theme::u32(theme::header) : r % 2 ? kBox() : theme::u32(pageBg()));
                 float x = o.x;
                 for (size_t c = 0; c < cols; ++c) {
                     flow(b.rows[r][c], ImVec2(x + padX, o.y + y + padY), colW[c] - padX * 2.0f, cs);
@@ -1236,13 +1255,13 @@ float UserGuide::drawWhatsNewBand(App& app, ImVec2 at, float width, const std::s
     if (!right.empty()) {
         const float rw = small->CalcTextSizeA(small->FontSize, FLT_MAX, 0.0f, right.c_str()).x;
         dl->AddText(small, small->FontSize, ImVec2(at.x + width - rw, y + head->FontSize - small->FontSize - 2.0f * s),
-                    theme::u32(theme::textDim), right.c_str());
+                    kDim(), right.c_str());
     }
     y += std::round(head->FontSize * 1.3f);
     if (!line.empty()) {
         const float lw = std::min(width, 680.0f * s);
         const ImVec2 ls = regular->CalcTextSizeA(regular->FontSize, FLT_MAX, lw, line.c_str());
-        dl->AddText(regular, regular->FontSize, ImVec2(at.x, y + 2.0f * s), theme::u32(theme::textDim), line.c_str(), nullptr, lw);
+        dl->AddText(regular, regular->FontSize, ImVec2(at.x, y + 2.0f * s), kDim(), line.c_str(), nullptr, lw);
         ImGui::LogText("%s\n", line.c_str());
         y += ls.y + 4.0f * s;
     }
@@ -1291,7 +1310,7 @@ float UserGuide::drawWhatsNewCards(App& app, const whatsnew::Version& v, ImVec2 
             dl->AddText(bold, bold->FontSize, ImVec2(p0.x + pad, ty), theme::u32(theme::textBright), card.title.c_str(), nullptr, tw);
             ImGui::LogText("%s\n", card.title.c_str());
             ty += bold->CalcTextSizeA(bold->FontSize, FLT_MAX, tw, card.title.c_str()).y + 4.0f * s;
-            dl->AddText(regular, lineSize, ImVec2(p0.x + pad, ty), theme::u32(theme::textDim), card.line.c_str(), nullptr, tw);
+            dl->AddText(regular, lineSize, ImVec2(p0.x + pad, ty), kDim(), card.line.c_str(), nullptr, tw);
             ImGui::LogText("%s\n", card.line.c_str());
             const bool guideLink = card.action.rfind("guide:", 0) == 0;
             ImGui::SetCursorScreenPos(ImVec2(p0.x + pad, p1.y - pad - ImGui::GetFrameHeight()));
@@ -1365,7 +1384,7 @@ float UserGuide::drawWhatsNew(App& app, ImVec2 origin, float width) {
     }
     if (!wn.groups.empty() && place_.chapter == page) {
         ImFont* small = app.boldFont() ? app.boldFont() : ImGui::GetFont();
-        dl->AddText(small, small->FontSize, ImVec2(origin.x, origin.y + y), theme::u32(theme::textDim), "EARLIER VERSIONS");
+        dl->AddText(small, small->FontSize, ImVec2(origin.x, origin.y + y), kDim(), "EARLIER VERSIONS");
         y += small->FontSize + 18.0f * s;
     }
     for (const whatsnew::Group& g : wn.groups) {
@@ -1410,7 +1429,7 @@ float UserGuide::drawWhatsNew(App& app, ImVec2 origin, float width) {
 
 void UserGuide::drawPage(App& app) {
     const float s = app.uiScale_;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::panelBg);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, pageBg());
     ImGui::BeginChild("##guide_page", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_None);
     const guide::Document& doc = page();
     const float avail = ImGui::GetContentRegionAvail().x;
