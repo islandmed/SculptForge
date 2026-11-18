@@ -10,17 +10,32 @@ three versions in full, then the older ones in groups. Every detail is in the
 ```features
 date: 2026-11-18
 tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+highlight: In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 208 frames a second
 highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
 highlight: Python scripts can add their own buttons and panels
 highlight: Splats show the sheen that changes as you orbit
 highlight: Files with non-English names open on Windows again
 highlight: Size and Intensity follow the pen as it hovers above the tablet
+title: 805 million triangles, still smooth
+line: In our benchmark, 805 million triangles of detail still orbit at 208 frames a second, on an Apple M1 Pro limited to entry-level budgets. It is a benchmark scene, not a sculpt.
+image: images/wn-0138-engine.jpg
+action: guide:performance.md
 title: Finer detail up close
 line: Zoom in on a micro level in smooth shading and the view draws up to two levels finer than the stored grid, following the surface's curve, with no extra memory or file size. Brushes and picks are unchanged.
+image: images/wn-0138-detail.jpg
 action: guide:micro-levels.md
 title: Buttons and panels from Python
 line: A Python script can add its own panels of buttons, sliders and check boxes under File > Script, and actions to the command palette, shelves and My Panel.
+image: images/wn-0138-panel.jpg
 action: guide:python.md
+title: Splats that shine as you orbit
+line: Splat captures that store view-dependent colour now show the sheen and highlights that change as you orbit, and keep them when you turn and save them.
+image: images/wn-0138-splats.jpg
+action: guide:splats.md
+title: Size follows the pen
+line: Press S (or U) with a pen in range and move it above the tablet: the size follows live, and a tap keeps it.
+image: images/wn-0138-pen.jpg
+action: guide:sculpting.md
 ```
 
 - Scripts and tools that use SculptForge's Python API or command line can be under any licence (new scripting
