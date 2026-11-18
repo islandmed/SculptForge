@@ -20,46 +20,49 @@ Use a virtual environment (`python -m venv .venv`) per project, as with any pack
 ## A first script
 
 ```python
+import numpy as np
 import sculptforge as sf
 
 doc = sf.Document()
-sf.run(doc, "new_sphere", subdivisions=5)
+doc.new_sphere(5)
 
-# Brush strokes from code: a brush, a path of points, a radius and a strength.
-sf.run(doc, "stroke", brush="Clay", points="-0.6,0.2,1 0,0.4,1 0.6,0.2,1", radius=0.25, strength=0.6)
-sf.run(doc, "stroke", brush="Crease", points="-0.5,-0.3,1 0.5,-0.3,1", radius=0.12, strength=0.5)
+# Brush strokes from code: a brush, a path of points (any (K, 3) array), a radius and a strength.
+doc.stroke("Clay", [[-0.6, 0.2, 1], [0, 0.4, 1], [0.6, 0.2, 1]], radius=0.25, strength=0.6)
+doc.stroke("Crease", np.array([[-0.5, -0.3, 1], [0.5, -0.3, 1]]), radius=0.12, strength=0.5)
 
-verts = doc.vertices                       # NumPy (N, 3) float32, a copy
-doc.mask = (verts[:, 1] < 0).astype("float32")   # protect the lower half (1 = masked)
-sf.run(doc, "stroke", brush="Inflate", points="0,0.8,1", radius=0.3, strength=0.4, symmetry="x")
-sf.run(doc, "mask_clear")
+verts = doc.vertices                              # NumPy (N, 3) float32, a copy
+doc.mask = (verts[:, 1] < 0).astype("float32")    # protect the lower half (1 = masked)
+doc.stroke("Inflate", [0, 0.8, 1], radius=0.3, strength=0.4, symmetry="x")   # one point: one dab
+doc.clear_mask()
 
-sf.run(doc, "remesh", resolution=128)
-sf.run(doc, "export_glb", path="asset.glb")
+doc.remesh(128)
+doc.save("asset.glb")                             # the format follows the file name
 ```
 
-`sf.run(doc, command, **params)` runs any command and returns its message. `sf.commands()` lists every command
-with its parameters, the same ones as the [console and sculptforge-cli](scripting.md). Paths can be strings or
-`pathlib.Path`.
+Every method runs one of SculptForge's commands, and `sf.run(doc, command, **params)` runs any of them directly:
+`sf.commands()` lists them all with their parameters, the same ones as the [console and sculptforge-cli](scripting.md),
+and `sf.command("stroke")` describes one. Paths can be strings or `pathlib.Path`.
 
 ## What you can do
 
-| Function or property | What it does |
+| Function, method or property | What it does |
 |---|---|
-| `sf.Document()` | A new, empty scene (with the default brush library) |
-| `sf.run(doc, command, **params)` | Runs one command; returns its message, raises `sf.CommandError` on failure |
-| `sf.run_script(doc, script)` | Runs several commands in [script syntax](scripting.md#the-script-language) (`"new_sphere; subdivide"`) |
-| `sf.commands()`, `sf.tool_schema()` | Every command and its parameters; the same as LLM tool definitions (JSON) |
+| `sf.Document()`, `sf.Document.open(path)` | A new, empty scene; or one with a project (`.sfproj`) or model (OBJ, PLY, FBX, glTF/GLB, USD, STL) in it |
+| `doc.save(path, **options)` (also `doc.export`) | Saves by file name: `.sfproj`, `.obj`, `.glb`, `.gltf`, `.usda`, `.usdz`, `.usd`, `.fbx`, `.ply`, `.stl`; `doc.export_lods(path, levels)` writes a LOD chain |
+| `doc.new_sphere(subdivisions)` | Replaces the scene with a sphere |
+| `doc.stroke(brush, points, radius=, strength=, view=, symmetry=, ...)` | One brush stroke along a path; the same input gives the same result |
+| `doc.remesh(resolution)`, `doc.decimate(ratio)` or `decimate(triangles=n)`, `doc.subdivide(levels)` | Even surface, fewer triangles, smooth subdivision |
+| `doc.divide()`, `doc.subdivision_levels`, `doc.subdivision_level = n` | Subdivision levels: add one, count them, move between them |
+| `doc.mask`, `doc.clear_mask()`, `doc.invert_mask()` | The per-vertex mask as a NumPy array (1 = masked) |
+| `doc.colors`, `doc.facegroups`, `doc.hidden` | Per-vertex paint, per-triangle face groups and visibility: read and assign NumPy arrays (`None` when absent) |
 | `doc.vertices`, `doc.base_vertices`, `doc.normals`, `doc.triangles` | Mesh arrays of the active Part (copies) |
-| `doc.mask`, `doc.colors`, `doc.facegroups`, `doc.hidden` | Per-vertex mask and paint, per-triangle face groups and visibility: read and assign NumPy arrays (`None` when absent) |
 | `doc.set_mesh(vertices, triangles)` | Replaces the active Part's mesh with your own |
+| `doc.parts`, `doc.part_names()`, `doc.active_part` | The Parts and which one the arrays and methods act on (index or name) |
+| `doc.add_part("cube")` or `add_part(path=...)`, `doc.rename_part(p, to)`, `doc.remove_part(p)` | Add, rename and delete Parts |
 | `doc.layers`, `doc.layer_delta(i)` | Sculpt layers as `(name, weight)` and their per-vertex offsets |
-| `doc.parts`, `doc.active_part` | The Parts and which one the arrays and commands act on (index or name) |
 | `doc.selection_sets`, `doc.selection_set(name)`, `doc.set_selection_set(name, mask=...)` | Selection sets as arrays |
-
-Useful commands: `open`, `new_sphere`, `subdivide`, `subdiv_divide`, `stroke`, `remesh`, `decimate`, `mask_*`,
-`facegroup_*`, `part_append`, `layer_add`, `save_obj`, `export_glb`, `export_usd`, `export_fbx`, `export_lods`,
-`save_project`.
+| `sf.run(doc, command, **params)`, `sf.run_script(doc, script)` | Any command, or several in [script syntax](scripting.md#the-script-language); raise `sf.CommandError` on failure |
+| `sf.commands()`, `sf.command(name)`, `sf.tool_schema()` | Every command and its parameters; one command; the same as LLM tool definitions (JSON) |
 
 The package ships type hints: editors complete names and check argument types.
 
@@ -70,12 +73,11 @@ import pathlib
 import sculptforge as sf
 
 for src in sorted(pathlib.Path("scans").glob("*.obj")):
-    doc = sf.Document()
     try:
-        sf.run(doc, "open", path=src)
-        sf.run(doc, "remesh", resolution=128)
-        sf.run(doc, "decimate", ratio=0.5)
-        sf.run(doc, "export_usd", path=f"out/{src.stem}.usda")
+        doc = sf.Document.open(src)
+        doc.remesh(128)
+        doc.decimate(0.5)
+        doc.save(f"out/{src.stem}.usda")
     except sf.CommandError as e:     # one bad file doesn't stop the batch
         print("skipped", src.name, e)
 ```
@@ -88,8 +90,7 @@ The engine gives the same result for the same input on every run, so it fits in 
 import numpy as np, sculptforge as sf
 
 def test_triangle_budget():
-    doc = sf.Document()
-    sf.run(doc, "open", path="hero.fbx")
+    doc = sf.Document.open("hero.fbx")
     assert doc.triangles.shape[0] <= 200_000
 ```
 

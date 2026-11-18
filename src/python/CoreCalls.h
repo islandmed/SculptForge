@@ -48,6 +48,7 @@ struct CoreCalls {
                              int level, SelectionSet& out, std::string& msg);
     int (*subdivCurrentLevel)(const Mesh&);
     bool (*addSelectionSet)(Document&, SelectionSet&&, const std::string& label, std::string& msg);
+    int (*subdivLevelCount)(const Mesh&); // 0 without levels
 };
 
 // The table over the core this binary links (the app's, the module's, the tests').

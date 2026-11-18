@@ -1,5 +1,5 @@
 # SculptForge for Python: testing your own asset rules with pytest. Run: pytest test_my_asset.py
-# Replace the sphere with sf.run(doc, "open", path="your_asset.fbx") and the rules with your studio's.
+# Replace the sphere with sf.Document.open("your_asset.fbx") and the rules with your studio's.
 # SPDX-License-Identifier: GPL-3.0-or-later
 import numpy as np
 import pytest
@@ -10,7 +10,7 @@ import sculptforge as sf
 @pytest.fixture
 def asset():
     doc = sf.Document()
-    sf.run(doc, "new_sphere", subdivisions=4)
+    doc.new_sphere(4)
     return doc
 
 
@@ -30,5 +30,5 @@ def test_no_degenerate_triangles(asset):
 
 
 def test_exports_to_glb(asset, tmp_path):
-    sf.run(asset, "export_glb", path=tmp_path / "asset.glb")
+    asset.save(tmp_path / "asset.glb")
     assert (tmp_path / "asset.glb").read_bytes()[:4] == b"glTF"

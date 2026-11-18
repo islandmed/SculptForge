@@ -31,7 +31,7 @@ def test_stubs_cover_the_module():
     names = stub_names()
     public = {n for n in dir(_core) if not n.startswith("_")} | {"__version__"}
     assert public <= names, public - names
-    members = {f"Document.{n}" for n in dir(sf.Document) if not n.startswith("_")}
+    members = {f"Document.{n}" for n in dir(_core.Document) if not n.startswith("_")}
     assert members <= names, members - names
 
 
