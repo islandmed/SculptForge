@@ -879,23 +879,19 @@ void main() {
 
 // 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse), with the view-dependent
 // colour of their spherical harmonics (the 3DGS basis, core/Splats.h evalSH) for the direction they are seen from.
-const char* kSplatVS = R"(#version 330 core
-layout(location = 0) in uint aIndex;
-uniform samplerBuffer uSplats;
+// That colour is evaluated once per splat by a pre-pass (kSplatColorFS: one RGBA32F texel a splat) when the eye moves,
+// not per quad corner; the splat shader reads it (uColorSource 1) or, to compare, evaluates it itself (2).
+const char* kSplatSH = R"(
 uniform samplerBuffer uSplatSH; // bands 1-3: coefficient-major rgb, packed 4 to a texel (half floats)
-uniform int uShDegree;          // 0: the plain colour only
+uniform int uShDegree;          // 1-3
 uniform int uShTexels;          // texels per splat in uSplatSH
 uniform mat3 uShFrame;          // world -> the cloud's own frame (the one its SH were captured in)
 uniform vec3 uEye;
-uniform mat4 uView;
-uniform mat4 uProj;
-uniform vec2 uViewport;
-uniform float uOpacity;
-out vec4 vColor;
-vec3 viewColor(vec3 base, vec3 centre) {
+uniform int uSplatColorWidth;   // texels a row of the pre-pass's colour texture
+vec3 viewColor(vec3 base, vec3 centre, int splat) {
     float f[48];
     for (int i = 0; i < uShTexels; ++i) {
-        vec4 v = texelFetch(uSplatSH, int(aIndex) * uShTexels + i);
+        vec4 v = texelFetch(uSplatSH, splat * uShTexels + i);
         f[4 * i] = v.x; f[4 * i + 1] = v.y; f[4 * i + 2] = v.z; f[4 * i + 3] = v.w;
     }
     vec3 d = normalize(uShFrame * (centre - uEye));
@@ -916,6 +912,33 @@ vec3 viewColor(vec3 base, vec3 centre) {
     #undef SH
     return c;
 }
+)";
+
+// The pre-pass (drawn over the colour texture with kBgVS): texel (x, y) = splat y * width + x, its view colour unclamped.
+// (A fragment pass: transform feedback stalled 100-400 ms a frame on Mesa while orbiting.)
+const char* kSplatColorFS = R"(
+uniform samplerBuffer uSplats;
+uniform int uSplatCount;
+out vec4 fragColor;
+void main() {
+    int i = int(gl_FragCoord.y) * uSplatColorWidth + int(gl_FragCoord.x);
+    if (i >= uSplatCount) discard;
+    vec4 t0 = texelFetch(uSplats, i * 4);
+    vec4 t3 = texelFetch(uSplats, i * 4 + 3);
+    fragColor = vec4(viewColor(t3.rgb, t0.xyz, i), 1.0);
+}
+)";
+
+const char* kSplatVS = R"(
+layout(location = 0) in uint aIndex;
+uniform samplerBuffer uSplats;
+uniform sampler2D uSplatColor;     // the pre-pass's view colours, one RGBA32F texel per splat
+uniform int uColorSource;          // 0: the plain colour, 1: the pre-pass's, 2: evaluated here (per corner)
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform vec2 uViewport;
+uniform float uOpacity;
+out vec4 vColor;
 out vec2 vOffset;
 const vec2 kCorners[4] = vec2[4](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));
 void main() {
@@ -948,7 +971,9 @@ void main() {
     vec2 px = corner.x * 3.0 * min(sqrt(l1), 1024.0) * axis1 + corner.y * 3.0 * min(sqrt(l2), 1024.0) * axis2;
     gl_Position = clip + vec4(px / uViewport * 2.0 * clip.w, 0.0, 0.0);
     vOffset = corner * 3.0;
-    vec3 color = uShDegree > 0 ? viewColor(t3.rgb, t0.xyz) : t3.rgb;
+    vec3 color = uColorSource == 1
+                     ? texelFetch(uSplatColor, ivec2(int(aIndex) % uSplatColorWidth, int(aIndex) / uSplatColorWidth), 0).rgb
+               : uColorSource == 2 ? viewColor(t3.rgb, t0.xyz, int(aIndex)) : t3.rgb;
     vColor = vec4(clamp(color, 0.0, 1.0), t0.w * uOpacity);
 }
 )";
@@ -1102,14 +1127,21 @@ bool Renderer::init(std::string& error) {
     if (!wireLineProgram_) return false;
     bgProgram_ = link(kBgVS, kBgFS, error);
     if (!bgProgram_) return false;
-    splatProgram_ = link(kSplatVS, kSplatFS, error);
-    if (!splatProgram_) return false;
+    {
+        const std::string head = std::string("#version 330 core\n") + kSplatSH;
+        splatProgram_ = link((head + kSplatVS).c_str(), kSplatFS, error);
+        if (!splatProgram_) return false;
+        splatColorProgram_ = link(kBgVS, (head + kSplatColorFS).c_str(), error);
+        if (!splatColorProgram_) return false;
+    }
     gl::GenVertexArrays(1, &splatVao_);
     gl::GenBuffers(1, &splatData_);
     gl::GenBuffers(1, &splatOrder_);
     gl::GenTextures(1, &splatTexture_);
     gl::GenBuffers(1, &splatShData_);
     gl::GenTextures(1, &splatShTexture_);
+    gl::GenFramebuffers(1, &splatColorFbo_);
+    gl::GenTextures(1, &splatColorTexture_);
     gl::BindVertexArray(splatVao_);
     gl::BindBuffer(GL_ARRAY_BUFFER, splatOrder_);
     gl::EnableVertexAttribArray(0);
@@ -1458,11 +1490,14 @@ void Renderer::shutdown() {
     deleteProgram(wireLineProgram_);
     deleteProgram(bgProgram_);
     deleteProgram(splatProgram_);
+    deleteProgram(splatColorProgram_);
     gl::DeleteBuffers(1, &splatData_);
     gl::DeleteBuffers(1, &splatOrder_);
     gl::DeleteTextures(1, &splatTexture_);
     gl::DeleteBuffers(1, &splatShData_);
     gl::DeleteTextures(1, &splatShTexture_);
+    gl::DeleteFramebuffers(1, &splatColorFbo_);
+    gl::DeleteTextures(1, &splatColorTexture_);
     gl::DeleteVertexArrays(1, &splatVao_);
     if (viewFbo_) {
         gl::DeleteFramebuffers(1, &viewFbo_);
@@ -1524,6 +1559,27 @@ void Renderer::syncSplats(const SplatCloud& c, uint64_t version, bool viewColor)
         gl::BindBuffer(GL_TEXTURE_BUFFER, splatShData_);
         gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW); // (frees the last cloud's)
     }
+    // The pre-pass's output: one view colour a splat (16 bytes), rows of up to 4096, refilled when the eye moves. Too many
+    // rows for the driver: the splat shader evaluates the colour per corner (as before the pre-pass).
+    GLint maxSize = 0;
+    gl::GetIntegerv(0x0D33 /* GL_MAX_TEXTURE_SIZE */, &maxSize);
+    const int width = std::max(1, std::min(4096, int(maxSize))), rows = int((n + size_t(width) - 1) / size_t(width));
+    splatColorWidth_ = splatShDegree_ > 0 && rows <= maxSize ? width : 0;
+    gl::BindTexture(GL_TEXTURE_2D, splatColorTexture_);
+    gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32F), splatColorWidth_, splatColorWidth_ ? std::max(rows, 1) : 0, 0, GL_RGBA,
+                   GL_FLOAT, nullptr);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+    if (splatColorWidth_) {
+        GLint fbo = 0;
+        gl::GetIntegerv(0x8CA6 /* GL_FRAMEBUFFER_BINDING */, &fbo);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, splatColorFbo_);
+        gl::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, splatColorTexture_, 0);
+        if (gl::CheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) splatColorWidth_ = 0;
+        gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+    }
+    splatColorFresh_ = false;
     gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     splatCount_ = GLsizei(n);
@@ -1531,7 +1587,7 @@ void Renderer::syncSplats(const SplatCloud& c, uint64_t version, bool viewColor)
 }
 
 void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity,
-                          bool viewColor) {
+                          bool viewColor, bool perVertexSh) {
     if (splatCount_ == 0) return;
     // Back-to-front order, re-sorted only when the camera moves (16-bit counting sort).
     if (view != lastSortView_) {
@@ -1559,22 +1615,58 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
         gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(n * sizeof(uint32_t)), splatSorted_.data(), GL_STREAM_DRAW);
         gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     }
+    const int shDegree = viewColor ? splatShDegree_ : 0;
+    const int colorSource = shDegree == 0 ? 0 : perVertexSh || splatColorWidth_ == 0 ? 2 : 1;
+    const glm::vec3 eye(glm::inverse(view)[3]);
+    const auto shUniforms = [&](GLuint prog) {
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplats"), 0);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplatSH"), 1);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uShDegree"), shDegree);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uShTexels"), splatShTexels_);
+        gl::UniformMatrix3fv(gl::GetUniformLocation(prog, "uShFrame"), 1, GL_FALSE, glm::value_ptr(splatShFrame_));
+        gl::Uniform3fv(gl::GetUniformLocation(prog, "uEye"), 1, glm::value_ptr(eye));
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplatColorWidth"), std::max(splatColorWidth_, 1));
+    };
+    if (shDegree > 0) {
+        gl::ActiveTexture(GL_TEXTURE1);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+        gl::ActiveTexture(GL_TEXTURE0);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
+    }
+    // The view colours, once a splat, when the eye has moved (they depend on nothing else the camera does).
+    if (colorSource == 1 && (!splatColorFresh_ || eye != splatColorEye_)) {
+        splatColorFresh_ = true;
+        splatColorEye_ = eye;
+        GLint fbo = 0, viewport[4] = {}, scissor = 0;
+        gl::GetIntegerv(0x8CA6 /* GL_FRAMEBUFFER_BINDING */, &fbo);
+        gl::GetIntegerv(0x0BA2 /* GL_VIEWPORT */, viewport);
+        gl::GetIntegerv(GL_SCISSOR_TEST, &scissor);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, splatColorFbo_);
+        gl::Viewport(0, 0, splatColorWidth_, (splatCount_ + splatColorWidth_ - 1) / splatColorWidth_);
+        gl::Disable(GL_SCISSOR_TEST);
+        gl::Disable(GL_DEPTH_TEST);
+        gl::Disable(GL_BLEND);
+        gl::UseProgram(splatColorProgram_);
+        shUniforms(splatColorProgram_);
+        gl::Uniform1i(gl::GetUniformLocation(splatColorProgram_, "uSplatCount"), splatCount_);
+        gl::BindVertexArray(emptyVao_);
+        gl::DrawArrays(GL_TRIANGLES, 0, 3);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+        gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        if (scissor) gl::Enable(GL_SCISSOR_TEST);
+    }
     gl::UseProgram(splatProgram_);
     gl::UniformMatrix4fv(gl::GetUniformLocation(splatProgram_, "uView"), 1, GL_FALSE, glm::value_ptr(view));
     gl::UniformMatrix4fv(gl::GetUniformLocation(splatProgram_, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
     gl::Uniform2f(gl::GetUniformLocation(splatProgram_, "uViewport"), float(fbWidth), float(fbHeight));
     gl::Uniform1f(gl::GetUniformLocation(splatProgram_, "uOpacity"), opacity);
-    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplats"), 0);
-    const int shDegree = viewColor ? splatShDegree_ : 0;
-    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uShDegree"), shDegree);
-    if (shDegree > 0) {
-        gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplatSH"), 1);
-        gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uShTexels"), splatShTexels_);
-        gl::UniformMatrix3fv(gl::GetUniformLocation(splatProgram_, "uShFrame"), 1, GL_FALSE, glm::value_ptr(splatShFrame_));
-        const glm::vec3 eye(glm::inverse(view)[3]);
-        gl::Uniform3fv(gl::GetUniformLocation(splatProgram_, "uEye"), 1, glm::value_ptr(eye));
-        gl::ActiveTexture(GL_TEXTURE1);
-        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uColorSource"), colorSource);
+    shUniforms(splatProgram_);
+    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplatColor"), 2);
+    if (colorSource == 1) {
+        gl::ActiveTexture(kTexture2);
+        gl::BindTexture(GL_TEXTURE_2D, splatColorTexture_);
+        gl::ActiveTexture(GL_TEXTURE0);
     }
     gl::ActiveTexture(GL_TEXTURE0);
     gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
@@ -1591,6 +1683,8 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
     if (shDegree > 0) {
         gl::ActiveTexture(GL_TEXTURE1);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::ActiveTexture(kTexture2);
+        gl::BindTexture(GL_TEXTURE_2D, 0);
         gl::ActiveTexture(GL_TEXTURE0);
     }
 }
@@ -3468,7 +3562,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
         if (!references_.empty()) drawReferences(false, view, proj, camera.ortho, viewAspect);
-        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor);
+        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor,
+                                          settings.splatShPerVertex);
         gl::UseProgram(0);
         return;
     }
@@ -3597,7 +3692,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::Disable(GL_BLEND);
     }
     gl::BindVertexArray(0);
-    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor);
+    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor,
+                                          settings.splatShPerVertex);
     gl::UseProgram(0);
 }
 
