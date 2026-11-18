@@ -171,6 +171,8 @@ jobs:
       contents: read
       actions: read
       attestations: read
+    outputs:
+      wheels: ${{ steps.wheels.outputs.ok }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ needs.locate.outputs.sha }}', persist-credentials: false, sparse-checkout: tools/release }
@@ -195,6 +197,37 @@ jobs:
           REF: ${{ needs.locate.outputs.built-ref }}
           SIGNED: ${{ vars.SIGNING == 'signpath' && '1' || '' }} # signing is on: packages staged unsigned (built before it was turned on) are refused
         run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"} ${SIGNED:+--require-signed}
+      # The Python wheels (packages.yml jobs wheels, wheel-sums) go on the release page too, checked the same way. A run
+      # without their checksums (a wheel failed: those jobs never hold the app) publishes the app without them.
+      - id: wheel-sums
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums-wheels
+          path: wheel-sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - if: steps.wheel-sums.outcome == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: wheels
+          merge-multiple: true
+          pattern: 'pywheels-*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - id: wheels
+        name: Wheels against their recorded SHA-256 and attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
+          STAGED: ${{ needs.locate.outputs.staged }}
+          REF: ${{ needs.locate.outputs.built-ref }}
+          HAVE: ${{ steps.wheel-sums.outcome == 'success' }}
+        run: |
+          if [ "$HAVE" != true ]; then echo "::warning::no wheel checksums in run $RUN: this release has no Python wheels"; echo "ok=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          python3 tools/release/verify_staged.py wheels wheel-sums/SHA256SUMS.wheels.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
+          echo "ok=true" >> "$GITHUB_OUTPUT"
 
   smoke:
     name: Smoke test ${{ matrix.name }}
@@ -338,6 +371,29 @@ jobs:
           RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
           SHA: ${{ needs.locate.outputs.sha }}
         run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.staged.txt --run "$RUN" --sha "$SHA" --sums-only && rm -r sums
+      - if: needs.verify.outputs.wheels == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums-wheels
+          path: wheel-sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - if: needs.verify.outputs.wheels == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: wheels
+          merge-multiple: true
+          pattern: 'pywheels-*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The Python wheels job verify checked (pip install <wheel URL>; in SHA256SUMS.txt and its signature below)
+        if: needs.verify.outputs.wheels == 'true'
+        env:
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
+        run: |
+          python3 tools/release/verify_staged.py wheels wheel-sums/SHA256SUMS.wheels.txt --run "$RUN" --sha "$SHA" --sums-only
+          mv wheels/*.whl dist/ && rm -r wheels wheel-sums
       - name: Version-less copies (fixed links such as releases/latest/download/SculptForge-macos.dmg)
         run: |
           cd dist

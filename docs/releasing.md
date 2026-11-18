@@ -404,6 +404,10 @@ and Windows x64, each installed in a clean environment and tested there (`pytest
 package; job **wheel-sums** records their SHA-256 (staged-sums-wheels). Both are `continue-on-error`: a red wheel never
 holds the app's release, it only means no Python package for that version.
 
+The release page carries the wheels too: job **verify** checks them against staged-sums-wheels and their
+attestations, and **publish** re-checks them and adds them to `dist/`, so they are in SHA256SUMS.txt and its signature
+(`pip install <wheel link>`). A run without wheel checksums releases the app without wheels, with a warning.
+
 release.yml job **pypi** runs after the GitHub Release, for stable tags only, while the repository variable
 `PYPI_PUBLISH` is `true`: it re-checks the wheels against the recorded checksums and attestations
 (verify_staged.py), uploads to TestPyPI, installs from there in a clean venv and runs a sphere, then uploads to PyPI.
