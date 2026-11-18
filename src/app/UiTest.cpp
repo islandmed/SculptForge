@@ -109,6 +109,7 @@
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
+//                            whats_new_more (improvements past its cards), whats_new_scrolled (1 once its cards scrolled),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
@@ -1337,6 +1338,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // entries (versions in full, then groups) and its open sections.
     if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
     if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_scrolled") return app_.whatsNewScrolled() ? 1.0 : 0.0;
+    if (name == "whats_new_more") return double(app_.whatsNewMore());
     if (name == "whats_new_tries") return double(app_.whatsNewTries_);
     if (name == "whats_new_contents") return double(app_.guide_.whatsNewContents().size());
     if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());

@@ -138,6 +138,7 @@ void App::initProject() {
         showWhatsNew_ = lastSeen != SCULPTFORGE_VERSION;
         // (the membership card's update moment: a newer version than the last start's)
         updatedThisStart_ = !lastSeen.empty() && compareVersions(SCULPTFORGE_VERSION, lastSeen) > 0;
+        if (updatedThisStart_) whatsNewSince_ = lastSeen; // What's New then shows every version since that one
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
         installerStamp_ = int64_t(prefs["installer_stamp"].asNumber(0));
@@ -898,7 +899,7 @@ void App::drawProjectPopups() {
         offerRestore_ = false;
     }
     if (showWhatsNew_ && !supportCard_ && !showWelcome_) { // after the membership card, if it showed
-        showWhatsNew();
+        showWhatsNew(whatsNewSince_);
         showWhatsNew_ = false;
     }
     drawUpdateBanner();

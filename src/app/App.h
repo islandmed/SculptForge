@@ -679,10 +679,13 @@ private:
     struct WhatsNewPopup;
     struct WhatsNewDelete { void operator()(WhatsNewPopup* p) const; };
     std::unique_ptr<WhatsNewPopup, WhatsNewDelete> whatsNew_;
-    void showWhatsNew(); // the popup, or the guide's chapter when this version has no cards
+    void showWhatsNew(const std::string& since = {}); // the popup (all versions newer than SINCE, else the newest), or the guide's chapter when it has no cards
+    std::string whatsNewSince_; // the last version seen when this start is an update ("" otherwise)
     void closeWhatsNew();
     bool whatsNewOpen() const;
     const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
+    int whatsNewMore() const;       // improvements past the cards (UI tests)
+    bool whatsNewScrolled() const;  // the cards scrolled (UI tests)
     bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
     void drawWhatsNew();
     // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).
