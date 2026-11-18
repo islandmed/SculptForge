@@ -339,7 +339,15 @@ add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Pro
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_ai PUBLIC sculptforge_core Threads::Threads)
-if(WIN32)
+# OFF: no HTTP transport at all (the Python wheels: no libcurl to bundle, and a library that never reaches the network);
+# the AI service commands then say so.
+option(SCULPTFORGE_HTTP "HTTPS for AI services and the brush gallery (WinHTTP or libcurl)" ON)
+if(NOT SCULPTFORGE_HTTP)
+  target_compile_definitions(sculptforge_ai PRIVATE SF_NO_HTTP)
+  if(WIN32)
+    target_link_libraries(sculptforge_ai PRIVATE ws2_32)
+  endif()
+elseif(WIN32)
   target_link_libraries(sculptforge_ai PRIVATE winhttp ws2_32)
 else()
   find_package(CURL QUIET)
@@ -677,7 +685,7 @@ if(MSVC)
   set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
   include(InstallRequiredSystemLibraries)
 endif()
-install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
+install(FILES LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)
 # A studio build: the profile's folder (packs, preferences, logo) where core/StudioProfile.h looks for it.
 if(SCULPTFORGE_STUDIO_PROFILE)
@@ -865,16 +873,39 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
   endif()
 endif()
 if(SCULPTFORGE_BUILD_PYTHON)
+  # The package `sculptforge` (python/sculptforge: __init__.py, type stubs) around the compiled sculptforge._core. In the
+  # build folder it is laid out as installed, in python-package/ (not python/: the app's Python home), for the tests.
+  # The wheel (pyproject.toml, scikit-build-core) installs only component python.
   pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp src/python/CoreCalls.cpp)
-  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
+  set(SF_PY_PACKAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/python-package/sculptforge)
+  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME _core LIBRARY_OUTPUT_DIRECTORY ${SF_PY_PACKAGE_DIR})
+  foreach(cfg ${CMAKE_CONFIGURATION_TYPES}) # (multi-config generators: no Release/ subfolder)
+    string(TOUPPER ${cfg} CFG)
+    set_target_properties(sculptforge_python PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${CFG} ${SF_PY_PACKAGE_DIR})
+  endforeach()
   target_link_libraries(sculptforge_python PRIVATE sculptforge_core sculptforge_ai)
   target_compile_definitions(sculptforge_python PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
-  set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
-      CACHE STRING "Where to install the Python module")
-  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR})
+  file(GLOB SF_PY_PACKAGE_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/python/sculptforge/*)
+  add_custom_command(TARGET sculptforge_python POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SF_PY_PACKAGE_FILES} ${SF_PY_PACKAGE_DIR})
+  if(SKBUILD) # a wheel: the package at the root of site-packages
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "." CACHE STRING "Where to install the Python package")
+  else()
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
+        CACHE STRING "Where to install the Python package")
+  endif()
+  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
+  install(FILES ${SF_PY_PACKAGE_FILES} DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
   if(SCULPTFORGE_BUILD_TESTS)
-    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=$<TARGET_FILE_DIR:sculptforge_python>
+    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
              ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python.py)
+    # The package's own suite (the wheels run it too), here also against sculptforge-cli: the same bytes from both.
+    execute_process(COMMAND ${Python_EXECUTABLE} -c "import pytest, numpy" RESULT_VARIABLE SF_NO_PYTEST OUTPUT_QUIET ERROR_QUIET)
+    if(SF_NO_PYTEST EQUAL 0)
+      add_test(NAME python_package COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
+               SF_CLI=$<TARGET_FILE:sculptforge-cli> ${Python_EXECUTABLE} -m pytest -q -p no:cacheprovider
+               ${CMAKE_CURRENT_SOURCE_DIR}/tests/python)
+    endif()
   endif()
 endif()
 

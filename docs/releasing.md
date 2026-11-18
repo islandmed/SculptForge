@@ -396,6 +396,26 @@ private, in one private repository per studio.
 - **Privacy:** a studio's files never go into public builds, packs or the public repository, and are never run (data
   only). Studio mode is tested: `ctest -R studio` (no request or socket leaves the machine).
 
+## Python package (PyPI)
+
+`pip install sculptforge` (pyproject.toml, docs/guide/python-package.md). packages.yml job **wheels** builds the engine-only
+wheels with cibuildwheel: CPython 3.12-3.14 on Linux x86_64 and aarch64 (manylinux_2_28), macOS universal2 (11.0+)
+and Windows x64, each installed in a clean environment and tested there (`pytest tests/python`), attested like every
+package; job **wheel-sums** records their SHA-256 (staged-sums-wheels). Both are `continue-on-error`: a red wheel never
+holds the app's release, it only means no Python package for that version.
+
+release.yml job **pypi** runs after the GitHub Release, for stable tags only, while the repository variable
+`PYPI_PUBLISH` is `true`: it re-checks the wheels against the recorded checksums and attestations
+(verify_staged.py), uploads to TestPyPI, installs from there in a clean venv and runs a sphere, then uploads to PyPI.
+Trusted Publishing: no token anywhere; the job is in the GitHub Environment `pypi` (deployment: tags `v*` only) and
+reads no secret (check_workflows.py). Versions are the app's; a version on PyPI can never be replaced, only yanked
+(pypi.org > project > Manage > Releases): fix forward in the next point release.
+
+One-time setup (the maintainer's account): on pypi.org and test.pypi.org, **Your projects > Publishing > Add a new
+pending publisher**: PyPI project name `sculptforge`, owner `islandmed`, repository `SculptForge`, workflow
+`release.yml`, environment `pypi`. In GitHub, **Settings > Environments > pypi**: deployment branches and tags, tag
+rule `v*`. Then `gh variable set PYPI_PUBLISH --body true`.
+
 ## When a step fails
 
 The script stops with a line starting `fix:` and the exact command to resume (`--from <step> --yes`, with this run's

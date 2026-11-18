@@ -121,7 +121,11 @@ Binary `.usdc` and USD references/payloads aren't read yet; convert with `usdcat
 
 ## Licensing for studios
 
-SculptForge is GPL-3.0-or-later. In practice:
+SculptForge is GPL-3.0-or-later with the SculptForge Scripting Exception (LICENSE-EXCEPTION.md). In practice:
+
+- **Your pipeline tools can be under any licence.** Scripts, add-ons and tools that use SculptForge only through
+  `import sculptforge`, `sculptforge-cli`, MCP or the plug-in SDK are not covered by the GPL, also when you give them
+  to vendors, outsourcers or clients.
 
 - **Using it is unrestricted**, commercially or otherwise, on any number of machines. There are no seats,
   licence servers or accounts.

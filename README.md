@@ -95,8 +95,10 @@ and the [Code of Conduct](CODE_OF_CONDUCT.md). For questions, tips and showing y
 
 Copyright © 2026 The SculptForge contributors.
 
-SculptForge is free software, licensed under the [GNU General Public License v3.0 or later](LICENSE). You own
-everything you make with it; the GPL covers the program, not your models. Third-party components and their
+SculptForge is free software, licensed under the [GNU General Public License v3.0 or later](LICENSE), with the
+[SculptForge Scripting Exception](LICENSE-EXCEPTION.md): scripts, add-ons and tools that use SculptForge only through
+its Python API, command line, MCP server or plug-in SDK can be under any licence. You own everything you make with
+it; the GPL covers the program, not your models. Third-party components and their
 licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 <sub>SculptForge is an independent project and is not affiliated with or endorsed by Epic Games,

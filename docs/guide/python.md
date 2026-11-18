@@ -242,3 +242,9 @@ app.lastWindowClosed.connect(lambda: sf.ui.cancel_timer(timer))
 ```
 
 *Thanks to Tpqz_ and chris_gardner on Discord for the idea.*
+
+## Licence of your scripts
+
+Your scripts are yours, under any licence you choose: SculptForge's licence (GPL-3.0-or-later) carries the
+**SculptForge Scripting Exception**, so code that uses SculptForge only through its Python API, command line, MCP
+server or plug-in SDK isn't bound by the GPL. See [The Python package](python-package.md#licence).

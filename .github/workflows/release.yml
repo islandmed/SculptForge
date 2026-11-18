@@ -399,6 +399,86 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SculptForge ${TAG#v}" --notes-file notes.md
           gh release upload "$TAG" dist/* --clobber
 
+  # The Python package (pip install sculptforge; packages.yml job wheels) from the same tested run: TestPyPI, a clean
+  # install from there, then PyPI. Trusted Publishing (OIDC): no token is stored anywhere; pypi.org and test.pypi.org
+  # trust this workflow in the GitHub Environment `pypi` only (deployment: tags v* only). Stable releases only, after
+  # the GitHub Release; on while the repository variable PYPI_PUBLISH is `true` (docs/releasing.md "Python package").
+  # A run without its wheel checksums (a wheel failed, or a run from before wheels) publishes nothing and says so.
+  pypi:
+    name: Publish the Python package
+    needs: [locate, build, verify, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && vars.PYPI_PUBLISH == 'true' && !contains(needs.locate.outputs.tag, '-') }}
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+      id-token: write # Trusted Publishing, and the PyPI attestations of each wheel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ needs.locate.outputs.sha }}', persist-credentials: false, sparse-checkout: tools/release }
+      - id: sums
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: staged-sums-wheels
+          path: sums
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - if: steps.sums.outcome != 'success'
+        run: echo "::warning::no wheel checksums in run $RUN, so the Python package is not published for $TAG"
+        env:
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+      - if: steps.sums.outcome == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: 'pywheels-*'
+          run-id: ${{ needs.locate.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The wheels job wheel-sums recorded, each attested by packages.yml in that run
+        if: steps.sums.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ needs.locate.outputs.run-id || github.run_id }}
+          SHA: ${{ needs.locate.outputs.built-sha || needs.locate.outputs.sha }}
+          STAGED: ${{ needs.locate.outputs.staged }}
+          REF: ${{ needs.locate.outputs.built-ref }}
+        run: |
+          python3 tools/release/verify_staged.py dist sums/SHA256SUMS.wheels.txt --repo "$GITHUB_REPOSITORY" --run "$RUN" --sha "$SHA" ${STAGED:+--staged --ref "$REF"}
+          v=${TAG#v}
+          ls dist/sculptforge-"$v"-*.whl >/dev/null || { echo "::error::no wheels of sculptforge $v (the tag's version)"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: TestPyPI
+        if: steps.sums.outcome == 'success'
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
+      - name: A clean install from TestPyPI imports and runs
+        if: steps.sums.outcome == 'success'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/v"
+          # Dependencies from PyPI only, then sculptforge alone from TestPyPI (--no-deps): anyone can upload a
+          # "numpy" to TestPyPI, so the two indexes are never mixed in one resolve.
+          "$RUNNER_TEMP/v/bin/pip" install -q --no-cache-dir "numpy>=1.26"
+          for i in $(seq 1 20); do # (the index shows a new release within a few minutes)
+            "$RUNNER_TEMP/v/bin/pip" install -q --no-cache-dir --no-deps --index-url https://test.pypi.org/simple/ \
+              "sculptforge==$VERSION" && break
+            [ "$i" = 20 ] && exit 1
+            sleep 30
+          done
+          cd "$RUNNER_TEMP" && v/bin/python -c "import sculptforge as sf; d = sf.Document(); sf.run(d, 'new_sphere', subdivisions=3); assert d.vertices.shape == (642, 3); assert sf.__version__ == '$VERSION'; print('sculptforge', sf.__version__, 'ok')"
+      - name: PyPI
+        if: steps.sums.outcome == 'success'
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist
+          skip-existing: true
+
   # A beta (a tag with a '-') is a member perk, published only in the private repository sculptforge/sculptforge-insiders.
   # INSIDERS_REPO_TOKEN lives only in the GitHub Environment "member-release" (deployment: tags v* only; the maintainer
   # approves each run), so no other job, workflow or branch can read it. This job's GitHub token only reads; the

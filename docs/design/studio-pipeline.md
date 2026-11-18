@@ -474,12 +474,9 @@ contractors for off-site use are. [18]
   vendor, an outsourcing partner, a freelancer on their own machine, or a client. Then you must offer them the
   source of your modifications under the GPL. Freelancers working on your machines and network are usually
   treated as internal; confirm with counsel.
-- **Our Python tools call `import sculptforge`. Do they become GPL?** Keeping them internal never triggers
-  anything. If you *distribute* a script together with SculptForge, the conservative reading is that code
-  linked into the same process may form a combined work. Scripts that run `sculptforge-cli` as a separate
-  process and exchange files are clearly separate programs. *(Decision for the maintainer and an IP lawyer: add an
-  explicit GPL exception, like a "plug-in and script exception", for code that uses only the public Python API
-  and CLI. That would remove the question entirely for vendors and tool sellers. Recommended.)*
+- **Our Python tools call `import sculptforge`. Do they become GPL?** No. Since 0.13.8 the licence carries the
+  SculptForge Scripting Exception (LICENSE-EXCEPTION.md): tools that use SculptForge only through the Python API,
+  the CLI, MCP or the plug-in SDK may be under any licence, internal or distributed, in the same process or not.
 - **Can we link SculptForge into our closed in-house asset system?** Internally, yes. If that system is ever
   distributed outside your organisation, the combined program must be GPL. Talking to it through files, USD or
   the CLI avoids the question.
