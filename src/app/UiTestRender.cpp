@@ -9,7 +9,7 @@
 //                            Tests only: no setting or environment reaches it.
 //   gl_limits copies=0|1|auto partial buffer updates as GPU copies (1) or BufferSubData (0) whatever the driver; auto: as the
 //                            driver needs (gl::copyUploads: copies on OpenGL over D3D12). Tests only, as texels=.
-//   render_cell NAME mode=lit|pbr|flat|wire|groups [min=F] [size=PX] [splats=1]   (groups: Lit Sphere with Show Face Groups)
+//   render_cell NAME mode=lit|pbr|flat|wire|groups [min=F|max=F] [size=PX] [splats=1]   (groups: Lit Sphere with Show Face Groups)
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
 //                            failing cell is listed by NAME (the script's "mode x path") with its picture in --ui-out, and
@@ -19,6 +19,7 @@
 //                            quad corner (not the once-a-splat pre-pass), no channel differs by more than 1/255.
 //                            After the frame the context must still draw (gl::contextHealthy): a cell fails when the
 //                            GPU dropped the device.
+//                            max=F instead: at most F of the box differs from the background (what is hidden is not drawn).
 // Value: render_coverage (the last cell's share, 0-1).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -62,6 +63,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     }
     std::string mode;
     double floor = kRenderCoverageFloor;
+    double most = -1.0; // max=F: at most F of the box drawn (-1: no limit, and the floor and colour checks apply)
     int size = 256;
     float distance = 0.0f; // 0 = frame the scene
     glm::vec3 target(0.0f);
@@ -69,6 +71,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     for (size_t i = 2; i < w.size(); ++i) {
         if (w[i].rfind("mode=", 0) == 0) mode = w[i].substr(5);
         else if (w[i].rfind("min=", 0) == 0) floor = std::strtod(w[i].c_str() + 4, nullptr);
+        else if (w[i].rfind("max=", 0) == 0) most = std::strtod(w[i].c_str() + 4, nullptr);
         else if (w[i].rfind("size=", 0) == 0) size = std::clamp(std::atoi(w[i].c_str() + 5), 64, 1024);
         else if (w[i].rfind("distance=", 0) == 0) distance = std::max(float(std::strtod(w[i].c_str() + 9, nullptr)), 0.0f);
         else if (w[i].rfind("target=", 0) == 0) {
@@ -88,7 +91,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         return false;
     }
     const std::string name = w[1];
-    steps_.push_back([this, line, name, mode, floor, size, splats, distance, target](float t) {
+    steps_.push_back([this, line, name, mode, floor, most, size, splats, distance, target](float t) {
         if (t == 0.0f) return false; // a settled frame
         App& app = app_;
         const RenderSettings saved = app.renderSettings_;
@@ -174,7 +177,13 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             r = measureRenderCoverage(img, cam, bounds);
             lastRenderCoverage_ = r.coverage;
             char buf[200];
-            if (r.coverage < floor) {
+            if (most >= 0.0) {
+                if (r.coverage > most) {
+                    std::snprintf(buf, sizeof buf, "too much is drawn: %.0f%% of its %dx%d px box differs from the background, wanted at most %.0f%%",
+                                  r.coverage * 100.0, r.boxW, r.boxH, most * 100.0);
+                    why = buf;
+                }
+            } else if (r.coverage < floor) {
                 std::snprintf(buf, sizeof buf, "the model is not drawn: %.0f%% of its %dx%d px box differs from the background, wanted %.0f%%",
                               r.coverage * 100.0, r.boxW, r.boxH, floor * 100.0);
                 why = buf;
