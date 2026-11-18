@@ -435,7 +435,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     // Adaptive Detail tiles: delta pages at the finest level a cluster may draw (plain program only).
     if (!focus_) {
         if (!tilePages_) tilePages_ = std::make_unique<MicroTilePages>();
-        tilePages_->setup(nt, maxDrawLevel());
+        tilePages_->setup(nt, tilePageLevel());
     } else {
         tilePages_.reset();
     }
@@ -843,8 +843,8 @@ bool MicroRenderer::sync(Mesh& mesh) {
             uploadDispTiles(mesh, slots, false);
         }
         if (tilePages_) { // (before the shading below: it reuses scratch_)
-            const bool relevel = tilePages_->pageLevel() != maxDrawLevel(); // (drawAbove changed: pages at the new finest level)
-            if (relevel) tilePages_->setup(baseTriangles_, maxDrawLevel());
+            const bool relevel = tilePages_->pageLevel() != tilePageLevel(); // (drawAbove changed: pages at the new finest level)
+            if (relevel) tilePages_->setup(baseTriangles_, tilePageLevel());
             tilePages_->sync(mesh, *this, scratch_, relevel || mm.allDirty || mm.rescaled);
         }
         // Bounds: the clusters whose base moved in full, those whose heights alone changed by their range.

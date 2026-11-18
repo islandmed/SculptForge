@@ -71,7 +71,10 @@ public:
     // dark column between; smooth shading, which interpolates the stored normals, never showed it). Set per draw.
     bool flatShading = false;
     static constexpr int kMaxDrawLevel = 8;
-    int maxDrawLevel() const { return flatShading ? level_ : std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
+    int maxDrawLevel() const { return flatShading ? level_ : tilePageLevel(); }
+    // Adaptive Detail tiles' page level: the finest level smooth shading draws (flat shading's coarser draws read the same
+    // pages, so switching shading keeps them).
+    int tilePageLevel() const { return std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
     // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
     const MicroFocus* focus() const { return focus_.get(); }
     MicroFocus* focus() { return focus_.get(); }
