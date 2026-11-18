@@ -140,6 +140,7 @@
 //                            right_tray_open, left_tray_open, right_tray_shown / left_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), clipped_labels / clipped_labels@SCOPE (controls whose label is wider than they are, e.g. @Extract), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
+//                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft
@@ -1647,6 +1648,23 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
+    }
+    if (name == "view_stale") {
+        // gh#184: the view as the GPU holds it after the edits so far, against the same mesh sent up whole again: the
+        // mean per-pixel difference (0-255) of the two renders. Stale GPU data (an undone stroke still drawn) shows here.
+        const int w = 480, h = 270;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        std::vector<uint8_t> now, whole;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, now, error)) return -1.0;
+        app_.displayedMesh().topologyDirty = true; // (a full upload)
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, whole, error) || whole.size() != now.size()) return -1.0;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
+        return double(sum) / double(std::max<size_t>(1, now.size()));
     }
     if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
         app_.benchmarkDrawMs(0);

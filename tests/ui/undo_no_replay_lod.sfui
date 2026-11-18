@@ -1,0 +1,53 @@
+# gh#184 (0.13.8: "after undoing, the next new stroke re-shows the undone strokes"), on a mesh over the triangle budget:
+# the coarse levels, the stroke thread's uploads and the still-frame budget are the big-mesh paths. After undo, while the
+# next stroke runs and after it, the view must be the mesh as it is (view_stale: against the same mesh sent up whole).
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 40000
+env SF_STILL_FRAME_MS 0.001
+env SF_BACKGROUND_DABS 1
+run new_sphere subdivisions=6
+camera 0 0
+wait 0.6
+brush_size 50
+expect_value view_stale < 0.5
+
+# Three strokes, undone one after the other.
+snapshot
+stroke 0.40 0.40 0.60 0.60 0.5
+wait 0.6
+stroke 0.45 0.55 0.65 0.45 0.5
+wait 0.6
+stroke 0.35 0.50 0.60 0.50 0.5
+wait 0.6
+expect_value view_stale < 0.5
+key ctrl+z
+wait 0.6
+key ctrl+z
+wait 0.6
+key ctrl+z
+wait 0.6
+expect_value moved == 0
+expect_value view_stale < 0.5
+
+# The next stroke, held: the view while it runs, then after it.
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.6 hold
+wait 0.3
+expect_value view_stale < 0.5
+release
+wait 0.6
+expect_value moved > 100
+expect_value view_stale < 0.5
+key ctrl+z
+wait 0.6
+expect_value moved == 0
+expect_value view_stale < 0.5
+
+# Undone, then a stroke at once (no wait between).
+stroke 0.40 0.40 0.60 0.60 0.5
+stroke 0.45 0.55 0.65 0.45 0.5
+key ctrl+z
+key ctrl+z
+stroke 0.40 0.45 0.60 0.55 0.5
+wait 0.6
+expect_value view_stale < 0.5
