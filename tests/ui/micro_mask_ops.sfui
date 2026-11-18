@@ -1,0 +1,43 @@
+# On a micro level the brushes and the viewport use the level's own mask (per grid point). Ctrl+W and Mask by
+# Cavity / Peaks / Colour / Facing / Face Group / Border read only the base mesh's mask, so they did nothing there.
+# Ctrl+W must group what the Mask brush painted on the micro level and clear that mask; Mask by Facing must mask
+# the micro level, with an undo step. tests/test_micro_mask_ops.cpp holds the geometry.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run micro_divide level=3
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+
+# Paint a mask on the micro level, then Ctrl+W: a new face group, and the micro mask cleared.
+remember groups before
+brush_size 80
+hold ctrl
+stroke 0.44 0.50 0.56 0.50 0.6
+hold none
+wait_idle 30
+expect_value micro_masked > 0
+shot painted
+key ctrl+w
+wait_idle 30
+expect_value groups > $before
+expect_value micro_masked == 0
+shot grouped
+key ctrl+z
+wait_idle 30
+key ctrl+z
+wait_idle 30
+expect_value groups == $before
+
+# Mask by Facing: what faces the view is masked on the micro level; undo takes it off again.
+run mask_clear
+wait_idle 30
+run mask_by_facing x=0 y=0 z=1 angle=40
+wait_idle 30
+expect_value micro_masked > 0
+remember micro_masked facing
+shot facing
+key ctrl+z
+wait_idle 30
+expect_value micro_masked == 0

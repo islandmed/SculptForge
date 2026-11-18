@@ -339,6 +339,7 @@ flat in int vPrimBase;
 // interpolated on the micro triangle under the pixel (normal, curvature, mask), whatever level the geometry drew.
 flat in int vSlot;
 flat in int vEdges;
+flat in int vGroup;
 in vec2 vIJ;
 uniform samplerBuffer uShade;
 uniform int uN;
@@ -595,6 +596,10 @@ void main() {
 #endif
     vec3 tint = vec3(1.0) + uTintShift; // multiplies a lit sphere: vertex paint or face group colours, or the active colour
     vec3 albedo = uBaseColor * tint;
+#ifdef MICRO
+    if (uGroups == 1) albedo = tint = groupColor(uint(vGroup)); // (each base triangle's, render/MicroRenderer.cpp)
+    else
+#endif
 #ifdef PRIM
     if (uGroups == 3) albedo = tint = faceColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
     else if (uGroups == 1) albedo = tint = groupColor(texelFetch(uGroupIds, vPrimBase + gl_PrimitiveID).r);
@@ -4126,7 +4131,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
     gl::Uniform1f(p->maskDarkness, std::clamp(settings.maskDarkness, 0.0f, 1.0f));
     gl::Uniform4fv(p->maskColor, 1, glm::value_ptr(glm::vec4(settings.maskColor, settings.maskColorCustom ? 1.0f : 0.0f)));
-    gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 2 : 0);
+    gl::Uniform1i(p->groups, active && settings.showFaceGroups ? 1 : 0);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     gl::Uniform1i(p->microWire, active && settings.wireframe ? 1 : 0); // (#128: the wireframe pass skips micro levels)
     setLightUniforms(*p, settings);

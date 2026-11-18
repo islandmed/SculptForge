@@ -4,6 +4,7 @@
 
 #include "core/Commands.h"
 #include "core/Masking.h"
+#include "core/Micro.h"
 #include "core/ScreenSelect.h"
 
 #include <algorithm>
@@ -217,7 +218,21 @@ std::vector<uint32_t> groupsFromMask(const Mesh& mesh, size_t* changed) {
     std::vector<uint32_t> groups = currentGroups(mesh);
     const uint32_t id = nextFaceGroupId(mesh);
     size_t n = 0;
-    if (mesh.hasMask()) {
+    if (mesh.micro && mesh.micro->hasMask() && microMatches(mesh)) {
+        // A micro level brushes with its own mask (per grid point): a base triangle joins when more than half of its
+        // grid points are masked at least half (its shared edges and corners counted with it, as with the base rule).
+        const MicroMesh& mm = *mesh.micro;
+        for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
+            if (mesh.triangleHidden(t)) continue;
+            const uint8_t* g = mm.tileMask(t);
+            const uint32_t S = mm.tileSamples(t);
+            if (2 * uint32_t(std::count_if(g, g + S, [](uint8_t v) { return v >= 128; })) > S) {
+                groups[t] = id;
+                ++n;
+            }
+        }
+    }
+    if (n == 0 && mesh.hasMask()) { // (the base mesh's)
         for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
             if (mesh.triangleHidden(t)) continue;
             const glm::uvec3& tri = mesh.triangles[t];

@@ -74,42 +74,11 @@ float smoothstep01(float e0, float e1, float x) {
 
 enum class MicroMaskOp { Clear, All, Invert, Blur, Sharpen, Grow, Shrink };
 
-// One neighbourhood pass over every visible tile: each point from its neighbours inside its tile, then the copies of a
-// point on a shared edge or corner combined (averaged; Grow the largest, Shrink the smallest), as a stroke stitches.
-void microMaskPass(const Mesh& m, MicroMesh& mm, MicroMaskOp op, std::vector<uint8_t>& out) {
+// Makes the copies of a grid point on a shared edge or corner one value again, as a stroke stitches: `combine` of the
+// visible copies (a hidden triangle keeps its own and gives it to the others).
+template <class Combine>
+void stitchMicroMask(const Mesh& m, const MicroMesh& mm, std::vector<uint8_t>& out, Combine combine) {
     const uint32_t n = mm.n, S = mm.samples;
-    const std::vector<uint8_t>& in = mm.mask;
-    out = in;
-    poolFor(mm.baseTriangles, [&](size_t b, size_t e) {
-        for (size_t t = b; t < e; ++t) {
-            if (m.triangleHidden(uint32_t(t))) continue;
-            const uint8_t* g = in.data() + t * S;
-            uint8_t* o = out.data() + t * S;
-            for (uint32_t j = 0; j <= n; ++j)
-                for (uint32_t i = 0; i + j <= n; ++i) {
-                    const float v = float(g[MicroMesh::index(i, j, n)]);
-                    float sum = 0.0f, lo = v, hi = v;
-                    int count = 0;
-                    auto at = [&](int di, int dj) {
-                        const int a = int(i) + di, c = int(j) + dj;
-                        if (a < 0 || c < 0 || uint32_t(a + c) > n) return;
-                        const float u = float(g[MicroMesh::index(uint32_t(a), uint32_t(c), n)]);
-                        sum += u, lo = std::min(lo, u), hi = std::max(hi, u), ++count;
-                    };
-                    at(1, 0), at(-1, 0), at(0, 1), at(0, -1), at(1, -1), at(-1, 1);
-                    const float avg = count ? sum / float(count) : v;
-                    float r = v;
-                    if (op == MicroMaskOp::Blur) r = 0.5f * v + 0.5f * avg;
-                    else if (op == MicroMaskOp::Sharpen) r = ((v + (v - avg)) - 127.5f) * 1.25f + 127.5f;
-                    else if (op == MicroMaskOp::Grow) r = hi;
-                    else if (op == MicroMaskOp::Shrink) r = lo;
-                    o[MicroMesh::index(i, j, n)] = uint8_t(std::clamp(std::lround(r), 0L, 255L));
-                }
-        }
-    }, 64);
-    auto combine = [&](int a, int c) {
-        return op == MicroMaskOp::Grow ? std::max(a, c) : op == MicroMaskOp::Shrink ? std::min(a, c) : (a + c + 1) / 2;
-    };
     poolFor(mm.baseTriangles, [&](size_t b, size_t e) { // (each shared edge once, by the lower visible triangle)
         for (size_t t = b; t < e; ++t) {
             if (m.triangleHidden(uint32_t(t))) continue;
@@ -156,6 +125,46 @@ void microMaskPass(const Mesh& m, MicroMesh& mm, MicroMaskOp op, std::vector<uin
     }, 4096);
 }
 
+// One neighbourhood pass over every visible tile: each point from its neighbours inside its tile, then the copies of a
+// point on a shared edge or corner combined (averaged; Grow the largest, Shrink the smallest), as a stroke stitches.
+void microMaskPass(const Mesh& m, MicroMesh& mm, MicroMaskOp op, std::vector<uint8_t>& out) {
+    const uint32_t n = mm.n, S = mm.samples;
+    const std::vector<uint8_t>& in = mm.mask;
+    out = in;
+    poolFor(mm.baseTriangles, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t) {
+            if (m.triangleHidden(uint32_t(t))) continue;
+            const uint8_t* g = in.data() + t * S;
+            uint8_t* o = out.data() + t * S;
+            for (uint32_t j = 0; j <= n; ++j)
+                for (uint32_t i = 0; i + j <= n; ++i) {
+                    const float v = float(g[MicroMesh::index(i, j, n)]);
+                    float sum = 0.0f, lo = v, hi = v;
+                    int count = 0;
+                    auto at = [&](int di, int dj) {
+                        const int a = int(i) + di, c = int(j) + dj;
+                        if (a < 0 || c < 0 || uint32_t(a + c) > n) return;
+                        const float u = float(g[MicroMesh::index(uint32_t(a), uint32_t(c), n)]);
+                        sum += u, lo = std::min(lo, u), hi = std::max(hi, u), ++count;
+                    };
+                    at(1, 0), at(-1, 0), at(0, 1), at(0, -1), at(1, -1), at(-1, 1);
+                    const float avg = count ? sum / float(count) : v;
+                    float r = v;
+                    if (op == MicroMaskOp::Blur) r = 0.5f * v + 0.5f * avg;
+                    else if (op == MicroMaskOp::Sharpen) r = ((v + (v - avg)) - 127.5f) * 1.25f + 127.5f;
+                    else if (op == MicroMaskOp::Grow) r = hi;
+                    else if (op == MicroMaskOp::Shrink) r = lo;
+                    o[MicroMesh::index(i, j, n)] = uint8_t(std::clamp(std::lround(r), 0L, 255L));
+                }
+        }
+    }, 64);
+    stitchMicroMask(m, mm, out, [op](int a, int c) {
+        return op == MicroMaskOp::Grow ? std::max(a, c) : op == MicroMaskOp::Shrink ? std::min(a, c) : (a + c + 1) / 2;
+    });
+}
+
+std::shared_ptr<MicroUndo> commitMicroMask(Mesh& mesh, MicroMesh& mm, const std::vector<uint8_t>& old, bool added, bool cleared);
+
 // Applies `op` to the micro level's mask (`iterations` passes of the neighbourhood ops, each about one base edge
 // ring as on the base mesh) and returns the undo step, or null when nothing changed. Kept strokes it reaches are
 // fixed in place (the mask is part of what their replay starts from).
@@ -190,12 +199,18 @@ std::shared_ptr<MicroUndo> microMaskAdjust(Mesh& mesh, MicroMaskOp op, int itera
             mm.mask.swap(next);
         }
     }
+    return commitMicroMask(mesh, mm, old, added, op == MicroMaskOp::Clear);
+}
+
+// The undo step of a change to the micro level's mask (`old`: as it was; `added`: the change allocated it, `cleared`:
+// it is to be freed), or null when nothing changed. Marks the changed tiles and fixes the kept strokes they reach.
+std::shared_ptr<MicroUndo> commitMicroMask(Mesh& mesh, MicroMesh& mm, const std::vector<uint8_t>& old, bool added, bool cleared) {
+    const size_t S = mm.samples;
     auto u = std::make_shared<MicroUndo>();
     u->step = mm.step, u->samples = mm.samples, u->maskAdded = added;
     for (uint32_t t = 0; t < mm.baseTriangles; ++t)
         if (!std::equal(old.begin() + std::ptrdiff_t(t * S), old.begin() + std::ptrdiff_t((t + 1) * S), mm.mask.begin() + std::ptrdiff_t(t * S)))
             u->tris.push_back(t);
-    const bool cleared = op == MicroMaskOp::Clear;
     if (u->tris.empty()) {
         if (added) std::vector<uint8_t>().swap(mm.mask);
         return nullptr;
@@ -439,10 +454,13 @@ std::vector<uint8_t> borderVertices(const Mesh& mesh, bool facegroups) {
     return border;
 }
 
-bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strength, bool add, size_t* found) {
+namespace {
+
+// maskBorder's value per vertex (empty when the mesh has no border).
+std::vector<float> borderValues(const Mesh& mesh, int rings, bool facegroups, bool soft, float strength, size_t* found) {
     const uint32_t n = static_cast<uint32_t>(mesh.vertexCount());
     if (found) *found = 0;
-    if (n == 0) return false;
+    if (n == 0) return {};
     rings = std::clamp(rings, 1, 20);
     strength = std::clamp(strength, 0.0f, 1.0f);
     // Ring index of each vertex from the border (0 = on it), out to rings - 1; -1 beyond.
@@ -455,7 +473,7 @@ bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strengt
             frontier.push_back(v);
         }
     if (found) *found = frontier.size();
-    if (frontier.empty()) return false;
+    if (frontier.empty()) return {};
     for (int r = 1; r < rings && !frontier.empty(); ++r) {
         next.clear();
         for (uint32_t v : frontier)
@@ -466,11 +484,18 @@ bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strengt
                 }
         frontier.swap(next);
     }
-    return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) {
-        float value = 0.0f;
-        if (ring[v] >= 0) value = strength * (soft ? 1.0f - float(ring[v]) / float(rings) : 1.0f);
-        return add ? std::max(m[v], value) : value;
-    });
+    std::vector<float> value(n, 0.0f);
+    for (uint32_t v = 0; v < n; ++v)
+        if (ring[v] >= 0) value[v] = strength * (soft ? 1.0f - float(ring[v]) / float(rings) : 1.0f);
+    return value;
+}
+
+} // namespace
+
+bool maskBorder(Mesh& mesh, int rings, bool facegroups, bool soft, float strength, bool add, size_t* found) {
+    const std::vector<float> value = borderValues(mesh, rings, facegroups, soft, strength, found);
+    if (value.empty()) return false;
+    return maskPass(mesh, [&](const std::vector<float>& m, uint32_t v) { return add ? std::max(m[v], value[v]) : value[v]; });
 }
 
 namespace {
@@ -567,11 +592,174 @@ void Sculptor::dabMask(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry 
     ++timings.dabs;
 }
 
+namespace {
+
+// --- Mask by ... on a micro level: per grid point, from the micro surface itself ---
+
+// One tile's micro surface: points and normals (from the micro triangles inside the tile), and concavity as the base
+// mesh's (each point against its neighbours, one smoothing pass). A point on a shared edge sees one side; the stitch
+// averages the copies.
+struct MicroTileShape {
+    std::vector<glm::vec3> p, nrm;
+    std::vector<float> raw, cav;
+};
+
+void microTileShape(const Mesh& m, const MicroMesh& mm, uint32_t t, bool cavity, MicroTileShape& g) {
+    const uint32_t n = mm.n, S = mm.samples;
+    g.p.resize(S);
+    g.nrm.assign(S, glm::vec3(0.0f));
+    MicroTriangle T;
+    T.set(m, t, n);
+    const int16_t* d = mm.tileDisp(t);
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i) {
+            glm::vec3 s, nn;
+            T.eval(i, j, s, nn);
+            const uint32_t k = MicroMesh::index(i, j, n);
+            g.p[k] = s + nn * (float(d[k]) * mm.step);
+        }
+    auto face = [&](uint32_t a, uint32_t b, uint32_t c) {
+        const glm::vec3 w = glm::cross(g.p[b] - g.p[a], g.p[c] - g.p[a]); // (area-weighted)
+        g.nrm[a] += w, g.nrm[b] += w, g.nrm[c] += w;
+    };
+    for (uint32_t j = 0; j < n; ++j)
+        for (uint32_t i = 0; i + j < n; ++i) {
+            const uint32_t a = MicroMesh::index(i, j, n), b = MicroMesh::index(i + 1, j, n), c = MicroMesh::index(i, j + 1, n);
+            face(a, b, c);
+            if (i + j + 1 < n) face(b, MicroMesh::index(i + 1, j + 1, n), c);
+        }
+    for (glm::vec3& v : g.nrm) {
+        const float len = glm::length(v);
+        v = len > 0.0f ? v / len : glm::vec3(0.0f);
+    }
+    if (!cavity) return;
+    auto ring = [&](uint32_t i, uint32_t j, auto&& f) {
+        const int di[6] = {1, -1, 0, 0, 1, -1}, dj[6] = {0, 0, 1, -1, -1, 1};
+        for (int q = 0; q < 6; ++q) {
+            const int a = int(i) + di[q], c = int(j) + dj[q];
+            if (a >= 0 && c >= 0 && uint32_t(a + c) <= n) f(MicroMesh::index(uint32_t(a), uint32_t(c), n));
+        }
+    };
+    g.raw.resize(S), g.cav.resize(S);
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i) { // (vertexConcavity)
+            const uint32_t k = MicroMesh::index(i, j, n);
+            glm::vec3 avg(0.0f);
+            float edge = 0.0f, count = 0.0f;
+            ring(i, j, [&](uint32_t u) { avg += g.p[u], edge += glm::distance(g.p[k], g.p[u]), count += 1.0f; });
+            g.raw[k] = edge > 1e-12f ? glm::dot(g.nrm[k], avg / count - g.p[k]) / (edge / count) : 0.0f;
+        }
+    for (uint32_t j = 0; j <= n; ++j)
+        for (uint32_t i = 0; i + j <= n; ++i) {
+            const uint32_t k = MicroMesh::index(i, j, n);
+            float sum = 0.0f, count = 0.0f;
+            ring(i, j, [&](uint32_t u) { sum += g.raw[u], count += 1.0f; });
+            g.cav[k] = 0.5f * g.raw[k] + 0.5f * (count > 0.0f ? sum / count : g.raw[k]);
+        }
+}
+
+enum class MicroShape { None, Normals, Cavity };
+
+// Sets the micro level's mask of every visible tile from `value(tri, i, j, k, shape, old)` (0..1, old the point's
+// mask 0..1), the copies on shared edges and corners then made one (averaged, or `widest`: the largest), and returns
+// the undo step (null: unchanged). Kept strokes it reaches are fixed in place.
+template <class F>
+std::shared_ptr<MicroUndo> microMaskBy(Mesh& mesh, MicroShape need, bool widest, F value) {
+    if (!mesh.micro || !microMatches(mesh)) return nullptr;
+    MicroMesh& mm = mutableMicro(mesh);
+    mm.ensureTopology(mesh);
+    const uint32_t n = mm.n, S = mm.samples;
+    const bool added = !mm.hasMask();
+    if (added) mm.mask.assign(mm.disp.size(), 0);
+    const std::vector<uint8_t> old = mm.mask;
+    poolFor(mm.baseTriangles, [&](size_t b, size_t e) {
+        MicroTileShape g;
+        for (size_t t = b; t < e; ++t) {
+            if (mesh.triangleHidden(uint32_t(t))) continue;
+            if (need != MicroShape::None) microTileShape(mesh, mm, uint32_t(t), need == MicroShape::Cavity, g);
+            uint8_t* o = mm.mask.data() + t * S;
+            for (uint32_t j = 0; j <= n; ++j)
+                for (uint32_t i = 0; i + j <= n; ++i) {
+                    const uint32_t k = MicroMesh::index(i, j, n);
+                    const float v = value(uint32_t(t), i, j, k, g, float(o[k]) / 255.0f);
+                    o[k] = uint8_t(std::clamp(std::lround(v * 255.0f), 0L, 255L));
+                }
+        }
+    }, 16);
+    if (widest) stitchMicroMask(mesh, mm, mm.mask, [](int a, int c) { return std::max(a, c); });
+    else stitchMicroMask(mesh, mm, mm.mask, [](int a, int c) { return (a + c + 1) / 2; });
+    return commitMicroMask(mesh, mm, old, added, false);
+}
+
+// A per-vertex value of the base mesh at grid point (i, j) of triangle t (barycentric, as the base mesh shades it).
+float atGridPoint(const Mesh& m, const std::vector<float>& value, uint32_t t, uint32_t i, uint32_t j, uint32_t n) {
+    const glm::uvec3& tri = m.triangles[t];
+    const float inv = 1.0f / float(n);
+    return value[tri.x] * float(n - i - j) * inv + value[tri.y] * float(i) * inv + value[tri.z] * float(j) * inv;
+}
+
+constexpr float kCavityRamp = 0.15f; // (as maskByCavity)
+
+std::shared_ptr<MicroUndo> microMaskByCavity(Mesh& mesh, float strength, float threshold, bool peaks) {
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    return microMaskBy(mesh, MicroShape::Cavity, false, [&](uint32_t, uint32_t, uint32_t, uint32_t k, const MicroTileShape& g, float) {
+        return strength * smoothstep01(threshold, threshold + kCavityRamp, peaks ? -g.cav[k] : g.cav[k]);
+    });
+}
+
+std::shared_ptr<MicroUndo> microMaskByColor(Mesh& mesh, const glm::vec3& color, float tolerance, float strength, bool add) {
+    tolerance = std::clamp(tolerance, 0.001f, 1.0f);
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    const glm::vec3 c = glm::clamp(color, glm::vec3(0.0f), glm::vec3(1.0f));
+    const uint32_t n = mesh.micro ? mesh.micro->n : 1;
+    return microMaskBy(mesh, MicroShape::None, false, [&](uint32_t t, uint32_t i, uint32_t j, uint32_t, const MicroTileShape&, float old) {
+        const glm::uvec3& tri = mesh.triangles[t];
+        const float inv = 1.0f / float(n);
+        const glm::vec3 col = mesh.colorAt(tri.x) * (float(n - i - j) * inv) + mesh.colorAt(tri.y) * (float(i) * inv) +
+                              mesh.colorAt(tri.z) * (float(j) * inv);
+        const float w = strength * (1.0f - smoothstep01(tolerance * 0.8f, tolerance, glm::distance(col, c) / 1.7320508f));
+        return add ? std::max(old, w) : w;
+    });
+}
+
+std::shared_ptr<MicroUndo> microMaskByFacing(Mesh& mesh, const glm::vec3& direction, float angleDeg, float strength, bool add) {
+    const float len = glm::length(direction);
+    if (!(len > 1e-9f)) return nullptr;
+    const glm::vec3 dir = direction / len;
+    angleDeg = std::clamp(angleDeg, 1.0f, 180.0f);
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    const float full = std::max(0.0f, angleDeg - 15.0f); // (as maskByFacing)
+    return microMaskBy(mesh, MicroShape::Normals, false, [&](uint32_t, uint32_t, uint32_t, uint32_t k, const MicroTileShape& g, float old) {
+        const float a = std::acos(std::clamp(glm::dot(g.nrm[k], dir), -1.0f, 1.0f)) * 57.29578f;
+        const float w = strength * (1.0f - smoothstep01(full, angleDeg, a));
+        return add ? std::max(old, w) : w;
+    });
+}
+
+// A grid point of the group's triangles is masked (with the stitch's largest copy: its border points too, as
+// maskByFaceGroup masks every vertex of the group's triangles).
+std::shared_ptr<MicroUndo> microMaskByFaceGroup(Mesh& mesh, uint32_t group, bool add) {
+    return microMaskBy(mesh, MicroShape::None, true, [&](uint32_t t, uint32_t, uint32_t, uint32_t, const MicroTileShape&, float old) {
+        return mesh.facegroupAt(t) == group ? 1.0f : add ? old : 0.0f;
+    });
+}
+
+std::shared_ptr<MicroUndo> microMaskBorder(Mesh& mesh, const std::vector<float>& value, bool add) {
+    const uint32_t n = mesh.micro ? mesh.micro->n : 1;
+    return microMaskBy(mesh, MicroShape::None, true, [&](uint32_t t, uint32_t i, uint32_t j, uint32_t, const MicroTileShape&, float old) {
+        const float w = atGridPoint(mesh, value, t, i, j, n);
+        return add ? std::max(old, w) : w;
+    });
+}
+
+} // namespace
+
 void registerMaskingCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     // Wraps a mask operation as an undoable command.
     auto add = [&registry](std::string name, std::string label, std::string description, std::vector<ParamSpec> params,
-                           std::function<bool(Mesh&, const Args&)> op, std::optional<MicroMaskOp> micro = std::nullopt) {
+                           std::function<bool(Mesh&, const Args&)> op,
+                           std::function<std::shared_ptr<MicroUndo>(Mesh&, const Args&)> micro = {}) {
         registry.add({std::move(name), std::move(description), std::move(params),
                       [label, op, micro](Document& doc, const Args& a) -> CommandResult {
                           if (doc.mesh.vertexCount() == 0) return {false, "The mesh is empty"};
@@ -579,7 +767,7 @@ void registerMaskingCommands(CommandRegistry& registry) {
                           // A micro level brushes and draws with its own mask (per grid point): the op changes that
                           // one, and the base mesh's only when it has one (Invert or All would mask the whole cage).
                           const bool onMicro = micro && doc.mesh.micro;
-                          if (onMicro) record.micro = microMaskAdjust(doc.mesh, *micro, std::clamp(int(argNumber(a, "iterations", 1)), 1, 100));
+                          if (onMicro) record.micro = micro(doc.mesh, a);
                           const bool base = (!onMicro || doc.mesh.hasMask()) && op(doc.mesh, a);
                           if (!record.micro && !base) return {true, label + ": mask unchanged"};
                           if (!base) record.mask = {};
@@ -590,21 +778,24 @@ void registerMaskingCommands(CommandRegistry& registry) {
     };
     const ParamSpec iterations{"iterations", T::Number, "Number of passes (1-100). Default 1.", false};
     auto iters = [](const Args& a) { return std::clamp(int(argNumber(a, "iterations", 1)), 1, 100); };
+    auto adjust = [iters](MicroMaskOp op) {
+        return [iters, op](Mesh& m, const Args& a) { return microMaskAdjust(m, op, iters(a)); };
+    };
 
     add("mask_clear", "Clear Mask", "Remove the mask so every vertex can be sculpted again.", {},
-        [](Mesh& m, const Args&) { return maskClear(m); }, MicroMaskOp::Clear);
+        [](Mesh& m, const Args&) { return maskClear(m); }, adjust(MicroMaskOp::Clear));
     add("mask_all", "Mask All", "Mask every visible vertex (protects the whole mesh from brushes).", {},
-        [](Mesh& m, const Args&) { return maskAll(m); }, MicroMaskOp::All);
+        [](Mesh& m, const Args&) { return maskAll(m); }, adjust(MicroMaskOp::All));
     add("mask_invert", "Invert Mask", "Invert the mask of visible vertices: masked becomes free and vice versa.", {},
-        [](Mesh& m, const Args&) { return maskInvert(m); }, MicroMaskOp::Invert);
+        [](Mesh& m, const Args&) { return maskInvert(m); }, adjust(MicroMaskOp::Invert));
     add("mask_blur", "Blur Mask", "Soften the mask edges by averaging with neighbouring vertices.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskBlur(m, iters(a)); }, MicroMaskOp::Blur);
+        [iters](Mesh& m, const Args& a) { return maskBlur(m, iters(a)); }, adjust(MicroMaskOp::Blur));
     add("mask_sharpen", "Sharpen Mask", "Tighten soft mask edges, pushing values towards fully masked or free.",
-        {iterations}, [iters](Mesh& m, const Args& a) { return maskSharpen(m, iters(a)); }, MicroMaskOp::Sharpen);
+        {iterations}, [iters](Mesh& m, const Args& a) { return maskSharpen(m, iters(a)); }, adjust(MicroMaskOp::Sharpen));
     add("mask_grow", "Grow Mask", "Expand the masked region by one edge ring per iteration.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskGrow(m, iters(a)); }, MicroMaskOp::Grow);
+        [iters](Mesh& m, const Args& a) { return maskGrow(m, iters(a)); }, adjust(MicroMaskOp::Grow));
     add("mask_shrink", "Shrink Mask", "Contract the masked region by one edge ring per iteration.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskShrink(m, iters(a)); }, MicroMaskOp::Shrink);
+        [iters](Mesh& m, const Args& a) { return maskShrink(m, iters(a)); }, adjust(MicroMaskOp::Shrink));
     add("mask_by_cavity", "Mask by Cavity",
         "Mask concave areas (creases, folds, pores), replacing the current mask - e.g. to protect detail while smoothing.",
         {{"strength", T::Number, "Mask value in the deepest cavities (0-1). Default 1.", false},
@@ -615,6 +806,10 @@ void registerMaskingCommands(CommandRegistry& registry) {
         [](Mesh& m, const Args& a) {
             return maskByCavity(m, float(argNumber(a, "strength", 1.0)),
                                 std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
+        },
+        [](Mesh& m, const Args& a) {
+            return microMaskByCavity(m, float(argNumber(a, "strength", 1.0)),
+                                     std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f), false);
         });
     add("mask_by_peaks", "Mask by Peaks",
         "Mask convex areas (ridges, peaks, sharp edges), replacing the current mask - e.g. to work only in the "
@@ -627,6 +822,10 @@ void registerMaskingCommands(CommandRegistry& registry) {
         [](Mesh& m, const Args& a) {
             return maskByPeaks(m, float(argNumber(a, "strength", 1.0)),
                                std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f));
+        },
+        [](Mesh& m, const Args& a) {
+            return microMaskByCavity(m, float(argNumber(a, "strength", 1.0)),
+                                     std::clamp(float(argNumber(a, "threshold", 0.02)), -1.0f, 1.0f), true);
         });
     add("mask_by_color", "Mask by Colour",
         "Mask the vertices whose vertex paint is close to a colour (unpainted meshes are white).",
@@ -643,6 +842,13 @@ void registerMaskingCommands(CommandRegistry& registry) {
             if (!colorArg(a, c, err)) return false;
             return maskByColor(m, c, float(argNumber(a, "tolerance", 0.15)), float(argNumber(a, "strength", 1.0)),
                                argBool(a, "add", false));
+        },
+        [](Mesh& m, const Args& a) -> std::shared_ptr<MicroUndo> {
+            glm::vec3 c(1.0f);
+            std::string err;
+            if (!colorArg(a, c, err)) return nullptr;
+            return microMaskByColor(m, c, float(argNumber(a, "tolerance", 0.15)), float(argNumber(a, "strength", 1.0)),
+                                    argBool(a, "add", false));
         });
     add("mask_by_facing", "Mask by Facing",
         "Mask the vertices whose surface faces a direction (within an angle): e.g. 0 0 1 masks what faces the front "
@@ -657,6 +863,11 @@ void registerMaskingCommands(CommandRegistry& registry) {
             const glm::vec3 d(float(argNumber(a, "x", 0)), float(argNumber(a, "y", 0)), float(argNumber(a, "z", 1)));
             return maskByFacing(m, d, float(argNumber(a, "angle", 60)), float(argNumber(a, "strength", 1.0)),
                                 argBool(a, "add", false));
+        },
+        [](Mesh& m, const Args& a) {
+            const glm::vec3 d(float(argNumber(a, "x", 0)), float(argNumber(a, "y", 0)), float(argNumber(a, "z", 1)));
+            return microMaskByFacing(m, d, float(argNumber(a, "angle", 60)), float(argNumber(a, "strength", 1.0)),
+                                     argBool(a, "add", false));
         });
     add("mask_by_facegroup", "Mask by Face Group",
         "Mask the vertices of one face group (meshes without face groups are all group 0).",
@@ -664,6 +875,9 @@ void registerMaskingCommands(CommandRegistry& registry) {
          {"add", T::Bool, "Add to the current mask instead of replacing it. Default false.", false}},
         [](Mesh& m, const Args& a) {
             return maskByFaceGroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
+        },
+        [](Mesh& m, const Args& a) {
+            return microMaskByFaceGroup(m, uint32_t(std::max(0.0, argNumber(a, "group", 0))), argBool(a, "add", false));
         });
 
     registry.add(
@@ -685,13 +899,20 @@ void registerMaskingCommands(CommandRegistry& registry) {
              const bool facegroups = argBool(a, "facegroups", false);
              UndoRecord record = UndoRecord::captureMask(doc.mesh, label);
              size_t found = 0;
-             const bool changed =
-                 maskBorder(doc.mesh, int(argNumber(a, "rings", 1)), facegroups, argBool(a, "soft", false),
-                            float(argNumber(a, "strength", 1.0)), argBool(a, "add", false), &found);
+             const bool add = argBool(a, "add", false);
+             const std::vector<float> value = borderValues(doc.mesh, int(argNumber(a, "rings", 1)), facegroups,
+                                                           argBool(a, "soft", false), float(argNumber(a, "strength", 1.0)), &found);
              if (found == 0)
                  return {true, facegroups ? "No open edges or face group borders: the mesh is closed and one face group"
                                           : "No open edges: the mesh is closed"};
-             if (!changed) return {true, label + ": mask unchanged"};
+             // (on a micro level its own mask, per grid point as the base mesh shades it; the base's only when it has one)
+             const bool onMicro = doc.mesh.micro != nullptr;
+             if (onMicro) record.micro = microMaskBorder(doc.mesh, value, add);
+             const bool changed = (!onMicro || doc.mesh.hasMask()) && maskPass(doc.mesh, [&](const std::vector<float>& m, uint32_t v) {
+                 return add ? std::max(m[v], value[v]) : value[v];
+             });
+             if (!record.micro && !changed) return {true, label + ": mask unchanged"};
+             if (!changed) record.mask = {};
              doc.undo.push(std::move(record));
              doc.modified = true;
              return {true, label + ": " + std::to_string(found) + " border vertices"};
