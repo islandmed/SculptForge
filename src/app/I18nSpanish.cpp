@@ -926,7 +926,7 @@ constexpr Entry kSpanish[] = {
     {"Multithreading", "Multihilo"},
     {"Predictive Strokes", "Trazos predictivos"},
     {"Draft Strokes", "Trazos de borrador"},
-    {"Keep Strokes Editable", "Mantener trazos editables"},
+    {"Keep Strokes Editable (Experimental)", "Mantener trazos editables (experimental)"},
     {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
