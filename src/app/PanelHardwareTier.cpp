@@ -386,6 +386,10 @@ void App::drawTierCard() {
     ImGui::End();
 }
 
+// A modal card over the app (the membership card, What's New) is the one box that answers; the tier card waits under it
+// instead of sitting on top, unable to take a press (Android, ebarranco: Got it did nothing until the card below closed).
+bool App::tierCardCovered() const { return supportCardOpen() || whatsNewOpen(); }
+
 void App::dismissTierCard() {
     if (!hwProfile_ || !hwProfile_->tierCard) return;
     HwProfileUi& hw = *hwProfile_;
@@ -410,7 +414,7 @@ void App::tierCardFromDisk() {
 // on Linux). The press here is ImGui's only (no stroke under the card); the release on the same button puts the
 // card away. Esc and Enter do too, while no text field or pop-up has the keys.
 bool App::tierCardEvent(const SDL_Event& e) {
-    if (!hwProfile_ || !hwProfile_->tierCard || hwProfile_->calibrator) return false;
+    if (!hwProfile_ || !hwProfile_->tierCard || hwProfile_->calibrator || tierCardCovered()) return false;
     if (options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty()) return false; // (not shown)
     HwProfileUi& hw = *hwProfile_;
     const ImGuiIO& io = ImGui::GetIO();

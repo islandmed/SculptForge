@@ -3621,7 +3621,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return false;
             }
         }
-        run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
+        run([this, firstRun, testMode] {
+            app_.launchSupportCard(firstRun, app_.memberClock(), testMode);
+            app_.tickSupportCardQueue(); // (a start's next frame: it opens now unless a first-run box is up)
+        });
         break;
     }
     case StepVerb::MemberCard: {

@@ -1307,12 +1307,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Hardware tiers: the first-run card, the tier chip, Turbo, the panel (tests/ui/hardware_tier.sfui).
     # Also at 2880 px wide, so the 200 % top bar has room for the chip and the bolt (the shots show them).
     sculptforge_ui_test(hardware_tier_2880 hardware_tier --size 2880x1620)
+    sculptforge_ui_test(first_run_modal_order_2880 first_run_modal_order --size 2880x1620)
     if(TEST ui_hardware_tier)
       set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # Putting the first-run tier card away: every way, first press, any scale, nothing under it sculpted (#161).
     if(TEST ui_tier_card_click)
-      set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
+      set_tests_properties(ui_tier_card_click ui_first_run_modal_order ui_first_run_modal_order_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # One Alpha palette in the Classic and the SculptForge layout: the same controls reachable (tests/ui/alpha_layouts.sfui,
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
