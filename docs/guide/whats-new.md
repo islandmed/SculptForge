@@ -17,18 +17,23 @@ highlight: A portable copy on a USB stick that carries your settings, brushes an
 highlight: Python scripting in the app
 title: Circles for Mask, Select, Cut
 line: Draw a circle or an ellipse from its centre to mask, select or cut a round area in one drag. Pick Circle Mask in the Mask tool (B), or Select Circle and Cut Circle in Tool > Cut.
+image: images/wn-0137-circles.jpg
 action: guide:masking.md
 title: Slide a selection as you draw
 line: Hold Space while you drag a rectangle, lasso or circle to move the whole shape, then let go to keep sizing it. It works for Mask, Select and Cut.
+image: images/wn-0137-slide.jpg
 action: guide:masking.md
 title: Type any value on a slider
 line: Double-click (or Ctrl+click) any slider or number, type the value and press Enter; Esc cancels. Now it works in every panel, the top bar and Brush Lab.
+image: images/wn-0137-slider.jpg
 action: guide:interface.md
 title: Your setup on a USB stick
 line: The Windows portable .zip keeps your settings, brushes and library in a folder next to the program, so your workbench follows you from PC to PC. Unzip it anywhere and run it.
+image: images/wn-0137-usb.jpg
 action: guide:installing.md#a-portable-copy-a-usb-stick
 title: Script SculptForge in Python
 line: Turn it on in Edit > Preferences > Scripts, then open the console and click Python: loops, conditions and every command, each run one undo step. Scripts are programs, so run only ones you trust.
+image: images/wn-0137-python.jpg
 action: guide:python.md
 ```
 
@@ -65,9 +70,11 @@ highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longe
 highlight: A public benchmark you can run in one command
 title: Insert keeps every level
 line: Add a horn, an ear or any shape to a mesh that has subdivision levels: it becomes its own Part and every level keeps its detail. Parts > Append > Insert on the model.
+image: images/wn-0136-insert.jpg
 action: guide:parts.md
 title: No freeze after a heavy stroke
 line: On a very dense mesh, Undo, Save or a click right after a stroke no longer freezes the window.
+image: images/wn-0136-nofreeze.jpg
 action: guide:sculpting.md
 ```
 
@@ -90,6 +97,7 @@ highlight: AI agents can run a list of commands as one undo step that rolls back
 highlight: AI agents can read the scene as plain numbers without changing it
 title: Safer plugins
 line: A plugin can no longer stop SculptForge or use up your memory, so trying one from a pack is safer. Plugins still have no access to your files or the network.
+image: images/wn-0135-plugins.jpg
 action: guide:packs-and-macros.md#plugins
 ```
 
@@ -110,6 +118,7 @@ highlight: A short note from the members: once per version, a small card says Sc
 highlight: Membership links in the app carry a small source tag, so we can see which one helps
 title: Saves that don't give up
 line: On Windows, a save that meets a busy or read-only file tries again instead of failing, and if it still can't save, the status bar names the file.
+image: images/wn-0134-save.jpg
 action: guide:projects.md
 ```
 
