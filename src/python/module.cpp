@@ -16,6 +16,7 @@
 #include <chrono>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace py = pybind11;
 namespace fs = std::filesystem;
@@ -60,20 +61,29 @@ sf::CommandResult executeSafely(sf::Document& doc, const std::string& name, cons
     sf::Args redirected = args;
     redirected["path"] = str(temp / target.filename());
     sf::CommandResult r = core.execute(doc, name, redirected);
+    std::vector<fs::path> written; // listed first: files never move while the folder is being walked
     if (r.ok)
-        for (auto f = fs::recursive_directory_iterator(temp, ec); !ec && f != fs::recursive_directory_iterator(); f.increment(ec)) {
-            if (!f->is_regular_file(ec)) continue;
-            const fs::path dest = target.parent_path() / f->path().lexically_relative(temp);
-            fs::create_directories(dest.parent_path(), ec);
-            std::string err;
-            if (!sf::replaceFile(f->path(), dest, err)) {
-                r = {false, err};
-                break;
-            }
+        for (auto f = fs::recursive_directory_iterator(temp, ec); !ec && f != fs::recursive_directory_iterator(); f.increment(ec))
+            if (f->is_regular_file(ec)) written.push_back(f->path());
+    for (const fs::path& file : written) {
+        const fs::path dest = target.parent_path() / file.lexically_relative(temp);
+        fs::create_directories(dest.parent_path(), ec);
+        std::string err;
+        if (!sf::replaceFile(file, dest, err)) { // (files already moved are whole; this one and the rest are not written)
+            r = {false, err};
+            break;
         }
+    }
     fs::remove_all(temp, ec);
-    replaceAll(r.message, str(temp / target.filename()), str(target));
-    replaceAll(r.message, str(temp), str(target.parent_path()));
+    for (const bool generic : {false, true}) { // a message may name the path either way ('\\' or '/' on Windows)
+        auto s = [&](const fs::path& p) {
+            if (!generic) return str(p);
+            const std::u8string g = p.generic_u8string();
+            return std::string(g.begin(), g.end());
+        };
+        replaceAll(r.message, s(temp / target.filename()), s(target));
+        replaceAll(r.message, s(temp), s(target.parent_path()));
+    }
     return r;
 }
 

@@ -87,3 +87,15 @@ def test_same_result_as_the_cli(tmp_path, cli):
     script = "; ".join(STEPS) + f'; save_obj path="{cli_out.as_posix()}"'
     subprocess.run([cli, "-q", "--no-packs", "-c", script], check=True, timeout=300)
     assert digest(py_out) == digest(cli_out)
+
+
+def test_multi_file_export_moves_every_file(tmp_path):
+    # export_lods writes one file per level; all of them arrive, in a folder whose name isn't ASCII.
+    folder = tmp_path / "Zoë modèles"
+    folder.mkdir()
+    doc = build(sf.Document())
+    message = sf.run(doc, "export_lods", path=folder / "asset.glb", levels=3)
+    files = sorted(p.name for p in folder.iterdir())
+    assert len([f for f in files if f.endswith(".glb")]) >= 2, files
+    assert not [f for f in files if f.startswith(".sculptforge-write-")], files
+    assert ".sculptforge-write-" not in message

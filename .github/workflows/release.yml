@@ -462,9 +462,12 @@ jobs:
         if: steps.sums.outcome == 'success'
         run: |
           python3 -m venv "$RUNNER_TEMP/v"
+          # Dependencies from PyPI only, then sculptforge alone from TestPyPI (--no-deps): anyone can upload a
+          # "numpy" to TestPyPI, so the two indexes are never mixed in one resolve.
+          "$RUNNER_TEMP/v/bin/pip" install -q --no-cache-dir "numpy>=1.26"
           for i in $(seq 1 20); do # (the index shows a new release within a few minutes)
-            "$RUNNER_TEMP/v/bin/pip" install -q --no-cache-dir --index-url https://test.pypi.org/simple/ \
-              --extra-index-url https://pypi.org/simple/ "sculptforge==$VERSION" && break
+            "$RUNNER_TEMP/v/bin/pip" install -q --no-cache-dir --no-deps --index-url https://test.pypi.org/simple/ \
+              "sculptforge==$VERSION" && break
             [ "$i" = 20 ] && exit 1
             sleep 30
           done
