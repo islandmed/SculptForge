@@ -222,7 +222,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
-        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y flatpak flatpak-builder xvfb
+        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends flatpak flatpak-builder xvfb
       - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
         uses: actions/cache@v5
         with:
