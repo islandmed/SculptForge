@@ -116,6 +116,11 @@ frame is drawn only if something changed (frameKey). With no timer set, or Pytho
 check: nothing per frame, no wake-ups. A PySide script calls `app.processEvents()` from it, so its windows stay alive
 beside SculptForge, their signals arrive on the main thread, and no second thread touches the scene.
 
+`sf.ui.main_window_handle()` (read-only, main thread) gives the main window's native handle from SDL's window
+properties (HWND, `NSWindow*`, X11 window id; `None` where SDL has none: Wayland, offscreen) through `AppSide::windowHandle`
+(host ABI 5), so a toolkit's window can be made transient for it. No new capability: a script in this process can find the
+handle with the OS's own calls.
+
 ### Security review (P3)
 
 The hook adds a way for code that is already running to keep running later. It adds no way for code to start.

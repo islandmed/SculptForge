@@ -30,7 +30,7 @@ struct CoreCalls;
 
 namespace python {
 
-constexpr int kHostAbi = 4;
+constexpr int kHostAbi = 5;
 
 // A direct change to a document's data from Python (doc.mask = ...).
 enum class Edit { Mask, Colors, FaceGroups, Hidden };
@@ -75,6 +75,9 @@ struct AppSide {
     std::function<void(bool error, const std::string& text)> write; // print() and tracebacks
     // sf.ui.place: puts "script.py.<id>" (an action, or with `panel` a panel's section) there; false if it can't.
     std::function<bool(const std::string& id, bool panel, Place where)> place;
+    // sf.ui.main_window_handle: the main window's native handle (HWND, NSWindow*, X11 Window id), 0 when there is
+    // none (Wayland, offscreen and headless runs). Main thread.
+    std::function<uint64_t()> windowHandle;
     std::string home;               // the Python runtime shipped with the app ("" = the one the host was built with)
     std::vector<std::string> paths; // put first on sys.path: the scripts folder and its site-packages
 };

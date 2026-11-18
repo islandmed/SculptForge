@@ -200,6 +200,9 @@ public:
     // The warm UI test server (sculptforge --ui-serve, UiServe.cpp): every App it makes draws in this one hidden
     // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
     static void shareWindow(SDL_Window* window, SDL_GLContext context);
+    // The main window's native handle for Python (sf.ui.main_window_handle): HWND, NSWindow*, X11 Window id; 0 where
+    // SDL has none (Wayland, the offscreen and dummy drivers).
+    uint64_t nativeWindowHandle() const;
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
     void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
