@@ -11,6 +11,7 @@
 //     neighbours, like Smooth), so the surface stays closed.
 #include "core/Micro.h"
 #include "core/AtomicRef.h"
+#include "core/MicroTiles.h"
 #include "core/FocusDetail.h"
 #include "core/MicroHistory.h"
 
@@ -22,6 +23,7 @@
 #include "core/TierConfig.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 
@@ -229,6 +231,16 @@ void MicroStroke::begin(Mesh& m) {
     grabWeight_.clear();
     grabNormal_.clear();
     baseEdge_ = mm.baseEdge;
+    bornKeys_.clear();
+    bornSet_.clear();
+    oldTiles_.clear();
+    lastDepth = 0, lastTiles = 0;
+    if (MicroTiles::enabled() && !mm.tiles) {
+        mm.tiles = std::make_shared<MicroTiles>();
+        mm.tiles->residentBudget = MicroTiles::defaultResidentBudget();
+    }
+    if (mm.tiles && mm.tiles->maxDepth.size() != mm.baseTriangles) mm.tiles->resize(mm.baseTriangles);
+    strokeStamp_ = mm.tiles ? mm.tiles->useStamp + 1 : 0;
     mm.stroking = true;
     active_ = true;
 }
@@ -380,7 +392,7 @@ void MicroStroke::stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t>
 void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& center, const glm::vec3& viewDir, float radius,
                       float strength, bool invert, float focal, const glm::vec3& alphaUp, bool maskBrush, float maskStrength,
                       const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture,
-                      const glm::vec3& strokeDir) {
+                      const glm::vec3& strokeDir, float pxPerUnit) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
     auto clock = std::chrono::steady_clock::now();
@@ -467,6 +479,17 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         up = projectOnPlane(std::abs(areaNormal.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0), areaNormal);
     up = glm::normalize(up);
     const glm::vec3 right = glm::cross(up, areaNormal);
+    // Adaptive Detail tiles (core/MicroTiles.h): a dab finer than the root grid writes delta tiles at its own depth
+    // and leaves the root alone (the plane, found above, is the same).
+    lastDepth = 0, lastTiles = 0;
+    if (mm.tiles && !maskBrush) {
+        const int depth = MicroTiles::depthFor(baseEdge_ / float(n), r, pxPerUnit);
+        if (depth > 0 && dabTiles(m, type, center, r, s, invert, focal, areaNormal, areaCenter, right, up, useAlpha ? alpha : nullptr, texture, depth)) {
+            lastDepth = depth;
+            kernelMs += lapMs(clock);
+            return;
+        }
+    }
     const float layerHeight = r * 0.08f * s;
     const bool readsNeighbours = type == BrushType::Smooth || type == BrushType::SmoothPeaks;
     // Pinch, Crease and Sharp Crease pull the surface towards the centre (PinchSampler), reading the grids as the
@@ -704,10 +727,176 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     stitchMs += lapMs(clock);
 }
 
+bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, float r, float s, bool invert, float focal,
+                           const glm::vec3& areaNormal, const glm::vec3& areaCenter, const glm::vec3& right, const glm::vec3& up,
+                           const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth) {
+    switch (type) { // the brushes that read nothing but the point under them (Smooth, Layer and the pinches: the root)
+    case BrushType::Standard:
+    case BrushType::Inflate:
+    case BrushType::Flatten:
+    case BrushType::Clay:
+    case BrushType::ClayBlock:
+    case BrushType::Trim: break;
+    default: return false;
+    }
+    MicroMesh& mm = *m.micro;
+    MicroTiles& tiles = *mm.tiles;
+    const float sign = invert ? -1.0f : 1.0f, r2 = r * r, invStep = 1.0f / mm.step;
+    const bool useAlpha = alpha && !alpha->empty();
+    const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
+    // 1. The tiles at `depth` the brush reaches: down each candidate's quadtree, dropping sub-triangles whose sphere
+    // (grown by how far the surface can leave the base) misses the brush.
+    struct Target {
+        uint32_t tri, path;
+        TileFrame f;
+    };
+    std::vector<Target> targets;
+    struct Node {
+        TileFrame f;
+        uint32_t path;
+        int d;
+    };
+    std::vector<Node> stack;
+    for (uint32_t t : cand_) {
+        const glm::uvec3 tr = m.triangles[t];
+        const glm::vec3 P0 = m.positions[tr.x], P1 = m.positions[tr.y], P2 = m.positions[tr.z];
+        const float grow = mm.bulgeMax + float(mm.triRange[t]) * mm.step + r * reach;
+        auto at = [&](const glm::vec3& w) { return P0 * w.x + P1 * w.y + P2 * w.z; };
+        stack.assign(1, Node{TileFrame{}, 0u, -1});
+        while (!stack.empty()) {
+            const Node nd = stack.back();
+            stack.pop_back();
+            const glm::vec3 c0 = at(nd.f.at(0, 0)), c1 = at(nd.f.at(1, 0)), c2 = at(nd.f.at(0, 1)), ctr = (c0 + c1 + c2) / 3.0f;
+            const float rad = std::sqrt(std::max({glm::dot(c0 - ctr, c0 - ctr), glm::dot(c1 - ctr, c1 - ctr), glm::dot(c2 - ctr, c2 - ctr)})) + grow;
+            if (glm::dot(ctr - center, ctr - center) > rad * rad) continue;
+            if (nd.d == depth) {
+                targets.push_back({t, nd.path, nd.f});
+                continue;
+            }
+            for (int q = 0; q < 4; ++q) stack.push_back({nd.f.child(q), nd.path << 2 | uint32_t(q), nd.d + 1});
+        }
+    }
+    if (targets.empty()) return true;
+    // 2. The tiles: made (born in this stroke: undo frees them) or copied once for the undo step.
+    std::vector<uint32_t> slots(targets.size());
+    std::vector<uint8_t> bornNow(targets.size(), 0);
+    for (size_t k = 0; k < targets.size(); ++k) {
+        const uint64_t key = MicroTiles::key(targets[k].tri, depth, targets[k].path);
+        bool born = false;
+        MicroTiles::Tile* t = tiles.obtain(key, born);
+        slots[k] = tiles.slot(t);
+        if (born) bornNow[k] = 1;
+        else if (!bornSet_.count(key) && !oldTiles_.count(key)) oldTiles_.emplace(key, std::vector<int16_t>(t->delta.begin(), t->delta.end()));
+        tiles.residentAbove(targets[k].tri, depth, targets[k].path); // (the kernel reads the deltas above: resident, not unpacked per point)
+    }
+    // 3. The kernel over the tiles in parallel (each writes its own; the deltas above it are read only). The surface
+    // under a tile point is the root plus the deltas down to this tile's own, so a brush sees what it sculpts.
+    std::vector<uint8_t> wrote(targets.size(), 0);
+    std::vector<int> triMax(targets.size(), 0);
+    std::atomic<uint64_t> count{0};
+    poolFor(targets.size(), [&](size_t b, size_t e) {
+        MicroTriangle T;
+        uint64_t visited = 0;
+        for (size_t k = b; k < e; ++k) {
+            const Target& tg = targets[k];
+            T.set(m, tg.tri, mm.n);
+            MicroTiles::Tile& tile = tiles.at(slots[k]);
+            int range = 0;
+            bool any = false;
+            uint32_t p = 0;
+            for (uint32_t j = 0; j <= MicroTiles::kN; ++j)
+                for (uint32_t i = 0; i + j <= MicroTiles::kN; ++i, ++p) {
+                    const glm::vec3 w = tg.f.at(float(i) / float(MicroTiles::kN), float(j) / float(MicroTiles::kN));
+                    glm::vec3 sp, nn;
+                    T.evalWeights(&w.x, sp, nn);
+                    const float hUnits = tiles.heightAt(mm, tg.tri, w, depth - 1) + float(tile.delta[p]);
+                    const glm::vec3 pt = sp + nn * (hUnits * mm.step);
+                    const glm::vec3 o = pt - center;
+                    const float dist2 = glm::dot(o, o);
+                    if (dist2 >= r2 * reach * reach) continue;
+                    ++visited;
+                    float f = useAlpha ? alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, focal) : brushFalloff(std::sqrt(dist2), r, focal);
+                    if (type == BrushType::ClayBlock && !useAlpha) { // (as the root kernel)
+                        const float cheb = std::max(std::abs(glm::dot(o, right)), std::abs(glm::dot(o, up))) / r;
+                        const float corner = std::clamp((1.3f - std::sqrt(dist2) / r) / 0.3f, 0.0f, 1.0f);
+                        const float edge = std::clamp((1.0f - cheb) / 0.35f, 0.0f, 1.0f);
+                        f = edge * edge * (3.0f - 2.0f * edge) * corner;
+                    }
+                    if (texture) f *= texture(pt);
+                    if (f <= 0.0f) continue;
+                    const float facingRaw = glm::dot(nn, areaNormal);
+                    const float facing = std::max(facingRaw, 0.3f);
+                    const bool reachesPlane = facingRaw > 0.1f;
+                    const float planeCap = r * 0.25f * f;
+                    float delta = 0.0f;
+                    switch (type) {
+                    case BrushType::Standard: delta = sign * s * r * 0.06f * f * glm::dot(areaNormal, nn); break;
+                    case BrushType::Inflate: delta = sign * s * r * 0.05f * f; break;
+                    case BrushType::Flatten: {
+                        if (!reachesPlane) break;
+                        const float h = glm::dot(pt - areaCenter, areaNormal);
+                        delta = std::clamp(-h * s * f * (invert ? -0.5f : 1.0f) / facing, -planeCap, planeCap);
+                        break;
+                    }
+                    case BrushType::Clay: {
+                        if (!reachesPlane) break;
+                        float k2;
+                        const glm::vec3 pp = PlaneKernel::clayPlaneAt(areaCenter, areaNormal, center, sign, r * 0.05f * s, k2);
+                        const float h = glm::dot(pt - pp, areaNormal);
+                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) * k2 / facing, -planeCap, planeCap);
+                        break;
+                    }
+                    case BrushType::ClayBlock: {
+                        if (!reachesPlane) break;
+                        const glm::vec3 pp = areaCenter + areaNormal * (sign * r * 0.08f * s);
+                        const float h = glm::dot(pt - pp, areaNormal);
+                        if (sign * h < 0.0f) delta = std::clamp(-h * f * clayPull(s) / facing, -planeCap, planeCap);
+                        break;
+                    }
+                    case BrushType::Trim: {
+                        if (!reachesPlane) break;
+                        const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
+                        const float h = glm::dot(pt - pp, areaNormal);
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
+                        break;
+                    }
+                    default: break;
+                    }
+                    if (delta == 0.0f) continue;
+                    tile.delta[p] = quantizeUnits(float(tile.delta[p]) + delta * invStep);
+                    range = std::max(range, int(std::abs(hUnits + delta * invStep)) + 1);
+                    any = true;
+                }
+            if (any) wrote[k] = 1, triMax[k] = range;
+        }
+        count += visited;
+    }, 4, 2);
+    points += count;
+    // 4. Ranges (the BVH's reach), what the renderer re-reads; tiles born for nothing go again.
+    size_t written = 0;
+    for (size_t k = 0; k < targets.size(); ++k) {
+        const uint64_t key = MicroTiles::key(targets[k].tri, depth, targets[k].path);
+        if (!wrote[k]) {
+            if (bornNow[k]) tiles.release(key);
+            continue;
+        }
+        ++written;
+        if (bornNow[k]) bornKeys_.push_back(key), bornSet_.insert(key);
+        mm.triRange[targets[k].tri] = uint16_t(std::min(std::max<int>(mm.triRange[targets[k].tri], triMax[k]), 32767));
+        mm.rangeMax = std::max(mm.rangeMax, mm.triRange[targets[k].tri]);
+        mm.markDirty(targets[k].tri);
+    }
+    lastTiles = written;
+    ++mm.revision;
+    return true;
+}
+
 void MicroStroke::widen(MicroMesh& mm, float need) {
     const int div = mm.widen(need);
     if (div == 1) return;
     for (int16_t& v : oldDisp_) v = int16_t(int(v) / div);
+    for (auto& [key, old] : oldTiles_)
+        for (int16_t& v : old) v = int16_t(int(v) / div);
     strokeStep_ = mm.step;
 }
 
@@ -817,9 +1006,16 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
 }
 
 void MicroStroke::restore(Mesh& m) {
-    if (!active_ || !m.micro || tiles_.empty()) return;
+    if (!active_ || !m.micro || (tiles_.empty() && bornKeys_.empty() && oldTiles_.empty())) return;
     MicroMesh& mm = *m.micro;
     const size_t S = mm.samples;
+    if (mm.tiles) { // Adaptive Detail tiles: those born go, those changed get their old deltas
+        for (uint64_t key : bornKeys_) mm.tiles->release(key), mm.markDirty(MicroTiles::keyTri(key));
+        bornKeys_.clear();
+        bornSet_.clear();
+        for (auto& [key, old] : oldTiles_)
+            if (MicroTiles::Tile* t = mm.tiles->resident(key)) std::copy(old.begin(), old.end(), t->delta.begin()), mm.markDirty(MicroTiles::keyTri(key));
+    }
     poolFor(tiles_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             const size_t t = tiles_[i];
@@ -829,6 +1025,47 @@ void MicroStroke::restore(Mesh& m) {
     }, 64);
     for (uint32_t t : tiles_) mm.markDirty(t);
     ++mm.revision;
+}
+
+// The stroke's Adaptive Detail tiles into the step: each tile's change (from zero for one born in the stroke) as a
+// journal, as the root tiles' (a tile changed and changed back is left out).
+void MicroStroke::endTiles(MicroUndo& u, const MicroTiles& tiles) {
+    constexpr uint32_t S = MicroTiles::kSamples, N = MicroTiles::kN;
+    std::vector<int16_t> change;
+    const std::array<int16_t, S> zeros{};
+    MicroTiles::Tile scratch;
+    auto add = [&](uint64_t key, const int16_t* old, bool born) {
+        const MicroTiles::Tile* t = tiles.read(key, scratch);
+        if (!t) return;
+        if (!born && std::equal(t->delta.begin(), t->delta.end(), old)) return;
+        const size_t base = change.size();
+        change.resize(base + S);
+        int16_t* out = change.data() + base;
+        uint32_t p = 0;
+        int16_t first = 0;
+        for (uint32_t j = 0; j <= N; ++j)
+            for (uint32_t i = 0; i + j <= N; ++i, ++p) {
+                const int d = int(t->delta[p]) - int(old[p]);
+                int pred = 0;
+                if (i > 0) pred = int(t->delta[p - 1]) - int(old[p - 1]);
+                else if (j > 0) {
+                    const uint32_t q = MicroTiles::index(0, j - 1);
+                    pred = int(t->delta[q]) - int(old[q]);
+                }
+                if (p == 0) first = int16_t(d);
+                out[p] = p == 0 ? int16_t(0) : int16_t(std::clamp(d - pred, -32767, 32767));
+            }
+        u.tileKeys.push_back(key);
+        u.tileBorn.push_back(born ? 1 : 0);
+        u.tileFirsts.push_back(first);
+    };
+    for (uint64_t key : bornKeys_) add(key, zeros.data(), true);
+    for (const auto& [key, old] : oldTiles_) add(key, old.data(), false);
+    if (!u.tileKeys.empty()) microPackTiles(change.data(), u.tileKeys.size(), S, u.tilePacked);
+    u.tilesApplied = true;
+    bornKeys_.clear();
+    bornSet_.clear();
+    oldTiles_.clear();
 }
 
 std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
@@ -841,8 +1078,12 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     grabTris_.clear();
     grabWeight_.clear();
     grabNormal_.clear();
-    if (tiles_.empty() || !m.micro) {
+    const bool tileChanges = m.micro && m.micro->tiles && (!bornKeys_.empty() || !oldTiles_.empty());
+    if ((tiles_.empty() && !tileChanges) || !m.micro) {
         tiles_.clear();
+        bornKeys_.clear();
+        bornSet_.clear();
+        oldTiles_.clear();
         return nullptr;
     }
     auto u = std::make_unique<MicroUndo>();
@@ -851,6 +1092,9 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     u->step = strokeStep_;
     u->samples = mm.samples;
     for (uint32_t t : tiles_) tileOf_[t] = 0;
+    if (tileChanges) endTiles(*u, *mm.tiles);
+    if (mm.tiles) mm.tiles->trim(); // (the stroke is over: the least recently used tiles park beyond the budget, this stroke's last)
+    if (count) {
     // The journal: tiles in Morton order of their centres, each the stroke's change, packed.
     AABB box;
     for (uint32_t t : tiles_) {
@@ -937,6 +1181,7 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         u->disp = std::move(oldDisp_);
         if (masked) u->mask = std::move(oldMask_);
     }
+    } // (count)
     u->maskAdded = maskAdded_;
     tiles_.clear();
     oldDisp_.clear();

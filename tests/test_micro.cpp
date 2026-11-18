@@ -9,6 +9,7 @@
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Micro.h"
+#include "core/MicroTiles.h"
 #include "core/Multires.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
@@ -22,6 +23,7 @@
 #include <cstring>
 #include <filesystem>
 #include <algorithm>
+#include <array>
 #include <map>
 
 using namespace sf;
@@ -161,6 +163,314 @@ TEST(micro_draw_above_stored_level_is_seamless) {
     // The pull leaves the flat micro triangle, but by less than a micro edge's worth over a bumpy sphere.
     CHECK(worstOff < microEdge);
     CHECK(worstOff > 0.0f);
+}
+
+// --- Adaptive Detail tiles (core/MicroTiles.h; the 10x scoreboard's axis 2) ---
+namespace {
+
+// The tile store attached to the level (what SF_MICRO_TILES=1 does at the first stroke).
+void attachTiles(Document& doc, size_t residentBudget = 0) {
+    MicroMesh& mm = mutableMicro(doc.mesh);
+    mm.tiles = std::make_shared<MicroTiles>();
+    mm.tiles->resize(mm.baseTriangles);
+    mm.tiles->residentBudget = residentBudget;
+}
+
+// Base weights of the surface point hit from the front, and its base triangle.
+uint32_t frontTriangle(const Document& doc, glm::vec3& w) {
+    RayHit hit;
+    CHECK(doc.bvh.raycast(doc.mesh, glm::vec3(0.001f, 0.002f, 5.0f), glm::vec3(0, 0, -1), hit));
+    const glm::uvec3 tr = doc.mesh.triangles[hit.triangle];
+    const glm::vec3 a = doc.mesh.positions[tr.x], b = doc.mesh.positions[tr.y], c = doc.mesh.positions[tr.z], p = hit.position;
+    const glm::vec3 v0 = b - a, v1 = c - a, v2 = p - a;
+    const float d00 = glm::dot(v0, v0), d01 = glm::dot(v0, v1), d11 = glm::dot(v1, v1), d20 = glm::dot(v2, v0), d21 = glm::dot(v2, v1);
+    const float den = d00 * d11 - d01 * d01;
+    w.y = (d11 * d20 - d01 * d21) / den, w.z = (d00 * d21 - d01 * d20) / den, w.x = 1.0f - w.y - w.z;
+    return hit.triangle;
+}
+
+std::map<uint64_t, std::array<int16_t, MicroTiles::kSamples>> tileSnapshot(const MicroTiles& t) {
+    std::map<uint64_t, std::array<int16_t, MicroTiles::kSamples>> out;
+    t.forEach([&](uint64_t key, const MicroTiles::Tile& tile) { out[key] = tile.delta; });
+    return out;
+}
+
+// A stroke of small Standard dabs at the front (finer than the root grid: tiles).
+UndoRecord fineStroke(Document& doc, float r = 0.02f, int dabs = 5) {
+    Symmetry sym;
+    sym.x = false;
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+    for (int i = 0; i < dabs; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.002f * float(i), 0, 1), r, 1.0f), sym);
+    return doc.sculptor.endStroke();
+}
+
+} // namespace
+
+// A dab much smaller than the root cell x 48 writes delta tiles at its own depth and leaves the root grid untouched;
+// the surface under it still rises; undo frees the tiles and redo brings them back identical.
+TEST(micro_tiles_small_dab_writes_tiles_not_root_and_undoes) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    const MicroMesh& mm0 = *doc.mesh.micro;
+    const float rootCell = mm0.baseEdge / float(mm0.n);
+    CHECK(MicroTiles::depthFor(rootCell, 0.02f, 0.0f) >= 2);
+    CHECK(MicroTiles::depthFor(rootCell, 0.3f, 0.0f) <= 0);
+    CHECK(MicroTiles::depthFor(rootCell, 0.02f, 1.0f / rootCell) <= 2); // seen from afar (the root cell 1 px): capped to 2 levels finer
+    CHECK(MicroTiles::depthFor(rootCell, 0.02f, 0.1f / rootCell) <= 0); // (0.1 px: nothing finer than the root is worth storing)
+    const std::vector<int16_t> rootBefore = doc.mesh.micro->disp;
+    glm::vec3 w;
+    const uint32_t tri = frontTriangle(doc, w);
+    const float hBefore = doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w);
+    UndoRecord r = fineStroke(doc);
+    CHECK(r.micro != nullptr);
+    CHECK(!r.micro->tileKeys.empty());
+    CHECK(r.micro->tris.empty() || r.micro->journal || !r.micro->disp.empty()); // (root tiles were saved by touch; their change is zero)
+    const MicroMesh& mm = *doc.mesh.micro;
+    CHECK(mm.tiles != nullptr);
+    CHECK(mm.tiles->alive() > 0);
+    CHECK(mm.disp == rootBefore);                      // the root grid: untouched
+    CHECK(mm.tiles->heightAt(mm, tri, w, 0) == hBefore); // (the root's own height, the same)
+    CHECK(mm.tiles->heightAt(mm, tri, w) > hBefore + 0.5f * 0.02f * 0.06f / mm.step); // raised by at least half a full dab
+    CHECK(mm.rangeMax > 0);
+    const auto after = tileSnapshot(*mm.tiles);
+    const size_t alive = mm.tiles->alive();
+    for (uint8_t b : r.micro->tileBorn) CHECK(b == 1); // every tile is new in this stroke
+    CHECK(r.micro->tileKeys.size() == alive);
+    doc.undo.push(std::move(r));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->tiles->alive() == 0);
+    CHECK(doc.mesh.micro->disp == rootBefore);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->tiles->alive() == alive);
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == after);
+    // A second stroke over the same tiles: they existed before (not born), undo restores their old deltas.
+    UndoRecord r2 = fineStroke(doc);
+    CHECK(r2.micro != nullptr && !r2.micro->tileKeys.empty());
+    bool anyOld = false;
+    for (uint8_t b : r2.micro->tileBorn) anyOld = anyOld || b == 0;
+    CHECK(anyOld);
+    doc.undo.push(std::move(r2));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == after);
+}
+
+// Every tile point on a base edge resolves to the same height from both base triangles (no stitch needed: the
+// interpolation parameters are exact and the brush saw the same position and normal).
+TEST(micro_tiles_shared_edges_are_bit_identical) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    doc.undo.push(fineStroke(doc, 0.03f, 8));
+    const MicroMesh& mm = *doc.mesh.micro;
+    const MicroTiles& tiles = *mm.tiles;
+    CHECK(tiles.alive() > 0);
+    size_t checks = 0, edgeTiles = 0;
+    std::vector<uint64_t> keys;
+    tiles.forEach([&](uint64_t key, const MicroTiles::Tile&) { keys.push_back(key); });
+    for (const uint64_t key : keys) {
+        const uint32_t t = MicroTiles::keyTri(key);
+        const int depth = MicroTiles::keyDepth(key);
+        const TileFrame f = TileFrame::of(depth, MicroTiles::keyPath(key));
+        const glm::vec3 c[3] = {f.at(0, 0), f.at(1, 0), f.at(0, 1)};
+        const glm::uvec3 tt = doc.mesh.triangles[t];
+        for (int e = 0; e < 3; ++e) { // the tile's edge from corner e to e + 1: on a base edge when a base weight is 0 at both
+            const glm::vec3 a = c[e], b = c[(e + 1) % 3];
+            int zero = -1;
+            for (int k = 0; k < 3; ++k)
+                if (std::abs(a[k]) < 1e-7f && std::abs(b[k]) < 1e-7f) zero = k;
+            if (zero < 0) continue;
+            const int baseEdge = zero == 2 ? 0 : zero == 0 ? 1 : 2; // base edge e runs from corner e to e + 1: the corner left out is e + 2
+            const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(baseEdge)];
+            if (nb == MicroMesh::kNone) continue;
+            const uint32_t u = nb >> 2;
+            const glm::uvec3 ut = doc.mesh.triangles[u];
+            ++edgeTiles;
+            for (int k = 0; k <= 8; ++k) {
+                const glm::vec3 w = a + (b - a) * (float(k) / 8.0f);
+                glm::vec3 wu(0.0f);
+                for (int i = 0; i < 3; ++i)
+                    for (int j = 0; j < 3; ++j)
+                        if (ut[j] == tt[i]) wu[j] = w[i];
+                const float h1 = tiles.heightAt(mm, t, w), h2 = tiles.heightAt(mm, u, wu);
+                CHECK(h1 == h2);
+                ++checks;
+            }
+        }
+    }
+    CHECK(edgeTiles > 0 && checks > 0);
+    CHECK(watertight(doc.mesh)); // the root is as before
+}
+
+// A big dab over tiled detail writes the root only: the fine deltas ride along unchanged (the multires promise),
+// and no tile is made or touched.
+TEST(micro_tiles_coarse_dab_leaves_fine_deltas) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    doc.undo.push(fineStroke(doc));
+    const auto fine = tileSnapshot(*doc.mesh.micro->tiles);
+    const std::vector<int16_t> rootBefore = doc.mesh.micro->disp;
+    Symmetry sym;
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+    for (int i = 0; i < 4; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0, 0, 1), 0.3f), sym);
+    UndoRecord r = doc.sculptor.endStroke();
+    CHECK(r.micro != nullptr && r.micro->tileKeys.empty());
+    CHECK(doc.mesh.micro->disp != rootBefore);
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == fine);
+    CHECK(watertight(doc.mesh));
+    doc.undo.push(std::move(r));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->disp == rootBefore);
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == fine);
+}
+
+// A resident budget: at the end of a stroke the least recently used tiles beyond it are parked (packed), the surface
+// reads the same, a later stroke and undo bring them back, and nothing is lost.
+TEST(micro_tiles_park_beyond_the_budget_and_come_back) {
+    Document doc = microDoc(4);
+    attachTiles(doc, 20 * sizeof(MicroTiles::Tile)); // room for 20 resident tiles
+    doc.undo.push(fineStroke(doc));
+    const auto one = tileSnapshot(*doc.mesh.micro->tiles);
+    glm::vec3 w;
+    const uint32_t tri = frontTriangle(doc, w);
+    const float h1 = doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w);
+    {
+        const MicroTiles& t = *doc.mesh.micro->tiles;
+        CHECK(t.alive() == one.size());
+        CHECK(t.residentCount() <= 20);
+        CHECK(t.parkedCount() > 0 && t.parkedCount() + t.residentCount() == t.alive());
+        CHECK(t.parkedBytes() < t.parkedCount() * sizeof(MicroTiles::Tile)); // packed smaller than raw
+    }
+    // the codec round-trips every tile exactly
+    {
+        std::vector<uint8_t> packed;
+        MicroTiles::Tile back;
+        for (const auto& [key, delta] : one) {
+            MicroTiles::Tile t;
+            t.delta = delta;
+            packed.clear();
+            MicroTiles::packTile(t, packed);
+            CHECK(MicroTiles::unpackTile(packed.data(), packed.size(), back) && back.delta == delta);
+        }
+    }
+    // a second stroke a little aside: parked tiles under it come back and take the change; the far ones stay parked
+    Symmetry sym;
+    sym.x = false;
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+    for (int i = 0; i < 5; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.002f * float(i), 0, 1), 0.02f, 1.0f), sym);
+    UndoRecord r2 = doc.sculptor.endStroke();
+    CHECK(r2.micro != nullptr && !r2.micro->tileKeys.empty());
+    const float h2 = doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w);
+    CHECK(h2 > h1);
+    CHECK(doc.mesh.micro->tiles->residentCount() <= 20 || doc.mesh.micro->tiles->parkedCount() == 0);
+    doc.undo.push(std::move(r2));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == one); // (through parked and resident tiles alike)
+    CHECK(doc.mesh.micro->tiles->heightAt(*doc.mesh.micro, tri, w) == h1);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.micro->tiles->alive() == 0);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(tileSnapshot(*doc.mesh.micro->tiles) == one);
+}
+
+// The tile path's promises, measured on the surface the tiles describe (heightAt on a grid of points under the brush):
+// a cut (inverted Standard) lowers and never raises; nothing moves outside the brush; the X mirror of a symmetric
+// stroke matches; the surface stays closed across base edges (the shared-edge test above). GeomInvariants.h's rules
+// for the base cage, applied to the micro surface a tiled dab writes.
+TEST(micro_tiles_invariant_cut_only_local_and_symmetric) {
+    Document doc = microDoc(4);
+    attachTiles(doc);
+    const MicroMesh& mm0 = *doc.mesh.micro;
+    const float r = 0.02f;
+    CHECK(MicroTiles::depthFor(mm0.baseEdge / float(mm0.n), r, 0.0f) >= 2);
+    // sample points: rays from the front onto a grid around the dab centre, 3 r wide (inside and outside the brush)
+    struct Sample { uint32_t tri; glm::vec3 w; glm::vec3 p; };
+    std::vector<Sample> samples;
+    for (int y = -12; y <= 12; ++y)
+        for (int x = -12; x <= 12; ++x) {
+            RayHit hit;
+            const glm::vec3 o(float(x) * 0.25f * r, float(y) * 0.25f * r, 5.0f);
+            if (!doc.bvh.raycast(doc.mesh, o, glm::vec3(0, 0, -1), hit)) continue;
+            const glm::uvec3 tr = doc.mesh.triangles[hit.triangle];
+            const glm::vec3 a = doc.mesh.positions[tr.x], b = doc.mesh.positions[tr.y], c = doc.mesh.positions[tr.z];
+            const glm::vec3 v0 = b - a, v1 = c - a, v2 = hit.position - a;
+            const float d00 = glm::dot(v0, v0), d01 = glm::dot(v0, v1), d11 = glm::dot(v1, v1), d20 = glm::dot(v2, v0), d21 = glm::dot(v2, v1);
+            const float den = d00 * d11 - d01 * d01;
+            glm::vec3 w;
+            w.y = (d11 * d20 - d01 * d21) / den, w.z = (d00 * d21 - d01 * d20) / den, w.x = 1.0f - w.y - w.z;
+            samples.push_back({hit.triangle, w, hit.position});
+        }
+    CHECK(samples.size() > 500);
+    auto heights = [&] {
+        std::vector<float> h(samples.size());
+        const MicroMesh& mm = *doc.mesh.micro;
+        for (size_t k = 0; k < samples.size(); ++k) h[k] = mm.tiles->heightAt(mm, samples[k].tri, samples[k].w);
+        return h;
+    };
+    const std::vector<float> before = heights();
+    // 1. cut-only: an inverted Standard stroke never raises a point, lowers under the centre, moves nothing outside r
+    {
+        Symmetry sym;
+        sym.x = false;
+        CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+        for (int i = 0; i < 4; ++i) {
+            DabParams p = dabAt(glm::vec3(0.001f * float(i), 0, 1), r, 1.0f);
+            p.invert = true;
+            doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, p, sym);
+        }
+        UndoRecord rec = doc.sculptor.endStroke();
+        CHECK(rec.micro != nullptr && !rec.micro->tileKeys.empty());
+        const std::vector<float> after = heights();
+        float maxRise = 0, maxSink = 0, outside = 0;
+        for (size_t k = 0; k < samples.size(); ++k) {
+            const float d = after[k] - before[k];
+            maxRise = std::max(maxRise, d), maxSink = std::min(maxSink, d);
+            if (glm::length(glm::vec2(samples[k].p.x, samples[k].p.y)) > 1.3f * r) outside = std::max(outside, std::abs(d));
+        }
+        std::printf("tiles cut: max rise %.1f units, max sink %.1f, outside the brush %.1f\n", double(maxRise), double(maxSink), double(outside));
+        CHECK(maxRise <= 0.0f);
+        CHECK(maxSink < -0.5f * 0.06f * r / doc.mesh.micro->step);
+        CHECK(outside == 0.0f);
+        doc.undo.push(std::move(rec));
+        CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+        CHECK(heights() == before);
+    }
+    // 2. symmetry: with X symmetry the surface at (x, y) and (-x, y) changes alike
+    {
+        Symmetry sym;
+        sym.x = true;
+        CHECK(doc.sculptor.beginStroke(doc.mesh, "Standard"));
+        for (int i = 0; i < 4; ++i) doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::vec3(0.6f * r + 0.001f * float(i), 0.002f * float(i), 1), r, 1.0f), sym);
+        doc.undo.push(doc.sculptor.endStroke());
+        const std::vector<float> after = heights();
+        float worst = 0, biggest = 0;
+        size_t pairs = 0;
+        for (size_t k = 0; k < samples.size(); ++k) {
+            const glm::vec3& p = samples[k].p;
+            if (std::abs(p.x) < 1e-6f) continue;
+            // the mirror sample: the closest one to (-x, y)
+            size_t best = samples.size();
+            float bd = 1e30f;
+            for (size_t m = 0; m < samples.size(); ++m) {
+                const float dd = glm::length(glm::vec2(samples[m].p.x + p.x, samples[m].p.y - p.y));
+                if (dd < bd) bd = dd, best = m;
+            }
+            if (best == samples.size() || bd > 0.02f * r) continue;
+            const float d1 = after[k] - before[k], d2 = after[best] - before[best];
+            worst = std::max(worst, std::abs(d1 - d2)), biggest = std::max(biggest, std::abs(d1));
+            ++pairs;
+        }
+        std::printf("tiles symmetry: %zu pairs, largest change %.1f units, worst mirror difference %.2f\n", pairs, double(biggest), double(worst));
+        CHECK(pairs > 200 && biggest > 10.0f);
+        CHECK(worst <= 0.02f * biggest + 1.0f); // the mirror matches to the quantization step and the sample pairing
+    }
+}
+
+// Without the store (the default), nothing changes: no tiles appear and the step records none.
+TEST(micro_tiles_absent_by_default) {
+    Document doc = microDoc(4);
+    CHECK(doc.mesh.micro->tiles == nullptr);
+    UndoRecord r = fineStroke(doc);
+    CHECK(r.micro != nullptr && r.micro->tileKeys.empty());
+    CHECK(doc.mesh.micro->tiles == nullptr || !MicroTiles::enabled());
 }
 
 TEST(micro_divide_needs_top_level) {
