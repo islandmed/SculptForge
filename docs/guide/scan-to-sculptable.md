@@ -12,7 +12,7 @@ a clean Part you can: a watertight surface with the floaters and background gone
 polygon budget you choose, edge loops round the eyes and mouth when the capture is a head, and the capture's
 colours as vertex paint or a texture. One click, in the background, with the splats kept next to the result.
 
-![A test head capture, the review of its face landmarks and loops, and the finished quads with its colours](images/make-sculptable.jpg)
+![Splats made from one of our sculpted heads, the review of its face landmarks and loops, and the finished quads](images/make-sculptable.jpg)
 
 ## One click
 

@@ -315,10 +315,12 @@ wait 0.2
 shot guides-with
 click "Wire##view.wire"
 
-# Make sculptable (scan-to-sculptable.md): the built-in test head capture, the review with its face landmarks and
-# loops, and the finished quads with the capture's colours.
-run new_sphere subdivisions=5
-run splat_test_capture kind=head count=200000 floaters=0
+# Make sculptable (scan-to-sculptable.md): splats made from our starter head sculpt, the review with its face landmarks
+# and loops (the mouth corners and chin dragged onto the lips and chin, as the panel asks), and the finished quads.
+run new_starter_mesh name=human-head levels=3
+wait_idle 20
+run mesh_to_splats count=1000000
+wait_idle 20
 camera 0 0
 click "Show mesh"
 wait 0.3
@@ -328,9 +330,16 @@ hover "Make sculptable/More##sculptable"
 wait 0.2
 shot sculptable-panel
 click "Make sculptable/Review##sculptable"
+type "Make sculptable/##sculptdetail" 512
 click "Make sculptable/Make sculptable"
 wait_idle 120
 camera 0 0
+wait 0.2
+drag_landmark 5 -14 30
+wait_idle 20
+drag_landmark 7 0 14
+wait_idle 20
+mouse_move 200 800
 wait 0.2
 shot sculptable-review
 click "Make sculptable/Finish"

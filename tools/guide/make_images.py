@@ -219,7 +219,7 @@ def qremesh_guides(shots: pathlib.Path):
 
 
 def make_sculptable(shots: pathlib.Path):
-    box = (455, 240, 865, 770)
+    box = (455, 215, 865, 745)
     names = [("sculptable-capture", "Splat capture"), ("sculptable-review", "Review: landmarks and loops"),
              ("sculptable-result", "Sculptable quads")]
     panels = [Image.open(shots / f"{n}.png").convert("RGB").crop(box) for n, _ in names]
