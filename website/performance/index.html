@@ -82,9 +82,28 @@
     only on a fast desktop. This page lists what we're building toward that: what each piece does in plain words,
     how it works for the technically curious, and whether it has shipped.</p>
 
+  <section class="card" id="engine">
+    <h2>The engine, in numbers</h2>
+    <p>SculptForge draws fine detail as tiny triangles stored on top of a lighter base mesh, so a sculpt can hold far
+      more detail than a plain mesh. These are the figures we measure with SculptForge's own benchmark, with the
+      machine named and the steps to repeat each one.</p>
+    <figure style="margin:20px 0">
+      <img src="../media/engine-numbers.jpg" width="1600" height="900" loading="lazy" style="width:100%;height:auto;border-radius:8px" alt="208 frames a second orbiting 104 million triangles of fine detail, measured on an Apple M1 Pro limited to entry-level budgets">
+    </figure>
+    <ul>
+      <li><strong>208 frames a second</strong> orbiting a head of 104 million triangles of fine detail, on an Apple M1 Pro limited to the entry-level tier (simulated). On a Windows desktop with an AMD Ryzen 5 5600X and an NVIDIA RTX 3060: 657 frames a second.</li>
+      <li><strong>1.2 GB</strong> of memory for the whole application with 201 million triangles of fine detail, on that Windows desktop.</li>
+      <li><strong>30 ms</strong>: 99 frames in 100 were faster than this while sculpting with a 240 px brush on a 33-million-triangle head, entry-level tier (simulated). The slowest single frame in that run was 103 ms.</li>
+    </ul>
+    <p>The weak spot, plainly: on that dense head a 240 px brush lands its stroke about a second behind the pen. The
+      view stays smooth, the stroke arrives late, and we're working on it. These figures come from a development
+      build made after 0.12.10, and each links to its raw results on <a href="../fast/">How fast?</a>, where you can
+      also send us a result that disagrees with ours.</p>
+  </section>
+
   <div class="card">
-    <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so this page
-      has no figures yet. They'll appear here once they're verified, each with the method and the machine. Until then,
+    <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so the figures above come
+      from scenes anyone can rebuild, not from scans. Each comes with the method and the machine, and
       <a href="../fast/">How fast?</a> has the machines, the limits we know of and the steps to measure your own computer,
       and the <a href="../benchmarks/">benchmarks page</a> has results you can repeat yourself.</p>
     <p class="small muted">Our low-end tier is <strong>simulated</strong>: the memory, graphics and core budgets of a
