@@ -1,11 +1,13 @@
 {
-  "version": "0.13.6",
+  "version": "0.13.7",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail",
-    "Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window",
-    "A public benchmark you can run in one command"
+    "Circle and ellipse shapes for Mask, Select and Cut",
+    "Hold Space to slide a selection while you draw it",
+    "Type an exact value on any slider",
+    "A portable copy on a USB stick that carries your settings, brushes and library",
+    "Python scripting in the app"
   ],
   "support": {
     "founding": {
