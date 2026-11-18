@@ -142,6 +142,8 @@ struct PenDiagnostics {
     uint64_t lostSamples = 0;     // pressure samples that lost their value (PenPressureTracker::sample)
     uint64_t strayMouse = 0;      // the system's own mouse events while the pen was in range (ignored)
     uint64_t penTouchEvents = 0;  // touch events SDL made from the pen (ignored)
+    uint64_t wheel = 0, wheelPenInRange = 0; // mouse-wheel events that reached the view; of them, with a pen in range
+    uint64_t fingers = 0, pinches = 0;       // finger touches (a tablet's touch surface too) and pinch gestures (#216)
     float lastPressure = -1.0f;   // -1: no pressure sample yet
     float strokeMin = -1.0f, strokeMax = -1.0f; // the last stroke's raw pressure range (-1: none yet)
     bool axesAfterMotion = false; // seen: a pen's pressure arrives after its motion (SDL's order on every platform)

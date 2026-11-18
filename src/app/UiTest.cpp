@@ -304,6 +304,7 @@
 //   pen_button N down|up [at X Y]   side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click;
 //                            at: the event carries that position (window fractions) instead of the pen's, as a
 //                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
+//   pen_move X Y [S]         the same to a point of the window (fractions): a fixed path, whatever the view does
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -331,7 +332,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
+//   pen_stream ink|huion|kde|kde_pointer|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -1882,7 +1883,7 @@ enum class StepVerb { None,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
-    PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
+    PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, Shot,
@@ -1984,7 +1985,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_drag_item", StepVerb::PenDragItem},
         {"pen_tap", StepVerb::PenTap},
         {"pen_button", StepVerb::PenButton},
-        {"pen_hover", StepVerb::PenHover},
+        {"pen_hover", StepVerb::PenHover}, {"pen_move", StepVerb::PenMove},
         {"pen_enter", StepVerb::PenEnter},
         {"pen_drag", StepVerb::PenDrag},
         {"pen_pressure", StepVerb::PenPressure},
@@ -4106,6 +4107,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.05f);
         break;
     }
+    case StepVerb::PenMove: { // the hovering pen to a point of the window (not of the model, which turns under it)
+        if (!need(2)) return false;
+        const float x = num(1, 0.5f), y = num(2, 0.5f), seconds = num(3, 0.4f);
+        auto from = std::make_shared<ImVec2>();
+        auto to = std::make_shared<ImVec2>();
+        steps_.push_back([this, from, to, x, y, seconds](float t) {
+            if (t == 0.0f) {
+                *from = penIn_ ? penAt_ : mouse_;
+                if (!penIn_) penProximity(true);
+                int ww = 0, wh = 0;
+                SDL_GetWindowSize(app_.window_, &ww, &wh);
+                *to = ImVec2(x * float(ww), y * float(wh));
+            }
+            const float k = std::min(t / seconds, 1.0f);
+            penMove(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
+            return t >= seconds;
+        });
+        wait(0.05f);
+        break;
+    }
     case StepVerb::PenEnter: {
         // The pen comes into range at u, v straight away (put down elsewhere on the tablet, no hover there).
         if (!need(2)) return false;
@@ -4166,6 +4187,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4643,7 +4665,7 @@ void Demo::penMove(float x, float y) {
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
-    if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
+    if (huionStream_ || kdeStream_ != 0) mouseMotion(x, y, kDriverMouse); // ... and the driver moves it too
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4757,6 +4779,14 @@ void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     e.pbutton.y = at ? at->y : penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
+    // KDE maps the barrel buttons to mouse buttons in the compositor: the tablet protocol's button event, then the pointer's
+    // click, at the pointer (where the pen is).
+    static const int kKdeMouse[] = {0, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
+    if (kdeStream_ != 0 && button >= 1 && button <= 2) {
+        if (kdeStream_ == 1) app_.handleEvent(e);
+        mouseButton(down, kKdeMouse[button], kDriverMouse);
+        return;
+    }
     if (driverRight_ == 2 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
     app_.handleEvent(e);
     if (driverRight_ == 1 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4899,7 +4929,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
-                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
                 "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
