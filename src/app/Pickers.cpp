@@ -115,6 +115,7 @@ struct State {
     int sliderFrame = -1;
     std::string sliderTyped;
     bool sliderWasActive = false;
+    bool sliderFollowed = false; // it has followed the pointer since it opened (it goes on following, back near the start too)
     // Follow mode (the Blender-style feel): after the key, moving the mouse sideways sets the value live from where it
     // opened; a click or Enter keeps it, Esc or a right click puts back what it was.
     bool sliderBaseSet = false;
@@ -1285,6 +1286,7 @@ void PickerUi::sizePopup(App& app, Slider which) {
     s.sliderFrame = ImGui::GetFrameCount();
     s.sliderTyped.clear();
     s.sliderWasActive = false;
+    s.sliderFollowed = false;
     s.sliderBaseSet = false;
     s.sliderValue = nullptr;
 }
@@ -1294,13 +1296,18 @@ namespace {
 // half a point (of the shown 0-100) per unscaled pixel, so 200 px cover the range.
 constexpr float kFollowPerPx = 0.5f;
 constexpr float kFollowSlopPx = 2.0f; // less than this is a click on the knob, not a move
+// A hovering pen drifts a few pixels as the tip comes down onto the knob: that is still a press on the knob (gh#184).
+constexpr float kFollowSlopPenPx = 8.0f;
 } // namespace
 
 bool PickerUi::sliderFollowing(const App& app) {
     const State& s = st();
-    // (Not with a pen in range: it keeps dragging the knob, and a driver's stray mouse events would move the value.)
-    return s.slider >= 0 && !s.sliderWasActive && s.sliderTyped.empty() && !app.penInProximity_ &&
-           std::fabs(app.mouseX_ - s.sliderAt.x) > kFollowSlopPx;
+    // A pen hovering in range follows too (gh#184: with it left out, holding S and moving a Wacom pen showed the size
+    // standing still until the tip came down). The pen alone moves the pointer then (App::strayMouseMotion): a driver's
+    // stray mouse events don't move the value.
+    const float slop = app.penInProximity_ ? kFollowSlopPenPx * app.uiScale_ : kFollowSlopPx;
+    return s.slider >= 0 && !s.sliderWasActive && s.sliderTyped.empty() &&
+           (s.sliderFollowed || std::fabs(app.mouseX_ - s.sliderAt.x) > slop);
 }
 
 void drawPickers(App& app) {
@@ -1457,6 +1464,7 @@ void drawPickers(App& app) {
             // (before any move) still drags it as before; a click after moving keeps the value (nothing starts a stroke).
             const bool leftDown = ImGui::GetIO().MouseDown[ImGuiMouseButton_Left];
             const bool following = PickerUi::sliderFollowing(app);
+            if (following && !first) s.sliderFollowed = true;
             // The pointer going past the canvas edge (growing a brush at the right side) keeps the value of the edge. A
             // click on a control there (a shelf tile, a panel button: going for another tool) cancels and goes on to it;
             // a click on nothing in particular keeps the value, as on the canvas.

@@ -398,3 +398,71 @@ TEST(micro_ink_cage_move_fixes_only_what_it_moved) {
     CHECK(h->edit(doc.mesh, doc.bvh, far, dabs));
     CHECK(grid(doc.mesh) == before);
 }
+
+// gh#184 (a tester, Sharp Crease on a dense lip): "one stroke was triggering other strokes in adjacent areas ... I did
+// undo a few strokes before". The promise, on the live path with Keep Strokes Editable on and off: undo puts the grids
+// back exactly, and a stroke after it changes no tile outside its own dabs' reach (and its mirror's, with X on); both
+// settings leave the same bytes.
+TEST(micro_ink_stroke_after_undo_changes_only_its_reach) {
+    std::vector<int16_t> finals[2];
+    for (const bool keep : {true, false}) {
+        Document doc = inkDoc();
+        doc.sculptor.keepEditable = keep;
+        Sculptor& sc = doc.sculptor;
+        const MicroMesh& mm = *doc.mesh.micro;
+        const size_t S = mm.samples;
+        // Sharp Crease lines down the front, side by side (the lip's vertical creases).
+        auto line = [&](float x, const Symmetry& sym, std::vector<uint32_t>* reach) {
+            CHECK(sc.beginStroke(doc.mesh, "Sharp Crease"));
+            for (int i = 0; i < 10; ++i) {
+                DabParams p = dabAt(glm::vec3(x, 0.25f - 0.05f * float(i), 1.0f), 0.06f, 0.6f);
+                p.strokeDelta = glm::vec3(0.0f, -0.05f, 0.0f);
+                p.pressure = 0.4f + 0.06f * float(i);
+                sc.dab(doc.mesh, doc.bvh, BrushType::SharpCrease, p, sym);
+                if (!reach) continue;
+                for (const float m : {1.0f, sym.x ? -1.0f : 1.0f}) {
+                    std::vector<uint32_t> one;
+                    microQueryTriangles(doc.mesh, doc.bvh, glm::vec3(m, 1.0f, 1.0f) * p.center, p.radius * 1.01f, one);
+                    reach->insert(reach->end(), one.begin(), one.end());
+                }
+            }
+            doc.undo.push(sc.endStroke());
+        };
+        Symmetry none;
+        none.x = false;
+        Symmetry mirror; // (X on)
+        line(0.10f, none, nullptr);
+        const std::vector<int16_t> afterFirst = grid(doc.mesh);
+        line(0.18f, none, nullptr);
+        line(0.26f, mirror, nullptr);
+        CHECK(doc.undo.undo(doc.mesh, doc.bvh) && doc.undo.undo(doc.mesh, doc.bvh));
+        CHECK(grid(doc.mesh) == afterFirst); // undo is exact, kept strokes or not
+
+        const std::pair<float, Symmetry> next[3] = {{0.14f, none}, {0.22f, mirror}, {0.30f, none}}; // (where the undone ones were)
+        for (const auto& [x, sym] : next) {
+            const std::vector<int16_t> before = grid(doc.mesh);
+            std::vector<uint32_t> reach;
+            line(x, sym, &reach);
+            std::sort(reach.begin(), reach.end());
+            reach.erase(std::unique(reach.begin(), reach.end()), reach.end());
+            const std::vector<int16_t> after = grid(doc.mesh);
+            CHECK(after != before);
+            size_t outside = 0;
+            for (uint32_t t = 0; t < mm.baseTriangles; ++t)
+                if (!std::equal(before.begin() + std::ptrdiff_t(t * S), before.begin() + std::ptrdiff_t((t + 1) * S),
+                                after.begin() + std::ptrdiff_t(t * S)) &&
+                    !std::binary_search(reach.begin(), reach.end(), t))
+                    ++outside;
+            if (outside) std::printf("    keep=%d mirror=%d: %zu tiles changed outside the stroke's reach\n", keep, sym.x, outside);
+            CHECK(outside == 0);
+        }
+        // Undo all three again and redo them: the same bytes.
+        const std::vector<int16_t> top = grid(doc.mesh);
+        for (int i = 0; i < 3; ++i) CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+        CHECK(grid(doc.mesh) == afterFirst);
+        for (int i = 0; i < 3; ++i) CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+        CHECK(grid(doc.mesh) == top);
+        finals[keep ? 0 : 1] = top;
+    }
+    CHECK(finals[0] == finals[1]); // recording the strokes changes nothing
+}
