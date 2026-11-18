@@ -361,6 +361,7 @@ void MicroRenderer::release() {
     if (emptyVao_) gl::DeleteVertexArrays(1, &emptyVao_), emptyVao_ = 0;
     focus_.reset();
     tilePages_.reset();
+    upload_.release();
     serial_ = 0;
     bytes_ = 0;
 }
@@ -625,17 +626,16 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
     poolFor(slots.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) std::memcpy(st + i * S, mm.disp.data() + size_t(order_[slots[i]]) * S, S * 2);
     }, 256);
+    upload_.stage(st, staging_.size()); // (render/BufferUpload.h: copies on the GPU, not BufferSubData)
     for (size_t i = 0; i < slots.size();) {
         const uint32_t chunk = slots[i] / chunkSlots_;
         size_t j = i + 1;
         while (j < slots.size() && slots[j] == slots[j - 1] + 1 && slots[j] / chunkSlots_ == chunk) ++j;
         const Chunk& c = chunks_[chunk];
-        gl::BindBuffer(GL_TEXTURE_BUFFER, c.disp);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(slots[i] - c.firstSlot) * S * 2), GLsizeiptr((j - i) * S * 2),
-                          st + i * S);
+        upload_.copy(c.disp, i * S * 2, size_t(slots[i] - c.firstSlot) * S * 2, (j - i) * S * 2);
         i = j;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
 }
 
 // Shading for the base triangles marked pending: all of it (`all`), or up to shadeBudget grid points of it.
@@ -726,17 +726,16 @@ size_t MicroRenderer::shadeSeeds(const Mesh& mesh, std::span<const uint32_t> see
         for (size_t i = 0; i < sorted.size(); ++i) stageIndex_[sorted[i]] = uint32_t(i);
         staging_.resize(sorted.size() * S * 4);
     }, false, outer);
-    const auto* st = reinterpret_cast<const uint32_t*>(staging_.data());
+    if (!sorted.empty()) upload_.stage(staging_.data(), sorted.size() * S * 4);
     for (size_t i = 0; i < sorted.size();) {
         const uint32_t s0 = slotOf_[sorted[i]], chunk = s0 / chunkSlots_;
         size_t j = i + 1;
         while (j < sorted.size() && slotOf_[sorted[j]] == slotOf_[sorted[j - 1]] + 1 && slotOf_[sorted[j]] / chunkSlots_ == chunk) ++j;
         const Chunk& c = chunks_[chunk];
-        gl::BindBuffer(GL_TEXTURE_BUFFER, c.shade);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - c.firstSlot) * S * 4), GLsizeiptr((j - i) * S * 4), st + i * S);
+        upload_.copy(c.shade, i * S * 4, size_t(s0 - c.firstSlot) * S * 4, (j - i) * S * 4);
         i = j;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
     for (uint32_t t : written_) { // (written whole and current: neither pending nor stale)
         const uint64_t bit = uint64_t(1) << (t & 63);
         uint64_t& w = pending_[t >> 6];
@@ -820,11 +819,11 @@ bool MicroRenderer::sync(Mesh& mesh) {
                             part[(at[k] + o) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
                         }
                 }, 64);
-                gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
+                upload_.stage(part.data(), part.size() * sizeof(glm::vec4));
                 for (size_t k = 0; k < runs.size(); ++k)
-                    gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(runs[k].first) * 2 * sizeof(glm::vec4)),
-                                      GLsizeiptr((runs[k].second - runs[k].first) * 2 * sizeof(glm::vec4)), part.data() + at[k] * 2);
-                gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+                    upload_.copy(baseData_, at[k] * 2 * sizeof(glm::vec4), size_t(runs[k].first) * 2 * sizeof(glm::vec4),
+                                 (runs[k].second - runs[k].first) * 2 * sizeof(glm::vec4));
+                BufferUpload::done();
             }
         }
         // This sync's triangles whose heights changed: their tiles go to the GPU (a moved base sends no heights).
@@ -952,9 +951,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         std::fprintf(stderr, "\n");
     }
     for (uint32_t c = 0; c < clusters; ++c) levels_[c] = uint32_t(want_[c]);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, levelData_);
-    gl::BufferSubData(GL_TEXTURE_BUFFER, 0, GLsizeiptr(levels_.size() * 4), levels_.data());
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    upload_.write(levelData_, 0, levels_.data(), levels_.size() * 4);
 
     if (u_.program != program) {
         u_.program = program;

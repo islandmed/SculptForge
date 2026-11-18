@@ -1344,19 +1344,6 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
-    # Label no_d3d12: tests that the Windows PC's WSL GPU path (Mesa's OpenGL on D3D12, ~/Work/.sf/pc.sh) can't run and
-    # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
-    # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
-    # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage);
-    # ui_micro_kse_move_mask likewise.
-    # ui_micro_tiles_closeup(_1440, _2880, labelled below): the same on the first tiled frame (Removing Device, every run);
-    # tiles now fall back to the plain levels on a D3D12 renderer (MicroTiles::setGpu), so there the script finds no tiles.
-    foreach(t ui_micro_levels ui_micro_mask_kelvin ui_micro_kse_move_mask ui_micro_tiles_closeup)
-      if(TEST ${t})
-        set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
-      endif()
-    endforeach()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")

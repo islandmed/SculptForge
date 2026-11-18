@@ -7,6 +7,8 @@
 //   gl_limits texels=N       the buffer-texture limit the renderer reads (and the most one micro buffer holds) is at most N
 //                            texels, as on a small GPU, so a mesh runs the path past the limits on any machine; 0: the driver's.
 //                            Tests only: no setting or environment reaches it.
+//   gl_limits copies=0|1|auto partial buffer updates as GPU copies (1) or BufferSubData (0) whatever the driver; auto: as the
+//                            driver needs (gl::copyUploads: copies on OpenGL over D3D12). Tests only, as texels=.
 //   render_cell NAME mode=lit|pbr|flat|wire [min=F] [size=PX] [splats=1]
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
@@ -15,6 +17,8 @@
 //                            box is theirs); when they carry view-dependent colour (SH degree >= 1) it must show: drawn again
 //                            with their plain colour only, at least 10% of the box changes; drawn with that colour per
 //                            quad corner (not the once-a-splat pre-pass), no channel differs by more than 1/255.
+//                            After the frame the context must still draw (gl::contextHealthy): a cell fails when the
+//                            GPU dropped the device.
 // Value: render_coverage (the last cell's share, 0-1).
 #include "app/App.h"
 #include "app/Demo.h"
@@ -33,12 +37,22 @@ namespace sf {
 bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::string& error) {
     const std::string& verb = w[0];
     if (verb == "gl_limits") {
-        if (w.size() < 2 || w[1].rfind("texels=", 0) != 0) {
-            error = "'gl_limits' needs texels=N (0: the driver's limits)";
+        if (w.size() < 2) {
+            error = "'gl_limits' needs texels=N (0: the driver's limits) or copies=0|1|auto";
             return false;
         }
-        const unsigned long texels = std::strtoul(w[1].c_str() + 7, nullptr, 10);
-        run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
+        for (size_t i = 1; i < w.size(); ++i) {
+            if (w[i].rfind("texels=", 0) == 0) {
+                const unsigned long texels = std::strtoul(w[i].c_str() + 7, nullptr, 10);
+                run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
+            } else if (w[i] == "copies=0" || w[i] == "copies=1" || w[i] == "copies=auto") {
+                const int copies = w[i] == "copies=auto" ? -1 : w[i] == "copies=1" ? 1 : 0;
+                run([copies] { gl::setTestCopyUploads(copies); });
+            } else {
+                error = "'gl_limits': unknown argument '" + w[i] + "' (texels=N, copies=0|1|auto)";
+                return false;
+            }
+        }
         return true;
     }
     // render_cell NAME mode=... [min=F] [size=PX] [splats=1] [target=X,Y,Z distance=D: a close-up, the camera D from that point]
@@ -146,9 +160,14 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         app.renderSettings_ = saved;
         app.splatViewColorForced_ = forced;
         app.syncScene();
+        // ... and the GPU still has its device after the frame (Mesa's OpenGL over D3D12 removed it after micro strokes:
+        // render/BufferUpload.h); a lost device draws nothing again, so it fails here by its name, not as an empty cell.
+        gl::Finish();
+        const bool healthy = gl::contextHealthy();
         std::string why;
         RenderCoverage r;
-        if (!ok) why = "the render failed: " + err;
+        if (!healthy) why = "the GPU dropped the device (GL context lost) by this frame", ok = false;
+        else if (!ok) why = "the render failed: " + err;
         else if (!bounds.valid()) why = splats ? "no splats are loaded" : "the scene has no model";
         else {
             r = measureRenderCoverage(img, cam, bounds);

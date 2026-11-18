@@ -128,17 +128,16 @@ void MicroFocus::writeRecords(const MicroMesh& mm, MicroRenderer& r, std::vector
     poolFor(slots.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) fill(slots[k], staging_.data() + k * R);
     }, 256);
+    r.upload_.stage(staging_.data(), staging_.size() * 2); // (render/BufferUpload.h: copies on the GPU, not BufferSubData)
     for (size_t i = 0; i < slots.size();) {
         const uint32_t chunk = slots[i] / r.chunkSlots_;
         size_t j = i + 1;
         while (j < slots.size() && slots[j] == slots[j - 1] + 1 && slots[j] / r.chunkSlots_ == chunk) ++j;
         const MicroRenderer::Chunk& c = r.chunks_[chunk];
-        gl::BindBuffer(GL_TEXTURE_BUFFER, c.disp);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(slots[i] - c.firstSlot) * R * 2), GLsizeiptr((j - i) * R * 2),
-                          staging_.data() + i * R);
+        r.upload_.copy(c.disp, i * R * 2, size_t(slots[i] - c.firstSlot) * R * 2, (j - i) * R * 2);
         i = j;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
 }
 
 // Coarse shading of `tris` and the tiles around them (all of it when `all`), shaded on the coarse level and sent.
@@ -177,17 +176,16 @@ void MicroFocus::shadeCoarse(const Mesh& mesh, MicroRenderer& r, const std::vect
     std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf[a] < slotOf[b]; });
     shadeStaging_.resize(sorted.size() * CS);
     for (size_t i = 0; i < sorted.size(); ++i) std::memcpy(shadeStaging_.data() + i * CS, coarseShade_.data() + size_t(sorted[i]) * CS, CS * 4);
+    if (!sorted.empty()) r.upload_.stage(shadeStaging_.data(), sorted.size() * CS * 4);
     for (size_t i = 0; i < sorted.size();) {
         const uint32_t s0 = slotOf[sorted[i]], chunk = s0 / r.chunkSlots_;
         size_t j = i + 1;
         while (j < sorted.size() && slotOf[sorted[j]] == slotOf[sorted[j - 1]] + 1 && slotOf[sorted[j]] / r.chunkSlots_ == chunk) ++j;
         const MicroRenderer::Chunk& c = r.chunks_[chunk];
-        gl::BindBuffer(GL_TEXTURE_BUFFER, c.shade);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(s0 - c.firstSlot) * CS * 4), GLsizeiptr((j - i) * CS * 4),
-                          shadeStaging_.data() + i * CS);
+        r.upload_.copy(c.shade, i * CS * 4, size_t(s0 - c.firstSlot) * CS * 4, (j - i) * CS * 4);
         i = j;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
 }
 
 bool MicroFocus::growPool(uint32_t want) {
@@ -256,14 +254,14 @@ void MicroFocus::sendPages(const MicroMesh& mm, MicroRenderer& r, const std::vec
     poolFor(list.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) std::memcpy(staging_.data() + k * S, mm.disp.data() + size_t(r.order_[list[k].second]) * S, S * 2);
     }, 64);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, poolDisp_);
+    if (!list.empty()) r.upload_.stage(staging_.data(), list.size() * S * 2);
     for (size_t i = 0; i < list.size();) {
         size_t j = i + 1;
         while (j < list.size() && list[j].first == list[j - 1].first + 1) ++j;
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(list[i].first) * S * 2), GLsizeiptr((j - i) * S * 2), staging_.data() + i * S);
+        r.upload_.copy(poolDisp_, i * S * 2, size_t(list[i].first) * S * 2, (j - i) * S * 2);
         i = j;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
 }
 
 // Full shading for the pages waiting for it, up to `budgetPoints` grid points.
@@ -289,15 +287,15 @@ void MicroFocus::shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoi
     // (each seed alone and exact: its neighbours' edge sums are read, not written)
     r.shader_.shade(mesh, seeds, false, written_, [&](uint32_t t) -> uint32_t* { return shadeStaging_.data() + size_t(index[t]) * S; },
                     {}, false, nullptr);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, poolShade_);
+    r.upload_.stage(shadeStaging_.data(), seeds.size() * S * 4);
     for (size_t i = 0; i < seeds.size(); ++i) {
         const uint32_t s = r.slotOf_[seeds[i]];
         uint32_t& e = page_[s];
         if (!e) continue;
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t((e & ~kShaded) - 1) * S * 4), GLsizeiptr(S * 4), shadeStaging_.data() + i * S);
+        r.upload_.copy(poolShade_, i * S * 4, size_t((e & ~kShaded) - 1) * S * 4, S * 4);
         if (!(e & kShaded)) e |= kShaded, ++shadedPages_, pageTableDirty_ = true;
     }
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    BufferUpload::done();
     const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(seeds.size() * S);
     shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
 }
@@ -420,9 +418,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
     }
     lap(kShadePages);
     if (pageTableDirty_) {
-        gl::BindBuffer(GL_TEXTURE_BUFFER, pageData_);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, 0, GLsizeiptr(size_t(slots_) * 4), page_.data());
-        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        r.upload_.write(pageData_, 0, page_.data(), size_t(slots_) * 4);
         pageTableDirty_ = false;
     }
     lap(kPages);

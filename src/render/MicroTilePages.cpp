@@ -191,25 +191,22 @@ void MicroTilePages::sync(const Mesh& mesh, MicroRenderer& r, const std::vector<
                 for (size_t q = 0; q < S * 2; ++q) slopeStaging_[k * S * 2 + q] = glm::packHalf1x16(slopes[q]);
             }
         }, 4);
-        auto send = [&](GLuint buffer, const void* data, size_t bytesPerPoint) {
-            gl::BindBuffer(GL_TEXTURE_BUFFER, buffer);
+        auto send = [&](GLuint buffer, const void* data, size_t bytesPerPoint) { // (render/BufferUpload.h: copies on D3D12)
+            r.upload_.stage(data, fill.size() * S * bytesPerPoint);
             for (size_t i = 0; i < fill.size();) {
                 size_t j = i + 1;
                 while (j < fill.size() && page_[fill[j]] == page_[fill[j - 1]] + 1) ++j;
-                gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(page_[fill[i]] - 1) * S * bytesPerPoint), GLsizeiptr((j - i) * S * bytesPerPoint),
-                                  static_cast<const uint8_t*>(data) + i * S * bytesPerPoint);
+                r.upload_.copy(buffer, i * S * bytesPerPoint, size_t(page_[fill[i]] - 1) * S * bytesPerPoint, (j - i) * S * bytesPerPoint);
                 i = j;
             }
-            gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+            BufferUpload::done();
         };
         send(pool_, staging_.data(), 2);
         send(slope_, slopeStaging_.data(), 4);
         lastFilled = fill.size();
     }
     if (tableLo_ < tableHi_) {
-        gl::BindBuffer(GL_TEXTURE_BUFFER, table_);
-        gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(size_t(tableLo_) * 4), GLsizeiptr(size_t(tableHi_ - tableLo_) * 4), page_.data() + tableLo_);
-        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        r.upload_.write(table_, size_t(tableLo_) * 4, page_.data() + tableLo_, size_t(tableHi_ - tableLo_) * 4);
         tableLo_ = ~0u, tableHi_ = 0;
     }
     lastFillMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();

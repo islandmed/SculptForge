@@ -3,6 +3,7 @@
 #include "render/GL.h"
 
 #include <algorithm>
+#include <cstring>
 
 #ifdef SF_GLES
 #include <SDL3/SDL_log.h>
@@ -15,6 +16,19 @@ namespace gl {
 
 namespace {
 uint32_t g_testTexelLimit = 0;
+int g_testCopyUploads = -1; // -1: the driver decides
+int g_layerCopyUploads = -1; // -1: not looked at yet
+}
+
+void setTestCopyUploads(int copies) { g_testCopyUploads = copies; }
+
+bool copyUploads() {
+    if (g_testCopyUploads >= 0) return g_testCopyUploads != 0;
+    if (g_layerCopyUploads < 0) {
+        const auto* r = reinterpret_cast<const char*>(GetString(GL_RENDERER));
+        g_layerCopyUploads = r && std::strstr(r, "D3D12") ? 1 : 0; // (Mesa's OpenGL over D3D12: "D3D12 (NVIDIA GeForce ...)")
+    }
+    return g_layerCopyUploads != 0;
 }
 
 void setTestTexelLimit(uint32_t texels) { g_testTexelLimit = texels; }
@@ -23,6 +37,23 @@ GLint maxTextureBufferTexels() {
     GLint texels = 0;
     GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
     return g_testTexelLimit ? std::min(texels, GLint(g_testTexelLimit)) : texels;
+}
+
+bool contextHealthy() {
+    while (gl::GetError() != GL_NO_ERROR) {
+    }
+    GLuint fbo = 0, rb = 0;
+    gl::GenFramebuffers(1, &fbo);
+    gl::GenRenderbuffers(1, &rb);
+    gl::BindRenderbuffer(GL_RENDERBUFFER, rb);
+    gl::RenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, 4, 4);
+    gl::BindFramebuffer(GL_FRAMEBUFFER, fbo);
+    gl::FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb);
+    const bool complete = gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+    gl::DeleteFramebuffers(1, &fbo);
+    gl::DeleteRenderbuffers(1, &rb);
+    return complete && gl::GetError() == GL_NO_ERROR;
 }
 
 uint32_t bufferChunkTexels(uint32_t natural) { return g_testTexelLimit ? std::min(natural, g_testTexelLimit) : natural; }

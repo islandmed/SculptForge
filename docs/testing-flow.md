@@ -195,10 +195,11 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
 - **Parallel runs** (`ctest -jN`, N > 1): timing checks get CI's slack (`SF_TIME_LIMIT_SCALE=4`, `timeLimit()` in
   tests/TestHarness.h). With `--threads-per-test auto` (pc.sh), each test process gets its share of the cores
   (`SF_THREADS`, core/ThreadPool.cpp), instead of ten pools each the size of the machine.
-- **GPU lost**: a failure whose output says the graphics device went away is the machine, not the code (exit 4).
-  pc.sh says so, and such a failure is never logged as a flake. Tests that the PC's WSL GPU path (Mesa on D3D12) can't
-  run carry the label `no_d3d12`, which pc.sh leaves out. ui_micro_levels makes D3D12 remove the device, yet passes on
-  CI and on the same PC's native driver.
+- **GPU lost**: a failure whose output says the graphics device went away is reported apart (exit 4) and never logged
+  as a flake. It is not always the machine: micro strokes made the PC's WSL GPU path (Mesa's OpenGL on D3D12, also
+  Windows on ARM) remove the device on every run until 11-17 (BufferSubData into busy texture buffers;
+  copies there: render/BufferUpload.h). A test that loses the device there is a bug to isolate, not a test to label away: the render
+  matrix's cells fail by name when the context is gone after their frame.
 
 ## Modes and the monkey
 
