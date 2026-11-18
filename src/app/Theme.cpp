@@ -304,6 +304,8 @@ void applyLook(const LookSettings& settings, std::string* status) {
     syncUiColors();
 }
 
+ImVec4 readableOn(const ImVec4& c, const ImVec4& bg, const ImVec4& toward, float ratio) { return readable(c, bg, toward, ratio); }
+
 const char* roleIcon(Role r) {
     switch (r) {
     case Role::Info: return ICON_LC_LIGHTBULB;

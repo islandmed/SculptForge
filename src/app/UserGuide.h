@@ -33,6 +33,7 @@ public:
     void open(const std::string& target = "");
     void toggle();
     bool isOpen() const { return open_; }
+    bool roleShown() const { return roleShown_; } // drew its Learn edge, strip and surface last frame (UI tests)
     void draw(App& app);
 
     // The chapter that explains a palette path from the Ctrl-help footer ("Tool > Masking" -> "masking.md"),
@@ -84,7 +85,7 @@ private:
     void prepareWhatsNew();
     std::string websiteUrl() const;
 
-    bool open_ = false, loaded_ = false, focusSearch_ = false;
+    bool open_ = false, loaded_ = false, focusSearch_ = false, roleShown_ = false;
     std::string loadError_;
     guide::Book book_;
     Place place_;

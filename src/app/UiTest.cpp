@@ -1268,6 +1268,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
+    if (name == "guide_role_edge") return app_.guide_.roleShown() ? 1.0 : 0.0; // the guide window drew its Learn edge + strip
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "parts") return double(doc.partCount());
