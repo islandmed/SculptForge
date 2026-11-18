@@ -44,6 +44,8 @@ void App::updateFocusDetail(float heightPx) {
     view.viewProj = partCamera().projection() * partCamera().view();
     // pixels per world unit at distance 1 (ortho: as a perspective view would at the target's depth)
     view.focalPx = glm::distance(view.eye, partCamera().target) / std::max(partCamera().worldPerPixel(partCamera().target, h), 1e-12f);
+    view.baseRevision = doc_.undo.revision();
+    view.baseMoving = drag_ != Drag::None || doc_.bvhDirty;
     const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     FocusBrush brush;
     RayHit hit;

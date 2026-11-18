@@ -568,6 +568,10 @@ void App::startProofMode() {
     else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds); // (a pack too: kProofPackStrokeSet)
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
                       {"still", -1.0f, 0.6}};
+    // SF_BENCH_STILL_SECONDS=8: a longer view at rest (#184: what a micro level settles to once its detail is in).
+    if (const char* still = std::getenv("SF_BENCH_STILL_SECONDS"); still && std::atof(still) > 0)
+        for (PhaseSpec& ph : p->phases)
+            if (std::string(ph.name) == "still") ph.seconds = std::atof(still);
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -1062,7 +1066,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (doc_.mesh.micro && doc_.mesh.micro->focus) {
                 double f[MicroFocus::kParts] = {};
                 renderer_.takeFocusSplit(f);
-                ph.focusSplit[0].push_back(doc_.mesh.micro->focus->stats().lastUpdateMs);
+                ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
                 for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
             }
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));

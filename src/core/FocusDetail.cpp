@@ -733,65 +733,105 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size());
     std::unique_lock<std::mutex> lock(mutex_);
-    ++frame_;
-    // Frustum planes (Gribb & Hartmann) for the visibility test.
-    glm::vec4 planes[6];
-    if (view.valid) {
-        const glm::mat4 M = glm::transpose(view.viewProj);
-        planes[0] = M[3] + M[0], planes[1] = M[3] - M[0], planes[2] = M[3] + M[1];
-        planes[3] = M[3] - M[1], planes[4] = M[3] + M[2], planes[5] = M[3] - M[2];
-        for (glm::vec4& p : planes) p /= glm::length(glm::vec3(p));
-    }
-    const glm::vec3 b0 = brush.position, b1 = brush.position + brush.velocity * lookaheadSeconds;
-    const float reach = brush.radius * brushReach;
-    poolFor(T, [&](size_t s, size_t e) {
-        for (size_t t = s; t < e; ++t) {
-            // (from the base as it is now: Move on a micro level moves the base cage)
-            const glm::uvec3 tr = tris_[t];
-            const glm::vec3 a = m.positions[tr.x], b = m.positions[tr.y], cc = m.positions[tr.z];
-            const glm::vec3 c = (a + b + cc) / 3.0f;
-            const glm::vec4 bs(c, std::sqrt(std::max({glm::dot(a - c, a - c), glm::dot(b - c, b - c), glm::dot(cc - c, cc - c)})) +
-                                      mm.bulgeMax + float(mm.triRange[t]) * mm.step);
-            float score = 0.0f;
-            if (brush.present) { // distance to the brush's path ahead (and its mirror's)
-                for (int k = 0; k < (brush.mirrorX ? 2 : 1); ++k) {
-                    const glm::vec3 q = k ? glm::vec3(-c.x, c.y, c.z) : c;
-                    const glm::vec3 d = b1 - b0;
-                    const float len2 = glm::dot(d, d);
-                    const float u = len2 > 0.0f ? std::clamp(glm::dot(q - b0, d) / len2, 0.0f, 1.0f) : 0.0f;
-                    const float dist = glm::distance(q, b0 + d * u) - bs.w;
-                    if (dist < reach) score = std::max(score, 1e6f - dist);
-                }
-            }
-            if (score == 0.0f && view.valid) {
-                bool in = true;
-                for (const glm::vec4& p : planes)
-                    if (glm::dot(glm::vec3(p), c) + p.w < -bs.w) in = false;
-                if (in) {
-                    const float px = dir_[t].coarseErr * view.focalPx / std::max(glm::distance(c, view.eye) - bs.w, 1e-4f);
-                    if (px > view.errorPx) score = px;
-                }
-            }
-            score_[t] = score;
-        }
-    }, 4096);
-    scratch_.clear();
-    size_t wanted = 0;
-    for (uint32_t t = 0; t < T; ++t)
-        if (score_[t] > 0.0f) {
-            ++wanted;
-            lastWanted_[t] = frame_;
-            if (state_[t] == kCoarse) scratch_.push_back(t);
-        }
-    std::sort(scratch_.begin(), scratch_.end(), [&](uint32_t a, uint32_t b) { return score_[a] > score_[b] || (score_[a] == score_[b] && a < b); });
+    // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
+    // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
+    // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
+    // a rescore at 2.5M base is ~30 ms on floor, so not often).
+    constexpr uint32_t kRescore = 600;
+    const auto sameView = [](const FocusView& a, const FocusView& b) {
+        return a.valid == b.valid && a.viewProj == b.viewProj && a.eye == b.eye && a.focalPx == b.focalPx && a.errorPx == b.errorPx &&
+               a.baseRevision == b.baseRevision && !a.baseMoving && !b.baseMoving;
+    };
+    const auto sameBrush = [](const FocusBrush& a, const FocusBrush& b) {
+        if (a.present != b.present) return false;
+        if (!a.present) return true;
+        const float still = 1e-3f * std::max(a.radius, 1e-12f); // (the app's smoothed velocity only tends to zero)
+        const bool stillA = glm::length(a.velocity) < still, stillB = glm::length(b.velocity) < still;
+        return a.position == b.position && a.radius == b.radius && a.mirrorX == b.mirrorX &&
+               (stillA && stillB ? true : a.velocity == b.velocity);
+    };
     const size_t maxFull = std::max<size_t>(budgetBytes / (size_t(samples_) * 2), 1);
+    const bool inBudget = fullTiles_ <= maxFull; // (else demotions wait on frames)
+    const bool unchanged = scored_.valid && scored_.frames < kRescore && inBudget && !mm.stroking && scored_.revision == mm.revision &&
+                           scored_.fullTiles == fullTiles_ && scored_.budgetBytes == budgetBytes && sameView(scored_.view, view) &&
+                           sameBrush(scored_.brush, brush);
+    if (unchanged && (stats_.lastPending == 0 || scored_.stalled)) {
+        ++scored_.frames;
+        ++stats_.skippedUpdates;
+        stats_.lastUpdateMs = msSince(t0);
+        return;
+    }
+    // Still promoting what the last scoring wanted (a view after strokes: tens of thousands of tiles, a batch a
+    // frame): the rest of its list, in its order, without scoring again (a full budget demotes what it no longer wants).
+    const bool fromQueue = unchanged;
+    size_t wanted = stats_.lastWanted;
+    if (fromQueue) {
+        scratch_.erase(scratch_.begin(), scratch_.end() - std::ptrdiff_t(stats_.lastPending));
+        std::erase_if(scratch_, [&](uint32_t t) { return state_[t] != kCoarse; }); // (a brush promoted it meanwhile)
+        ++stats_.skippedUpdates;
+    } else {
+        ++frame_;
+        lruValid_ = false;
+        // Frustum planes (Gribb & Hartmann) for the visibility test.
+        glm::vec4 planes[6];
+        if (view.valid) {
+            const glm::mat4 M = glm::transpose(view.viewProj);
+            planes[0] = M[3] + M[0], planes[1] = M[3] - M[0], planes[2] = M[3] + M[1];
+            planes[3] = M[3] - M[1], planes[4] = M[3] + M[2], planes[5] = M[3] - M[2];
+            for (glm::vec4& p : planes) p /= glm::length(glm::vec3(p));
+        }
+        const glm::vec3 b0 = brush.position, b1 = brush.position + brush.velocity * lookaheadSeconds;
+        const float reach = brush.radius * brushReach;
+        poolFor(T, [&](size_t s, size_t e) {
+            for (size_t t = s; t < e; ++t) {
+                // (from the base as it is now: Move on a micro level moves the base cage)
+                const glm::uvec3 tr = tris_[t];
+                const glm::vec3 a = m.positions[tr.x], b = m.positions[tr.y], cc = m.positions[tr.z];
+                const glm::vec3 c = (a + b + cc) / 3.0f;
+                const glm::vec4 bs(c, std::sqrt(std::max({glm::dot(a - c, a - c), glm::dot(b - c, b - c), glm::dot(cc - c, cc - c)})) +
+                                          mm.bulgeMax + float(mm.triRange[t]) * mm.step);
+                float score = 0.0f;
+                if (brush.present) { // distance to the brush's path ahead (and its mirror's)
+                    for (int k = 0; k < (brush.mirrorX ? 2 : 1); ++k) {
+                        const glm::vec3 q = k ? glm::vec3(-c.x, c.y, c.z) : c;
+                        const glm::vec3 d = b1 - b0;
+                        const float len2 = glm::dot(d, d);
+                        const float u = len2 > 0.0f ? std::clamp(glm::dot(q - b0, d) / len2, 0.0f, 1.0f) : 0.0f;
+                        const float dist = glm::distance(q, b0 + d * u) - bs.w;
+                        if (dist < reach) score = std::max(score, 1e6f - dist);
+                    }
+                }
+                if (score == 0.0f && view.valid) {
+                    bool in = true;
+                    for (const glm::vec4& p : planes)
+                        if (glm::dot(glm::vec3(p), c) + p.w < -bs.w) in = false;
+                    if (in) {
+                        const float px = dir_[t].coarseErr * view.focalPx / std::max(glm::distance(c, view.eye) - bs.w, 1e-4f);
+                        if (px > view.errorPx) score = px;
+                    }
+                }
+                score_[t] = score;
+            }
+        }, 4096);
+        scratch_.clear();
+        wanted = 0;
+        for (uint32_t t = 0; t < T; ++t)
+            if (score_[t] > 0.0f) {
+                ++wanted;
+                lastWanted_[t] = frame_;
+                if (state_[t] == kCoarse) scratch_.push_back(t);
+            }
+        std::sort(scratch_.begin(), scratch_.end(), [&](uint32_t a, uint32_t b) { return score_[a] > score_[b] || (score_[a] == score_[b] && a < b); });
+    }
     // Demotion candidates: full tiles not wanted for kLinger frames, least recently wanted first (never a dirty
     // one while stroking: a dab on the solver thread may be writing it).
     constexpr uint32_t kLinger = 8;
-    std::vector<uint32_t> lru;
+    std::vector<uint32_t>& lru = lru_;
     auto demoteFor = [&](size_t room) {
         if (fullTiles_ + room <= maxFull) return true;
-        if (lru.empty()) {
+        if (!lruValid_) {
+            lruValid_ = true;
+            lru.clear();
             for (uint32_t t = 0; t < T; ++t)
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
@@ -799,7 +839,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
             const uint32_t t = lru.back();
             lru.pop_back();
-            if (state_[t] != kCoarse) demoteLocked(mm, t);
+            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t);
         }
         return fullTiles_ + room <= maxFull;
     };
@@ -819,6 +859,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         lock.lock();
     }
     demoteFor(0);
+    scored_ = {true, view, brush, mm.revision, fullTiles_, budgetBytes, fromQueue ? scored_.frames + 1 : 0, done == 0 && !scratch_.empty()};
     stats_.lastWanted = wanted;
     stats_.lastPending = scratch_.size() - done;
     stats_.lastUpdateMs = msSince(t0);
