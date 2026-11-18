@@ -5,6 +5,24 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.8
+
+```features
+date: unreleased
+tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
+highlight: Python scripts can add their own buttons and panels
+highlight: Splats show the sheen that changes as you orbit
+highlight: Files with non-English names open on Windows again
+highlight: Size and Intensity follow the pen as it hovers above the tablet
+title: Finer detail up close
+line: Zoom in on a micro level in smooth shading and the view draws up to two levels finer than the stored grid, following the surface's curve, with no extra memory or file size. Brushes and picks are unchanged.
+action: guide:micro-levels.md
+title: Buttons and panels from Python
+line: A Python script can add its own panels of buttons, sliders and check boxes under File > Script, and actions to the command palette, shelves and My Panel.
+action: guide:python.md
+```
+
 ## Version 0.13.7
 
 ```features

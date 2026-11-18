@@ -3,7 +3,6 @@ whats_new: **Scripts can add buttons and panels**: a Python script can add actio
   and panels of labels, buttons, sliders and check boxes under **File > Script**. Scripts ticked under **Edit > Preferences >
   Scripts > Run at start-up** bring theirs back at every start; a script that changed since you trusted it does not run
   until you trust it again.
-highlight: Python scripts can add buttons and panels
 added: **Python scripts add to the interface** (`sf.ui`, Edit > Preferences > Scripts): actions (command palette, shelves,
   My Panel, keys) and panels of labels, buttons, sliders and check boxes under File > Script, drawn by SculptForge's own
   controls. **Run at start-up** (off, per script, only for files in the Scripts folder): the script's bytes are read once,
