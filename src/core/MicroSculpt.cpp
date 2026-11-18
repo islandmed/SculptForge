@@ -230,6 +230,7 @@ void MicroStroke::begin(Mesh& m) {
     grabTris_.clear();
     grabWeight_.clear();
     grabNormal_.clear();
+    grabTotal_ = glm::vec3(0.0f);
     baseEdge_ = mm.baseEdge;
     bornKeys_.clear();
     bornSet_.clear();
@@ -989,13 +990,19 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples;
     const float invStep = 1.0f / mm.step;
+    // Each event writes the rounded change of the whole drag so far less the rounded change before it (from the
+    // values the stroke found): rounding each event's own change lost every change under half a unit (the falloff's
+    // tail, a soft mask edge, never moved) and gave a whole one to those just above, a terrace per event.
+    const glm::vec3 before = grabTotal_, total = grabTotal_ + delta;
+    grabTotal_ = total;
     // One mirror after another (a point may be in two), each in parallel over its triangles.
     size_t weightBase = 0;
     for (const GrabMirror& gm : grabMirrors_) {
         const uint32_t cm = n / gm.stride, cs = (cm + 1) * (cm + 2) / 2;
-        const glm::vec3 dm = gm.mirror * delta;
+        const glm::vec3 d0 = gm.mirror * before, d1 = gm.mirror * total;
         poolFor(gm.tris, [&](size_t b, size_t e) {
-            thread_local std::vector<float> coarse, baseFree;
+            thread_local std::vector<glm::vec2> coarse; // (the change before this event, and after it)
+            thread_local std::vector<float> baseFree;
             coarse.resize(cs);
             for (size_t k = b; k < e; ++k) {
                 const uint32_t t = grabTris_[gm.firstTri + k];
@@ -1003,18 +1010,23 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
                 const glm::vec3* nrm = grabNormal_.data() + weightBase + k * cs;
                 bool any = false;
                 for (uint32_t c = 0; c < cs; ++c) {
-                    coarse[c] = w[c] > 0.0f ? glm::dot(dm, nrm[c]) * w[c] : 0.0f;
-                    any = any || coarse[c] != 0.0f;
+                    coarse[c] = w[c] > 0.0f ? glm::vec2(glm::dot(d0, nrm[c]), glm::dot(d1, nrm[c])) * w[c] : glm::vec2(0.0f);
+                    any = any || coarse[c].x != coarse[c].y;
                 }
                 if (!any) continue;
                 int16_t* g = mm.disp.data() + size_t(t) * S;
+                const int16_t* start = oldDisp_.data() + size_t(tileOf_[t] - 1) * S; // (touched by beginGrab)
                 const uint8_t* mk = mm.hasMask() ? mm.mask.data() + size_t(t) * S : nullptr;
                 const float* bf = baseFreedom(m, t, n, baseFree) ? baseFree.data() : nullptr;
                 int triMax = mm.triRange[t];
-                interpolateCoarse(coarse.data(), n, gm.stride, [&](uint32_t idx, float dd) {
+                forInterpolated(coarse.data(), n, gm.stride, [&](uint32_t idx, uint32_t, uint32_t, glm::vec2 dd) {
+                    if (dd.x == dd.y) return;
                     if (mk) dd *= 1.0f - float(mk[idx]) * (1.0f / 255.0f);
                     if (bf) dd *= bf[idx];
-                    const int16_t q = quantizeUnits(float(g[idx]) + dd * invStep);
+                    const float s0 = float(start[idx]);
+                    const int change = int(quantizeUnits(s0 + dd.y * invStep)) - int(quantizeUnits(s0 + dd.x * invStep));
+                    if (change == 0) return;
+                    const int16_t q = int16_t(std::clamp(int(g[idx]) + change, -32767, 32767));
                     g[idx] = q;
                     triMax = std::max(triMax, q >= 0 ? int(q) : -int(q));
                 });
@@ -1037,6 +1049,7 @@ void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
 
 void MicroStroke::restore(Mesh& m) {
     if (!active_ || !m.micro || (tiles_.empty() && bornKeys_.empty() && oldTiles_.empty())) return;
+    grabTotal_ = glm::vec3(0.0f); // (back where the drag began)
     MicroMesh& mm = *m.micro;
     const size_t S = mm.samples;
     if (mm.tiles) { // Adaptive Detail tiles: those born go, those changed get their old deltas

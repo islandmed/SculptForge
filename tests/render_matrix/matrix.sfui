@@ -23,6 +23,11 @@ render_cell "Lit Sphere x small" mode=lit
 render_cell "PBR x small" mode=pbr
 render_cell "flat x small" mode=flat
 render_cell "wire x small" mode=wire
+# (face groups: a second group in front, Show Face Groups on)
+run mask_by_facing x=0 y=0 z=1 angle=50
+run facegroup_from_mask
+run mask_clear
+render_cell "face groups x small" mode=groups
 
 # --- Gaussian splats: plain colour (SH 0), then view-dependent colour (SH 3; drawn again without it, the box must change)
 run splat_test_capture kind=object count=20000 floaters=0
@@ -45,6 +50,10 @@ render_cell "Lit Sphere x dense Micro" mode=lit
 render_cell "PBR x dense Micro" mode=pbr
 render_cell "flat x dense Micro" mode=flat
 render_cell "wire x dense Micro" mode=wire
+run mask_by_facing x=0 y=0 z=1 angle=50
+run facegroup_from_mask
+run mask_clear
+render_cell "face groups x dense Micro" mode=groups
 # ... drawn ABOVE the stored level (close-ups: TierBudgets::microDrawAbove, posAt in the micro vertex shader): the camera
 # 0.03 from the unit sphere's front, a few stored cells across the view, so every drawn vertex is an interpolated one.
 render_cell "Lit Sphere x dense Micro, above the stored level" mode=lit target=0,0,1 distance=0.03

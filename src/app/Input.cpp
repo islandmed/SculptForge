@@ -18,6 +18,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/FaceGroups.h"
+#include "core/Micro.h"
 
 #include <IconsLucide.h>
 
@@ -41,6 +42,8 @@ constexpr double kQuickMenuTapSeconds = 0.25; // Space released sooner: a tap, t
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
 
 bool anyMasked(const Mesh& mesh) {
+    if (mesh.micro && std::any_of(mesh.micro->mask.begin(), mesh.micro->mask.end(), [](uint8_t m) { return m > 0; }))
+        return true; // (a micro level's own mask: Ctrl+W groups from it, core/FaceGroups.cpp groupsFromMask)
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
 }
 

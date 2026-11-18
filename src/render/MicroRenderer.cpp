@@ -33,7 +33,7 @@ const char* kMicroVS = R"(
 layout(location = 0) in uvec2 aIJ; // the patch's grid point at uLevel
 uniform mat4 uView;
 uniform mat4 uProj;
-uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges), (cluster across each edge, -)
+uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges), (cluster across each edge, face group)
 uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
 uniform usamplerBuffer uLevels; // per cluster: the level it draws
@@ -67,6 +67,7 @@ int gTilePage = -1;
 #endif
 flat out int vSlot;
 flat out int vEdges; // the base triangle's edges the wireframe draws (bit e: edge e; quad diagonals left out)
+flat out int vGroup; // the base triangle's face group (Show Face Groups)
 out vec2 vIJ;
 #ifdef FLAT
 out vec3 vViewPos;
@@ -242,6 +243,7 @@ void main() {
     int slot = uSlotBase + instance;
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
+    vGroup = int(texelFetch(uTris, slot * 2 + 1).w);
 #ifdef FOCUS
     uint pg = texelFetch(uPages, slot).r;
     gPage = int(pg & 0x7FFFFFFFu) - 1;
@@ -445,24 +447,6 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     clusterShift_ = uint32_t(std::countr_zero(clusterSize));
     chunkSlots_ = std::max(clusterSize, (gl::bufferChunkTexels(kChunkTexels) / dispPer) & ~(clusterSize - 1));
     const uint32_t clusters = (nt + clusterSize - 1) >> clusterShift_;
-    // Corners, the edges the wireframe draws (#128: the base's, without quad diagonals, as Renderer's own
-    // wireframe) and the clusters across the edges, per slot.
-    std::vector<uint32_t> tri(size_t(nt) * 8);
-    poolFor(nt, [&](size_t b, size_t e) {
-        for (size_t s = b; s < e; ++s) {
-            const uint32_t t = order_[s];
-            const glm::uvec3 tr = mesh.triangles[t];
-            uint32_t* o = tri.data() + s * 8;
-            const uint32_t partner = mesh.quadPartnerAt(t);
-            const int diagonal = partner != Mesh::kNoQuad && !mesh.triangleHidden(partner) ? mesh.quadDiagonal(t, partner) : -1;
-            o[0] = tr.x, o[1] = tr.y, o[2] = tr.z, o[3] = diagonal < 0 ? 7u : 7u & ~(1u << diagonal);
-            for (int k = 0; k < 3; ++k) {
-                const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(k)];
-                o[4 + k] = nb == MicroMesh::kNone ? kNoCluster : slotOf_[nb >> 2] >> clusterShift_;
-            }
-            o[7] = 0;
-        }
-    }, 1 << 14);
     auto makeTex = [&](GLuint& buffer, GLuint& tex, GLenum format, const void* data, size_t bytes) {
         if (!buffer) gl::GenBuffers(1, &buffer);
         if (!tex) gl::GenTextures(1, &tex);
@@ -473,7 +457,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
         bytes_ += bytes;
     };
     bytes_ = 0;
-    makeTex(triData_, triTex_, GL_RGBA32UI, tri.data(), tri.size() * 4);
+    uploadTris(mesh);
+    bytes_ += size_t(nt) * 8 * 4;
     levels_.assign(clusters, 0);
     makeTex(levelData_, levelTex_, GL_R32UI, levels_.data(), levels_.size() * 4);
     // Grid chunks.
@@ -506,6 +491,36 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     stale_.assign(pending_.size(), 0);
     pendingCount_ = staleCount_ = 0;
     ensurePatches(std::min(mm.level + std::max(drawAbove, 0), kMaxDrawLevel));
+}
+
+// The per-slot record (uTris): again when face groups or hidden triangles change (Mesh::facesDirty).
+void MicroRenderer::uploadTris(const Mesh& mesh) {
+    const MicroMesh& mm = *mesh.micro;
+    const uint32_t nt = mm.baseTriangles;
+    // Corners, the edges the wireframe draws (#128: the base's, without quad diagonals, as Renderer's own
+    // wireframe), the clusters across the edges and the face group, per slot.
+    std::vector<uint32_t> tri(size_t(nt) * 8);
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t s = b; s < e; ++s) {
+            const uint32_t t = order_[s];
+            const glm::uvec3 tr = mesh.triangles[t];
+            uint32_t* o = tri.data() + s * 8;
+            const uint32_t partner = mesh.quadPartnerAt(t);
+            const int diagonal = partner != Mesh::kNoQuad && !mesh.triangleHidden(partner) ? mesh.quadDiagonal(t, partner) : -1;
+            o[0] = tr.x, o[1] = tr.y, o[2] = tr.z, o[3] = diagonal < 0 ? 7u : 7u & ~(1u << diagonal);
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(k)];
+                o[4 + k] = nb == MicroMesh::kNone ? kNoCluster : slotOf_[nb >> 2] >> clusterShift_;
+            }
+            o[7] = mesh.facegroupAt(t);
+        }
+    }, 1 << 14);
+    if (!triData_) gl::GenBuffers(1, &triData_);
+    if (!triTex_) gl::GenTextures(1, &triTex_);
+    gl::BindBuffer(GL_TEXTURE_BUFFER, triData_);
+    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(tri.size() * 4), tri.data(), GL_STATIC_DRAW);
+    gl::BindTexture(GL_TEXTURE_BUFFER, triTex_);
+    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, triData_);
 }
 
 void MicroRenderer::uploadBase(const Mesh& mesh) {
@@ -772,6 +787,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             shadePending(mesh, true);
         }
     } else {
+        if (mesh.facesDirty) uploadTris(mesh); // (face groups: the group colours)
         // The base cage moved (dual-scale Move, big brushes on a dense base, a transform, undo of any): the detail
         // rides along on the GPU (it is relative to the base); what changes is the base, the bounds and the shading
         // around moved vertices. Their triangles in a bitset (millions on a scan: no lists to sort).

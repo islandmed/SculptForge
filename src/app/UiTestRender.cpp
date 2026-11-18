@@ -9,7 +9,7 @@
 //                            Tests only: no setting or environment reaches it.
 //   gl_limits copies=0|1|auto partial buffer updates as GPU copies (1) or BufferSubData (0) whatever the driver; auto: as the
 //                            driver needs (gl::copyUploads: copies on OpenGL over D3D12). Tests only, as texels=.
-//   render_cell NAME mode=lit|pbr|flat|wire [min=F] [size=PX] [splats=1]
+//   render_cell NAME mode=lit|pbr|flat|wire|groups [min=F] [size=PX] [splats=1]   (groups: Lit Sphere with Show Face Groups)
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
 //                            failing cell is listed by NAME (the script's "mode x path") with its picture in --ui-out, and
@@ -57,7 +57,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     }
     // render_cell NAME mode=... [min=F] [size=PX] [splats=1] [target=X,Y,Z distance=D: a close-up, the camera D from that point]
     if (w.size() < 3) {
-        error = "'render_cell' needs NAME mode=lit|pbr|flat|wire";
+        error = "'render_cell' needs NAME mode=lit|pbr|flat|wire|groups";
         return false;
     }
     std::string mode;
@@ -83,8 +83,8 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             return false;
         }
     }
-    if (mode != "lit" && mode != "pbr" && mode != "flat" && mode != "wire") {
-        error = "'render_cell' needs mode=lit|pbr|flat|wire";
+    if (mode != "lit" && mode != "pbr" && mode != "flat" && mode != "wire" && mode != "groups") {
+        error = "'render_cell' needs mode=lit|pbr|flat|wire|groups";
         return false;
     }
     const std::string name = w[1];
@@ -96,6 +96,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         s.shading = mode == "pbr" ? RenderSettings::Shading::Pbr : RenderSettings::Shading::LitSphere;
         s.flatShading = mode == "flat";
         s.wireframe = mode == "wire";
+        s.showFaceGroups = mode == "groups";
         s.gradientBackground = false;
         s.backgroundColor = glm::vec3(0.06f, 0.30f, 0.12f); // (unlike any shaded surface's colour)
         s.dimInactive = false;

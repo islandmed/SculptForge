@@ -90,6 +90,7 @@ private:
     friend class MicroFocus;
     friend class MicroTilePages;
     void buildLayout(const Mesh& mesh);
+    void uploadTris(const Mesh& mesh);
     void uploadBase(const Mesh& mesh);
     void updateClusterBounds(const Mesh& mesh, const std::vector<uint32_t>& clusters);
     // The same after only displacement changed (the base didn't move): the clusters' displacement range only.

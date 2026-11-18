@@ -411,6 +411,7 @@ private:
     std::vector<uint32_t> grabTris_;
     std::vector<float> grabWeight_;
     std::vector<glm::vec3> grabNormal_;
+    glm::vec3 grabTotal_{0.0f}; // the drag so far (grab: each event writes the change of the whole drag, rounded once)
 };
 
 // One micro step: the old grid points of the base triangles a stroke touched (in units of `step`), or a whole
