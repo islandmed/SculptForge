@@ -285,6 +285,12 @@ void python::bind(py::module_& m, std::shared_ptr<const Api> api, const char* de
             py::arg("vertices"), py::arg("triangles"),
             "Replace the active Part's mesh with your own (in the app one undo step; in a pipeline it clears undo).")
         .def_property_readonly("splat_count", [](const Document& d) { return d.splats.size(); })
+        .def_property_readonly("subdivision_levels", [](const Document& d) { return g_core->subdivLevelCount(d.mesh); },
+                               "How many subdivision levels the active Part has (0: none, after subdiv_divide 2 or more).")
+        .def_property_readonly(
+            "subdivision_level",
+            [](const Document& d) { return g_core->subdivLevelCount(d.mesh) ? g_core->subdivCurrentLevel(d.mesh) + 1 : 0; },
+            "The level shown and sculpted, 1 (lowest) to subdivision_levels; 0 without levels.")
         // Parts: the mesh properties above are the active Part's.
         .def_property_readonly("parts",
                                [](const Document& d) {

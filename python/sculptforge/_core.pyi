@@ -93,6 +93,12 @@ class Document:
     @property
     def splat_count(self) -> int: ...
     @property
+    def subdivision_levels(self) -> int:
+        """How many subdivision levels the active Part has (0: none)."""
+    @property
+    def subdivision_level(self) -> int:
+        """The level shown and sculpted, 1 to subdivision_levels; 0 without levels."""
+    @property
     def parts(self) -> list[PartInfo]:
         """The Parts (separate meshes) in list order."""
     @property

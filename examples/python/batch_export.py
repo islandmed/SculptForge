@@ -15,18 +15,17 @@ def main(out: pathlib.Path, models: pathlib.Path | None) -> None:
         sources = []
         for level in (3, 4, 5):
             doc = sf.Document()
-            sf.run(doc, "new_sphere", subdivisions=level)
+            doc.new_sphere(level)
             path = out / f"sphere{level}.obj"
-            sf.run(doc, "save_obj", path=path)
+            doc.save(path)
             sources.append(path)
     for src in sources:
-        doc = sf.Document()
         try:
-            sf.run(doc, "open", path=src)
-            sf.run(doc, "remesh", resolution=128)
-            sf.run(doc, "decimate", ratio=0.5)
-            sf.run(doc, "export_glb", path=out / f"{src.stem}.glb")
-            sf.run(doc, "export_usd", path=out / f"{src.stem}.usda")
+            doc = sf.Document.open(src)
+            doc.remesh(128)
+            doc.decimate(0.5)
+            doc.save(out / f"{src.stem}.glb")
+            doc.save(out / f"{src.stem}.usda")
         except sf.CommandError as e:  # one bad file doesn't stop the batch
             print(f"skipped {src.name}: {e}", file=sys.stderr)
             continue
