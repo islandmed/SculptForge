@@ -14,6 +14,8 @@
 #include "core/MicroHistory.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <vector>
 
 using namespace sf;
@@ -92,6 +94,52 @@ void moveKeeps(bool keep, MoveKind kind) {
     // Undo the two strokes: the Move is still there, exactly.
     CHECK(registry().execute(doc, "undo").ok);
     CHECK(registry().execute(doc, "undo").ok);
+    CHECK(state(doc.mesh) == dragged);
+    sc.microMoveAlongNormals = false;
+}
+
+// The tester's other levers: an undo right before the Move, and Keep Strokes Editable switched on, off and on again
+// mid-session over kept strokes and a mask.
+void moveAfterUndoAndToggle(MoveKind kind) {
+    Document doc = microDoc(true);
+    Sculptor& sc = doc.sculptor;
+    standardStroke(doc, glm::vec3(-0.05f, 0.0f, 1.0f));
+    standardStroke(doc, glm::vec3(0.05f, 0.03f, 1.0f));
+    CHECK(sc.beginStroke(doc.mesh, "Mask"));
+    sc.dabMask(doc.mesh, doc.bvh, dabAt(glm::vec3(0.25f, 0.0f, 1.0f), 0.08f, 1.0f), noSymmetry());
+    doc.undo.push(sc.endStroke());
+    CHECK(registry().execute(doc, "undo").ok); // (the mask out again: redo holds it)
+    CHECK(registry().execute(doc, "redo").ok);
+    sc.keepEditable = false; // off mid-session
+    standardStroke(doc, glm::vec3(0.0f, -0.05f, 1.0f));
+    sc.keepEditable = true; // and on again
+    standardStroke(doc, glm::vec3(0.02f, 0.0f, 1.0f));
+    CHECK(registry().execute(doc, "undo").ok); // an undo right before the Move
+    sc.microMoveAlongNormals = kind == MoveKind::AlongNormals;
+    const State before = state(doc.mesh);
+    const float stepBefore = doc.mesh.micro->step;
+    CHECK(sc.beginStroke(doc.mesh, "Move"));
+    sc.beginGrab(doc.mesh, doc.bvh, dabAt(glm::vec3(0.1f, 0.0f, 1.0f), 0.25f, 1.0f), noSymmetry());
+    for (int i = 0; i < 5; ++i) sc.grab(doc.mesh, doc.bvh, glm::vec3(0.01f, 0.0f, 0.02f));
+    const State dragged = state(doc.mesh);
+    CHECK(!(dragged == before));
+    doc.undo.push(sc.endStroke());
+    CHECK(state(doc.mesh) == dragged);
+    standardStroke(doc, glm::vec3(0.0f, 0.0f, -1.0f));
+    CHECK(registry().execute(doc, "undo").ok);
+    CHECK(state(doc.mesh) == dragged);
+    CHECK(registry().execute(doc, "undo").ok); // the Move itself steps back, and redo brings it exactly
+    // (a Move makes room for a radius either way first: the grid's range grows, every value rescaled, losing its
+    // lowest bits; undo gives back the old surface to within that rounding)
+    const State undone = state(doc.mesh);
+    CHECK(undone.positions == before.positions);
+    const float ratio = doc.mesh.micro->step / stepBefore;
+    printf("  Move rescaled the grid %gx\n", double(ratio));
+    bool close = true;
+    for (size_t i = 0; i < before.disp.size(); ++i)
+        close = close && std::abs(float(undone.disp[i]) * ratio - float(before.disp[i])) <= ratio;
+    CHECK(close);
+    CHECK(registry().execute(doc, "redo").ok);
     CHECK(state(doc.mesh) == dragged);
     sc.microMoveAlongNormals = false;
 }
@@ -191,6 +239,8 @@ TEST(kse_move_mask_near_keeps_its_result_off) { moveKeeps(false, MoveKind::MaskN
 TEST(kse_move_mask_near_keeps_its_result_on) { moveKeeps(true, MoveKind::MaskNear); }
 TEST(kse_move_along_normals_keeps_its_result_off) { moveKeeps(false, MoveKind::AlongNormals); }
 TEST(kse_move_along_normals_keeps_its_result_on) { moveKeeps(true, MoveKind::AlongNormals); }
+TEST(kse_move_after_undo_and_toggle_mask_near) { moveAfterUndoAndToggle(MoveKind::MaskNear); }
+TEST(kse_move_after_undo_and_toggle_along_normals) { moveAfterUndoAndToggle(MoveKind::AlongNormals); }
 TEST(kse_mask_adjust_on_micro_off) { maskAdjust(false); }
 TEST(kse_mask_adjust_on_micro_on) { maskAdjust(true); }
 
