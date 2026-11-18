@@ -5,6 +5,7 @@
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/MemoryGuard.h"
 #include "core/Micro.h"
 #include "core/FocusDetail.h"
 #include "core/Multires.h"
@@ -262,6 +263,24 @@ int coreSceneMillions(const std::string& name) {
     return n >= 1 && n <= 4000 ? n : 0;
 }
 
+CoreSceneNeed coreSceneNeed(int millions) {
+    CoreSceneNeed n;
+    n.ramBytes = size_t(double(millions) * 1e6 * kCoreBytesPerMicroTriangle);
+    n.diskBytes = size_t(double(millions) * 1e6 * kCoreFileBytesPerMicroTriangle);
+    return n;
+}
+
+std::string coreSceneShortMessage(const std::string& name, int millions, size_t availableRam, size_t availableDisk, bool needDisk) {
+    const CoreSceneNeed need = coreSceneNeed(millions);
+    const MemoryCheck ram = checkMemory(need.ramBytes, availableRam);
+    if (!ram.enough) return benchmarkSkippedMessage(name, ram);
+    const size_t diskMargin = size_t(256) << 20;
+    if (needDisk && availableDisk > 0 && availableDisk < need.diskBytes + diskMargin)
+        return name + " skipped: needs ~" + formatGigabytes(need.diskBytes + diskMargin) + " of free disk space for its scene file (written once), " +
+               formatGigabytes(availableDisk) + " free. Free some space and run again";
+    return {};
+}
+
 std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log, int millions) {
     namespace fs = std::filesystem;
     const fs::path dir = MicroStore::swapFolder();
@@ -269,7 +288,15 @@ std::string core200mScenePath(std::string& error, const std::function<void(const
     fs::create_directories(dir, ec);
     const std::string name = "core-" + std::to_string(millions) + "m";
     const fs::path path = dir / (name + "-v1.sfproj");
-    if (fs::exists(path, ec)) return path.string(); // (renamed into place when whole)
+    const bool exists = fs::exists(path, ec);
+    { // Memory and disk first, a plain message, before anything is written or built (a small machine never gets to an OOM)
+        size_t freeDisk = 0;
+        if (const char* v = std::getenv("SF_AVAILABLE_DISK_MB"); v && *v) freeDisk = size_t(std::atof(v)) << 20; // (tests: a full disk)
+        else if (const fs::space_info si = fs::space(dir, ec); !ec) freeDisk = size_t(si.available);
+        error = coreSceneShortMessage(name, millions, availableMemoryBytes(), freeDisk, !exists);
+        if (!error.empty()) return {};
+    }
+    if (exists) return path.string(); // (renamed into place when whole)
     if (log) log("Writing the " + name + " scene (once): " + path.string());
     Document doc;
     doc.mesh = makeCore200mMesh(size_t(millions) * 1000000 / 1024); // micro level 5: 1,024 micro triangles a base one
