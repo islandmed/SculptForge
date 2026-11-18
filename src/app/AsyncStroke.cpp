@@ -436,12 +436,21 @@ void App::pumpStroke() {
     }
 }
 
-bool App::liveMoveEnabled() const {
+bool App::liveMoveEnabled(size_t region) const {
     static const int env = [] {
         const char* v = std::getenv("SF_LIVE_MOVE");
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return env >= 0 ? env == 1 : uiPrefs_.liveMove;
+    // Big grabs on dense meshes always (floor tier, a 3.5M triangle Voxel Remesh: a 240 px Move otherwise trails the pen
+    // by over 100 ms, a whole-head one by 400 ms; a 60 px one keeps up on the CPU, which then draws the mesh coarse).
+    // The preference turns it on for every mesh and grab.
+    auto number = [](const char* name, size_t fallback) { // (UI tests: a small sphere)
+        const char* v = std::getenv(name);
+        return v && *v ? size_t(std::max(1LL, std::atoll(v))) : fallback;
+    };
+    if (env >= 0) return env == 1;
+    return uiPrefs_.liveMove || (doc_.mesh.vertexCount() >= number("SF_LIVE_MOVE_VERTICES", kLiveMoveAutoVertices) &&
+                                 region >= number("SF_LIVE_MOVE_REGION", kLiveMoveAutoRegion));
 }
 
 void App::commitLiveMove() {

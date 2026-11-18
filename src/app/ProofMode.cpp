@@ -272,7 +272,27 @@ struct PhaseSpec {
     // the view's centre, turning +-10 degrees over the phase. Where micro levels draw past their stored resolution
     // (TierBudgets::microDrawAbove) and where Adaptive Detail will store its finest tiles: the 10x scoreboard's row.
     float closeUp = 0.0f;
+    int gizmo = 0;           // 1 / 2: a Gizmo Move / Rotate drag of the whole Part (the centre handle), no stroke
+    bool wholeView = false;  // the brush as big as the framed model (half the view's height)
 };
+
+// SF_BENCH_DENSE=1 with --benchmark-file (bench.sh dense): a dense plain mesh's interactive actions, each on the mesh
+// the phases before it left: Move at three sizes, Standard at 240 px, a Gizmo drag and turn, the orbit.
+std::vector<PhaseSpec> densePhases(double seconds) {
+    PhaseSpec whole{"move whole", 1.0f, seconds, BrushType::Move, 0.25f, 0.4f};
+    whole.wholeView = true;
+    PhaseSpec gm{"gizmo move", 0.0f, seconds}, gr{"gizmo rotate", 0.0f, seconds};
+    gm.gizmo = 1;
+    gr.gizmo = 2;
+    return {{"orbit", 0.0f, 10.0},
+            {"move 60 px", 60.0f, seconds, BrushType::Move, 0.25f, 0.4f},
+            {"move 240 px", 240.0f, seconds, BrushType::Move, 0.25f, 0.4f},
+            whole,
+            {"standard 240 px", 240.0f, seconds, BrushType::Standard, 0.35f},
+            gm,
+            gr,
+            {"still", -1.0f, 0.6}};
+}
 
 // The standard scenes' stroke set (kProofStrokeSet): the same figure eight with each brush in turn, on one mesh.
 std::vector<PhaseSpec> standardPhases(double seconds) {
@@ -360,6 +380,7 @@ struct PhaseResult {
     std::string name;
     std::string brush;
     float radiusPx = 0;
+    int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
     size_t dabs = 0, samples = 0;
@@ -423,6 +444,11 @@ struct ProofState {
     std::vector<Sample> samples;
     std::vector<glm::vec2> dabs;
     size_t sent = 1; // samples handed to onMouseMove (the first went to onMouseDown)
+    // SF_BENCH_DENSE: Move and the Gizmo follow the pointer on the main thread (no dabs to match): their lag is the
+    // age of the oldest sample handed over last frame when this frame shows it (its index; -1: none handed).
+    bool dense = false;
+    double shownFrom = -1;
+    glm::vec2 grabAt{0.0f}; // a Gizmo phase: the handle grabbed (p.cx, p.cy: the pivot on screen)
     // The samples the newest dab / preview head were last matched to: the stroke only moves forward, so the
     // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
     size_t dabFrom = 0, previewFrom = 0;
@@ -530,7 +556,9 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (p->scene.rfind("core-", 0) == 0 || p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
+    if (const char* dense = std::getenv("SF_BENCH_DENSE"); dense && *dense == '1' && p->scene.rfind("file:", 0) == 0)
+        p->phases = densePhases(p->strokeSeconds), p->dense = true;
+    else if (p->scene.rfind("core-", 0) == 0 || p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
         p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
@@ -747,8 +775,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         SizeResult& r = p.results.back();
         r.phases.push_back({});
         r.phases.back().name = spec.name;
-        r.phases.back().radiusPx = spec.radiusPx;
+        r.phases.back().radiusPx = spec.wholeView ? 0.5f * std::min(c.w, c.h) : spec.radiusPx;
+        r.phases.back().gizmo = spec.gizmo;
         if (spec.radiusPx > 0) r.phases.back().brush = proofBrushName(spec.brush);
+        if (!spec.gizmo && gizmo_.mode != GizmoMode::Off) setGizmoMode(GizmoMode::Off);
+        p.shownFrom = -1;
         p.stageStart = p.lastFrame = nowSeconds(); // (not counting what the last phase's release cost)
         proofGpuMs_.clear(); // (frames from before the phase)
         p.samples.clear();
@@ -802,7 +833,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                                                                                    : brushName(brush_));
             }
             paintMode_ = false;
-            radiusPx_ = spec.radiusPx;
+            radiusPx_ = r.phases.back().radiusPx;
             strength_ = spec.strength;
             p.cx = c.x + c.w * 0.5f;
             p.cy = c.y + c.h * 0.5f;
@@ -842,6 +873,22 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 strokeProbe_ = nullptr;
                 p.error = "No stroke began on the " + r.label + " mesh (nothing under the pointer)";
             }
+        } else if (spec.gizmo) { // the centre handle: Move drags in the view plane, Rotate turns about the view axis
+            setGizmoMode(spec.gizmo == 1 ? GizmoMode::Move : GizmoMode::Rotate);
+            ImVec2 at, pc;
+            p.pressed = false;
+            if (gizmoHandleScreen(spec.gizmo == 1 ? GizmoHandle::MoveView : GizmoHandle::RotateView, at) &&
+                gizmoProject(gizmo_.pivot, pc)) {
+                p.cx = pc.x;
+                p.cy = pc.y;
+                p.R = 0.12f * std::min(c.w, c.h);
+                p.grabAt = {at.x, at.y};
+                p.samples.push_back({now, p.grabAt, 0.0});
+                p.lastSample = now;
+                onMouseDown(at.x, at.y, SDL_BUTTON_LEFT);
+                p.pressed = drag_ == Drag::Gizmo;
+            }
+            if (!p.pressed) p.error = "No Gizmo drag began on the " + r.label + " mesh";
         }
         p.stage = Stage::Phase;
     };
@@ -1029,7 +1076,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             camera_.yaw = p.closeYaw + 0.1745f * float(std::sin(6.2831853 * u));
             perf_.framesStill = 0;
         } else if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
-        } else if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
+        } else if (spec.radiusPx <= 0 && !spec.gizmo) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
             perf_.framesStill = 0;
         } else if (p.pressed) {
@@ -1037,7 +1084,15 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             while (p.lastSample + 1.0 / kPointerHz <= now) {
                 p.lastSample += 1.0 / kPointerHz;
                 const double su = std::min(1.0, (p.lastSample - p.stageStart) / spec.seconds);
-                const glm::vec2 q = strokePoint(p, su);
+                glm::vec2 q = strokePoint(p, su);
+                if (spec.gizmo == 1) { // a figure eight from the grabbed centre
+                    const double phi = 2.0 * 3.14159265358979 * 2.0 * su;
+                    q = p.grabAt + p.R * glm::vec2(float(std::sin(phi)), 0.5f * float(std::sin(2.0 * phi)));
+                } else if (spec.gizmo == 2) { // the grabbed point turned 135 degrees each way about the pivot, twice
+                    const float a = 0.75f * 3.14159265f * float(std::sin(2.0 * 3.14159265358979 * 2.0 * su));
+                    const glm::vec2 r0 = p.grabAt - glm::vec2(p.cx, p.cy);
+                    q = glm::vec2(p.cx, p.cy) + glm::vec2(r0.x * std::cos(a) - r0.y * std::sin(a), r0.x * std::sin(a) + r0.y * std::cos(a));
+                }
                 p.samples.push_back({p.lastSample, q, p.samples.back().s + double(glm::length(q - p.samples.back().p))});
                 ++ph.samples;
             }
@@ -1063,6 +1118,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 }
                 p.previewFrom = nearest;
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
+            }
+            if (p.dense && p.dabs.empty() && (spec.gizmo || spec.brush == BrushType::Move)) {
+                if (p.shownFrom >= 0) {
+                    ph.lagMs.push_back((now - p.samples[size_t(p.shownFrom)].t) * 1000.0);
+                    ph.lagPx.push_back(p.samples.back().s - p.samples[size_t(p.shownFrom)].s);
+                }
+                p.shownFrom = p.sent < p.samples.size() ? double(p.sent) : -1;
             }
             // ... then the new samples go to the input handler, as the next frame's events would.
             // (each with its own time, as SDL stamps a tablet's events: the batch is handled at once, they weren't made at once)
@@ -1257,6 +1319,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     }
                     j.set("preview_lag_px", percentilesJson(percentiles(ph.previewLagPx)));
                     j.set("pointer_speed_px_s", ph.seconds > 0 ? std::round(ph.pathPx / ph.seconds) : 0.0);
+                } else if (ph.gizmo) { // a Gizmo drag (SF_BENCH_DENSE): how far behind the pointer, and letting go
+                    if (!ph.lagMs.empty()) j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));
+                    j.set("pointer_samples", double(ph.samples));
+                    j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
+                    j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
                 }
                 phases.push(j);
             }

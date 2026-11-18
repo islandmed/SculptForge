@@ -2421,10 +2421,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Live Move (Experimental)", "实时移动（实验性）"},
     {"Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it follows "
      "the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, when you "
-     "lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move "
-     "works as before there).",
+     "lift the pen. Big drags on meshes of a million vertices or more always move this way; this turns it on for every mesh and size. Not "
+     "with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move works as before "
+     "there).",
      "实验性功能。Move 笔刷的拖动由显卡从表面起始状态绘制，因此无论网格多大，都能以视图的帧率跟上笔；实际移动会在抬"
-     "笔时精确应用一次。不适用于遮罩、隐藏部分、雕刻图层、微细分层级、仅限相连或视图衰减（这些情况下 Move 与以往相"
+     "笔时精确应用一次。一百万个顶点以上的网格上，大幅拖动始终以此方式移动；开启此选项则用于所有网格和大小。不适用于遮罩、隐藏部分、雕刻图层、微细分层级、仅限相连或视图衰减（这些情况下 Move 与以往相"
      "同）。"},
     {"Background Preview (Experimental)", "背景预览（实验性）"},
     {"Experimental. On meshes of 2 million vertices or more, big brushes are worked out on their own thread; with "

@@ -104,6 +104,9 @@ public:
     bool active() const { return active_; }
     size_t movingVertices() const { return verts_.size(); }
     bool mirrored() const { return mirrors_.size() > 1; }
+    // True when every vertex of `mesh` takes the whole transform (no mask, nothing hidden, no mirror): the mesh
+    // moves rigidly, as one matrix would draw it.
+    bool wholeRigid(const Mesh& mesh) const { return active_ && whole_ && verts_.size() == mesh.vertexCount(); }
     // True when begin failed because the layer to record into has weight 0 (its offsets would not show).
     static bool layerWeightZero(const Mesh& mesh, int layer);
 
@@ -131,6 +134,7 @@ private:
     std::vector<Level> table_;                        // mirrors_.size() * (kLevels + 1)
     bool moved_ = false;
     bool keepOp_ = false;
+    bool whole_ = false; // every vertex at full weight, one mirror (begin)
     Symmetry mirror_{false, false, false}; // as asked for in begin
     MeshTransform last_;                   // the last transform applied
 

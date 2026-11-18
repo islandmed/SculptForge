@@ -536,9 +536,13 @@ private:
         glm::vec3 center{0.0f}, delta{0.0f};
         float radius = 0.0f, scale = 0.0f;
     } liveMove_;
-    bool liveMoveEnabled() const;      // the Live Move preference (and SF_LIVE_MOVE)
+    // The Live Move preference, or a dense mesh whose grab moves `region` vertices or more (and SF_LIVE_MOVE).
+    bool liveMoveEnabled(size_t region = SIZE_MAX) const;
+    static constexpr size_t kLiveMoveAutoVertices = 1'000'000; // (about 2M triangles)
+    static constexpr size_t kLiveMoveAutoRegion = 100'000;     // (smaller grabs: the CPU Move keeps up, and draws less)
     void commitLiveMove();
     bool grabPending_ = false; // Move: positions moved, normals and BVH not yet (queueGrab / flushGrab, once a frame)
+    std::vector<glm::vec3> grabQueued_; // Move in the app's loop: the pointer's moves since the last frame, not yet applied
     void queueGrab(const glm::vec3& delta);
     void flushGrab();
     // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
@@ -2812,7 +2816,10 @@ private:
     bool gizmoActive() const { return gizmo_.mode != GizmoMode::Off; }
     bool gizmoMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void gizmoDragTo(float x, float y);
+    void flushGizmoDrag(); // the newest pointer position of a drag, once a frame (gizmo_.pending)
     void gizmoRelease();
+    // Where the scene draws Part `index` (its transform), with a whole-Part Gizmo drag drawn by the GPU (gizmo_.gpu).
+    glm::mat4 gizmoDrawnTransform(int index) const;
     void drawGizmo();          // the handles over the canvas, and the Transform gizmo panel
     void drawGizmoPanel();
     void drawGizmoContents(bool compact); // Transform palette > Transform gizmo and the floating panel
@@ -2859,6 +2866,15 @@ private:
         MeshTransform current;
         std::vector<int> parts;
         std::vector<TransformSession> sessions;
+        // A dense mesh moved as a whole (TransformSession::wholeRigid, not shared, even scale): while dragging, its
+        // vertices stay and the Part is drawn moved by `gpuModel` (one matrix, nothing uploaded); the release bakes
+        // the transform into the vertices, as the per-frame path would have. Parallel to sessions.
+        std::vector<uint8_t> gpu;
+        glm::mat4 gpuModel{1.0f}; // the drag's world matrix (MeshTransform::matrix)
+        // In the app's loop the pointer's samples only note where it is; the drag follows the newest once a frame
+        // (every apply starts from the originals, so the skipped ones changed nothing).
+        bool pending = false;
+        ImVec2 pendingAt{0, 0};
         // Linked copies (#94) the drag moves as a whole (partMovesWhole), and their transforms when it began.
         std::vector<int> wholeParts;
         std::vector<glm::mat4> wholeStart;

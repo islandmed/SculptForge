@@ -2665,6 +2665,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // short ranges holding what it changed, gathered from the mesh arrays.
     bool indicesDone = false;
     if (full) ++fullUploads_, ++s.fullUploads;
+    if (full || mesh.dirtyBegin < mesh.dirtyEnd) ++s.vertexSyncs;
     if (full) {
         // The index buffer is written while the layout is made (mapped: the build's threads write each
         // cluster's drawn triangles straight into it).
@@ -4250,8 +4251,11 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const size_t budget = coarseLod_ ? triangleBudget(settings) : 0;
     // (While a stroke's edits wait for their levels, all of it in full: edited clusters in full beside coarse ones
     // would leave seams, and squeeze the rest to the coarsest level.)
+    // A Live Move drag (GhostKind::Move) draws in full: it edits nothing until the pen lifts, and only full clusters go
+    // through the GHOST program (coarse, a dense mesh showed no drag at all; a mix of the two leaves seams).
+    const bool liveMove = active && s.id == ghostId_ && !ghost_.empty() && ghost_.kind == GhostKind::Move;
     bool coarse = coarseLod_ && coarseAllowed && s.coarse && s.coarse->clusters.size() == s.drawCount.size() &&
-                  s.coarsePending.empty() && !settings.fullDetail && (settings.motionProxy || s.drawnTriangles > budget);
+                  s.coarsePending.empty() && !settings.fullDetail && !liveMove && (settings.motionProxy || s.drawnTriangles > budget);
     // At rest the real detail, if one full frame fits the still-frame budget (a single slow frame is fine).
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,

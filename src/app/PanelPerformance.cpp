@@ -111,7 +111,8 @@ void App::registerPerformanceUiActions() {
         [this] { return uiPrefs_.liveMove; },
         "Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it "
         "follows the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, "
-        "when you lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View "
+        "when you lift the pen. Big drags on meshes of a million vertices or more always move this way; this turns it "
+        "on for every mesh and size. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View "
         "falloff (Move works as before there).");
     add("perf.background_preview", "Background Preview (Experimental)",
         [this] {
