@@ -1513,6 +1513,9 @@ private:
     void applyViewEffects();
     void drawViewEffectsControls(const char* idSuffix); // Preferences > Display and Material > Viewport Shading
     bool viewEffectsDropped_ = false;
+    // Splats' view-dependent colour (SH 1-3): off on the floor tier (it doubled the frame at 1.5M splats, SH 3, on the
+    // floor bench machine), where their SH aren't uploaded either. UI tests (render_cell splats=1) force it on.
+    bool splatViewColorForced_ = false;
     int viewEffectsBusyFrames_ = 0;
     double viewEffectsBusyAt_ = 0.0, viewEffectsBusyMs_ = 0.0;
     struct PerfState {

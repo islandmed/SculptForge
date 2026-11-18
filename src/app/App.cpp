@@ -61,6 +61,7 @@
 #include "core/ImageTo3D.h"
 #include "core/Project.h"
 #include "core/Script.h"
+#include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
 
@@ -3589,7 +3590,8 @@ void App::syncScene() {
         scene.back().pbr = renderSettings_.pbr();
     }
     renderer_.syncScene(scene);
-    renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
+                         splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
     updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;

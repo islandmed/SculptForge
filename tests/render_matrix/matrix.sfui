@@ -24,6 +24,19 @@ render_cell "PBR x small" mode=pbr
 render_cell "flat x small" mode=flat
 render_cell "wire x small" mode=wire
 
+# --- Gaussian splats: plain colour (SH 0), then view-dependent colour (SH 3; drawn again without it, the box must change)
+run splat_test_capture kind=object count=20000 floaters=0
+wait 0.3
+render_cell "splats x plain colour" mode=lit splats=1
+run splat_test_capture kind=object count=20000 floaters=0 sh_degree=3
+wait 0.3
+render_cell "splats x view-dependent colour" mode=lit splats=1
+# turned (the placement's rotation reaches the shader's SH frame)
+run splat_transform rotate_y=120
+wait 0.3
+render_cell "splats x view-dependent colour, turned" mode=lit splats=1
+run splat_clear
+
 # --- dense Micro
 run new_sphere subdivisions=3
 run micro_divide level=3

@@ -78,7 +78,7 @@ glm::quat SplatCloud::transformRotation() const {
     return glm::normalize(glm::quat_cast(glm::mat3(transform) / (s > 0.0f ? s : 1.0f)));
 }
 
-bool SplatCloud::bakeTransform() {
+void SplatCloud::bakeTransform() {
     const float s = transformScale();
     const glm::quat r = transformRotation();
     for (size_t i = 0; i < size(); ++i) {
@@ -87,15 +87,125 @@ bool SplatCloud::bakeTransform() {
         scales[i] *= s;
     }
     transform = glm::mat4(1.0f);
-    const bool rotated = std::abs(std::abs(r.w) - 1.0f) > 1e-6f;
-    if (rotated && shDegree > 0) {
-        std::vector<glm::vec3> dc(size());
-        for (size_t i = 0; i < size(); ++i) dc[i] = sh[i * size_t(shCount())];
-        sh.swap(dc);
-        shDegree = 0;
-        return false;
+    if (shDegree > 0 && std::abs(std::abs(r.w) - 1.0f) > 1e-7f) {
+        const ShRotation turn(glm::mat3_cast(r), shDegree);
+        const size_t k = size_t(shCount());
+        for (size_t i = 0; i < size(); ++i) turn.apply(&sh[i * k]);
     }
-    return true;
+}
+
+namespace {
+
+// The basis functions of band l (1-3) at unit direction d, in the 3DGS coefficient order.
+void shBand(int l, const glm::dvec3& d, double* y) {
+    const double x = d.x, yy = d.y, z = d.z;
+    const double xx = x * x, y2 = yy * yy, zz = z * z;
+    if (l == 1) {
+        const double c = 0.4886025119029199;
+        y[0] = -c * yy, y[1] = c * z, y[2] = -c * x;
+    } else if (l == 2) {
+        y[0] = 1.0925484305920792 * x * yy;
+        y[1] = -1.0925484305920792 * yy * z;
+        y[2] = 0.31539156525252005 * (2.0 * zz - xx - y2);
+        y[3] = -1.0925484305920792 * x * z;
+        y[4] = 0.5462742152960396 * (xx - y2);
+    } else {
+        y[0] = -0.5900435899266435 * yy * (3.0 * xx - y2);
+        y[1] = 2.890611442640554 * x * yy * z;
+        y[2] = -0.4570457994644658 * yy * (4.0 * zz - xx - y2);
+        y[3] = 0.3731763325901154 * z * (2.0 * zz - 3.0 * xx - 3.0 * y2);
+        y[4] = -0.4570457994644658 * x * (4.0 * zz - xx - y2);
+        y[5] = 1.445305721320277 * z * (xx - y2);
+        y[6] = -0.5900435899266435 * x * (xx - 3.0 * y2);
+    }
+}
+
+constexpr int kShSamples = 32;
+
+// Least squares on kShSamples directions: P = (Y^T Y)^-1 Y^T, Y[k][j] = band function j at direction k. A turned
+// band-l function is again a band-l function, so P times the turned samples is its exact matrix.
+struct ShFit {
+    glm::dvec3 dirs[kShSamples];
+    double p[3][7][kShSamples];
+    ShFit() {
+        for (int k = 0; k < kShSamples; ++k) { // a Fibonacci sphere: well spread, never degenerate
+            const double z = 1.0 - (2.0 * k + 1.0) / kShSamples, r = std::sqrt(1.0 - z * z);
+            const double a = 2.399963229728653 * k;
+            dirs[k] = glm::dvec3(r * std::cos(a), r * std::sin(a), z);
+        }
+        for (int l = 1; l <= 3; ++l) {
+            const int n = 2 * l + 1;
+            double y[kShSamples][7], g[7][14] = {};
+            for (int k = 0; k < kShSamples; ++k) shBand(l, dirs[k], y[k]);
+            for (int i = 0; i < n; ++i) {
+                for (int j = 0; j < n; ++j)
+                    for (int k = 0; k < kShSamples; ++k) g[i][j] += y[k][i] * y[k][j];
+                g[i][n + i] = 1.0;
+            }
+            for (int c = 0; c < n; ++c) { // Gauss-Jordan with partial pivoting
+                int best = c;
+                for (int r = c + 1; r < n; ++r)
+                    if (std::abs(g[r][c]) > std::abs(g[best][c])) best = r;
+                for (int j = 0; j < 2 * n; ++j) std::swap(g[c][j], g[best][j]);
+                const double inv = 1.0 / g[c][c];
+                for (int j = 0; j < 2 * n; ++j) g[c][j] *= inv;
+                for (int r = 0; r < n; ++r)
+                    if (r != c && g[r][c] != 0.0) {
+                        const double f = g[r][c];
+                        for (int j = 0; j < 2 * n; ++j) g[r][j] -= f * g[c][j];
+                    }
+            }
+            for (int i = 0; i < n; ++i)
+                for (int k = 0; k < kShSamples; ++k) {
+                    double v = 0.0;
+                    for (int j = 0; j < n; ++j) v += g[i][n + j] * y[k][j];
+                    p[l - 1][i][k] = v;
+                }
+        }
+    }
+};
+
+} // namespace
+
+glm::vec3 evalSH(const glm::vec3* coeffs, int degree, const glm::vec3& dir) {
+    glm::vec3 c = kShC0 * coeffs[0];
+    double y[7];
+    for (int l = 1, at = 1; l <= degree; at += 2 * l + 1, ++l) {
+        shBand(l, glm::dvec3(dir), y);
+        for (int j = 0; j < 2 * l + 1; ++j) c += float(y[j]) * coeffs[at + j];
+    }
+    return c + glm::vec3(0.5f);
+}
+
+ShRotation::ShRotation(const glm::mat3& rotation, int degree) : degree_(std::clamp(degree, 0, 3)), band_{} {
+    static const ShFit fit;
+    // The turned colour at direction d is the old colour at R^T d.
+    const glm::dmat3 back = glm::transpose(glm::dmat3(rotation));
+    for (int l = 1; l <= degree_; ++l) {
+        const int n = 2 * l + 1;
+        double turned[kShSamples][7];
+        for (int k = 0; k < kShSamples; ++k) shBand(l, back * fit.dirs[k], turned[k]);
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j) {
+                double v = 0.0;
+                for (int k = 0; k < kShSamples; ++k) v += fit.p[l - 1][i][k] * turned[k][j];
+                band_[l - 1][i * n + j] = float(v);
+            }
+    }
+}
+
+void ShRotation::apply(glm::vec3* coeffs) const {
+    glm::vec3 in[7];
+    for (int l = 1, at = 1; l <= degree_; at += 2 * l + 1, ++l) {
+        const int n = 2 * l + 1;
+        std::copy(coeffs + at, coeffs + at + n, in);
+        const float* m = band_[l - 1];
+        for (int i = 0; i < n; ++i) {
+            glm::vec3 v(0.0f);
+            for (int j = 0; j < n; ++j) v += m[i * n + j] * in[j];
+            coeffs[at + i] = v;
+        }
+    }
 }
 
 size_t cleanSplats(SplatCloud& cloud, float minOpacity, float keepFraction) {

@@ -324,7 +324,7 @@ def test_splats():
     check(bpy.ops.sculptforge.export_splats(filepath=out, world_space=True) == {"FINISHED"}, "export applying the object transform")
     placed = splat_io.read_ply(out)
     world = np.array(m)[:3, :3] @ a.positions.astype(np.float64).T + np.array(m)[:3, 3:4]
-    check(np.abs(placed.positions - world.T).max() < 1e-4 and placed.sh.shape[1] == 1, "exported world-space positions; turned splats keep plain colour")
+    check(np.abs(placed.positions - world.T).max() < 1e-4 and placed.sh.shape == a.sh.shape, "exported world-space positions; turned splats keep every SH band")
 
     # Dropping a .splat file: its handler's operator.
     check(bpy.ops.sculptforge.import_splat(filepath=dot) == {"FINISHED"}, "import a .splat file")

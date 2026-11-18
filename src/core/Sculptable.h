@@ -199,6 +199,7 @@ struct TestCaptureOptions {
     size_t floaters = 0;     // small clusters of splats floating around the subject
     size_t interior = 0;     // splats inside the subject with a wrong colour (green), as trained captures have
     bool openBottom = false; // no splats on the lowest 15% (a subject standing on a table)
+    int shDegree = 0;        // 1-3: a view-dependent sheen in the spherical harmonics
     uint32_t seed = 7;
 };
 // The mesh as a capture-like splat cloud: flat surfels in its vertex paint colours (display sRGB), plus the
