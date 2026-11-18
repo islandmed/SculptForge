@@ -83,7 +83,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 38. [Projects, autosave and Snapshots](projects.md)
 39. [Scripting and automation](scripting.md)
     - [Python scripting](python.md)
-    - [The Python package (pip install sculptforge)](python-package.md)
+    - [The Python package (import sculptforge)](python-package.md)
 40. [Packs and macros](packs-and-macros.md)
 41. [SculptForge for studios](studios.md)
 42. [Security overview for IT reviews](security.md)

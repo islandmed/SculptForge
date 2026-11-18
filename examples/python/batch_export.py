@@ -1,5 +1,5 @@
 # SculptForge for Python: batch export. Every model in a folder -> an even remesh, a reduced copy, GLB + USD.
-#   pip install sculptforge
+#   needs the sculptforge package: docs/guide/python-package.md (PyPI coming)
 #   python batch_export.py OUT_FOLDER [MODEL_FOLDER]     (without a model folder it makes three to show the flow)
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pathlib
