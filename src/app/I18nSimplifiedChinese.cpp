@@ -775,11 +775,13 @@ constexpr Entry kSimplifiedChinese[] = {
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
      "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
-     "sit on it. Off when memory is low.",
+     "sit on it. Off when memory is low."
+     " Experimental: a tester reports Move results can snap back with it on; we're checking.",
      "在微细分层级上，每一笔都会保留构成它的笔触点，之后可以移动、修改或移除，其上的笔触会精确跟"
      "随。每一笔的雕刻与撤销都与之前完全相同。会移动基底的笔触（大型 Standard、Clay"
      "、Inflate 笔刷，以及在基底上的 Move）或使用模板的笔触，会把触及的笔触固定在原"
-     "处；一笔上方叠了 20 笔后也会被固定。内存不足时关闭。"},
+     "处；一笔上方叠了 20 笔后也会被固定。内存不足时关闭。"
+     "实验性功能：有测试者报告开启后 Move 的结果可能会回弹，我们正在检查。"},
     {"%d threads", "%d 个线程"},
     {"Memory", "内存"},
     {"Hardware profile", "硬件配置文件"},

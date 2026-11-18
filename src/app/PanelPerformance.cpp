@@ -151,7 +151,8 @@ void App::registerPerformanceUiActions() {
         "On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or taken out later "
         "and the strokes over it follow exactly. Each stroke sculpts and undoes exactly as before. Strokes that move "
         "the base (big Standard, Clay and Inflate brushes, Move on the base) or use the Stencil fix the strokes they "
-        "reach in place; so does a stroke once 20 others sit on it. Off when memory is low.");
+        "reach in place; so does a stroke once 20 others sit on it. Off when memory is low. "
+        "Experimental: a tester reports Move results can snap back with it on; we're checking.");
     add("perf.fast_big_brushes", "Fast Big Brushes (Experimental)",
         [this] {
             uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
