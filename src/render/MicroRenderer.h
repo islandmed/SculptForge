@@ -25,6 +25,7 @@
 #pragma once
 
 #include "core/Micro.h"
+#include "render/BufferUpload.h"
 #include "render/Clusters.h"
 #include "render/MicroFocus.h"
 #include "render/MicroTilePages.h"
@@ -142,6 +143,7 @@ private:
     std::vector<uint64_t> slotBits_, baseBits_;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> baseRuns_; // per block of moved vertices: [first, end) runs
     std::vector<uint8_t> staging_;
+    BufferUpload upload_; // partial updates of the buffers above, as GPU copies (render/BufferUpload.h)
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;
     struct Uniforms {

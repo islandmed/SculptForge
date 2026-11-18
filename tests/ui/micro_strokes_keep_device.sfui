@@ -1,0 +1,83 @@
+# Micro strokes keep the GPU's device, on every Micro path of the render matrix (tests/render_matrix/matrix.sfui). Until
+# 11-17 a few strokes on a micro level made Mesa's OpenGL over D3D12 (WSL; Windows on ARM laptops) remove the device:
+# the strokes' partial updates went to texture buffers the last frames still drew from (glBufferSubData); there they are
+# now copies on the GPU (render/BufferUpload.h, gl::copyUploads). Each path is stroked while its frames are in flight, then
+# drawn: a cell fails when the model is not drawn or the GL context is gone after its frame (render_cell).
+# The first path is the heavy one (5.24M micro triangles: the GPU still draws the last frames when a stroke's update
+# comes), the way the bug showed, with the driver's own choice (copies on D3D12, BufferSubData elsewhere); the others are
+# the matrix's paths at its sizes, with copies forced, so every machine draws through the copy path too.
+# cold: gl_limits and SF_FOCUS_DETAIL are set here, and a warm server keeps neither between scripts.
+run new_sphere subdivisions=5
+orbit 30 -15
+click "Geometry##tool.geometry"
+click "Geometry/Add Micro"
+expect_status "Added micro"
+run micro_noise amplitude=0.003 scale=40
+key b
+key s
+key t
+
+# --- dense Micro (Micro 4 on 20k base triangles)
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+render_cell "Lit Sphere x dense Micro, after strokes" mode=lit
+render_cell "PBR x dense Micro, after strokes" mode=pbr
+
+# --- Focus Detail (from here: copies on every driver)
+gl_limits copies=1
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=3
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+render_cell "Lit Sphere x Focus Detail, after strokes" mode=lit
+
+# --- dense Micro, over the buffer limit (its grids split over several buffers)
+gl_limits texels=16384
+run new_sphere subdivisions=4
+run micro_divide level=3
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+render_cell "Lit Sphere x dense Micro, over the buffer limit, after strokes" mode=lit
+gl_limits texels=0
+
+# --- Focus Detail, over the buffer limit
+gl_limits texels=16384
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=4
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+stroke 0.3 0.6 0.7 0.35
+stroke 0.45 0.35 0.5 0.65
+stroke 0.32 0.5 0.68 0.5
+render_cell "Lit Sphere x Focus Detail, over the buffer limit, after strokes" mode=lit
+gl_limits texels=0 copies=auto
+expect_value render_coverage > 0.3

@@ -90,25 +90,6 @@ void restoreEnvironment(const std::map<std::string, std::string>& saved) {
         if (!std::getenv(name.c_str())) setEnv(name, value);
 }
 
-// After each script: can this context still draw offscreen? A script that makes the GPU drop the device (WSL's
-// d3d12: "Removing Device") leaves the server unable to run any other; it then quits and is started again.
-bool glHealthy() {
-    while (gl::GetError() != GL_NO_ERROR) {
-    }
-    GLuint fbo = 0, rb = 0;
-    gl::GenFramebuffers(1, &fbo);
-    gl::GenRenderbuffers(1, &rb);
-    gl::BindRenderbuffer(GL_RENDERBUFFER, rb);
-    gl::RenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, 4, 4);
-    gl::BindFramebuffer(GL_FRAMEBUFFER, fbo);
-    gl::FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb);
-    const bool complete = gl::CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
-    gl::DeleteFramebuffers(1, &fbo);
-    gl::DeleteRenderbuffers(1, &rb);
-    return complete && gl::GetError() == GL_NO_ERROR;
-}
-
 // Globals a run leaves set, back to a new process's values. App::init sets the rest again (the AI policy, the
 // packs and macro folders, the bake listener and mesh map requester point at the App, hardware tier...).
 void resetGlobals() {
@@ -300,7 +281,7 @@ int runUiServer(int argc, char** argv, int (*runOne)(int argc, char** argv)) {
 #if defined(__GLIBC__)
         malloc_trim(0);
 #endif
-        const bool healthy = glHealthy();
+        const bool healthy = gl::contextHealthy(); // (a script that made the GPU drop the device leaves the server unable to run any other)
         std::fprintf(answers, "done\t%d\t%.0f%s\n", code, ms, healthy ? "" : "\tlost");
         std::fflush(answers);
         if (!healthy) break;
