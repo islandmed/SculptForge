@@ -1370,9 +1370,6 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Adaptive Detail tiles drawn, before/after at three zooms (tests/ui/micro_tiles_closeup.sfui): the READY shots.
     sculptforge_ui_test(micro_tiles_closeup_1440 micro_tiles_closeup --size 1440x900)
     sculptforge_ui_test(micro_tiles_closeup_2880 micro_tiles_closeup --size 2880x1800)
-    if(TEST ui_micro_tiles_closeup_1440)
-      set_tests_properties(ui_micro_tiles_closeup_1440 ui_micro_tiles_closeup_2880 PROPERTIES LABELS "ui;no_d3d12")
-    endif()
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # Space slides a Mask / Select / Cut shape while it is dragged out (tests/ui/selection_space.sfui, #214), at the review sizes.
     sculptforge_ui_test(whats_new_since_1440 whats_new_since --size 1440x900)

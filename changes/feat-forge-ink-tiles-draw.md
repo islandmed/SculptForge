@@ -8,6 +8,5 @@ testers:
 ---
 Adaptive Detail tiles drawn (testers only, no user-visible change): with SF_MICRO_TILES=1, strokes finer than the stored
 micro grid are kept in per-triangle tiles and drawn as delta pages added to the micro surface at every drawn level, lit by
-per-page slopes. The flag stays OFF by default. On Mesa's OpenGL over D3D12 (WSL, Windows on ARM) the first tiled frame
-removed the GPU device; tiles now fall back to the plain micro levels when the GL renderer is D3D12, and that device loss
-needs a real fix before tiles can ever default on. Stacked on feat/forge-ink-tiles (lands after it).
+per-page slopes. The flag stays OFF by default. On Mesa's OpenGL over D3D12 (WSL, Windows on ARM) the tile pages' partial
+updates go as GPU copies (render/BufferUpload.h), as the micro levels' do, so tiled frames keep the device there too. Stacked on feat/forge-ink-tiles (lands after it).
