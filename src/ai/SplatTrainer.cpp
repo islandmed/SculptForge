@@ -176,7 +176,7 @@ std::string findColmap(const SplatTrainSettings& settings) {
 std::string findFfmpeg(const SplatTrainSettings& settings) {
     if (std::string e = envValue("SCULPTFORGE_FFMPEG"); !e.empty()) return findOnPath(e);
     if (!settings.ffmpegPath.empty()) return findOnPath(settings.ffmpegPath);
-    return firstOnPath({"ffmpeg"});
+    return findFfmpegExe(); // (PATH, then Homebrew's, winget's ... folders: a desktop-launched app's PATH misses them)
 }
 
 bool downloadTool(const ToolDownload& tool, std::string& exePath, std::string& error, std::atomic<float>* progress,

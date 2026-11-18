@@ -333,7 +333,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GlbFetch.cpp src/ai/SpaceHealth.cpp src/ai/Tripo.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
-  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
+  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/VideoEncoder.cpp src/ai/SplatTrainer.cpp)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(Threads REQUIRED)
@@ -956,6 +956,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
   target_link_libraries(sf_fake_splat_tools PRIVATE sculptforge_core)
   add_dependencies(sculptforge_tests sf_fake_splat_tools)
+  # A stand-in for ffmpeg as the video encoder calls it (tests/tools/fake_ffmpeg.cpp): exits 1, stalls, writes nothing.
+  add_executable(sf_fake_ffmpeg tests/tools/fake_ffmpeg.cpp)
+  add_dependencies(sculptforge_tests sf_fake_ffmpeg)
+  target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_FFMPEG="$<TARGET_FILE:sf_fake_ffmpeg>")
   # Remesh timings per path and stage at the UI defaults (tests/tools/remesh_bench.cpp).
   add_executable(sf_remesh_bench tests/tools/remesh_bench.cpp)
   target_link_libraries(sf_remesh_bench PRIVATE sculptforge_core)

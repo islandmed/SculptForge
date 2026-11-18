@@ -221,6 +221,7 @@ test_rodin_fal              ai
 test_phone_link             ai
 test_discord_presence       ai
 test_process_signals        ai
+test_video_encoder          ai
 test_update_check           ai
 test_self_update            ai
 test_splat_train            ai
