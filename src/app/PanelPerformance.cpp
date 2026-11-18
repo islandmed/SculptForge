@@ -142,7 +142,7 @@ void App::registerPerformanceUiActions() {
         "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
         "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
         "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
-    add("perf.keep_strokes_editable", "Keep Strokes Editable",
+    add("perf.keep_strokes_editable", "Keep Strokes Editable (Experimental)",
         [this] {
             uiPrefs_.keepStrokesEditable = !uiPrefs_.keepStrokesEditable;
             status_ = uiPrefs_.keepStrokesEditable ? "Keep strokes editable on" : "Keep strokes editable off";
@@ -266,6 +266,10 @@ void App::drawPerformanceSection() {
     bool draft = uiPrefs_.draftStrokes;
     if (ImGui::Checkbox(tr("Draft Strokes"), &draft)) actions_.find("perf.draft_strokes")->run();
     ui::HelpAction(*this, "perf.draft_strokes");
+    bool keepEditable = uiPrefs_.keepStrokesEditable;
+    if (ImGui::Checkbox(tr("Keep Strokes Editable (Experimental)"), &keepEditable))
+        actions_.find("perf.keep_strokes_editable")->run();
+    ui::HelpAction(*this, "perf.keep_strokes_editable");
     bool liveMove = uiPrefs_.liveMove;
     if (ImGui::Checkbox(tr("Live Move (Experimental)"), &liveMove)) actions_.find("perf.live_move")->run();
     ui::HelpAction(*this, "perf.live_move");

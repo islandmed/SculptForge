@@ -1388,7 +1388,7 @@ constexpr Entry kJapanese[] = {
      "予測ストローク"},
     {"Draft Strokes",
      "ドラフトストローク"},
-    {"Keep Strokes Editable", "ストロークを編集可能に保つ"},
+    {"Keep Strokes Editable (Experimental)", "ストロークを編集可能に保つ (試験的機能)"},
     {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "

@@ -770,7 +770,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Multithreading", "多執行緒"},
     {"Predictive Strokes", "預測筆畫"},
     {"Draft Strokes", "草稿筆畫"},
-    {"Keep Strokes Editable", "保持筆畫可編輯"},
+    {"Keep Strokes Editable (Experimental)", "保持筆畫可編輯（實驗性）"},
     {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "

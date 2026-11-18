@@ -730,6 +730,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "threads") return double(ThreadPool::shared().threads()); // the shared pool's size now (workers + the caller)
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
     if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
+    if (name == "keep_strokes_editable") return app_.uiPrefs_.keepStrokesEditable ? 1.0 : 0.0;
     if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
     if (name == "fast_upload") return app_.uiPrefs_.fastUpload ? 1.0 : 0.0;
     if (name == "live_move_active") return app_.liveMove_.active ? 1.0 : 0.0; // (a Move drag drawn by the GPU)
