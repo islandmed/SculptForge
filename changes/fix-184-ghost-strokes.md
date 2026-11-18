@@ -1,8 +1,9 @@
 ---
-fixed: On a mesh of millions of triangles, the creases and fine detail around the brush could fade out and pop back as a
-  stroke began (they looked like strokes appearing beside the brush): the view dropped to its lighter preview of the mesh
-  from the moment the pen went down until the stroke's first dabs showed. With the view still, a stroke now keeps the full
-  detail from its first frame; the lighter preview is only for turning the view (#184, reported by @HG4Science).
+fixed: On a mesh of millions of triangles, the view switched to its lighter preview of the mesh from the moment the pen
+  went down until the stroke's first dabs showed, so fine creases near the brush could fade out and pop back as a stroke
+  began. With the view still, a stroke now keeps the full detail from its first frame; the lighter preview is only for
+  turning the view. This is the likely cause of the strokes seen appearing beside the brush in #184 (reported by
+  @HG4Science); we'll confirm with them on this version.
 testers:
   - Any OS, a head subdivided to 10 million triangles or more, the view still: draw short Sharp
     Crease strokes with X symmetry on, also right after an undo; the creases already there stay put and sharp as each
