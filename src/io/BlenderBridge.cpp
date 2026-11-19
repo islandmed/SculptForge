@@ -371,6 +371,19 @@ bool readBridgeShapes(const std::string& path, uint32_t& vertexCount, std::vecto
     return ok;
 }
 
+void setLayersFromShapes(Mesh& mesh, const std::vector<BridgeShape>& shapes, const glm::dmat3& linear) {
+    mesh.layers.clear();
+    mesh.base = mesh.positions;
+    for (const BridgeShape& shape : shapes) {
+        SculptLayer layer{shape.name, std::vector<glm::vec3>(mesh.positions.size(), glm::vec3(0.0f)), shape.weight};
+        for (size_t k = 0; k < shape.index.size() && k < shape.offset.size(); ++k)
+            layer.delta[shape.index[k]] = glm::vec3(linear * blenderToSculptForge(glm::dvec3(shape.offset[k])));
+        mesh.layers.push_back(std::move(layer));
+    }
+    if (mesh.layers.empty()) mesh.base.clear();
+    mesh.evaluateAll();
+}
+
 bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, BridgeManifest* manifest,
                     std::string& message, SplatCloud* splats, bool* splatsFound) {
     if (splatsFound) *splatsFound = false;
@@ -421,6 +434,19 @@ bool blenderReceive(const std::string& root, std::vector<MeshObject>& out, Bridg
             const glm::dmat4 t = blenderMatrixToSculptForge(b.matrix);
             for (glm::vec3& p : obj.mesh.positions) p = glm::vec3(t * glm::dvec4(glm::dvec3(p), 1.0));
             obj.mesh.recomputeAllNormals();
+        }
+        if (!b.shapes.empty()) {
+            // Blender's shape keys: each becomes a sculpt layer (offsets from the Basis, in the object's space like the
+            // positions, so the matrix's linear part and the axes apply to them), at the key's value.
+            uint32_t count = 0;
+            std::vector<BridgeShape> shapes;
+            std::string serr;
+            if (!readBridgeShapes(pathUtf8(utf8Path(inbox) / utf8Path(b.shapes)), count, shapes, serr))
+                warnings += "; " + obj.name + ": shape keys skipped (" + serr + ")";
+            else if (count != obj.mesh.vertexCount())
+                warnings += "; " + obj.name + ": shape keys skipped (they are for " + std::to_string(count) + " vertices)";
+            else
+                setLayersFromShapes(obj.mesh, shapes, b.hasMatrix ? glm::dmat3(blenderMatrixToSculptForge(b.matrix)) : glm::dmat3(1.0));
         }
         objects.push_back(std::move(obj));
     }
