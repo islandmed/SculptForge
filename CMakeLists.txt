@@ -1016,6 +1016,16 @@ if(SCULPTFORGE_BUILD_TESTS)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)
+  # gh#226 (Quad Remesh held at 52%, Cancel ignored): a member's size and target (2.4M triangles, 50000 quads) smooth, with
+  # grain along the normals, on the bust with grain, and cancelled after 9 s. Each finished in 15-140 s after the fix;
+  # the grainy ones ran past the 600 s limit before it.
+  set(qr226 sf_remesh_bench --runs 1 --tris 2378056 --target 50000 --paths qr2)
+  add_test(NAME remesh_bench_226 COMMAND ${qr226} --bumpy)
+  add_test(NAME remesh_bench_226_grain COMMAND ${qr226} --bumpy --noise 0.002)
+  add_test(NAME remesh_bench_226_bust COMMAND ${qr226} --shape starter:bust --noise 0.0005)
+  add_test(NAME remesh_bench_226_cancel COMMAND ${qr226} --bumpy --noise 0.002 --cancel-after 9000)
+  set_tests_properties(remesh_bench_226 remesh_bench_226_grain remesh_bench_226_bust remesh_bench_226_cancel PROPERTIES LABELS nightly
+                       TIMEOUT 600)
   target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_SPLAT_TOOLS="$<TARGET_FILE:sf_fake_splat_tools>")
 
   # Tests that launch our programs from Python get a path they can run directly. When cross-compiling

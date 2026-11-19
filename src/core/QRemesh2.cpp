@@ -47,6 +47,48 @@ using glm::ivec2;
 
 namespace {
 
+// Above these the sharp-tip search calls the surface grainy and looks for no tips (a full body has 20 tips, a spiky
+// creature some dozens; a grainy 2.4M-triangle sculpt gave 30k "tips", gh#226).
+constexpr size_t kMaxTips = 128, kMaxSharpTipVertices = 8192;
+
+// Points bucketed in cubes of `cell`: near(p) lists (ascending) the points in the 27 cubes round p, which holds every
+// point closer than `cell` (callers test the distance themselves). The sharp-tip search uses it: by brute force it was
+// points x points, which on a grainy sculpt (thousands of "tips", gh#226) ran for many minutes.
+struct PointHash {
+    float cell = 1.0f;
+    std::unordered_map<uint64_t, std::vector<uint32_t>> cells;
+    static uint64_t key(int x, int y, int z) {
+        return (uint64_t(uint32_t(x) & 0x1fffffu) << 42) | (uint64_t(uint32_t(y) & 0x1fffffu) << 21) |
+               uint64_t(uint32_t(z) & 0x1fffffu);
+    }
+    glm::ivec3 at(const vec3& p) const { return glm::ivec3(glm::floor(p / cell)); }
+    PointHash(const std::vector<vec3>& pts, float c) : cell(std::max(c, 1e-20f)) {
+        for (uint32_t i = 0; i < pts.size(); ++i) {
+            const glm::ivec3 g = at(pts[i]);
+            cells[key(g.x, g.y, g.z)].push_back(i);
+        }
+    }
+    void near(const vec3& p, std::vector<uint32_t>& out) const {
+        out.clear();
+        const glm::ivec3 g = at(p);
+        for (int dx = -1; dx <= 1; ++dx)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dz = -1; dz <= 1; ++dz) {
+                    const auto it = cells.find(key(g.x + dx, g.y + dy, g.z + dz));
+                    if (it != cells.end()) out.insert(out.end(), it->second.begin(), it->second.end());
+                }
+        std::sort(out.begin(), out.end());
+    }
+    bool any(const vec3& p) const {
+        const glm::ivec3 g = at(p);
+        for (int dx = -1; dx <= 1; ++dx)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dz = -1; dz <= 1; ++dz)
+                    if (cells.count(key(g.x + dx, g.y + dy, g.z + dz))) return true;
+        return false;
+    }
+};
+
 struct UF {
     std::vector<uint32_t> parent;
     explicit UF(size_t n) : parent(n) { std::iota(parent.begin(), parent.end(), 0u); }
@@ -1263,13 +1305,34 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             for (uint32_t i : sharpEdges)
                 bend[uf.find(id[edges[i].a])] += double(glm::length(piece.P[edges[i].a] - piece.P[edges[i].b])) *
                                                  std::acos(std::clamp(double(glm::dot(fn[edges[i].t0], fn[edges[i].t1])), -1.0, 1.0));
+            // A hard edge is a line: its vertices have two sharp edges each, three or more only at corners. Grain
+            // (pores, scan noise) makes sharp edges everywhere, which join into a net with branches all over
+            // (gh#226: 1.4M "hard edges" on a grainy 2.4M sculpt, a proxy of 690k singularities and a grid map that
+            // never ended).
+            std::vector<uint32_t> sharpDegree(verts.size(), 0);
+            for (uint32_t i : sharpEdges)
+                ++sharpDegree[id[edges[i].a]], ++sharpDegree[id[edges[i].b]];
+            std::vector<uint32_t> branches(verts.size(), 0), members(verts.size(), 0);
+            for (size_t v = 0; v < verts.size(); ++v) {
+                ++members[uf.find(uint32_t(v))];
+                if (sharpDegree[v] >= 3) ++branches[uf.find(uint32_t(v))];
+            }
+            auto net = [&](uint32_t r) { return branches[r] > 8 && branches[r] * 10 > members[r]; };
             for (size_t r = 0; r < verts.size(); ++r)
-                if (len[r] >= 3.0 * double(h0) && bend[r] >= glm::radians(55.0) * len[r]) hardChains = true;
+                if (len[r] >= 3.0 * double(h0) && bend[r] >= glm::radians(55.0) * len[r] && !net(uint32_t(r)))
+                    hardChains = true;
+            size_t netEdges = 0;
             for (uint32_t i : sharpEdges) {
+                if (net(uf.find(id[edges[i].a]))) {
+                    ++netEdges;
+                    continue;
+                }
                 if (len[uf.find(id[edges[i].a])] < 1.5 * double(h0)) continue;
                 sharp.insert(edgeKey(edges[i].a, edges[i].b));
                 segA.push_back(piece.P[edges[i].a]), segB.push_back(piece.P[edges[i].b]);
             }
+            if (timing && netEdges)
+                std::fprintf(stderr, "  v2 %zu sharp edges in nets (grain), not hard edges\n", netEdges);
         }
     }
     const bool organicTry = density < 2.5f && !std::getenv("SF_QR2_DENSITY");
@@ -1333,32 +1396,57 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                 defect[px.T[t][k]] -= std::acos(std::clamp(double(glm::dot(safeNormalize(b - a), safeNormalize(c - a))), -1.0, 1.0));
                 if (px.opp[3 * t + k] == kNone) open[px.T[t][k]] = open[px.T[t][(k + 1) % 3]] = 1;
             }
+        const float anchorR = 3.0f * L0 + 2.0f * h0;
+        const PointHash anchors(tipAnchors, anchorR);
+        std::vector<uint32_t> nearby;
         auto nearAnchor = [&](const vec3& x) {
             if (tipAnchors.empty()) return true;
-            for (const vec3& a : tipAnchors)
-                if (glm::length(x - a) < 3.0f * L0 + 2.0f * h0) return true;
+            if (!anchors.any(x)) return false;
+            anchors.near(x, nearby);
+            for (uint32_t a : nearby)
+                if (glm::length(x - tipAnchors[a]) < anchorR) return true;
             return false;
         };
         std::vector<uint32_t> sharp;
         for (uint32_t v = 0; v < px.P.size(); ++v)
             if (!open[v] && defect[v] > tipLimit && nearAnchor(px.P[v])) sharp.push_back(v);
+        // A grainy surface (pores, scan noise: gh#226) has sharp vertices everywhere at the proxy's scale, not tips:
+        // refining round thousands of them only multiplies the proxy. A real tip has a few sharp vertices.
+        if (sharp.size() > kMaxSharpTipVertices) {
+            if (timing) std::fprintf(stderr, "  v2 %zu sharp vertices: a grainy surface, not tips\n", sharp.size());
+            return false;
+        }
         // Sharp vertices closer than 2 edges are one tip; its centre is the defect-weighted mean of the vertices around it.
+        std::vector<vec3> sharpP(sharp.size());
+        for (size_t i = 0; i < sharp.size(); ++i)
+            sharpP[i] = px.P[sharp[i]];
+        const PointHash sharpHash(sharpP, 2.0f * L0), vertexHash(px.P, 3.0f * L0);
         std::vector<int> cl(sharp.size(), -1);
+        size_t clusters = 0;
         for (size_t i = 0; i < sharp.size(); ++i) {
             if (cl[i] >= 0) continue;
             cl[i] = int(i);
             vec3 seed(0.0f);
             int n = 0;
-            for (size_t j = i; j < sharp.size(); ++j) {
-                if (j > i && (cl[j] >= 0 || glm::length(px.P[sharp[j]] - px.P[sharp[i]]) >= 2.0f * L0)) continue;
-                cl[j] = int(i), seed += px.P[sharp[j]], ++n;
+            sharpHash.near(sharpP[i], nearby); // (ascending, as the brute-force walk over j went)
+            for (uint32_t j : nearby) {
+                if (j < i || (j > i && (cl[j] >= 0 || glm::length(sharpP[j] - sharpP[i]) >= 2.0f * L0))) continue;
+                cl[j] = int(i), seed += sharpP[j], ++n;
             }
             seed /= float(n);
             glm::dvec3 s(0.0);
             double sum = 0.0;
-            for (size_t v = 0; v < px.P.size(); ++v)
+            vertexHash.near(seed, nearby);
+            for (uint32_t v : nearby)
                 if (!open[v] && defect[v] > 0.0 && glm::length(px.P[v] - seed) <= 3.0f * L0) s += defect[v] * glm::dvec3(px.P[v]), sum += defect[v];
             if (sum < tipDefect) continue;
+            if (++clusters > kMaxTips) {
+                if (timing)
+                    std::fprintf(stderr, "  v2 more than %zu sharp tips: a grainy surface, not tips\n", kMaxTips);
+                tips.clear(), tipCenters.clear();
+                if (tipAnchors.empty()) tipApex.clear();
+                return false;
+            }
             uint32_t apex = sharp[i];
             for (size_t j = i; j < sharp.size(); ++j)
                 if (cl[j] == int(i)) {
@@ -1374,9 +1462,14 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     };
     auto tipRelB = [&](const Proxy& px, const std::vector<uint32_t>& vm, std::vector<float>& relB) {
         const float R = 2.0f * L0;
-        for (size_t v = 0; v < vm.size(); ++v)
-            for (const vec3& tp : tips)
-                if (glm::length(px.P[v] - tp) < R) relB[vm[v]] = std::min(relB[vm[v]], tipRel);
+        const PointHash near(tips, R);
+        std::vector<uint32_t> found;
+        for (size_t v = 0; v < vm.size(); ++v) {
+            if (!near.any(px.P[v])) continue;
+            near.near(px.P[v], found);
+            for (uint32_t i : found)
+                if (glm::length(px.P[v] - tips[i]) < R) relB[vm[v]] = std::min(relB[vm[v]], tipRel);
+        }
     };
     if (findTips(proxy))
         for (int it = 0; it < 2 && !tips.empty(); ++it) {
@@ -1588,13 +1681,20 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         // at the tip from about five quads around instead (quads converge on it like a pencil's), solved again. Tips the
         // field handles (a full body's fingertips) stay as they are.
         if (!tipAnchors.empty() && findTips(proxy)) {
-            std::vector<vec3> bad;
-            for (size_t i = 0; i < tipCenters.size(); ++i)
-                for (uint32_t v = 0; v < field.vertexIndex.size(); ++v)
-                    if (field.vertexIndex[v] >= 2 && glm::length(proxy.P[v] - tipCenters[i]) < 3.0f * L0 + 2.0f * h0) {
+            std::vector<vec3> bad, high;
+            for (uint32_t v = 0; v < field.vertexIndex.size(); ++v)
+                if (field.vertexIndex[v] >= 2) high.push_back(proxy.P[v]);
+            const float badR = 3.0f * L0 + 2.0f * h0;
+            const PointHash highHash(high, badR);
+            std::vector<uint32_t> found;
+            for (size_t i = 0; i < tipCenters.size(); ++i) {
+                highHash.near(tipCenters[i], found);
+                for (uint32_t k : found)
+                    if (glm::length(high[k] - tipCenters[i]) < badR) {
                         bad.push_back(tipCenters[i]);
                         break;
                     }
+            }
             for (size_t i = 0; i < tipApex.size(); ++i) {
                 bool keep = false;
                 for (const vec3& c : bad) keep |= glm::length(c - tipApex[i]) < 3.0f * L0 + 4.0f * h0;
@@ -1626,6 +1726,13 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     out.singularities = field.singularities;
     mark("cross field");
     if (timing) std::fprintf(stderr, "  v2 proxy %zu triangles, %zu singularities\n", proxy.T.size(), field.singularities);
+    // The grid map's cost grows faster than its singularities (each adds integer unknowns and seams to eliminate), and
+    // a field with more than one per few quads is noise, not a layout (a sphere has 8, a head some hundreds): stop here
+    // rather than run without limit (gh#226: 690k on a grainy sculpt held the bar at 52% for good).
+    if (double(field.singularities) > std::max(1000.0, wantQuads * double(tune("SF_QR2_MAXSING", 0.25f)))) {
+        out.why = "field too noisy";
+        return false;
+    }
     if (std::getenv("SF_QR2_FIELD_ONLY")) {
         out.why = "field only";
         return false;
@@ -1660,7 +1767,9 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         GridMap map;
         map.wantQuads = wantQuads * countFix;
         smooth.size = proxy.size;
-        if (!solveGridMap(smooth, sframes, field, map, isCancelled)) {
+        const float from = at; // (0.55, or 0.7 for the second attempt): the map takes the next 0.15
+        if (!solveGridMap(smooth, sframes, field, map, isCancelled,
+                          [&](float f) { at = from + 0.15f * std::floor(20.0f * f) / 20.0f; })) {
             if (cancelled) return false;
             out.why = "map";
             return false;

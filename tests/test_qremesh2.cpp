@@ -233,6 +233,32 @@ TEST(qremesh2_cancel_answers_within_a_second) {
     }
 }
 
+// gh#226: a dense sculpt with grain (pores, scan noise) along its normals. The grain's sharp edges join into a net
+// that is no hard edge, its points are no sharp tips, and a field with a singularity every few quads goes to the
+// legacy method instead of the grid map: it finishes in seconds near the target (on the member's 2.4M triangles the
+// grain gave 1.4M "hard edges", 690k singularities and a grid map that never finished).
+TEST(qremesh2_grainy_sculpt_is_not_hard_edges) {
+    using Clock = std::chrono::steady_clock;
+    Mesh m = sculptedSphere(1);
+    m.recomputeAllNormals();
+    const float d = diag(m);
+    uint32_t state = 12345u;
+    for (size_t v = 0; v < m.positions.size(); ++v) {
+        state = state * 1664525u + 1013904223u;
+        m.positions[v] += m.normals[v] * (0.002f * d * (2.0f * float(state >> 8) / float(1u << 24) - 1.0f));
+    }
+    m.recomputeAllNormals();
+    const auto t0 = Clock::now();
+    const Run r = run(m, 5000, QRemeshMethod::V2);
+    const double s = std::chrono::duration<double>(Clock::now() - t0).count();
+    std::printf("  grainy %u triangles: %.2f s, %zu quads, %zu singularities, %zu legacy pieces\n", m.triangleCount(),
+                s, r.out.triangleCount() / 2, r.st.singularities, r.st.fallbackPieces);
+    CHECK(r.ok);
+    const double quads = double(r.out.triangleCount()) / 2.0;
+    CHECK(quads > 0.75 * 5000.0 && quads < 1.25 * 5000.0);
+    CHECK(s < timeLimit(20.0));
+}
+
 TEST(qremesh2_is_deterministic) {
     const Mesh m = creature();
     const Run a = run(m, 3000, QRemeshMethod::V2), b = run(m, 3000, QRemeshMethod::V2);

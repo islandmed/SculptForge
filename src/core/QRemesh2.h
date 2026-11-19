@@ -152,6 +152,8 @@ struct GridMap {
 
 // Seamless map with the u / v gradients following the field at 1 / size, singularities and feature lines on the
 // integer lattice (greedy rounding), so the lattice is a quad mesh. Combs `field` (match is 0 off the cut).
-bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out, const std::function<bool()>& cancelled);
+// progress (optional): 0..1 through the solve, for the bar (the first solve, then the rounding rounds).
+bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out,
+                  const std::function<bool()>& cancelled, const std::function<void(float)>& progress = {});
 
 } // namespace sf::qr2

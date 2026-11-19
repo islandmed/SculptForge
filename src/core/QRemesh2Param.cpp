@@ -264,7 +264,8 @@ int conjugateGradients(const ReducedOp& A, const std::vector<double>& b, const s
 }
 } // namespace
 
-bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out, const std::function<bool()>& cancelled) {
+bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out,
+                  const std::function<bool()>& cancelled, const std::function<void(float)>& progress) {
     static const bool timing = std::getenv("SF_QREMESH_TIMING") != nullptr;
     const size_t nt = p.T.size(), nv = p.P.size();
     const size_t nc = 3 * nt;
@@ -766,8 +767,16 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     bool stop = false;
     if (useIntBlock && !factorInts(fixed)) return false;
     clock.lap("integer block");
-    int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, cancelled, stop, precond);
+    // The first solve is most of the time with many singularities (2000 iterations, a minute or two at 5000 integer
+    // unknowns): the bar moves with its iterations (CG asks `cancelled` once per iteration).
+    int asked = 0;
+    const std::function<bool()> firstSolve = [&] {
+        if (progress && (++asked & 15) == 0) progress(0.6f * float(asked) / 2000.0f);
+        return cancelled && cancelled();
+    };
+    int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, firstSolve, stop, precond);
     if (stop) return false;
+    if (progress) progress(0.6f);
     clock.lap("first solve");
     // Before rounding: scale the map so its area (the number of unit squares, i.e. quads) is the wanted count. The
     // constraints are homogeneous, so a scaled solution is still a solution; distortion near singularities and
@@ -821,6 +830,9 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-4 : midTol, left.empty() ? 2000 : 500, cancelled, stop, precond);
             if (stop) return false;
             ++rounds;
+            if (progress)
+                progress(0.6f +
+                         0.4f * float(intFree.size() - left.size()) / float(std::max<size_t>(intFree.size(), 1)));
         }
     }
     clock.lap("rounding + re-solves");
