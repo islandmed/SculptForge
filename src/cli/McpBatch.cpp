@@ -5,6 +5,7 @@
 #include "cli/McpServer.h"
 #include "core/AuditLog.h"
 #include "core/ManagedPolicy.h"
+#include "core/OpControl.h"
 #include "core/UndoBatch.h"
 
 #include <algorithm>
@@ -81,13 +82,25 @@ HistoryToolReply runBatch(const CommandRegistry& registry, Document& doc, const 
     int failedAt = -1;
     std::string failedWhy;
     size_t ran = 0, failedCount = 0;
+    bool cancelled = false; // (the client cancelled: the batch rolls back whole, whatever stop_on_error says)
     {
         UndoBatchScope scope; // every step the commands push carries this id: one undo step
         for (size_t i = 0; i < commands.size(); ++i) {
             const std::string& n = commands[i]["name"].asString();
+            if (opCancelled()) {
+                cancelled = true;
+                if (failedAt < 0) failedAt = int(i + 1), failedWhy = "cancelled before " + n;
+                break;
+            }
             int64_t ms = 0;
-            const CommandResult r = callRegistryTool(registry, doc, n, commands[i]["arguments"], &ms);
+            CommandResult r;
+            {
+                OpProgressWindow window(float(i) / float(commands.size()), 1.0f / float(commands.size())); // (each command's slice)
+                opProgress(0.0f, "Command " + std::to_string(i + 1) + " of " + std::to_string(commands.size()) + ": " + n);
+                r = callRegistryTool(registry, doc, n, commands[i]["arguments"], &ms);
+            }
             ++ran;
+            if (!r.ok && opCancelled()) cancelled = true;
             Json s = Json::object();
             s.set("index", int(i + 1));
             s.set("name", n);
@@ -99,7 +112,7 @@ HistoryToolReply runBatch(const CommandRegistry& registry, Document& doc, const 
             if (!r.ok) {
                 ++failedCount;
                 if (failedAt < 0) failedAt = int(i + 1), failedWhy = n + ": " + r.message;
-                if (stopOnError) break;
+                if (stopOnError || cancelled) break;
             }
         }
     }
@@ -110,7 +123,7 @@ HistoryToolReply runBatch(const CommandRegistry& registry, Document& doc, const 
     out.set("executed", double(ran));
     out.set("steps", steps);
     std::string text;
-    const bool rollBack = failedAt >= 0 && stopOnError;
+    const bool rollBack = cancelled || (failedAt >= 0 && stopOnError);
     if (rollBack) {
         const HistoryWalk w = walkToMark(doc, before);
         if (const int i = doc.partIndex(activeBefore); i >= 0) doc.selectPart(i); // (part_select isn't a history step)

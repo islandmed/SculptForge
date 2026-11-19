@@ -10,6 +10,7 @@
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
 #include "core/Backdrop.h"
+#include "core/OpControl.h"
 #include "core/GeneratedRemesh.h"
 #include "core/Texture.h"
 #include "core/Voxel.h"
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <filesystem>
 #include <optional>
+#include <thread>
 
 namespace sf::ai {
 
@@ -138,7 +140,33 @@ CommandResult runGenerateJob(const std::string& name, Document& doc, const Args&
     GenerateJob job;
     CommandResult refused;
     if (!prepareGenerateJob(name, a, settings, job, refused)) return refused;
-    GeneratorResult r = job.work(nullptr);
+    GeneratorResult r;
+    if (!currentOpControl()) { // (the app, a script: nobody watches)
+        r = job.work(nullptr);
+        return job.finish(doc, r);
+    }
+    // An MCP call (core/OpControl.h): the generator runs on a helper thread while this one forwards its progress to the
+    // agent and its Cancel to the generator (every service polls GenerationProgress::cancel).
+    GenerationProgress progress;
+    std::atomic<bool> finished{false};
+    std::thread worker([&] {
+        r = job.work(&progress);
+        finished = true;
+    });
+    while (!finished) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (opCancelled()) progress.cancel = true;
+        const int percent = progress.percent;
+        opProgress(percent < 0 ? 0.0f : 0.9f * float(percent) / 100.0f, progress.status());
+    }
+    worker.join();
+    if (opCancelled()) { // (whatever it made is not wanted: nothing is imported, the scene is as before)
+        std::error_code ec;
+        if (!r.outputPath.empty()) std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
+        if (!r.privateDir.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(r.privateDir.begin(), r.privateDir.end())), ec);
+        return {false, "Generation cancelled; the scene is unchanged"};
+    }
+    opProgress(0.95f, "Importing the model");
     return job.finish(doc, r);
 }
 
@@ -195,7 +223,8 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                   "Reconstruct a full 3D model from one picture (character, creature, prop) and make it sculptable. "
                   "Free by default via Hugging Face Spaces (Hunyuan3D, TRELLIS.2, Stable Fast 3D; HF_TOKEN raises the "
                   "daily quota), paid via fal.ai (FAL_KEY) / Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d) / Tripo direct (service=tripo), each with your key saved in Generate 3D, or any workflow on your own "
-                  "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best.",
+                  "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best."
+                  " Reports progress and can be cancelled (the scene stays as it was).",
                   {{"path", T::String, "Image file (png, jpg...).", true},
                    {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key), 'tripo' (your Tripo key), 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
                    {"model", T::String, "huggingface: hunyuan3d-2.1 (default, no token), trellis-2 (needs HF_TOKEN, else hunyuan3d-2.1 runs), hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2 or fal-ai/hyper3d/rodin/v2.5; hyper3d: a tier, Gen-2.5-Extreme-Low, Gen-2.5-Low (default), Gen-2.5-Medium, Gen-2.5-High or Gen-2.5-Extreme-High.", false},
@@ -218,7 +247,8 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
     add({"text_to_3d",
                   "Create a 3D model from a description and make it sculptable. Free by default via Hugging Face "
                   "(Hunyuan3D 2 / 2 mini Turbo; HF_TOKEN raises the daily quota), or paid via fal.ai (FAL_KEY) / "
-                  "Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d) / Tripo direct (service=tripo), each with your key saved in Generate 3D, or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene.",
+                  "Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d) / Tripo direct (service=tripo), each with your key saved in Generate 3D, or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene."
+                  " Reports progress and can be cancelled (the scene stays as it was).",
                   {{"prompt", T::String, "One object, e.g. 'a stylised dragon head with curled horns'.", true},
                    {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key), 'tripo' (your Tripo key) or 'comfyui' (your ComfyUI server).", false},
                    {"model", T::String, "huggingface: hunyuan3d-2-turbo or hunyuan3d-2; fal: fal-ai/hyper3d/rodin/v2.5 (or /fast), "

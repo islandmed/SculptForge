@@ -42,7 +42,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
     reg.add({"subdiv_divide",
              "Divide: add a subdivision level above the highest one and step "
              "to it. Quads stay quads (Catmull-Clark); triangle meshes use Loop subdivision. Lower levels are kept, so "
-             "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons.",
+             "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons. It has no cancel point: once started it runs to the end.",
              {{"smooth", T::Bool, "Smooth: smooth the new level (default true); false divides flat, keeping hard edges.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::string msg;
