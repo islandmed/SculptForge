@@ -38,7 +38,8 @@ wait_idle 30
 expect_value view_vs_mark < 0.01
 
 # S again, released and still draining: Undo and a far-away press wait behind it. Once the undo has run (the redo step exists), the
-# far stroke is on the stroke thread: the view meanwhile is the mark's, not S's.
+# far stroke is on the stroke thread: the view meanwhile is the mark's, not S's. The far stroke's own batches reach the GPU as they
+# land (more of them under a loaded machine: 0.039 seen), so the bound is half of S's difference, not a third: S still shown is all of it.
 stroke 0.45 0.35 0.70 0.65 0.5 hold
 wait 0.2
 release
@@ -48,5 +49,5 @@ stroke 0.10 0.12 0.12 0.14 0.5
 wait_value can_redo == 1 30
 expect_value stroke_draining == 1
 print view_vs_mark
-expect_value view_vs_mark < $with_s*0.3
+expect_value view_vs_mark < $with_s*0.5
 shot undo-then-stroke-busy
