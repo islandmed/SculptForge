@@ -16,6 +16,7 @@
 #include "core/QRemesh.h"
 #include "core/SurfaceQuery.h"
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -24,6 +25,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 
 using namespace sf;
 
@@ -184,6 +187,50 @@ TEST(qremesh2_thin_horn_stays_clean) {
     CHECK(r.st.quality.measured && r.st.quality.hausdorff < 2.0f);
     CHECK(r.st.quality.poles < 600);
     CHECK(ms < 30000.0); // "takes an eternity" guard only: CI machines differ
+}
+
+// gh#226 (Quad Remesh held at 52% and Cancel did nothing): Cancel from another thread, as the app's button does, at
+// points spread over a whole run (each phase: proxy build, cross field, grid map, extraction, relax) returns within a
+// second and writes nothing; the run after it is the same as an uncancelled one.
+TEST(qremesh2_cancel_answers_within_a_second) {
+    using Clock = std::chrono::steady_clock;
+    const Mesh m = sculptedSphere(1); // ~330k triangles: the dense path (parallel pre-decimation) too
+    for (int symmetry : {-1, 0}) {    // Symmetry on adds the mirror-plane search and the cut before the pieces
+        QRemeshOptions o;
+        o.targetQuads = 3000;
+        o.symmetryAxis = symmetry;
+        Mesh whole;
+        std::string err;
+        const auto t0 = Clock::now();
+        CHECK(qremesh(m, o, whole, err));
+        const double total = std::chrono::duration<double>(Clock::now() - t0).count();
+        double worst = 0.0;
+        for (double at : {0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.92}) {
+            std::atomic<bool> cancel{false};
+            Clock::time_point asked{};
+            Mesh out;
+            std::thread button([&] {
+                std::this_thread::sleep_for(std::chrono::duration<double>(at * total));
+                asked = Clock::now();
+                cancel = true;
+            });
+            const bool ok = qremesh(m, o, out, err, [&](float) { return !cancel.load(); });
+            const auto back = Clock::now();
+            button.join();
+            if (ok) continue; // finished before the press (a faster run than the timed one)
+            const double latency = std::chrono::duration<double>(back - asked).count();
+            worst = std::max(worst, latency);
+            std::printf("  symmetry %d, cancel at %.0f%% of %.2f s: back in %.0f ms\n", symmetry, 100.0 * at, total,
+                        1000.0 * latency);
+            CHECK(err.find("cancelled") != std::string::npos);
+            CHECK(out.triangleCount() == 0); // nothing written
+            CHECK(latency < timeLimit(1.0));
+        }
+        Mesh again;
+        CHECK(qremesh(m, o, again, err));
+        CHECK(again.positions == whole.positions && again.triangles == whole.triangles);
+        std::printf("  symmetry %d: worst %.0f ms\n", symmetry, 1000.0 * worst);
+    }
 }
 
 TEST(qremesh2_is_deterministic) {

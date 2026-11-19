@@ -1184,14 +1184,21 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                          std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
     };
     cancelled = false;
+    float at = 0.0f; // the last fraction reported: the long phases between steps ask again at it
     auto step = [&](float f) {
+        at = f;
         if (report && !report(f)) {
             cancelled = true;
             return false;
         }
         return true;
     };
-    const std::function<bool()> isCancelled = [&] { return cancelled; };
+    // The solvers' (and the long loops') Cancel check: it asks the caller, so Cancel lands within one solver
+    // iteration (gh#226: it only read this flag, which nothing set between steps, so Cancel waited for the phase).
+    const std::function<bool()> isCancelled = [&] {
+        if (!cancelled && report && !report(at)) cancelled = true;
+        return cancelled;
+    };
     if (piece.T.empty()) {
         out.why = "empty";
         return false;
@@ -1213,12 +1220,14 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     TriangleBVH surface;
     surface.build(piece.P, piece.T);
     mark("surface bvh");
+    if (isCancelled()) return false;
     const float sharpCos = opt.detectEdges ? std::cos(glm::radians(60.0f)) : 2.0f;
     std::vector<vec3> segA, segB;
     std::unordered_set<uint64_t> sharp;
     bool hardChains = false;
     {
         const std::vector<SrcEdge> edges = meshEdges(piece.P, piece.T);
+        if (isCancelled()) return false;
         std::vector<vec3> fn(piece.T.size());
         parallelFor(piece.T.size(), [&](size_t b, size_t e) {
             for (size_t t = b; t < e; ++t) {
@@ -1226,6 +1235,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
                 fn[t] = safeNormalize(glm::cross(piece.P[tri.y] - piece.P[tri.x], piece.P[tri.z] - piece.P[tri.x]));
             }
         });
+        if (isCancelled()) return false;
         std::vector<uint32_t> sharpEdges;
         for (uint32_t i = 0; i < edges.size(); ++i) {
             const SrcEdge& e = edges[i];
@@ -1267,6 +1277,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         out.why = "hard edges"; // (remeshPieceV2 starts again at the hard-edge density)
         return false;
     }
+    if (isCancelled()) return false;
     SegmentBVH features;
     if (!segA.empty()) features.build(segA, segB);
     mark("features");
@@ -1279,6 +1290,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     ps.features = features.empty() ? nullptr : &features;
     ps.sharp = std::move(sharp);
     ps.keepGroups = opt.keepGroups;
+    ps.cancelled = isCancelled;
     // About three proxy edges per quad edge, at most ~400k proxy triangles.
     const float minEdge = float(std::sqrt(area / (0.433 * 400000.0)));
     const float L0 = std::max(h0 / tune("SF_QR2_DENSITY", density), minEdge);
@@ -1288,6 +1300,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     if (double(piece.T.size()) > 8.0 * proxyTris && piece.T.size() > 300000) {
         std::unordered_set<uint64_t> sharpPre;
         pre = preDecimate(ps, L0, sharpPre);
+        if (isCancelled()) return false;
         ps.mesh = &pre;
         ps.sharp = std::move(sharpPre);
         mark("parallel pre-decimate");
@@ -1298,6 +1311,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
     mark("decimate");
     if (!step(0.25f)) return false;
     pb.remesh(L0, {}, 2);
+    if (isCancelled()) return false;
     mark("remesh");
     std::vector<uint32_t> vmap;
     Proxy proxy = pb.result(&vmap);
@@ -1369,6 +1383,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
             std::vector<float> relB(pb.vertexCount(), 1.0f);
             tipRelB(proxy, vmap, relB);
             pb.remesh(L0, relB, 2);
+            if (isCancelled()) return false;
             vmap.clear();
             proxy = pb.result(&vmap);
             findTips(proxy);
@@ -1502,6 +1517,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
         for (size_t v = 0; v < vmap.size(); ++v) relB[vmap[v]] = std::max(rel[v], minEdge / L0);
         if (!tips.empty()) tipRelB(proxy, vmap, relB);
         pb.remesh(L0, relB, 2);
+        if (isCancelled()) return false;
         vmap.clear();
         proxy = pb.result(&vmap);
         demoteSoftEdges(proxy);

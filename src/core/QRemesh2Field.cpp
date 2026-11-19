@@ -254,7 +254,7 @@ bool solveCrossField(const Proxy& p, const Frames& f, const Curvature& curv, con
         A.build(nfree, trips);
         clock.lap("setup");
         Multigrid<cd> mg;
-        mg.build(A);
+        if (!mg.build(A, cancelled)) return false;
         clock.lap("multigrid build");
         bool stop = false;
         // Inverse power iteration (the smoothest field, Knoppel et al. 2013) with the alignment and the fixed
