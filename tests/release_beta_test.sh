@@ -42,6 +42,7 @@ cat > changes/beta-test.md <<'EOF'
 ---
 whats_new: **Beta test feature**: something new to try.
 highlight: First highlight of the beta
+member_request: true
 highlight: Second highlight of the beta
 highlight: Third highlight of the beta
 added: **Beta test feature**: something new to try.
@@ -202,6 +203,8 @@ import json
 feed = json.load(open("website/latest.json"))
 assert feed["version"] == "9.0.0" and feed["highlights"] == ["One", "Two", "Three"], feed
 assert "preview" not in feed.get("channels", {}), "the passed beta is still on the Preview channel"
+# the beta's bump counted its member_request fragment; the stable release's feed carries it
+assert feed.get("support", {}).get("member_requests_this_release") == 1, feed.get("support")
 EOF
 
 git push -q origin main
