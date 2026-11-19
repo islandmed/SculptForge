@@ -141,7 +141,8 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
+//                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
 //                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft
 //                            (micro grid points masked at least half / partly),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
@@ -1561,6 +1562,17 @@ double Demo::query(const std::string& name, bool& known) const {
         double up = 0.0;
         for (size_t v = 0; v < basePositions_.size(); ++v)
             up = std::max(up, double(glm::dot(m.positions[v] - basePositions_[v], baseNormals_[v])));
+        return up;
+    }
+    if (name == "moved_raised_plane") { // the most any vertex rose along the last dab's plane (or its X mirror image, the lesser)
+        const auto& f = app_.doc_.sculptor.lastFrame;
+        if (basePositions_.size() != m.vertexCount() || !f.valid) return -1.0;
+        const glm::vec3 n = f.normal, mirrored(-n.x, n.y, n.z);
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v) {
+            const glm::vec3 d = m.positions[v] - basePositions_[v];
+            up = std::max(up, double(std::min(glm::dot(d, n), glm::dot(d, mirrored))));
+        }
         return up;
     }
     if (name == "moved_masked") { // masked vertices (mask >= 0.5) that moved since `snapshot`
