@@ -3,7 +3,7 @@
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 208 frames a second",
+    "In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 209 frames a second",
     "Finer micro detail up close: the viewport draws past the stored micro level as you zoom in",
     "Python scripts can add their own buttons and panels, and the Python package wheels come with the release",
     "Splats show the sheen that changes as you orbit",

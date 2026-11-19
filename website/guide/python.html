@@ -140,6 +140,16 @@ What a timer&#x27;s callback does to the scene is one undo step per tick, like a
 Only the main thread may use the open scene: a toolkit&#x27;s own threads get an error from <code>sf.run</code>.
 </li>
 </ul>
+<p><strong>Keep your window with SculptForge.</strong> <code>sf.ui.main_window_handle()</code> returns SculptForge&#x27;s main window as a native handle (an int): the window handle on Windows, the <code>NSWindow</code> pointer on macOS, the X11 window id on X11. Parent your window to it and it groups with SculptForge in the taskbar and stays on top of it. It is <code>None</code> on Wayland, which has no such handle, and when SculptForge runs without a window (offscreen, headless), so check for that. With PySide6:</p>
+<div class="code-block"><pre class="code"><code class="language-python">from PySide6.QtGui import QWindow
+
+handle = sf.ui.main_window_handle()
+win.show()                                   # the window has to exist before it can be given a parent
+if handle:
+    parent = QWindow.fromWinId(handle)
+    win.windowHandle().setTransientParent(parent)
+    win._sculptforge = parent                # keep it: Qt drops the parent when Python lets go of it</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
+<p>It only reads the handle, which a script could already find with the system&#x27;s own calls; it opens nothing new.</p>
 <p>Install PySide for SculptForge&#x27;s Python version into the Scripts folder&#x27;s <code>site-packages</code> (see NumPy above): <code>python3.13 -m pip install --target &quot;Documents/SculptForge/Scripts/site-packages&quot; PySide6</code>.</p>
 <h2 id="recipes">Recipes<a class="anchor" href="#recipes" aria-label="Link to this section">#</a></h2>
 <h3 id="batch-export">Batch export<a class="anchor" href="#batch-export" aria-label="Link to this section">#</a></h3>
@@ -194,6 +204,7 @@ sf.ui.place(&quot;cleanup&quot;, &quot;my_panel&quot;)</code></pre><button class
 <p>A window that lists the Parts and subdivides the one you pick. It stays open beside SculptForge until you close it.</p>
 <div class="code-block"><pre class="code"><code class="language-python">import sculptforge as sf
 from PySide6 import QtWidgets
+from PySide6.QtGui import QWindow
 
 app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 win = QtWidgets.QWidget()
@@ -218,6 +229,10 @@ button.clicked.connect(subdivide)
 refresh()
 win.show()
 timer = sf.ui.timer(app.processEvents, 30)   # Qt&#x27;s events, on SculptForge&#x27;s main thread
+handle = sf.ui.main_window_handle()          # stays on top of SculptForge (see &quot;Keep your window with SculptForge&quot;)
+if handle:
+    win._sculptforge = QWindow.fromWinId(handle)
+    win.windowHandle().setTransientParent(win._sculptforge)
 app.lastWindowClosed.connect(lambda: sf.ui.cancel_timer(timer))</code></pre><button class="copy" type="button" aria-label="Copy">Copy</button></div>
 <p><em>Thanks to Tpqz_ and chris_gardner on Discord for the idea.</em></p>
 <h2 id="licence-of-your-scripts">Licence of your scripts<a class="anchor" href="#licence-of-your-scripts" aria-label="Link to this section">#</a></h2>

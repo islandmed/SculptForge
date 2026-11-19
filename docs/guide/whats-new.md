@@ -9,15 +9,16 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-18
-tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
-highlight: In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 208 frames a second
+tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+highlight: In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 209 frames a second
+tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
 highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
 highlight: Python scripts can add their own buttons and panels
 highlight: Splats show the sheen that changes as you orbit
 highlight: Files with non-English names open on Windows again
 highlight: Size and Intensity follow the pen as it hovers above the tablet
 title: 805 million triangles, still smooth
-line: In our benchmark, 805 million triangles of detail still orbit at 208 frames a second, on an Apple M1 Pro limited to entry-level budgets. It is a benchmark scene, not a sculpt.
+line: In our benchmark, 805 million triangles of detail still orbit at 209 frames a second, on an Apple M1 Pro limited to entry-level budgets. It is a benchmark scene, not a sculpt.
 image: images/wn-0138-engine.jpg
 action: guide:performance.md
 title: Finer detail up close
