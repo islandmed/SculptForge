@@ -399,6 +399,7 @@ def main():
     sculptforge(["blender_receive", "blender_send"])
     bpy.ops.sculptforge.receive()
     check(not box.modifiers["Bevel"].show_viewport, "the applied modifier is turned off")
+    bridge.prefs().modifiers = "PRESERVE"  # (Apply sends the evaluated mesh without its shape keys: the shape key checks below send live)
 
     # Facial shapes: SculptForge's sculpt layers arrive as shape keys with their names (the 52 ARKit ones).
     sculptforge(["new_head", "face_shapes_generate", "face_weights json={\"jawOpen\":0.25}", "blender_send"])
@@ -436,6 +437,7 @@ def main():
         check(bpy.ops.sculptforge.send() == {"FINISHED"}, "send the head with its shape keys")
         sculptforge(["blender_receive", "blender_send"])
         check(bpy.ops.sculptforge.receive() == {"FINISHED"}, "receive the head again: " + bridge.state.message)
+        check("shape key" in bridge.state.message, "the shape keys came back with the mesh: " + bridge.state.message)
         got = [(k.name, k.value, arr(k.data, "co", 3).copy()) for k in head.data.shape_keys.key_blocks]
         check([w[0] for w in want] == [g[0] for g in got], "shape keys round trip: the same names in the same order")
         if len(want) == len(got):
