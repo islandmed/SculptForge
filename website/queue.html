@@ -121,6 +121,8 @@
             <tr><td>📦 Files &amp; Pipeline: Render bridge: send a quick render straight to an image editor (any program) for client previews</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Hydra render delegate (low priority, with the render bridge)</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Python scripting inside the regular app&#x27;s console and scripts (loops, conditions); today the flat command language only, while the sculptforge Python module ships in studio/VFX Platform builds and source builds</td><td class="st">Building</td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Python sf.ui: expose the main window&#x27;s native handle (HWND on Windows) so custom PySide dialogs can group with the main window</td><td class="st">Building</td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Environment variable search path for Python scripts (like SCULPTFORGE_BRUSH_PATH), so scripts can live in shared folders</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Bones and skin weights as USD skeletons, posing first</td><td class="st">Designing</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Paint layers exported as separate colour attributes</td><td class="st">Planned</td></tr>
             <tr><td>🔷 Topology: Sculpt layers on micro levels</td><td class="st">Planned</td></tr>
@@ -147,6 +149,7 @@
             <tr><td>🔷 Topology: Voxel Remesh minimum thickness (keep thin tips)</td><td class="st">Queued</td></tr>
             <tr><td>👁️ View &amp; Camera: Frozen multi-angle view: stamp the current view onto the canvas as a flat picture, turn the model and stamp more angles beside it; not editable, no extra memory (thanks dm4nd)</td><td class="st">Queued</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Render: more lights, ambient occlusion, soft shadows</td><td class="st">Queued</td></tr>
+            <tr><td>👁️ View &amp; Camera: Sidebar button to toggle the micro-level display on/off (default on), like the Wire / Mask / Paint toggles</td><td class="st">Queued</td></tr>
             <tr><td>〰️ Curves &amp; Tubes: Tube that subtracts: carve a tube stroke into the surface (boolean subtract)</td><td class="st">Queued</td></tr>
             <tr><td>〰️ Curves &amp; Tubes: Tube profiles: square, disc and other cross-sections</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Android port (phones and tablets with a pen)</td><td class="st">Queued</td></tr>
@@ -218,6 +221,7 @@
             <tr><td>⌨️ Interface: Italian interface language (today English, Español, Traditional/Simplified Chinese, Japanese); English makes settings hard for Italian users</td><td class="st">Queued</td></tr>
             <tr><td>📦 Files &amp; Pipeline: A general &#x27;Export FBX&#x27; in the File menu next to &#x27;Export FBX for Unreal&#x27; (today the general FBX is only the export_fbx command)</td><td class="st">Queued</td></tr>
             <tr><td>🧩 Parts &amp; Scene: Scatter / kitbash: insert objects on a surface chosen at random from a predefined list, fitting snugly to each other by their sides or vertices, and following a line you draw with a brush (today: Insert set = manual pick; Tool &gt; Tube &gt; Repeat along curve = one Part, spacing + turn)</td><td class="st">Queued</td></tr>
+            <tr><td>🎨 Painting: Smooth / blur vertex colours (e.g. Shift while painting, or a colour-blur brush); today Shift smooths the shape only and the Smooth brush never changes colour</td><td class="st">Queued</td></tr>
             <tr><td>Edge crease for subdivision + select edges by angle; creases through the Blender Bridge both ways <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.0</span></td></tr>
             <tr><td>Multi-object gizmo <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.11.16</span></td></tr>
             <tr><td>⌨️ Interface: Detachable panels (Member Request, November) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.1</span></td></tr>
