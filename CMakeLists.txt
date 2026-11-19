@@ -1293,6 +1293,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
     sculptforge_ui_test(prefs_updates_1440 prefs_updates --size 1440x900) # the installer's update-check box lands on this switch
     sculptforge_ui_test(prefs_updates_2880 prefs_updates --size 2880x1620)
+    sculptforge_ui_test(timelapse_failure_1440 timelapse_failure --size 1440x900) # the missing-ffmpeg dialog
+    sculptforge_ui_test(timelapse_failure_2880 timelapse_failure --size 2880x1800)
     sculptforge_ui_test(keep_strokes_editable_checkbox_1440 keep_strokes_editable_checkbox --size 1440x900)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)

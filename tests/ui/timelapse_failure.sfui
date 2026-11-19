@@ -15,6 +15,7 @@ wait 0.5
 expect_status "needs ffmpeg"
 expect_text "wasn't found"
 expect_text Copy
+shot timelapse-needs-ffmpeg
 click "Close"
 wait 0.3
 expect_not "wasn't found"
