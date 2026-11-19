@@ -213,6 +213,7 @@ test_support                ui
 test_library                ui
 test_connect_ai             ai
 test_mcp_structured         ai
+test_mcp_progress           ai
 test_ai_*                   ai
 test_comfyui                ai
 test_hyper3d                ai

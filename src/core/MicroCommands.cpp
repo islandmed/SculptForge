@@ -104,7 +104,7 @@ void registerMicroCommands(CommandRegistry& reg) {
              "a grid of scalar displacements per triangle (2 bytes per point) instead of a mesh, so hundreds of millions "
              "of triangles stay sculptable: 300M micro triangles take about 0.4 GB. Each micro level has 4x the "
              "triangles of the one below. The standard, clay, smooth, inflate, flatten, trim, layer, pinch / crease "
-             "and mask brushes work on it; it bakes down to a mesh or to displacement maps.",
+             "and mask brushes work on it; it bakes down to a mesh or to displacement maps. It has no cancel point: once started it runs to the end.",
              {{"level", T::Number, "Micro levels above the base: 1-7 (each 4x; 4 = 256 micro triangles per triangle).", false},
               {"triangles", T::Number, "Instead of level: about this many micro triangles, in millions (e.g. 300).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
