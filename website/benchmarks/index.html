@@ -143,7 +143,7 @@ sculptforge --benchmark core-100m</code></pre></li>
       <li><strong>The machine</strong>: an Apple M1 Pro laptop (10 cores, 30.9 GB, Linux), 1920 x 1080, vertical sync off, held to SculptForge's entry-level budget with
         <code>SF_HW_SIMULATE=floor</code>. It is a fast laptop slowed down in software, not a real entry-level computer: your numbers will differ, in either direction.</li>
       <li><strong>Memory</strong>: SculptForge held a peak of 1,645 to 1,656 MB (resident) plus 2,563 MB of graphics buffers; on integrated graphics those buffers are system memory, so about
-        <strong>4,200 MB in all</strong>. The program asks for about <strong>7 GB free</strong> before it starts, and stops with one line saying how much it needs and how much is free if you have less.
+        <strong>4,200 MB in all</strong>. The program asks for about <strong>8 GB free</strong> (6.4 GB and a margin: 7 GB is refused, 8 GB runs) before it starts, and stops with one line saying how much it needs and how much is free if you have less.
         A computer with a separate graphics card needs the 2,563 MB on the card.</li>
       <li><strong>Disk</strong>: the scene file is <strong>0.6 GB</strong> (609 MB), written once to the program's cache folder. It needs about 0.9 GB free to write; with less it stops with a message and writes nothing.</li>
     </ul>
