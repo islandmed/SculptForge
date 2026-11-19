@@ -130,7 +130,7 @@ bool VideoEncoder::start(const VideoEncoderSpec& spec, std::string& error) {
         std::ofstream probe(temp, std::ios::binary | std::ios::trunc);
         if (!probe) {
             const int e = errno;
-            std::string m = "The " + spec.what + " can't be written to " + spec_.output + (e ? std::string(": ") + std::strerror(e) : std::string());
+            std::string m = "The " + spec.what + " can't be written to " + spec_.output + (e ? ": " + std::error_code(e, std::generic_category()).message() : std::string());
 #if defined(_WIN32)
             m += " (if Windows Security's Controlled folder access is on, allow SculptForge there, or choose another folder)";
 #endif

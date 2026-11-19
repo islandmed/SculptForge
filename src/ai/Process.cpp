@@ -244,7 +244,8 @@ bool ChildProcess::spawn(const std::string& program, const std::vector<std::stri
     // fails CreateProcess with ERROR_INVALID_HANDLE).
     HANDLE inRead = INVALID_HANDLE_VALUE, inWrite = INVALID_HANDLE_VALUE;
     if (pipeStdin) {
-        if (!CreatePipe(&inRead, &inWrite, &sa, 0)) {
+        // (a 1 MB buffer: the default 4 KB makes every frame write wait for ffmpeg to read it in pieces)
+        if (!CreatePipe(&inRead, &inWrite, &sa, 1u << 20)) {
             error = "Cannot create a pipe for " + exe + " (error " + std::to_string(GetLastError()) + ")";
             if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
             return false;

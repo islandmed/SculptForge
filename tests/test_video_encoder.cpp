@@ -232,13 +232,14 @@ TEST(video_encoder_ffmpeg_that_never_finishes_is_reported) {
 }
 
 TEST(video_encoder_cancel_says_nothing_and_leaves_nothing) {
-    FakeFfmpeg fake("stall");
+    FakeFfmpeg fake("hangfinish"); // (reads its input like ffmpeg, then never ends: a run still going when cancelled)
     Run r("cancel");
     VideoEncoder enc;
     std::string error;
     CHECK(enc.start(r.spec, error));
     const std::vector<uint8_t> frame(r.frameBytes(), 1);
     CHECK(enc.write(frame.data(), frame.size()));
+    CHECK(enc.running());
     enc.cancel();
     CHECK(r.logged.empty());
     CHECK(filesIn(r.dir) == 0);

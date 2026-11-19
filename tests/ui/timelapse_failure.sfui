@@ -1,0 +1,20 @@
+# Exporting a timelapse when ffmpeg isn't installed says so, in the status bar and in a dialog that stays until closed
+# (0.12.12 / 0.13: "ffmpeg stopped", or no message at all; the encoder was started through the shell). The path is the
+# user's: the film button on the timeline strip, Export.
+env SCULPTFORGE_FFMPEG /no/such/folder/ffmpeg
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+stroke 0.35 0.40 0.60 0.45
+stroke 0.40 0.55 0.62 0.60
+expect_value timeline_steps == 2
+click "##timelapse"
+wait 0.3
+expect_text Length
+click "Export"
+wait 0.5
+expect_status "needs ffmpeg"
+expect_text "wasn't found"
+expect_text Copy
+click "Close"
+wait 0.3
+expect_not "wasn't found"
