@@ -715,6 +715,14 @@ int App::runUiTest(int w, int h, int fps) {
         updateSpaceMouse(dt);
         updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
+        if (interactiveStrokes_) { // (`interactive_strokes on`: what run() does each frame for a stroke's queued dabs)
+            flushGrab();
+            if (drainNextFrame_) {
+                drainNextFrame_ = false;
+                runDrainQueue();
+            } else if (asyncStroke_) pumpStroke();
+            else drainStrokeDabs(0.010);
+        }
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         // Help > Record a performance trace: run()'s phases, roughly (no events, dabs or 3D view drawn here).
@@ -3062,6 +3070,12 @@ void App::drainStrokeDabs(double budgetSeconds) {
 }
 
 void App::dabAt(float x, float y, float pressure, bool stamp) {
+    // (tests: SF_DAB_DELAY_MS slows every dab, on the stroke thread too, so a stroke is still draining when the next input comes)
+    static const int delayMs = [] {
+        const char* v = std::getenv("SF_DAB_DELAY_MS");
+        return v && *v ? std::max(0, std::atoi(v)) : 0;
+    }();
+    if (delayMs > 0) std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
     // On the solver thread (predictive strokes) the dab sees the view and the brush settings as they were when its
     // batch began (DabSettings), and nothing the main thread changes meanwhile.
     const DabSettings live = dabView_ ? DabSettings() : dabSettings();
