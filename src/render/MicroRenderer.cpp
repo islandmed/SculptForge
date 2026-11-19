@@ -26,6 +26,7 @@ namespace {
 constexpr GLenum kUnitTris = 0x84C8, kUnitBase = 0x84C9, kUnitDisp = 0x84CA, kUnitLevels = 0x84CB, kUnitShade = 0x84CC;
 constexpr uint32_t kChunkTexels = 1u << 26; // (gl::bufferChunkTexels: lower under a test's limit)
 constexpr uint32_t kNoCluster = 0xFFFFFFFFu;
+constexpr uint32_t kHiddenTri = 8u;  // in the per-slot wireframe-edge word (bits 0-2 the edges): the base triangle is hidden
 
 // Evaluates the micro surface exactly as MicroTriangle::evalWeights (corners in ascending vertex order), so
 // both triangles of a shared edge compute bit-identical points there.
@@ -33,7 +34,7 @@ const char* kMicroVS = R"(
 layout(location = 0) in uvec2 aIJ; // the patch's grid point at uLevel
 uniform mat4 uView;
 uniform mat4 uProj;
-uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges), (cluster across each edge, face group)
+uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges + 8 if hidden), (cluster across each edge, face group)
 uniform samplerBuffer uBase;    // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
 uniform usamplerBuffer uLevels; // per cluster: the level it draws
@@ -244,6 +245,10 @@ void main() {
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
     vGroup = int(texelFetch(uTris, slot * 2 + 1).w);
+    if ((texelFetch(uTris, slot * 2).w & 8u) != 0u) { // a hidden base triangle (kHiddenTri): every vertex outside the view
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        return;
+    }
 #ifdef FOCUS
     uint pg = texelFetch(uPages, slot).r;
     gPage = int(pg & 0x7FFFFFFFu) - 1;
@@ -508,6 +513,7 @@ void MicroRenderer::uploadTris(const Mesh& mesh) {
             const uint32_t partner = mesh.quadPartnerAt(t);
             const int diagonal = partner != Mesh::kNoQuad && !mesh.triangleHidden(partner) ? mesh.quadDiagonal(t, partner) : -1;
             o[0] = tr.x, o[1] = tr.y, o[2] = tr.z, o[3] = diagonal < 0 ? 7u : 7u & ~(1u << diagonal);
+            if (mesh.triangleHidden(t)) o[3] |= kHiddenTri; // (Hide / Isolate: the tile isn't drawn)
             for (int k = 0; k < 3; ++k) {
                 const uint32_t nb = mm.edgeNeighbor[size_t(t) * 3 + size_t(k)];
                 o[4 + k] = nb == MicroMesh::kNone ? kNoCluster : slotOf_[nb >> 2] >> clusterShift_;
