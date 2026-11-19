@@ -761,7 +761,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     if (p.video && p.stage != Stage::Announce && p.stage != Stage::Build) {
         const int w = fbW & ~1, h = fbH & ~1;
         if (!p.writer.running() && p.error.find("video") == std::string::npos && !p.writer.start(p.videoPath, w, h)) {
-            p.error = "The video couldn't be recorded (ffmpeg missing?)";
+            p.error = p.writer.error();
             p.video = false;
         }
         p.writer.grab(now, w, h);
@@ -1191,7 +1191,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     case Stage::Finish: {
         if (!p.vsync) SDL_GL_SetSwapInterval(1);
         if (p.writer.running()) {
-            if (!p.writer.finish()) p.error += (p.error.empty() ? "" : "; ") + std::string("the video couldn't be written");
+            if (!p.writer.finish()) p.error += (p.error.empty() ? "" : "; ") + std::string("the video couldn't be written: ") + p.writer.error();
         }
         Json root = Json::object();
         root.set("schema", "sculptforge-benchmark/1");

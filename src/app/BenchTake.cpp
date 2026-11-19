@@ -167,7 +167,7 @@ void App::takeBeforeSwap(int fbW, int fbH) {
     if (t.video) { // the frame about to be shown, HUD included
         const int w = fbW & ~1, h = fbH & ~1;
         if (!t.writer.running() && !t.writer.start(t.videoPath, w, h)) {
-            t.error = "The video couldn't be recorded (ffmpeg missing?)";
+            t.error = t.writer.error();
             t.video = false;
         }
         t.writer.grab(now, w, h);
@@ -215,7 +215,7 @@ void App::takeBeforeSwap(int fbW, int fbH) {
     t.stage = Stage::Done;
     strokeProbe_ = nullptr;
     if (!t.vsync) SDL_GL_SetSwapInterval(1);
-    if (t.writer.running() && !t.writer.finish()) t.error += (t.error.empty() ? "" : "; ") + std::string("the video couldn't be written");
+    if (t.writer.running() && !t.writer.finish()) t.error += (t.error.empty() ? "" : "; ") + std::string("the video couldn't be written: ") + t.writer.error();
     {
         std::ofstream csv(std::filesystem::path(std::u8string(t.csvPath.begin(), t.csvPath.end())));
         csv << "frame,t_s,frame_ms,stroking,lag_ms,lag_px\n";

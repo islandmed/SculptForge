@@ -18,6 +18,7 @@
 #include <cwchar>
 #else
 #include <cerrno>
+#include <csignal>
 #include <cstring>
 #include <fcntl.h>
 #include <signal.h>
@@ -89,11 +90,115 @@ std::string findOnPath(const std::string& name) {
     return {};
 }
 
+namespace {
+std::string envString(const char* name) {
+    const char* v = std::getenv(name);
+    return v ? std::string(v) : std::string();
+}
+
+// The first regular file `name` in each directory of `dirs` (a "*" in a directory name's last part matches any folder:
+// winget's package folders are Gyan.FFmpeg_<hash>/ffmpeg-<version>-full_build/bin).
+std::string firstIn(const std::vector<std::string>& dirs, const std::string& name) {
+    std::error_code ec;
+    for (const std::string& d : dirs) {
+        if (d.empty()) continue;
+        const size_t star = d.find('*');
+        if (star == std::string::npos) {
+            const fs::path c = u8path(d) / u8path(name);
+            if (fs::is_regular_file(c, ec)) return pathString(c);
+            continue;
+        }
+        // "<parent>/<prefix>*/<rest>": every child of <parent> starting with <prefix>, newest name first
+        const size_t slash = d.find_last_of("/\\", star);
+        const std::string parent = slash == std::string::npos ? "." : d.substr(0, slash);
+        const size_t afterStar = d.find_first_of("/\\", star);
+        const std::string prefix = d.substr(slash == std::string::npos ? 0 : slash + 1,
+                                            star - (slash == std::string::npos ? 0 : slash + 1));
+        const std::string rest = afterStar == std::string::npos ? std::string() : d.substr(afterStar + 1);
+        std::vector<fs::path> matches;
+        for (fs::directory_iterator it(u8path(parent), ec), end; !ec && it != end; it.increment(ec)) {
+            const std::string n = pathString(it->path().filename());
+            if (n.compare(0, prefix.size(), prefix) == 0) matches.push_back(it->path());
+        }
+        std::sort(matches.rbegin(), matches.rend());
+        for (const fs::path& m : matches) {
+            const std::string inner = rest.empty() ? pathString(m) : pathString(m / u8path(rest));
+            if (const std::string f = firstIn({inner}, name); !f.empty()) return f;
+        }
+    }
+    return {};
+}
+} // namespace
+
+std::string findFfmpegExe() {
+    if (const std::string e = envString("SCULPTFORGE_FFMPEG"); !e.empty()) return findOnPath(e);
+    if (const std::string p = findOnPath("ffmpeg"); !p.empty()) return p;
+#if defined(_WIN32)
+    const std::string local = envString("LOCALAPPDATA"), data = envString("ProgramData"), user = envString("USERPROFILE"),
+                      files = envString("ProgramFiles");
+    return firstIn({local + "\\Microsoft\\WinGet\\Links", local + "\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg*\\ffmpeg*\\bin",
+                    data + "\\chocolatey\\bin", user + "\\scoop\\shims", files + "\\ffmpeg\\bin", "C:\\ffmpeg\\bin"},
+                   "ffmpeg.exe");
+#else
+    const std::string home = envString("HOME");
+    return firstIn({"/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin", "/usr/bin", "/snap/bin",
+                    "/home/linuxbrew/.linuxbrew/bin", home.empty() ? std::string() : home + "/.local/bin",
+                    home.empty() ? std::string() : home + "/.linuxbrew/bin"},
+                   "ffmpeg");
+#endif
+}
+
 ChildProcess::~ChildProcess() {
+    stopWatchdog();
+    closeStdin();
     if (started_ && !finished_) kill(0.5);
 #if defined(_WIN32)
     if (job_) CloseHandle(job_); // kill-on-close: ends anything the finished child left running
 #endif
+}
+
+namespace {
+long long steadyMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + 1;
+}
+} // namespace
+
+bool ChildProcess::start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+                         const std::vector<std::pair<std::string, std::string>>& env, std::string& error) {
+    return spawn(program, args, logPath, env, false, error);
+}
+
+bool ChildProcess::startWithInput(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+                                  const std::vector<std::pair<std::string, std::string>>& env, std::string& error,
+                                  double stallSeconds) {
+    if (!spawn(program, args, logPath, env, true, error)) return false;
+    stallSeconds_ = stallSeconds;
+    stalled_ = false;
+    watchStop_ = false;
+    writeSince_ = 0;
+    watchdog_ = std::thread([this] {
+        std::unique_lock<std::mutex> lock(watchMutex_);
+        while (!watchStop_) {
+            watchCv_.wait_for(lock, std::chrono::milliseconds(100));
+            const long long since = writeSince_.load();
+            if (since != 0 && double(steadyMs() - since) > stallSeconds_ * 1000.0) {
+                stalled_ = true;
+                terminateNow(); // the blocked write fails now
+                writeSince_ = 0;
+            }
+        }
+    });
+    return true;
+}
+
+void ChildProcess::stopWatchdog() {
+    if (!watchdog_.joinable()) return;
+    {
+        std::lock_guard<std::mutex> lock(watchMutex_);
+        watchStop_ = true;
+    }
+    watchCv_.notify_all();
+    watchdog_.join();
 }
 
 #if defined(_WIN32)
@@ -135,8 +240,8 @@ void appendQuoted(std::wstring& cmd, const std::wstring& arg) {
 }
 } // namespace
 
-bool ChildProcess::start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
-                         const std::vector<std::pair<std::string, std::string>>& env, std::string& error) {
+bool ChildProcess::spawn(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+                         const std::vector<std::pair<std::string, std::string>>& env, bool pipeStdin, std::string& error) {
     const std::string exe = findOnPath(program);
     if (exe.empty()) {
         error = "Cannot find " + program;
@@ -178,22 +283,40 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     } else {
         for (const auto& [k, v] : env) _wputenv_s(widen(k).c_str(), widen(v).c_str());
     }
+    // The child's stdin: our pipe, or NUL (a GUI app has no console stdin to hand on: an invalid handle there
+    // fails CreateProcess with ERROR_INVALID_HANDLE).
+    HANDLE inRead = INVALID_HANDLE_VALUE, inWrite = INVALID_HANDLE_VALUE;
+    if (pipeStdin) {
+        // (a 1 MB buffer: the default 4 KB makes every frame write wait for ffmpeg to read it in pieces)
+        if (!CreatePipe(&inRead, &inWrite, &sa, 1u << 20)) {
+            error = "Cannot create a pipe for " + exe + " (error " + std::to_string(GetLastError()) + ")";
+            if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
+            return false;
+        }
+        SetHandleInformation(inWrite, HANDLE_FLAG_INHERIT, 0); // (only the child's end is inherited)
+    } else {
+        inRead = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
+    }
     STARTUPINFOW si{};
     si.cb = sizeof si;
     si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdInput = inRead;
     si.hStdOutput = log;
     si.hStdError = log;
     PROCESS_INFORMATION pi{};
+    // CREATE_NO_WINDOW: no console for a GUI app's child (the black cmd.exe window of a shell launch).
     // Started suspended and put in a job of its own before it runs, so that kill() also ends what it starts
     // (a launcher's real program, a renderer's worker processes) and closing the app ends them all.
     const BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE,
                                    CREATE_NO_WINDOW | CREATE_SUSPENDED |
                                        (hasFullEnv_ ? CREATE_UNICODE_ENVIRONMENT : 0),
                                    hasFullEnv_ ? block.data() : nullptr, nullptr, &si, &pi);
+    const DWORD createError = ok ? 0 : GetLastError();
     if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
+    if (inRead != INVALID_HANDLE_VALUE) CloseHandle(inRead);
     if (!ok) {
-        error = "Cannot start " + exe + " (error " + std::to_string(GetLastError()) + ")";
+        if (inWrite != INVALID_HANDLE_VALUE) CloseHandle(inWrite);
+        error = "Cannot start " + exe + " (error " + std::to_string(createError) + ")";
         return false;
     }
     if (job_) CloseHandle(job_);
@@ -209,6 +332,7 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     }
     ResumeThread(pi.hThread);
     CloseHandle(pi.hThread);
+    if (pipeStdin) stdin_ = inWrite;
     process_ = pi.hProcess;
     started_ = true;
     finished_ = false;
@@ -240,7 +364,37 @@ bool ChildProcess::running() {
     return false;
 }
 
+void ChildProcess::terminateNow() {
+    if (process_) TerminateProcess(process_, 1);
+}
+
+bool ChildProcess::writeStdin(const void* data, size_t bytes) {
+    if (!stdin_) return false;
+    const char* p = static_cast<const char*>(data);
+    writeSince_ = steadyMs();
+    while (bytes > 0) {
+        DWORD wrote = 0;
+        const DWORD chunk = DWORD(std::min<size_t>(bytes, 1u << 20));
+        if (!WriteFile(stdin_, p, chunk, &wrote, nullptr) || wrote == 0) {
+            writeSince_ = 0;
+            return false; // (the child ended: ERROR_BROKEN_PIPE / ERROR_NO_DATA)
+        }
+        p += wrote;
+        bytes -= wrote;
+        writeSince_ = steadyMs(); // (progress: the stall clock restarts)
+    }
+    writeSince_ = 0;
+    return true;
+}
+
+void ChildProcess::closeStdin() {
+    if (stdin_) CloseHandle(stdin_);
+    stdin_ = nullptr;
+}
+
 void ChildProcess::kill(double) {
+    stopWatchdog();
+    closeStdin();
     if (running()) {
         if (!job_ || !TerminateJobObject(job_, 1)) TerminateProcess(process_, 1);
         wait();
@@ -260,11 +414,11 @@ int ChildProcess::wait() {
 
 #else
 
-bool ChildProcess::start(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
-                         const std::vector<std::pair<std::string, std::string>>& env, std::string& error) {
+bool ChildProcess::spawn(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+                         const std::vector<std::pair<std::string, std::string>>& env, bool pipeStdin, std::string& error) {
 #ifdef __ANDROID__
     // An Android app can't run the desktop's tools (splat trainer, COLMAP, ffmpeg): there are none to find.
-    (void)args, (void)logPath, (void)env;
+    (void)args, (void)logPath, (void)env, (void)pipeStdin;
     error = program + " can't run on Android";
     return false;
 #endif
@@ -298,7 +452,20 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     const std::string out = logPath.empty() ? std::string("/dev/null") : logPath;
     posix_spawn_file_actions_addopen(&actions, 1, out.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
     posix_spawn_file_actions_adddup2(&actions, 1, 2);
-    posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+    int inPipe[2] = {-1, -1};
+    if (pipeStdin) {
+        if (::pipe(inPipe) != 0) {
+            error = "Cannot create a pipe for " + exe + ": " + std::strerror(errno);
+            posix_spawn_file_actions_destroy(&actions);
+            return false;
+        }
+        ::fcntl(inPipe[0], F_SETFD, FD_CLOEXEC); // (the dup2 onto 0 below is the child's only copy)
+        ::fcntl(inPipe[1], F_SETFD, FD_CLOEXEC);
+        posix_spawn_file_actions_adddup2(&actions, inPipe[0], 0);
+        std::signal(SIGPIPE, SIG_IGN); // a dead child is a failed write, never the app's death
+    } else {
+        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+    }
     posix_spawnattr_t attr;
     posix_spawnattr_init(&attr);
     // Its own process group, so stopping it also stops what it started.
@@ -308,14 +475,18 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     const int rc = posix_spawn(&pid, exe.c_str(), &actions, &attr, argv.data(), envp.data());
     posix_spawn_file_actions_destroy(&actions);
     posix_spawnattr_destroy(&attr);
+    if (inPipe[0] >= 0) ::close(inPipe[0]);
     if (rc != 0) {
+        if (inPipe[1] >= 0) ::close(inPipe[1]);
         error = "Cannot start " + exe + ": " + std::strerror(rc);
         return false;
     }
     if (pid <= 1) { // (never; but a pid of 0 or 1 would turn every later signal into one on us or on init)
+        if (inPipe[1] >= 0) ::close(inPipe[1]);
         error = "Cannot start " + exe + ": no process id";
         return false;
     }
+    stdin_ = inPipe[1];
     pid_ = pid;
     started_ = true;
     finished_ = false;
@@ -348,7 +519,38 @@ bool signalChildGroup(int pid, int sig) {
     return ::kill(pid, sig) == 0; // someone else's group: only the child itself
 }
 
+void ChildProcess::terminateNow() {
+    const int pid = pid_;
+    if (pid > 1) signalChildGroup(pid, SIGKILL);
+}
+
+bool ChildProcess::writeStdin(const void* data, size_t bytes) {
+    if (stdin_ < 0) return false;
+    const char* p = static_cast<const char*>(data);
+    writeSince_ = steadyMs();
+    while (bytes > 0) {
+        const ssize_t n = ::write(stdin_, p, bytes);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) {
+            writeSince_ = 0;
+            return false; // (EPIPE: the child ended)
+        }
+        p += n;
+        bytes -= size_t(n);
+        writeSince_ = steadyMs(); // (progress: the stall clock restarts)
+    }
+    writeSince_ = 0;
+    return true;
+}
+
+void ChildProcess::closeStdin() {
+    if (stdin_ >= 0) ::close(stdin_);
+    stdin_ = -1;
+}
+
 void ChildProcess::kill(double graceSeconds) {
+    stopWatchdog();
+    closeStdin();
     if (!running()) return; // (reaped, never started or detached = nothing of ours to signal)
     signalChildGroup(pid_, SIGTERM);
     const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(int(graceSeconds * 1000));

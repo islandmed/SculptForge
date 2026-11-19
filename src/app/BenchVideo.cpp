@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/BenchVideo.h"
 
-#include "app/ShellQuote.h"
-
 #include <algorithm>
 #include <cstring>
 
@@ -16,18 +14,18 @@ constexpr GLenum kPixelPackBuffer = 0x88EB, kStreamRead = 0x88E1, kMapReadBit = 
 bool BenchVideo::start(const std::string& path, int w, int h) {
     w_ = w, h_ = h;
     // Bottom-up rows from glReadPixels: flipped; scaled to at most 1920 wide to keep the encoder light.
-    const std::string quoted = shellQuote(path); // (never a shell-active file name)
-    if (quoted.empty()) return false;
-    const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
-                            std::to_string(h) + " -r " + std::to_string(kFps) +
-                            " -i - -vf \"vflip,scale='min(1920,iw)':-2\" -c:v libx264 -preset veryfast -crf 20 "
-                            "-pix_fmt yuv420p -movflags +faststart " + quoted;
-#if defined(_WIN32)
-    ff_ = _popen(cmd.c_str(), "wb");
-#else
-    ff_ = popen(cmd.c_str(), "w");
-#endif
-    if (!ff_) return false;
+    ai::VideoEncoderSpec spec;
+    spec.output = path;
+    spec.width = w;
+    spec.height = h;
+    spec.fps = kFps;
+    spec.what = "benchmark video";
+    spec.outputArgs = {"-vf", "vflip,scale='min(1920,iw)':-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                       "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+    spec.log = [](const std::string& m) { std::fprintf(stderr, "%s\n", m.c_str()); };
+    error_.clear();
+    if (!encoder_.start(spec, error_)) return false;
+    started_ = true;
     thread_ = std::thread([this] { loop(); });
     gl::GenBuffers(3, pbo_);
     for (GLuint b : pbo_) {
@@ -39,7 +37,7 @@ bool BenchVideo::start(const std::string& path, int w, int h) {
 }
 
 void BenchVideo::grab(double t, int w, int h) {
-    if (!ff_ || w != w_ || h != h_) return;
+    if (!started_ || w != w_ || h != h_) return;
     const int slot = pboNext_;
     if (pboFilled_ >= 3) { // the oldest read is done by now: hand it to the encoder
         gl::BindBuffer(kPixelPackBuffer, pbo_[slot]);
@@ -70,7 +68,7 @@ void BenchVideo::push(double t, std::vector<uint8_t>&& rgba, bool wait) {
 }
 
 bool BenchVideo::finish() {
-    if (!ff_) return false;
+    if (!started_) return false;
     // The frames still in the ring, oldest first: the video runs to the last frame shown.
     const size_t bytes = size_t(w_) * size_t(h_) * 4;
     for (int k = 0; k < pboFilled_; ++k) {
@@ -91,29 +89,22 @@ bool BenchVideo::finish() {
         cv_.notify_all();
     }
     thread_.join();
-#if defined(_WIN32)
-    const int status = _pclose(ff_);
-#else
-    const int status = pclose(ff_);
-#endif
-    ff_ = nullptr;
+    started_ = false;
+    const bool ok = encoder_.finish(error_) && written_ > 0; // (a failure is said once to the log)
+    if (!ok && error_.empty()) error_ = "The benchmark video recorded nothing";
     gl::DeleteBuffers(3, pbo_);
-    return status == 0 && written_ > 0;
+    return ok;
 }
 
 BenchVideo::~BenchVideo() {
-    if (!ff_) return;
+    if (!started_) return;
     { // (no GL here: the context may be gone; the buffers go with it)
         std::lock_guard<std::mutex> lock(m_);
         stop_ = true;
         cv_.notify_all();
     }
     thread_.join();
-#if defined(_WIN32)
-    _pclose(ff_);
-#else
-    pclose(ff_);
-#endif
+    encoder_.cancel();
 }
 
 // Frames to ffmpeg at a constant rate (frames repeat while the app is slower).
@@ -133,13 +124,11 @@ void BenchVideo::loop() {
         if (next < 0) next = f.first;
         // Slots up to this frame's time show the previous frame; then this one.
         while (!last.empty() && next + 1.0 / kFps <= f.first) {
-            std::fwrite(last.data(), 1, last.size(), ff_);
-            ++written_;
+            if (encoder_.write(last.data(), last.size())) ++written_;
             next += 1.0 / kFps;
         }
         if (next <= f.first + 1e-9 || last.empty()) {
-            std::fwrite(f.second.data(), 1, f.second.size(), ff_);
-            ++written_;
+            if (encoder_.write(f.second.data(), f.second.size())) ++written_;
             next += 1.0 / kFps;
         }
         last = std::move(f.second);

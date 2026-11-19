@@ -103,6 +103,7 @@ ui_space_camera             render
 ui_navigation               render
 ui_orbit_lock               render
 ui_timelapse_flicker        render
+ui_timelapse_failure        io
 ui_remove_flat_background   render
 ui_frame_free_area*         render
 ui_hover_pop                render
@@ -221,6 +222,7 @@ test_rodin_fal              ai
 test_phone_link             ai
 test_discord_presence       ai
 test_process_signals        ai
+test_video_encoder          ai
 test_update_check           ai
 test_self_update            ai
 test_splat_train            ai

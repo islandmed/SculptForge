@@ -7,7 +7,11 @@
 // Linux/macOS, CreateProcessW on Windows.
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -31,6 +35,16 @@ public:
         fullEnv_ = std::move(entries);
         hasFullEnv_ = true;
     }
+    // As start, with the child's standard input a pipe we write to (writeStdin, closeStdin): frames for an encoder.
+    // No shell, no console window on Windows. A child that stops reading for `stallSeconds` while we write is
+    // stopped (the write then fails) instead of hanging the app.
+    bool startWithInput(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+                        const std::vector<std::pair<std::string, std::string>>& env, std::string& error,
+                        double stallSeconds = 60.0);
+    // Writes all of it; false when the child is gone (or was stopped for not reading).
+    bool writeStdin(const void* data, size_t bytes);
+    void closeStdin();
+    bool stalled() const { return stalled_.load(); } // the last write was cut short by the stall watchdog
     // True while it runs; once it has ended, exitCode() is valid.
     bool running();
     int exitCode() const { return exitCode_; }
@@ -46,15 +60,29 @@ public:
 private:
     std::vector<std::string> fullEnv_;
     bool hasFullEnv_ = false;
+    bool spawn(const std::string& program, const std::vector<std::string>& args, const std::string& logPath,
+               const std::vector<std::pair<std::string, std::string>>& env, bool pipeStdin, std::string& error);
+    void stopWatchdog();
+    void terminateNow(); // the watchdog's stop: signals only, touches no state the caller's thread owns
     bool started_ = false;
     bool finished_ = false;
     int exitCode_ = -1;
 #if defined(_WIN32)
     void* process_ = nullptr;
     void* job_ = nullptr; // kill-on-close job holding the child and its children (null if the job could not be made)
+    void* stdin_ = nullptr; // our end of the child's stdin pipe
 #else
     int pid_ = -1;
+    int stdin_ = -1;
 #endif
+    // The stall watchdog (startWithInput): kills the child when one write has been blocked for stallSeconds_.
+    std::thread watchdog_;
+    std::mutex watchMutex_;
+    std::condition_variable watchCv_;
+    bool watchStop_ = false;
+    std::atomic<long long> writeSince_{0}; // steady-clock ms of the write in progress, 0 = none
+    double stallSeconds_ = 60.0;
+    std::atomic<bool> stalled_{false};
 };
 
 #if !defined(_WIN32)
@@ -69,6 +97,11 @@ std::vector<std::string> currentEnvironment();
 
 // The full path of `name` on PATH (with .exe on Windows), or "" when it isn't there.
 std::string findOnPath(const std::string& name);
+
+// ffmpeg: $SCULPTFORGE_FFMPEG, then PATH, then where installers put it that a desktop-launched app's PATH misses
+// (macOS: Homebrew's /opt/homebrew/bin, MacPorts; Windows: winget's Links folder and package folders, Chocolatey,
+// Scoop; Linux: Homebrew on Linux, snap). "" when it isn't installed.
+std::string findFfmpegExe();
 
 // Runs a program to completion with its output in `output` (both streams). Returns the exit code, or -1 if it
 // could not start (`output` then holds the reason). For short tools only (version checks, tar).
