@@ -84,7 +84,6 @@
             <li><span class="badge">Member request</span><span class="idea">🧩 Parts &amp; Scene: Two-step lattice deformer</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">🧩 Parts &amp; Scene: Bend over a range (start/end span)</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">👁️ View &amp; Camera: Silhouette view: small window with a flat black outline of the model, saved camera angles and lens in mm</span><span class="st">Building</span></li>
-            <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Colour column: bigger swatches that wrap, and a widenable column that remembers its width (both setups)</span><span class="st">Building</span></li>
             <li><span class="badge">Member request</span><span class="idea">〰️ Curves &amp; Tubes: Standalone curves: polyline to Bezier/NURBS, resample with point slider, curve from edges</span><span class="st">Planned</span></li>
             <li><span class="badge">Member request</span><span class="idea">⌨️ Interface: Discord Rich Presence (opt-in)</span><span class="st">Queued</span></li>
             <li><span class="badge">Member request</span><span class="idea">🔷 Topology: Polygon modelling mode: Points, Edges and Polygons panels; extrude, smart bevel, circle from edges, bridge, spin edge, add loops, inset. Plus a non-destructive Subdivision modifier: edit the low-poly cage and see the smooth result live (ebarranco)</span><span class="st">Queued</span></li>
@@ -117,14 +116,9 @@
             <tr><td>📦 Files &amp; Pipeline: Package managers (AUR, apt, dnf, winget, Scoop)</td><td class="st">Building</td></tr>
             <tr><td>🧩 Parts &amp; Scene: One-click mirrored copy of a Part</td><td class="st">Building</td></tr>
             <tr><td>🧩 Parts &amp; Scene: Numbered duplicates (Head.01) instead of &quot;copy copy&quot;</td><td class="st">Building</td></tr>
-            <tr><td>🖌️ Brushes: Crisp-edge flatten</td><td class="st">Building</td></tr>
             <tr><td>⚡ Performance: Faster Quad Remesh at high polygon counts</td><td class="st">Building</td></tr>
-            <tr><td>📦 Files &amp; Pipeline: Render bridge: send a quick render straight to an image editor (any program) for client previews</td><td class="st">Building</td></tr>
-            <tr><td>📦 Files &amp; Pipeline: Hydra render delegate (low priority, with the render bridge)</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Python scripting inside the regular app&#x27;s console and scripts (loops, conditions); today the flat command language only, while the sculptforge Python module ships in studio/VFX Platform builds and source builds</td><td class="st">Building</td></tr>
             <tr><td>🎨 Painting: Smooth / blur vertex colours (e.g. Shift while painting, or a colour-blur brush); today Shift smooths the shape only and the Smooth brush never changes colour</td><td class="st">Building</td></tr>
-            <tr><td>📦 Files &amp; Pipeline: Python sf.ui: expose the main window&#x27;s native handle (HWND on Windows) so custom PySide dialogs can group with the main window</td><td class="st">Building</td></tr>
-            <tr><td>📦 Files &amp; Pipeline: Environment variable search path for Python scripts (like SCULPTFORGE_BRUSH_PATH), so scripts can live in shared folders</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Bones and skin weights as USD skeletons, posing first</td><td class="st">Designing</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Paint layers exported as separate colour attributes</td><td class="st">Planned</td></tr>
             <tr><td>🔷 Topology: Sculpt layers on micro levels</td><td class="st">Planned</td></tr>
@@ -231,6 +225,7 @@
             <tr><td>⌨️ Interface: Shortcut editor: warn when a key is already used (no silent reassign) + per-shortcut reset button <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
             <tr><td>⌨️ Interface: Pan left/right/up/down as separate bindable keys (for game pads / analog sticks; zoom in/out keys exist) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.4</span></td></tr>
             <tr><td>⌨️ Interface: Custom quick panel: drag sections/buttons from any palette into it, open floating with a key or dock it in a tray; sections can be dragged out, hold a key to drag (not a pie menu) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
+            <tr><td>⌨️ Interface: Colour column: bigger swatches that wrap, and a widenable column that remembers its width (both setups) <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Portable-data mode: settings, brushes and layout stored in the portable folder, so a USB stick carries the whole workbench <span class="tag">member</span></td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>Generate a cavity map <span class="tag">member</span></td><td class="st">Already in the app<span class="detail">Tool &gt; Bake &gt; Cavity; Masking &gt; By cavity</span></td></tr>
             <tr><td>Deformation panel expansion</td><td class="st">Shipped<span class="detail">in 0.11.14</span></td></tr>
@@ -240,12 +235,15 @@
             <tr><td>🖌️ Brushes: Brush per modifier key (Shift/Ctrl assignment)</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Origin tools + pie menu</td><td class="st">Shipped<span class="detail">in 0.12.2</span></td></tr>
             <tr><td>🖌️ Brushes: Brush size preview</td><td class="st">Shipped<span class="detail">in 0.11.6</span></td></tr>
+            <tr><td>🖌️ Brushes: Crisp-edge flatten</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>Memory use (RAM, GPU) in the top bar</td><td class="st">Shipped<span class="detail">in 0.11.15</span></td></tr>
             <tr><td>Recent colours row on the left shelf</td><td class="st">Shipped<span class="detail">in 0.11.15</span></td></tr>
             <tr><td>👁️ View &amp; Camera: Orbit around the point under the pointer</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🔷 Topology: Voxel Remesh above 512 (to 4096, polygon estimate + one-time warning)</td><td class="st">Shipped<span class="detail">in 0.12.1</span></td></tr>
             <tr><td>👁️ View &amp; Camera: F key: one press frames the active Part, a second press frames the whole scene</td><td class="st">Shipped<span class="detail">in 0.12.2</span></td></tr>
             <tr><td>Shift+drag to rotate the alpha while stamping</td><td class="st">Shipped<span class="detail">in 0.12.3</span></td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Render bridge: send a quick render straight to an image editor (any program) for client previews</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Hydra render delegate (low priority, with the render bridge)</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Mesh Boolean: live Union/Subtract/Intersect preview + Make Boolean Mesh (new mesh, sources untouched), weld and face group options</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🖌️ Brushes: Smooth-peaks brush: smooths only the high points (peaks), valleys untouched</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Save a project with only some Parts (e.g. only the visible ones) to slim the file after working on different versions</td><td class="st">Shipped<span class="detail">in 0.12.6</span></td></tr>
@@ -254,6 +252,8 @@
             <tr><td>⌨️ Interface: Double-click any slider/knob to type an exact value (consistent everywhere)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Insert (Append &gt; Insert on the model) on meshes that keep their subdivision levels, instead of refusing; today needs a mesh without levels (Freeze Levels first)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Script-made buttons and panels: a script as a shelf button or a My Panel entry (today no script can add UI; saved scripts run via File &gt; Script &gt; Run script file...)</td><td class="st">Shipped<span class="detail">in 0.13.8</span></td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Python sf.ui: expose the main window&#x27;s native handle (HWND on Windows) so custom PySide dialogs can group with the main window</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
+            <tr><td>📦 Files &amp; Pipeline: Environment variable search path for Python scripts (like SCULPTFORGE_BRUSH_PATH), so scripts can live in shared folders</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>Light rotation on one axis</td><td class="st">Already in the app<span class="detail">PBR shading &gt; Rotation</span></td></tr>
             <tr><td>Duplicate Part shortcut</td><td class="st">Already in the app<span class="detail">Ctrl+Shift+D</span></td></tr>
             <tr><td>Constant detail for dynamic topology</td><td class="st">Already in the app<span class="detail">Draw &amp; Tablet &gt; Constant detail</span></td></tr>
