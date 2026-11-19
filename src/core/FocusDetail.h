@@ -52,6 +52,8 @@ struct FocusView {
     glm::vec3 eye{0.0f};
     float focalPx = 1000.0f; // pixels per world unit at distance 1 (viewport height / (2 tan(fov / 2)))
     float errorPx = 0.5f;    // a visible tile is promoted when its coarse grid is further off than this on screen
+    uint64_t baseRevision = 0; // the app's count of base changes (undo pushes, undo, redo): a new one scores again
+    bool baseMoving = false;   // a drag or a rebuild changing the base now (the Gizmo pushes on release): scored every update
 };
 
 struct FocusBrush {
@@ -70,6 +72,7 @@ struct FocusStats {
     double lastUpdateMs = 0;  // the last update() (scoring + promotions + demotions)
     size_t lastWanted = 0;    // tiles the last update() wanted full
     size_t lastPending = 0;   // of those, still coarse after it (the time budget ran out)
+    uint64_t skippedUpdates = 0; // update() calls that found nothing changed since the last scoring (since open)
 };
 
 class FocusDetail {
@@ -114,6 +117,7 @@ public:
     // 0 = coarse (upsampled), 1 = full.
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
     FocusStats stats() const;
+    double lastUpdateMs() const { std::lock_guard<std::mutex> lock(mutex_); return stats_.lastUpdateMs; } // (stats() without its counts: per frame)
     const std::string& path() const { return path_; }
     bool unsaved() const; // edits since the last save
 
@@ -167,6 +171,18 @@ private:
     FocusStats stats_;
     std::vector<uint32_t> scratch_;
     std::vector<float> score_;
+    // The last scoring's inputs (update: an unchanged view, brush, detail and budget wants the same tiles).
+    struct ScoredFor {
+        bool valid = false;
+        FocusView view;
+        FocusBrush brush;
+        uint64_t revision = 0;
+        size_t fullTiles = 0, budgetBytes = 0;
+        uint32_t frames = 0; // updates skipped since
+        bool stalled = false; // tiles still wanted but none went in (the budget full of wanted tiles)
+    } scored_;
+    std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
+    bool lruValid_ = false;
     // The mapped file
     int fd_ = -1;
     const uint8_t* map_ = nullptr;

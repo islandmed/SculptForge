@@ -347,6 +347,121 @@ TEST(focus_detail_prediction_budget_and_parking) {
     CHECK(fd->stats().promoted == before);
 }
 
+TEST(focus_detail_unchanged_frames_skip_scoring) {
+    // #184: scoring looks at every tile each frame. Nothing changed = the same tiles: skipped; a change of view,
+    // brush or detail, or kRescore skipped frames, scores again, and the tiles are those of a full scoring.
+    const std::string path = writeSmall("skip.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    MicroMesh& mm = *m.micro;
+    FocusBrush brush;
+    brush.present = true;
+    brush.position = glm::vec3(-0.3f, 0.1f, 0.9f);
+    brush.radius = 0.05f;
+    const auto levels = [&] {
+        std::vector<int> l(mm.baseTriangles);
+        for (uint32_t t = 0; t < mm.baseTriangles; ++t) l[t] = fd->tileLevel(t);
+        return l;
+    };
+    fd->update(m, FocusView{}, brush, 1000.0);
+    const auto first = levels();
+    const uint64_t s0 = fd->stats().skippedUpdates;
+    fd->update(m, FocusView{}, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 1);
+    CHECK(levels() == first);
+    // the brush moved: scored, and more tiles around it
+    brush.position = glm::vec3(0.3f, 0.1f, 0.9f);
+    fd->update(m, FocusView{}, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 1);
+    // an edit (the revision): scored
+    fd->update(m, FocusView{}, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    ++mm.revision;
+    fd->update(m, FocusView{}, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    // the view: scored
+    FocusView v;
+    v.valid = true;
+    v.eye = glm::vec3(0, 0, 4.0f);
+    fd->update(m, v, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    // a base change the app names (undo, redo, a push): scored; a base moving (a Gizmo drag): scored every update
+    v.baseRevision = 1;
+    fd->update(m, v, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    v.baseMoving = true;
+    for (int i = 0; i < 3; ++i) fd->update(m, v, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    v.baseMoving = false;
+    fd->update(m, v, brush, 1000.0);
+    CHECK(fd->stats().skippedUpdates == s0 + 2);
+    // a long still stretch rescores now and then (a backstop)
+    const uint64_t s1 = fd->stats().skippedUpdates;
+    for (int i = 0; i < 1201; ++i) fd->update(m, v, brush, 1000.0);
+    const uint64_t skipped = fd->stats().skippedUpdates - s1;
+    CHECK(skipped == 1200); // (600 skipped, one scoring, 600 skipped)
+    // what a skipping run leaves = what scoring every frame leaves (a fresh open, the same calls, nothing skipped)
+    Mesh m2;
+    auto fd2 = FocusDetail::open(path, m2, err);
+    CHECK(fd2 != nullptr);
+    if (!fd2) return;
+    fd2->update(m2, v, brush, 1000.0);
+    std::vector<int> l2(m2.micro->baseTriangles);
+    for (uint32_t t = 0; t < m2.micro->baseTriangles; ++t) l2[t] = fd2->tileLevel(t);
+    std::vector<int> l1 = levels(), want(l1.size()), got(l2.size());
+    for (size_t t = 0; t < l1.size(); ++t) want[t] = l1[t] > 0, got[t] = l2[t] > 0;
+    // (the skipping run also kept the brush's earlier tiles full: in budget nothing demotes them; so every tile
+    // full in the fresh scoring is full in it)
+    for (size_t t = 0; t < got.size(); ++t)
+        if (got[t]) CHECK(want[t]);
+    CHECK(edgesShared(m));
+    // A list longer than a frame's budget (budget 0: one batch an update): the next updates promote the rest of it
+    // without scoring again, and end where one unlimited update ends.
+    Mesh m3, m4;
+    auto fd3 = FocusDetail::open(path, m3, err), fd4 = FocusDetail::open(path, m4, err);
+    CHECK(fd3 != nullptr && fd4 != nullptr);
+    if (!fd3 || !fd4) return;
+    FocusBrush wide = brush;
+    wide.radius = 0.4f;
+    fd4->update(m4, v, wide, 1e9);
+    fd3->update(m3, v, wide, 0.0);
+    CHECK(fd3->stats().lastPending > 0);
+    const uint64_t s3 = fd3->stats().skippedUpdates;
+    for (int i = 0; i < 25 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
+    CHECK(fd3->stats().lastPending == 0);
+    CHECK(fd3->stats().skippedUpdates > s3); // (drained from the list, not rescored)
+    for (uint32_t t = 0; t < m3.micro->baseTriangles; ++t) CHECK(fd3->tileLevel(t) == fd4->tileLevel(t));
+    CHECK(edgesShared(m3));
+    // The view wants more tiles than the budget holds (#184 at 2.5M base after an orbit): the list drains up to the
+    // budget, never past it, then the updates skip until something changes.
+    FocusView near = v;
+    near.eye = glm::vec3(0, 0, 1.5f);
+    near.focalPx = 1e5f;
+    Mesh m5, m6;
+    auto fd5 = FocusDetail::open(path, m5, err), fd6 = FocusDetail::open(path, m6, err);
+    CHECK(fd5 != nullptr && fd6 != nullptr);
+    if (!fd5 || !fd6) return;
+    fd6->update(m6, near, FocusBrush{}, 1e9);
+    const size_t W = fd6->stats().lastWanted;
+    CHECK(W >= 8);
+    const size_t cap = W / 2;
+    fd5->budgetBytes = size_t(m5.micro->samples) * 2 * cap;
+    for (int i = 0; i < 2000 && fd5->stats().fullTiles < cap; ++i) {
+        fd5->update(m5, near, FocusBrush{}, 0.0);
+        CHECK(fd5->stats().fullTiles <= cap);
+    }
+    CHECK(fd5->stats().fullTiles == cap);
+    fd5->update(m5, near, FocusBrush{}, 0.0); // (the first update to find the budget full)
+    const uint64_t p5 = fd5->stats().promoted, s5 = fd5->stats().skippedUpdates;
+    for (int i = 0; i < 5; ++i) fd5->update(m5, near, FocusBrush{}, 0.0);
+    CHECK(fd5->stats().promoted == p5);           // (nothing churns)
+    CHECK(fd5->stats().skippedUpdates == s5 + 5); // (stalled at the budget: skipped)
+    CHECK(edgesShared(m5));
+}
+
 TEST(focus_detail_brush_thread_and_frames_together) {
     // A stroke's dabs (ensureFull on another thread) while frames promote and demote under a small budget.
     const std::string path = writeSmall("threads.sfdetail");
