@@ -88,11 +88,11 @@
       more detail than a plain mesh. These are the figures we measure with SculptForge's own benchmark, with the
       machine named and the steps to repeat each one.</p>
     <figure style="margin:20px 0">
-      <img src="../media/engine-numbers-805-209.jpg" width="1600" height="900" loading="lazy" style="width:100%;height:auto;border-radius:8px" alt="805 million triangles of fine detail orbiting at 209 frames a second, 64 ms for the slowest 1% of 240 px brush-stroke frames, 1.6 GB of memory, measured on an Apple M1 Pro limited to entry-level budgets (simulated), a benchmark scene and not a sculpt">
+      <img src="../media/engine-numbers-805-211.jpg" width="1600" height="900" loading="lazy" style="width:100%;height:auto;border-radius:8px" alt="805 million triangles of fine detail orbiting at 211 frames a second, 63 ms for the slowest 1% of 240 px brush-stroke frames, 1.6 GB of memory, measured on an Apple M1 Pro limited to entry-level budgets (simulated), a benchmark scene and not a sculpt">
     </figure>
     <ul>
-      <li><strong>209 frames a second</strong> orbiting 805 million micro triangles of fine detail in our benchmark scene (not a sculpt), on an Apple M1 Pro limited to the entry-level tier (simulated), with 1.6 GB of memory for the whole scene. The slowest 1% of 240 px brush-stroke frames took 64 ms. Three runs on the released 0.13.8.</li>
-      <li><strong>248 frames a second</strong> orbiting the same 805-million-triangle scene on a Windows desktop with an AMD Ryzen 5 5600X and an NVIDIA RTX 3060 (median of 4 runs, range 222 to 258; 0.13.8 as released). The scene uses 3.8 GB of memory and 2.6 GB of video memory, and the first stroke has one stall of about 0.3 seconds.</li>
+      <li><strong>211 frames a second</strong> orbiting 805 million micro triangles of fine detail in our benchmark scene (not a sculpt), on an Apple M1 Pro limited to the entry-level tier (simulated), with 1.6 GB of memory for the whole scene. The slowest 1% of 240 px brush-stroke frames took 63 ms. Median of three runs (203 to 216) on the released 0.13.9.</li>
+      <li><strong>237 frames a second</strong> orbiting the same 805-million-triangle scene on a Windows desktop with an AMD Ryzen 5 5600X and an NVIDIA RTX 3060 (median of 4 runs, range 232 to 239; 0.13.9 as released). The scene uses 3.5 to 3.7 GB of memory and 2.6 GB of video memory, and the first stroke has one stall of about 0.3 seconds.</li>
       <li><strong>657 frames a second</strong> orbiting the smaller 104-million-triangle benchmark scene on that desktop (an earlier development build).</li>
       <li><strong>1.2 GB</strong> of memory for the whole application with 201 million triangles of fine detail, on that Windows desktop.</li>
       <li><strong>30 ms</strong>: 99 frames in 100 were faster than this while sculpting with a 240 px brush on a 33-million-triangle head, entry-level tier (simulated). The slowest single frame in that run was 103 ms.</li>
