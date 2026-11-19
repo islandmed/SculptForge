@@ -9,7 +9,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-18
-tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
 highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
 highlight: Python scripts can add their own buttons and panels
 highlight: Splats show the sheen that changes as you orbit
