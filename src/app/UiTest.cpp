@@ -395,7 +395,7 @@
 //                            font_atlas_kpx (the font atlas texture, thousands of pixels)
 //   expect_value model_top_clear / model_bottom_clear (px between the model's projected bounding box and the bands
 //                            framing keeps it clear of: the open Library, the Sculpt Timeline strip; < 0: under one),
-//                            camera_shift_y (the lens shift framing set, x1000; + up), left_column_clipped (left shelf
+//                            camera_shift_y (the lens shift framing set, x1000; + up), left_shelf_width + colour_cell_min (logical px: the left column, its smallest colour cell), left_column_clipped (left shelf
 //                            items past its visible bottom)
 //   expect_value weld_preview_points (Merge by Distance's orange dots drawn this frame: only while its distance is
 //                            dragged or hovered, fading out after)
@@ -1564,6 +1564,8 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(std::min(left - c.x, c.x + c.w - right));
     }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
+    if (name == "left_shelf_width") return std::round(double(app_.shell_.leftShelf.w / app_.uiScale_)); // logical px
+    if (name == "colour_cell_min") return std::floor(double(app_.colourCellMin_) + 0.5); // the shelf's smallest colour cell, logical px
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
     if (name == "right_shelf_changes") return double(app_.rightShelfChanges_);
     if (name == "right_shelf_folded") return app_.rightShelfFolded_ ? 1.0 : 0.0;

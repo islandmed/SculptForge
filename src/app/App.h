@@ -2364,7 +2364,8 @@ private:
     void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
     void drawAlphaTile(const char* id, ImVec2 size);
     void drawMaterialTile(const char* id, ImVec2 size);
-    void drawColorWidget(float width);
+    void drawColorWidget(float width, float fit = 1.0f);
+    void drawLeftShelfGrip(const CanvasRect& shelf);
     // Palettes.cpp: every palette body, also used by the trays and drop-downs.
     bool subpalette(const char* id, const char* title); // Tool sub-palette header; true while open
     void drawPalette_Alpha();
@@ -2521,6 +2522,7 @@ private:
     double flashStart_ = 0.0;
     std::vector<std::string> collapsedPalettes_; // tray palettes showing only their header
     void autoCollapseTray(bool right, const std::string& keep);
+    float colourCellMin_ = 0.0f; // the smallest colour cell drawn on the left shelf last frame, logical px (UiTest colour_cell_min)
     glm::vec3 secondaryColor_{1.0f, 1.0f, 1.0f}; // the left shelf's second swatch (click swaps, "Alternate")
     // The left shelf's recent colours: the last paint colours a stroke or Fill used, newest first (Oslen on Discord).
     // Saved in project.json (the app's preferences), linear like doc_.paintColor.

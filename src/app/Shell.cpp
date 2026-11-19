@@ -1587,6 +1587,7 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.rightTrayPeek = from.rightTrayPeek;
     l.leftTrayWidth = from.leftTrayWidth;
     l.rightTrayWidth = from.rightTrayWidth;
+    l.leftShelfWidth = from.leftShelfWidth;
     l.openSubpalettes = from.openSubpalettes;
     l.consoleOpen = from.consoleOpen;
     l.consoleHeight = from.consoleHeight;
@@ -2674,6 +2675,44 @@ void App::drawDivider(bool right, const CanvasRect& r) {
     ImGui::End();
 }
 
+// The left shelf's inner edge: drag to widen or narrow the column (the colour field and its swatches grow with it, a
+// member couldn't manage the colours in the 88 px column), double-click for the default width. Kept in the layout.
+// Called inside the shelf's own window (a window of its own under the shelf never got the mouse): the strip lies in the
+// shelf's padding, where no item is.
+void App::drawLeftShelfGrip(const CanvasRect& shelf) {
+    const float s = uiScale_;
+    const float gripW = std::min(6.0f * s, shelf.w * 0.5f);
+    const ImRect bb(ImVec2(layout_.leftHanded ? shelf.x : shelf.x + shelf.w - gripW, shelf.y),
+                    ImVec2(layout_.leftHanded ? shelf.x + gripW : shelf.x + shelf.w, shelf.y + shelf.h));
+    const ImGuiID id = ImGui::GetID("##leftshelfgrip");
+    if (!ImGui::ItemAdd(bb, id)) return;
+    bool hovered = false, held = false;
+    ImGui::ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_PressedOnClick);
+    ImGuiIO& io = ImGui::GetIO();
+    if (hovered || held) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    const float logicalW = io.DisplaySize.x / s;
+    if (held && io.MouseDelta.x != 0.0f) {
+        const float now = leftShelfWidth(layout_.leftShelfWidth, logicalW);
+        const float next = leftShelfWidth(now + (layout_.leftHanded ? -io.MouseDelta.x : io.MouseDelta.x) / s, logicalW);
+        const float stored = next <= leftShelfWidth(0.0f, logicalW) ? 0.0f : std::floor(next);
+        if (stored != layout_.leftShelfWidth) {
+            layout_.leftShelfWidth = stored;
+            noteLayoutChanged();
+        }
+    }
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && layout_.leftShelfWidth != 0.0f) {
+        layout_.leftShelfWidth = 0.0f;
+        noteLayoutChanged();
+    }
+    ui::HelpText("Left shelf width", nullptr, "Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
+                 "Shell");
+    if (hovered || held) {
+        const float cx = layout_.leftHanded ? bb.Min.x + 1.0f * s : bb.Max.x - 1.0f * s, cy = (bb.Min.y + bb.Max.y) * 0.5f;
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.0f * s, cy - 16.0f * s), ImVec2(cx + 1.0f * s, cy + 16.0f * s),
+                                                  theme::u32(theme::accent, 1.0f), theme::rounding(1.0f * s));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Shelves
 // ---------------------------------------------------------------------------
@@ -2814,6 +2853,7 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         if (vertical) ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseWheel * 60.0f * s);
         else ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
     }
+    if (shelf == kShelfLeft) drawLeftShelfGrip(r);
     if (layout_.customize)
         dashedRect(dl, ImVec2(r.x + 2.0f, r.y + 2.0f), ImVec2(r.x + r.w - 2.0f, r.y + r.h - 2.0f), theme::u32(theme::accent, 0.6f),
                    4.0f * s);
@@ -3004,9 +3044,12 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else if (item == "widget.tile.material") drawMaterialTile("##tile.material", size);
         else ImGui::Dummy(size);
     } else if (item == "widget.color") {
-        const float w = fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
+        // The column's whole inside (76 px by default, 60 narrow): it follows a dragged column width (drawLeftShelfGrip).
+        // `fit` shrinks the SV square and the swatch heights only (drawColorWidget): the cells keep their width.
+        const float w = vertical ? std::floor(std::max(1.0f, winW - 2.0f * padX))
+                                 : fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
         centre(w);
-        drawColorWidget(w);
+        drawColorWidget(w, vertical ? shelfFit_[shelf] : 1.0f);
     } else if (item == "widget.nav.move" || item == "widget.nav.zoom" || item == "widget.nav.rotate") {
         const float navW = fitW(44.0f * s);
         centre(navW);

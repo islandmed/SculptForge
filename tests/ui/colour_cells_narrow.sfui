@@ -1,0 +1,24 @@
+# A narrow, short window (1440x900 at UI scale 150 is 960 x 600 logical): the shelf's fit shrinks the colour field, but the
+# colour cells keep their width (they once went one per row and full width, the column clipped, cells 15 px: artist-qa).
+run ui_look look=classic layout=classic
+ui_scale 150
+run new_sphere subdivisions=4
+key p
+run set_color color=c81e1e
+stroke 0.40 0.45 0.60 0.45
+run set_color color=1e3cc8
+stroke 0.40 0.50 0.60 0.50
+run set_color color=1ec83c
+stroke 0.40 0.55 0.60 0.55
+run set_color color=e0b020
+stroke 0.40 0.60 0.60 0.60
+run set_color color=8a3ca0
+stroke 0.40 0.62 0.60 0.62
+run set_color color=3c8ca0
+stroke 0.40 0.64 0.60 0.64
+expect_value recent_colors == 6
+wait_idle 10
+expect_value shell_narrow == 1
+expect_value colour_cell_min >= 20
+expect_value left_column_clipped == 0
+shot colours-narrow-150

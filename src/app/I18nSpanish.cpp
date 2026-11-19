@@ -1779,6 +1779,9 @@ constexpr Entry kSpanish[] = {
      "Continuo activado o no: mientras mantienes el pincel quieto sobre el modelo sigue añadiendo, 30 toques por "
      "segundo (crea un bulto sin moverte). No para Move, Tendril ni los trazos de arrastre."},
     {"Swap the main and the secondary colour.", "Intercambia el color principal y el secundario."},
+    {"Left shelf width", "Ancho del estante izquierdo"},
+    {"Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
+     "Arrastra para ensanchar o estrechar la columna (el campo de color crece con ella). Doble clic para el ancho predeterminado."},
     {"Mask the whole visible Part.", "Enmascara toda la Pieza visible."},
     {"Unmask everything (also: Ctrl+drag on the background, away from the model).",
      "Quita toda la máscara (también: Ctrl+arrastrar en el fondo, lejos del modelo)."},
