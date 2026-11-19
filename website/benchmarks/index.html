@@ -130,10 +130,15 @@ sculptforge --benchmark core-100m</code></pre></li>
   <div class="card small">
     <p>The largest scene we list is <code>core-800m</code>: the same procedural head at micro level 5, <strong>805,306,368</strong> micro triangles,
       held in memory. It is in SculptForge 0.13.9 and later. One command:</p>
+    <p>Linux (in a terminal):</p>
     <pre><code>SF_HW_SIMULATE=floor sculptforge --benchmark core-800m --benchmark-no-video --benchmark-out result.json</code></pre>
-    <p>Leave <code>SF_HW_SIMULATE=floor</code> off to run at your computer's own speed (it holds the program to the entry-level budget, as in the rows below;
-      on Windows set it first with <code>set SF_HW_SIMULATE=floor</code>). The first run writes the scene file once; every run after that opens it
-      (about a second here: 0.7 to 1.1 s). Send the JSON as <a href="#submit">below</a> to be listed.</p>
+    <p>macOS (in Terminal, with SculptForge in Applications):</p>
+    <pre><code>SF_HW_SIMULATE=floor /Applications/SculptForge.app/Contents/MacOS/SculptForge --benchmark core-800m --benchmark-no-video --benchmark-out result.json</code></pre>
+    <p>Windows (in PowerShell, from the unzipped portable folder):</p>
+    <pre><code>$env:SF_HW_SIMULATE = "floor"; .\bin\sculptforge.exe --benchmark core-800m --benchmark-no-video --benchmark-out result.json</code></pre>
+    <p>Leave the <code>SF_HW_SIMULATE</code> part off to run at your computer's own speed (<code>floor</code> holds the program to the entry-level budget, as in the rows below).
+      The scene needs about 4.2 GB of memory and a 0.6 GB scene file, written once; with too little of either the program says so and exits.
+      The first run writes the scene file; every run after that opens it (about a second here: 0.7 to 1.1 s). Send the JSON as <a href="#submit">below</a> to be listed.</p>
     <ul>
       <li><strong>What we measured</strong> (three runs, the evening of 2026-11-18, built from the 0.13.8 tag, commit d25dfe75, the program's own JSON for each:
         <a href="raw/floor-core-800m-1.json">run 1</a>, <a href="raw/floor-core-800m-2.json">run 2</a>, <a href="raw/floor-core-800m-3.json">run 3</a>): orbit
