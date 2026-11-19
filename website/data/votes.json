@@ -785,16 +785,6 @@
    "slug": "files-pipeline",
    "ideas": [
     {
-     "slug": "render-bridge",
-     "anchor": "vote-render-bridge",
-     "title": "Render bridge",
-     "line": "Send a quick render, or the scene with its materials and vertex paint, to an external renderer or image editor in one click.",
-     "where": "Render panel and File menu",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "houdini-link-via-usd",
      "anchor": "vote-houdini-link-via-usd",
      "title": "Houdini link via USD",
@@ -853,6 +843,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "render-bridge",
+     "anchor": "vote-render-bridge",
+     "title": "Render bridge",
+     "line": "Send a quick render, or the scene with its materials and vertex paint, to an external renderer or image editor in one click.",
+     "where": "Render panel and File menu",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.13.9"
     }
    ]
   },
@@ -874,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-19T14:38:10Z"
+ "updated": "2026-11-19T23:04:52Z"
 }
