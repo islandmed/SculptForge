@@ -3,7 +3,6 @@ whats_new: **Render with your renderer**: **File > Render with... (preview)** re
   a renderer you already have (any Hydra render delegate your OpenUSD install finds), shows it, keeps it in your
   Renders folder and opens it in any image editor you choose: a client preview in one click. Set it up once in
   **Edit > Preferences > Render bridge**.
-highlight: Render a still with your own renderer
 added: **Render with... (preview)** (File menu, off until set up in Edit > Preferences > Render bridge): renders the visible Parts
   from the current view (camera, lens shift and orthographic views, an optional studio light of key, fill, rim and a
   sky dome) through OpenUSD's `usdrecord` from your own USD install, so every Hydra render delegate it finds can be

@@ -5,13 +5,33 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.9
+
+```features
+date: unreleased
+tagline: The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and sculpt layers round trip with Blender.
+highlight: The Gizmo and the Move brush now follow the pen on meshes of millions of triangles
+highlight: Crisp Flatten cuts ridges and steep walls clean, with Symmetry on too
+highlight: Quad Remesh finishes on grainy, scanned sculpts, and Cancel stops it at once
+highlight: Sculpt layers make the round trip with Blender as shape keys
+highlight: Big micro levels settle back to a smooth view right after your strokes
+title: Dense meshes follow the pen
+line: On a mesh of millions of triangles, a high Voxel Remesh say, the Gizmo's Move, Rotate and Scale and the Move brush now keep up with the pen.
+action: guide:gizmo.md
+title: Crisp Flatten cuts clean
+line: Crisp Flatten cuts ridges and steep walls flat without teeth, shards or folded triangles, with a big brush on a dense mesh and with Symmetry on.
+action: guide:sculpting.md
+title: Layers round trip with Blender
+line: Shape keys sent from Blender arrive as sculpt layers with their names, values and order, and go back as shape keys; glTF, FBX and USD exports keep the same layers.
+action: guide:layers.md
+```
+
 ## Version 0.13.8
 
 ```features
 date: 2026-11-18
 tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
 highlight: In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 209 frames a second
-tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
 highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
 highlight: Python scripts can add their own buttons and panels
 highlight: Splats show the sheen that changes as you orbit

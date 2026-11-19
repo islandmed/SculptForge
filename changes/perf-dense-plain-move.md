@@ -2,7 +2,6 @@
 whats_new: **Dense meshes move smoothly**: on a mesh of millions of triangles (a high Voxel Remesh, say), the Gizmo's
   Move, Rotate and Scale and the Move brush now follow the pen; before, a 7M-triangle mesh dragged at under one frame a
   second.
-highlight: Gizmo and Move brush smooth on 7M+ triangle meshes
 fixed: The Gizmo and the Move brush were very slow on dense meshes (millions of triangles without a micro level, e.g.
   a Voxel Remesh at a high resolution): every pointer sample moved the whole region, so a slow frame took more samples
   and the next was slower. A Gizmo drag of a whole Part (no mask, nothing hidden) is now drawn by the graphics card and
