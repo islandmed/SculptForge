@@ -5,9 +5,11 @@
 #include "app/App.h"
 #include "app/UserData.h"
 #include "core/FileReplace.h"
+#include "core/BrushLibrary.h"
 #include "core/Json.h"
 #include "core/ManagedPolicy.h"
 #include "core/SelectionSets.h"
+#include "core/ScriptPath.h"
 #include "core/Sha256.h"
 #include "core/Undo.h"
 #include "python/CoreCalls.h"
@@ -469,23 +471,27 @@ std::string PythonScripting::scriptsFolder() const {
 }
 
 const std::vector<std::string>& PythonScripting::scripts() {
-    const double now = double(SDL_GetTicks()) / 1000.0;
-    if (now - scriptsScanned_ < 2.0) return scripts_;
-    scriptsScanned_ = now;
-    scripts_.clear();
-    const std::string dir = scriptsFolder();
-    std::error_code ec;
-    if (dir.empty() || !fs::is_directory(fsPath(dir), ec)) return scripts_;
-    for (fs::directory_iterator it(fsPath(dir), ec), end; !ec && it != end; it.increment(ec)) {
-        const fs::path& p = it->path();
-        std::string name = utf8(p.filename());
-        if (name.empty() || name[0] == '.' || name[0] == '_') continue; // hidden files and helper modules (_util.py)
-        std::string ext = utf8(p.extension());
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-        if (ext == ".py" && it->is_regular_file(ec)) scripts_.push_back(utf8(p));
-    }
-    std::sort(scripts_.begin(), scripts_.end());
+    scan();
     return scripts_;
+}
+
+const std::vector<std::string>& PythonScripting::pathScripts() {
+    scan();
+    return pathScripts_;
+}
+
+void PythonScripting::scan() {
+    const double now = double(SDL_GetTicks()) / 1000.0;
+    if (now - scriptsScanned_ < 2.0) return;
+    scriptsScanned_ = now;
+    scripts_.clear(), pathScripts_.clear();
+    if (!allowed()) return; // a studio policy of never hides them all
+    const char* env = std::getenv("SCULPTFORGE_SCRIPT_PATH");
+    std::vector<std::string> skipped;
+    for (ScriptFile& f : listScripts(scriptsFolder(), splitSearchPath(env ? env : ""), &skipped))
+        (f.fromSearchPath ? pathScripts_ : scripts_).push_back(std::move(f.path));
+    for (const std::string& dir : skipped)
+        if (skippedPaths_.insert(dir).second) app_.console_.print(Console::Kind::Info, "SCULPTFORGE_SCRIPT_PATH: skipped " + dir + " (not a readable folder)");
 }
 
 } // namespace sf

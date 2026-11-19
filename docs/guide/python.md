@@ -59,6 +59,13 @@ Put `.py` files in the **Scripts** folder (**Edit > Preferences > Scripts > Open
 library folder, `Documents/SculptForge/Scripts`). They are listed under **File > Script**; click one to run it. Names
 that start with `_` (helper modules) aren't listed. **Run script file...** runs a `.py` file from anywhere.
 
+**A shared scripts folder.** A team can list scripts from other folders too: set `SCULPTFORGE_SCRIPT_PATH` to folders
+separated by `:` (`;` on Windows), or a studio profile's `scriptPaths`. Only the top level of each folder is read: the
+`.py` files directly in it, not those in sub-folders. They are listed under **File > Script** with the folder's name beside them, after the ones in your Scripts folder, which wins when
+both have a script of the same name. A folder that can't be read is skipped, with a line in the console. Scripts found
+this way run only when you click one, and can't be set to **Run at start-up**. A studio policy that says Python is never
+allowed hides them with the rest.
+
 A script runs as `__main__`, with `import sculptforge as sf`. Each run is one undo step. The Scripts folder is on the
 import path, so scripts can share helper modules.
 

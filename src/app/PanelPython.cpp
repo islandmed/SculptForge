@@ -181,8 +181,9 @@ void App::drawPythonScripts() {
     for (python::UiPanel& p : py.panels()) drawPythonPanel(p);
     py.endDraw();
     const auto& scripts = py.scripts(); // (a folder listing at most every two seconds, only while this draws)
+    const auto& pathScripts = py.pathScripts();
     ImGui::SeparatorText(tr("Python scripts"));
-    if (scripts.empty()) {
+    if (scripts.empty() && pathScripts.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         ImGui::TextWrapped("%s", tr("Put .py files in the Scripts folder (Preferences > Scripts) to list them here."));
         ImGui::PopStyleColor();
@@ -192,6 +193,15 @@ void App::drawPythonScripts() {
     for (const std::string& path : scripts) {
         const std::u8string stem = fsPath(path).stem().u8string();
         const std::string label = std::string(ICON_LC_FILE_CODE) + "  " + std::string(stem.begin(), stem.end()) + "##py." + path;
+        if (ImGui::MenuItem(label.c_str())) run = path;
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", path.c_str());
+    }
+    // Scripts from SCULPTFORGE_SCRIPT_PATH: marked with their folder; a click runs one, nothing else ever does.
+    for (const std::string& path : pathScripts) {
+        const fs::path file = fsPath(path);
+        const std::u8string stem = file.stem().u8string(), dir = file.parent_path().filename().u8string();
+        const std::string label = std::string(ICON_LC_FILE_CODE) + "  " + std::string(stem.begin(), stem.end()) + "  (" +
+                                  std::string(dir.begin(), dir.end()) + ")##py." + path;
         if (ImGui::MenuItem(label.c_str())) run = path;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", path.c_str());
     }

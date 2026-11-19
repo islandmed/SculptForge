@@ -120,6 +120,7 @@ add_library(sculptforge_core STATIC
   src/core/Utf8Path.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
+  src/core/ScriptPath.cpp
   src/core/DataDir.cpp
   src/core/Image.cpp
   src/core/ImageTo3D.cpp
@@ -1380,6 +1381,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       sculptforge_ui_test(python_ui_1440 python_ui --size 1440x900) # script-made interface (sf.ui)
       sculptforge_ui_test(python_ui_2880 python_ui --size 2880x1800)
       sculptforge_ui_test(python_startup_1440 python_startup --size 1440x900)
+      sculptforge_ui_test(python_script_path_1440 python_script_path --size 1440x900)
+      sculptforge_ui_test(python_script_path_2880 python_script_path --size 2880x1800)
     endif()
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
     # Adaptive Detail tiles drawn, before/after at three zooms (tests/ui/micro_tiles_closeup.sfui): the READY shots.
