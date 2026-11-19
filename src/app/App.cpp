@@ -14,7 +14,6 @@
 #include "core/ThreadPool.h"
 #include "core/LayerStack.h"
 #include "core/HardwareProfile.h"
-#include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/IconsUsed.h"
 #include "app/UiScale.h"
@@ -29,6 +28,7 @@
 
 #include "ai/AiCommands.h"
 #include "ai/Oidc.h"
+#include "ai/VideoEncoder.h"
 #include "ai/Secrets.h"
 #include "core/AuditLog.h"
 #include "core/Keychain.h"
@@ -660,29 +660,22 @@ int App::runUiTest(int w, int h, int fps) {
     };
     // --ui-record: every frame to ffmpeg, paced to real time (background jobs run at their real speed in the video);
     // frames that take longer than 1/fps can't keep up, so the log says how much faster than real time the video ran.
-    FILE* video = nullptr;
+    ai::VideoEncoder videoEncoder;
+    ai::VideoEncoder* video = nullptr;
     if (!options_.uiRecordPath.empty()) {
-        if (shellQuote(options_.uiRecordPath).empty()) {
-            SDL_Log("--ui-record: choose a file name without \" %% ! ^ & | < > in it");
-            return 1;
-        }
-        const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
-                                std::to_string(h) + " -r " + std::to_string(fps) +
-                                " -i - -c:v libx264 " +
-                                (options_.uiRecordClip ? "-preset veryfast -crf 23" : "-preset slow -crf 16") +
-                                " -pix_fmt yuv420p -movflags +faststart " + shellQuote(options_.uiRecordPath);
-#if defined(_WIN32)
-        video = _popen(cmd.c_str(), "wb");
-#else
-        video = popen(cmd.c_str(), "w");
-#endif
-        if (!video) {
-            SDL_Log("Cannot start ffmpeg");
-            return 1;
-        }
-#if !defined(_WIN32)
-        std::signal(SIGPIPE, SIG_IGN); // ffmpeg missing or dead: the write fails (logged below) instead of killing the app
-#endif
+        ai::VideoEncoderSpec spec;
+        spec.output = options_.uiRecordPath;
+        spec.width = w;
+        spec.height = h;
+        spec.fps = fps;
+        spec.what = "recording";
+        spec.outputArgs = {"-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-preset",
+                           options_.uiRecordClip ? "veryfast" : "slow", "-crf", options_.uiRecordClip ? "23" : "16",
+                           "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+        spec.log = [](const std::string& m) { SDL_Log("--ui-record: %s", m.c_str()); };
+        std::string error;
+        if (!videoEncoder.start(spec, error)) return 1; // (the cause is in the log, once)
+        video = &videoEncoder;
     }
     const auto recordStart = std::chrono::steady_clock::now();
     int lateFrames = 0;
@@ -791,9 +784,9 @@ int App::runUiTest(int w, int h, int fps) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         if (video) {
-            if (fwrite(rgba.data(), 1, rgba.size(), video) != rgba.size() && !videoBroken) {
-                videoBroken = true; // (ffmpeg's own error is on stderr above; the verdict below fails the run)
-                SDL_Log("Recording stopped at frame %d: ffmpeg is not taking frames (is it installed? see its message above)", frames);
+            if (!video->write(rgba.data(), rgba.size()) && !videoBroken) {
+                videoBroken = true; // (the verdict below says why, once, and fails the run)
+                SDL_Log("Recording stopped at frame %d", frames);
             }
             if (!options_.uiRecordClip) { // (a bug clip runs as fast as the frames come, not paced to the clock)
                 const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -822,17 +815,14 @@ int App::runUiTest(int w, int h, int fps) {
     }
     for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
     if (video) {
-#if defined(_WIN32)
-        const int status = _pclose(video);
-#else
-        const int status = pclose(video);
-#endif
+        std::string videoError;
+        const bool videoOk = video->finish(videoError); // (a failure is said once to the log)
         const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - recordStart).count();
         const double length = double(frames) * double(dt);
         SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
                 length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
-                status == 0 && !videoBroken ? "" : " (ffmpeg failed)");
-        if (status != 0 || videoBroken) return 1;
+                videoOk ? "" : " (ffmpeg failed)");
+        if (!videoOk) return 1;
     }
     demo_->printProfile();
     const std::string known = xfailLine(options_.uiTest);
@@ -941,22 +931,19 @@ int App::runRecording() {
     // virtual camera and downsampled.
     const int ss = std::max(options_.supersample, 1), ow = w / ss, oh = h / ss;
     // Frames go straight to ffmpeg as raw RGBA.
-    if (shellQuote(options_.recordPath).empty()) {
-        SDL_Log("--record: choose a file name without \" %% ! ^ & | < > in it");
-        return 1;
-    }
-    std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(ow) + "x" + std::to_string(oh) +
-                      " -r " + std::to_string(fps) +
-                      " -i - -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart " +
-                      shellQuote(options_.recordPath);
-#if defined(_WIN32)
-    FILE* ff = _popen(cmd.c_str(), "wb");
-#else
-    FILE* ff = popen(cmd.c_str(), "w");
-#endif
-    if (!ff) {
-        SDL_Log("Cannot start ffmpeg");
-        return 1;
+    ai::VideoEncoder encoder;
+    {
+        ai::VideoEncoderSpec spec;
+        spec.output = options_.recordPath;
+        spec.width = ow;
+        spec.height = oh;
+        spec.fps = fps;
+        spec.what = "recording";
+        spec.outputArgs = {"-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+                           "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+        spec.log = [](const std::string& m) { SDL_Log("--record: %s", m.c_str()); };
+        std::string error;
+        if (!encoder.start(spec, error)) return 1; // (the cause is in the log, once)
     }
     std::vector<uint8_t> rgba, frame;
     const float dt = 1.0f / float(fps);
@@ -1016,22 +1003,19 @@ int App::runRecording() {
         float vz;
         demo_->view(vc, vz);
         if (ss == 1 && vz <= 1.0f) {
-            fwrite(rgba.data(), 1, rgba.size(), ff);
+            if (!encoder.write(rgba.data(), rgba.size())) break; // (finish below says why)
         } else {
             const float cw = float(w) / vz, ch = float(h) / vz;
             cropResample(rgba, w, h, vc.x - cw * 0.5f, vc.y - ch * 0.5f, cw, ch, ow, oh, frame);
-            fwrite(frame.data(), 1, frame.size(), ff);
+            if (!encoder.write(frame.data(), frame.size())) break;
         }
         ++written;
     }
-#if defined(_WIN32)
-    const int status = _pclose(ff);
-#else
-    const int status = pclose(ff);
-#endif
+    std::string recordError;
+    const bool recorded = encoder.finish(recordError); // (a failure is said once to the log)
     if (!status_.empty()) SDL_Log("Last status: %s", status_.c_str());
-    SDL_Log("Recorded %d frames (%.1f s) to %s", written, float(written) / float(fps), options_.recordPath.c_str());
-    return status == 0 ? 0 : 1;
+    if (recorded) SDL_Log("Recorded %d frames (%.1f s) to %s", written, float(written) / float(fps), options_.recordPath.c_str());
+    return recorded ? 0 : 1;
 }
 
 namespace {

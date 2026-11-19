@@ -335,7 +335,7 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GlbFetch.cpp src/ai/SpaceHealth.cpp src/ai/Tripo.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
-  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp src/ai/RenderBridge.cpp)
+  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/VideoEncoder.cpp src/ai/SplatTrainer.cpp src/ai/RenderBridge.cpp)
 target_include_directories(sculptforge_ai PRIVATE third_party/tinyexr) # (the render bridge reads EXR stills)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -997,6 +997,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
   target_link_libraries(sf_fake_splat_tools PRIVATE sculptforge_core)
   add_dependencies(sculptforge_tests sf_fake_splat_tools)
+  # A stand-in for ffmpeg as the video encoder calls it (tests/tools/fake_ffmpeg.cpp): exits 1, stalls, writes nothing.
+  add_executable(sf_fake_ffmpeg tests/tools/fake_ffmpeg.cpp)
+  add_dependencies(sculptforge_tests sf_fake_ffmpeg)
+  target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_FFMPEG="$<TARGET_FILE:sf_fake_ffmpeg>")
   # Remesh timings per path and stage at the UI defaults (tests/tools/remesh_bench.cpp).
   add_executable(sf_remesh_bench tests/tools/remesh_bench.cpp)
   target_link_libraries(sf_remesh_bench PRIVATE sculptforge_core)
@@ -1291,6 +1295,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
     sculptforge_ui_test(prefs_updates_1440 prefs_updates --size 1440x900) # the installer's update-check box lands on this switch
     sculptforge_ui_test(prefs_updates_2880 prefs_updates --size 2880x1620)
+    sculptforge_ui_test(timelapse_failure_1440 timelapse_failure --size 1440x900) # the missing-ffmpeg dialog
+    sculptforge_ui_test(timelapse_failure_2880 timelapse_failure --size 2880x1800)
     sculptforge_ui_test(keep_strokes_editable_checkbox_1440 keep_strokes_editable_checkbox --size 1440x900)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
