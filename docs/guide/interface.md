@@ -96,7 +96,9 @@ Choosing Forge Terminal, Phosphor or Blueprint also switches to the SculptForge 
 Classic layout again right after. The look and layout are remembered for the next start on their own, like every
 [preference](#saving-preferences-and-layouts).
 
-**Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
+**Updating from an older version** opens What's New as **New since** the version you last used: the features of
+every version you skipped, newest first (the first eight, then "and N more improvements", which opens the What's New
+chapter). Help > What's New shows the newest version. It also keeps the look and layout you had. A card, **SculptForge has a new look**,
 shows once: **Try it** switches to Forge Terminal with the Neutral colours and the SculptForge layout; **Keep my layout**
 changes nothing. Either way, Edit > Preferences > Interface > Look changes it later.
 

@@ -1,0 +1,34 @@
+# Preferences > Performance > Keep Strokes Editable (Experimental): the checkbox is there (next to Draft Strokes) in both
+# layouts and toggles the setting, the same one F3 flips; Ctrl-hover shows the action's help.
+run ui_look look=classic layout=classic
+expect_value keep_strokes_editable == 0
+click "Preferences##palette.preferences"
+click "Performance##preferences.performance"
+expect "Draft Strokes"
+expect "Keep Strokes Editable (Experimental)"
+hold ctrl
+hover "Keep Strokes Editable (Experimental)"
+expect_help "dabs it was made of"
+expect_help "Move results can snap back"
+shot kse_tooltip
+hold none
+click "Keep Strokes Editable (Experimental)"
+expect_value keep_strokes_editable == 1
+expect_status "Keep strokes editable on"
+shot kse_classic
+click "Keep Strokes Editable (Experimental)"
+expect_value keep_strokes_editable == 0
+
+# Streamlined layout (the open section is the same one: close it here so the click below opens it).
+click "Performance##preferences.performance"
+click "Preferences##palette.preferences"
+run ui_look look=forge scheme=neutral layout=sculptforge
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Performance##preferences.performance"
+expect "Keep Strokes Editable (Experimental)"
+click "Keep Strokes Editable (Experimental)"
+expect_value keep_strokes_editable == 1
+shot kse_streamlined
+click "Keep Strokes Editable (Experimental)"
+expect_value keep_strokes_editable == 0

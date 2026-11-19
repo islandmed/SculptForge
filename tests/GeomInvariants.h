@@ -449,6 +449,48 @@ inline float maskedOvershoot(const Mesh& m, const MicroSnapshot& before, const M
     return worst;
 }
 
+// The micro level's own edge umbrella (#220): per grid point inside a snapshot tile and within `radius` of a centre,
+// its move (after - before) minus the mean of its six grid neighbours' moves, in micro edges. The base surface's
+// curvature cancels, so a smooth change scores near 0; a lattice of creases along the coarse micro triangles (a big
+// brush's stride) scores the crease depth on the points between the coarse ones.
+struct MicroUmbrella {
+    float worst = 0.0f, mean = 0.0f;
+    size_t count = 0;
+};
+inline MicroUmbrella microUmbrella(const Mesh& m, const MicroSnapshot& before, const MicroSnapshot& after,
+                                   const std::vector<glm::vec3>& centers, float radius) {
+    const MicroMesh& mm = *m.micro;
+    const uint32_t n = mm.n;
+    MicroUmbrella u;
+    double sum = 0.0, edges = 0.0;
+    size_t edgeCount = 0;
+    for (size_t k = 0; k < before.tris.size(); ++k) {
+        const glm::vec3* b = before.points.data() + k * mm.samples;
+        edges += glm::distance(b[MicroMesh::index(0, 0, n)], b[MicroMesh::index(1, 0, n)]), ++edgeCount;
+    }
+    const float edge = edgeCount ? float(edges / double(edgeCount)) : 1.0f;
+    for (size_t k = 0; k < before.tris.size(); ++k) {
+        const glm::vec3* b = before.points.data() + k * mm.samples;
+        const glm::vec3* a = after.points.data() + k * mm.samples;
+        for (uint32_t j = 1; j < n; ++j)
+            for (uint32_t i = 1; i + j < n; ++i) {
+                const uint32_t idx = MicroMesh::index(i, j, n);
+                bool near = false;
+                for (const glm::vec3& c : centers) near = near || glm::distance(b[idx], c) < radius;
+                if (!near) continue;
+                glm::vec3 mean(0.0f);
+                for (uint32_t q : {MicroMesh::index(i - 1, j, n), MicroMesh::index(i + 1, j, n), MicroMesh::index(i, j - 1, n),
+                                   MicroMesh::index(i, j + 1, n), MicroMesh::index(i + 1, j - 1, n), MicroMesh::index(i - 1, j + 1, n)})
+                    mean += a[q] - b[q];
+                const float o = glm::length((a[idx] - b[idx]) - mean / 6.0f) / edge;
+                u.worst = std::max(u.worst, o);
+                sum += o, ++u.count;
+            }
+    }
+    u.mean = u.count ? float(sum / double(u.count)) : 0.0f;
+    return u;
+}
+
 // --- strokes as the app lays them ---
 // A brush's own dabs are not enough for the brushes that drag the surface: in the app each dab lands where the cursor's ray
 // meets the surface the earlier dabs left, so a stroke feeds on its own result (and the next stroke on the last one's).

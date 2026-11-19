@@ -1053,18 +1053,26 @@ namespace {
 int g_roleColors = 0; // what the last PushRole pushed
 } // namespace
 
-void PushRole(theme::Role role) {
-    g_roleColors = 0;
-    if (!theme::rolePopups) return;
-    const ImVec4 e = theme::edge(role), lift = theme::panelBg;
+ImVec4 RoleSurface(theme::Role role, float lift, float wash) {
+    const ImVec4 e = theme::edge(role), base = theme::panelBg, white(1, 1, 1, 1);
     auto mix = [](const ImVec4& a, const ImVec4& b, float t) {
         return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, 1.0f);
     };
-    // One step lighter than the panels, so it sits on the UI, with a wash of the role; its buttons and fields lift
-    // with it, so they keep their step above it.
+    // One step lighter than the panels, so it sits on the UI, with a wash of the role.
+    return mix(mix(base, white, lift < 0.0f ? theme::popupLift : lift), e, wash);
+}
+
+void PushRole(theme::Role role) {
+    g_roleColors = 0;
+    if (!theme::rolePopups) return;
+    const ImVec4 e = theme::edge(role);
+    auto mix = [](const ImVec4& a, const ImVec4& b, float t) {
+        return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, 1.0f);
+    };
+    // Its buttons and fields lift with the surface, so they keep their step above it.
     const ImVec4 white(1, 1, 1, 1);
     const float step = theme::popupLift;
-    const ImVec4 surface = mix(mix(lift, white, step), e, 0.05f);
+    const ImVec4 surface = RoleSurface(role);
     const ImVec4 title = ImGui::GetStyleColorVec4(ImGuiCol_TitleBg), border = ImGui::GetStyleColorVec4(ImGuiCol_Border);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, surface);
     ImGui::PushStyleColor(ImGuiCol_PopupBg, surface);

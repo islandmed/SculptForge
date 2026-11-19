@@ -319,6 +319,7 @@ void App::drawSupportUi() {
     const CanvasRect c = canvasRect();
     // The small membership card (PanelSupportCard.cpp): the sculpting moment, and the card once the frame is calm.
     // (Here, not in tickProject: this runs every frame, UI tests included.)
+    tickSupportCardQueue();
     tickMemberCard(ImGui::GetIO().DeltaTime);
     drawMemberCard();
     drawAppealCard();

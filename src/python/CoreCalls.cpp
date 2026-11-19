@@ -81,6 +81,7 @@ const CoreCalls& directCoreCalls() {
         [](Document& d, SelectionSet&& s, const std::string& label, std::string& msg) {
             return noThrow(msg, [&] { return addSelectionSet(d, std::move(s), label, msg); });
         },
+        [](const Mesh& m) { return subdivLevelCount(m); },
     };
     return calls;
 }

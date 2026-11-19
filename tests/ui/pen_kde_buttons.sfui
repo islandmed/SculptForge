@@ -1,0 +1,158 @@
+# A compositor that maps the pen's barrel buttons to a right and a middle click (KDE's tablet defaults) sends the
+# tablet protocol's button AND a pointer click, and moves its own pointer with the pen (#216, Wacom on Wayland KDE).
+# The view must end up exactly where the pen's own events alone put it, and a pen held still with a button down moves
+# nothing. (Orbit and pan turn about the surface under the pen, so the distance moves at the first step in both.)
+run ui_look look=classic layout=classic
+wait 0.2
+run new_sphere subdivisions=4
+snapshot
+
+# The reference: the pen's events only (SDL's own order).
+pen_stream ink
+camera 0 0
+pen_move 0.4 0.4
+pen_button 1 down
+pen_move 0.45 0.45 0.5
+pen_move 0.5 0.42 0.5
+pen_button 1 up
+remember camera_yaw yawL
+remember camera_pitch pitchL
+remember camera_distance distL
+remember camera_pan panL
+key f
+camera 0 0
+pen_move 0.4 0.4
+pen_button 2 down
+pen_move 0.45 0.45 0.5
+pen_move 0.5 0.42 0.5
+pen_button 2 up
+remember camera_yaw yawU
+remember camera_pitch pitchU
+remember camera_distance distU
+remember camera_pan panU
+key f
+camera 0 0
+
+# Held still: nothing moves.
+pen_stream kde
+pen_move 0.4 0.4
+pen_rest on
+remember camera_yaw y0
+remember camera_pitch p0
+remember camera_distance d0
+remember camera_pan t0
+pen_button 1 down
+wait 1.0
+expect_value camera_yaw == $y0
+expect_value camera_pitch == $p0
+expect_value camera_distance == $d0
+pen_button 1 up
+expect_value quickmenu_open == 1 # (a click that stays still opens the Quick Menu, as with a mouse)
+key escape
+pen_button 2 down
+wait 1.0
+expect_value camera_distance == $d0
+expect_value camera_pan < $t0+0.01 # (a resting pen's sub-pixel wobble is real movement of the pen: a hair)
+pen_button 2 up
+pen_rest off
+key f
+camera 0 0
+
+# Lower button (right click) with the compositor's pointer: the same view as the pen alone.
+pen_move 0.4 0.4
+pen_button 1 down
+pen_move 0.45 0.45 0.5
+pen_move 0.5 0.42 0.5
+pen_button 1 up
+expect_value view_dragging == 0
+expect_value camera_yaw < $yawL+0.5
+expect_value camera_yaw > $yawL-0.5
+expect_value camera_pitch < $pitchL+0.5
+expect_value camera_pitch > $pitchL-0.5
+expect_value camera_distance < $distL+0.01
+expect_value camera_distance > $distL-0.01
+key f
+camera 0 0
+
+# Upper button (a middle click, and Alt by its Invert action): the click pans, following the pen once, and nothing turns or zooms.
+pen_move 0.4 0.4
+pen_button 2 down
+pen_move 0.45 0.45 0.5
+pen_move 0.5 0.42 0.5
+pen_button 2 up
+expect_value view_dragging == 0
+expect_value camera_yaw < $yawU+0.5
+expect_value camera_yaw > $yawU-0.5
+expect_value camera_distance < $distU+0.01
+expect_value camera_distance > $distU-0.01
+expect_value camera_pan > 0.05 # (the middle click's own pan: the button's Invert alone pans nothing, as the reference)
+key f
+camera 0 0
+pen_stream ink
+
+# The compositor's click alone (no tablet-protocol button event): the pen's samples between the pointer's events must not
+# take the drag from it (each reset the right click's slop: the view never turned), and the drag runs by the pointer's
+# position at the pen's view speed: the same view as the pen's own button over a longer path in small steps.
+pen_stream ink
+key f
+camera 0 0
+pen_move 0.4 0.4
+pen_button 1 down
+pen_move 0.415 0.40 0.5
+pen_move 0.430 0.40 0.5
+pen_move 0.445 0.40 0.5
+pen_move 0.460 0.40 0.5
+pen_move 0.475 0.40 0.5
+pen_move 0.490 0.40 0.5
+pen_move 0.505 0.40 0.5
+pen_move 0.520 0.40 0.5
+pen_move 0.535 0.40 0.5
+pen_move 0.550 0.40 0.5
+pen_button 1 up
+remember camera_yaw yawS
+remember camera_pitch pitchS
+key f
+camera 0 0
+pen_stream kde_pointer
+pen_move 0.4 0.4
+pen_button 1 down
+pen_move 0.415 0.40 0.5
+pen_move 0.430 0.40 0.5
+pen_move 0.445 0.40 0.5
+pen_move 0.460 0.40 0.5
+pen_move 0.475 0.40 0.5
+pen_move 0.490 0.40 0.5
+pen_move 0.505 0.40 0.5
+pen_move 0.520 0.40 0.5
+pen_move 0.535 0.40 0.5
+pen_move 0.550 0.40 0.5
+pen_button 1 up
+expect_value view_dragging == 0
+expect_value camera_yaw < $yawS+1.5
+expect_value camera_yaw > $yawS-1.5
+expect_value camera_pitch < $pitchS+1.5
+expect_value camera_pitch > $pitchS-1.5
+expect_value quickmenu_open == 0
+key f
+camera 0 0
+
+# The upper button as a middle click: a pan that follows the pointer (not nothing, not by itself).
+pen_move 0.4 0.4
+remember camera_pan t2
+pen_button 2 down
+pen_move 0.415 0.40 0.5
+pen_move 0.430 0.40 0.5
+pen_move 0.445 0.40 0.5
+pen_move 0.460 0.40 0.5
+pen_move 0.475 0.40 0.5
+pen_move 0.490 0.40 0.5
+pen_move 0.505 0.40 0.5
+pen_move 0.520 0.40 0.5
+pen_move 0.535 0.40 0.5
+pen_move 0.550 0.40 0.5
+pen_button 2 up
+expect_value view_dragging == 0
+expect_value camera_pan != $t2
+key f
+camera 0 0
+pen_stream ink

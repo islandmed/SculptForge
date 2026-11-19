@@ -8,6 +8,7 @@
 #include "core/GarmentDrape.h"
 #include "core/GarmentPrint.h"
 #include "core/GarmentTemplates.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <cmath>
@@ -71,7 +72,7 @@ std::string summary(const Pattern& pat) {
 }
 
 bool writeText(const std::string& path, const std::string& text, std::string& error) {
-    std::ofstream f(path, std::ios::binary);
+    std::ofstream f(pathFromUtf8(path), std::ios::binary);
     if (!f || !f.write(text.data(), std::streamsize(text.size()))) {
         error = "Could not write " + path;
         return false;
@@ -365,7 +366,7 @@ void registerGarmentCommands(CommandRegistry& reg) {
              {{"path", T::String, "SVG file", true}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string path = argString(a, "path");
-                 std::ifstream f(path, std::ios::binary);
+                 std::ifstream f(pathFromUtf8(path), std::ios::binary);
                  if (!f) return {false, "Could not open " + path};
                  f.seekg(0, std::ios::end);
                  const std::streamoff size = f.tellg();

@@ -155,6 +155,9 @@ struct AppOptions {
 
 class Demo;
 class PythonScripting; // app/Python.h
+namespace python {
+struct UiPanel; // python/PyHost.h
+}
 struct LengthUnit; // core/Units.h
 struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
@@ -623,6 +626,8 @@ private:
     void showSupportCard(SupportCardReason reason); // (also Help > Support and the welcome)
     void closeSupportCard();
     bool supportCardOpen() const;
+    bool pleaBlocked() const;          // a member (or Android: members-only APKs): no membership card of any kind
+    void tickSupportCardQueue();       // opens the queued first-run card once the other first-run boxes are away
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
@@ -673,16 +678,19 @@ private:
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
     bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
-    bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
+    bool supportCardQueued_ = false;            // the first start's full card waits for the welcome and the tier card
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
     // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).
     struct WhatsNewPopup;
     struct WhatsNewDelete { void operator()(WhatsNewPopup* p) const; };
     std::unique_ptr<WhatsNewPopup, WhatsNewDelete> whatsNew_;
-    void showWhatsNew(); // the popup, or the guide's chapter when this version has no cards
+    void showWhatsNew(const std::string& since = {}); // the popup (all versions newer than SINCE, else the newest), or the guide's chapter when it has no cards
+    std::string whatsNewSince_; // the last version seen when this start is an update ("" otherwise)
     void closeWhatsNew();
     bool whatsNewOpen() const;
     const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
+    int whatsNewMore() const;       // improvements past the cards (UI tests)
+    bool whatsNewScrolled() const;  // the cards scrolled (UI tests)
     bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
     void drawWhatsNew();
     // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).
@@ -743,6 +751,7 @@ private:
     PythonScripting& python();     // made on first use (no file read, nothing loaded until a script runs)
     void drawPythonPrefs();        // Preferences > Scripts
     void drawPythonScripts();      // the Script palette's list of the Scripts folder
+    void drawPythonPanel(python::UiPanel& panel); // a script's panel (sf.ui.panel), a section of the Script palette
     void runPythonFile(const std::string& path);
     std::unique_ptr<PythonScripting> python_;
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
@@ -1507,6 +1516,9 @@ private:
     void applyViewEffects();
     void drawViewEffectsControls(const char* idSuffix); // Preferences > Display and Material > Viewport Shading
     bool viewEffectsDropped_ = false;
+    // Splats' view-dependent colour (SH 1-3): off on the floor tier (it doubled the frame at 1.5M splats, SH 3, on the
+    // floor bench machine), where their SH aren't uploaded either. UI tests (render_cell splats=1) force it on.
+    bool splatViewColorForced_ = false;
     int viewEffectsBusyFrames_ = 0;
     double viewEffectsBusyAt_ = 0.0, viewEffectsBusyMs_ = 0.0;
     struct PerfState {
@@ -1558,6 +1570,7 @@ private:
     // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
     void drawHardwareTierSection();
     void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    bool tierCardCovered() const;      // a modal card is over it: the tier card waits (not drawn, no input)
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
@@ -3374,6 +3387,7 @@ private:
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
+    bool pointerDragMoved_ = false; // the pointer itself (not the pen) has moved the view drag a mouse button began (#216)
     bool firstDabPending_ = false;
     float lastStrokePressure_ = 1.0f; // pressure at the previous stroke sample (dabs in between interpolate)
     float penTiltX_ = 0.0f, penTiltY_ = 0.0f;

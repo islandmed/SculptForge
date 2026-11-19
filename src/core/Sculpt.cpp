@@ -1110,7 +1110,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
             d.strength = p.strength * std::clamp(p.pressure, 0.0f, 1.0f), d.invert = p.invert, d.focal = p.focal;
             d.alphaUp = m.dir(p.alphaUp), d.strokeDir = m.dir(p.strokeDelta), d.copy = m, d.pxPerUnit = p.pxPerUnit;
             micro_.dab(mesh, bvh, type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, false, 0.0f, p.alpha,
-                       stencilTexture(p, m), d.strokeDir);
+                       stencilTexture(p, m), d.strokeDir, d.pxPerUnit);
             inkDab(d);
         }
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;
@@ -1776,7 +1776,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
             d.type = BrushType::Standard, d.center = m.point(p.center), d.viewDir = m.dir(p.viewDir), d.radius = p.radius;
             d.strength = strength * pressure, d.invert = invert, d.focal = p.focal, d.alphaUp = m.dir(p.alphaUp);
             d.copy = m, d.pxPerUnit = p.pxPerUnit;
-            micro_.dab(mesh, bvh, d.type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, false, 0.0f, p.alpha, both);
+            micro_.dab(mesh, bvh, d.type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, false, 0.0f, p.alpha, both, glm::vec3(0.0f), d.pxPerUnit);
             inkDab(d);
         }
         timings.kernelMs += micro_.findMs + micro_.kernelMs - k0;

@@ -1670,13 +1670,19 @@ SplatCloud makeTestCapture(const Mesh& mesh, const TestCaptureOptions& o) {
             push(p, glm::quat(1, 0, 0, 0), vec3(spacing * 1.2f), 0.9f, vec3(0.8f, 0.8f, 0.8f));
         }
     }
-    cloud.resize(pos.size(), 0);
+    cloud.resize(pos.size(), std::clamp(o.shDegree, 0, 3));
+    const size_t K = size_t(cloud.shCount());
     for (size_t i = 0; i < pos.size(); ++i) {
         cloud.positions[i] = pos[i];
         cloud.rotations[i] = rot[i];
         cloud.scales[i] = scale[i];
         cloud.opacities[i] = alpha[i];
         cloud.setColor(i, col[i]);
+        // A view-dependent sheen (as captures of skin and glaze have): warmer seen looking towards +X, cooler towards
+        // -X (band 1); brighter from above and below than from the side (band 2); a slight twist (band 3).
+        if (K > 1) cloud.sh[i * K + 3] = vec3(-0.35f, -0.1f, 0.25f);
+        if (K > 4) cloud.sh[i * K + 6] = vec3(0.3f);
+        if (K > 9) cloud.sh[i * K + 10] = vec3(0.1f, -0.05f, 0.0f);
     }
     return cloud;
 }
@@ -1877,7 +1883,9 @@ void registerSculptableCommands(CommandRegistry& reg) {
              {{"kind", T::String, "head (default) or object.", false},
               {"count", T::Number, "Surface splats (10000-5000000). Default 200000.", false},
               {"floaters", T::Number, "Floating clusters around the subject. Default 12.", false},
-              {"open_bottom", T::Bool, "Leave out the bottom (as a subject standing on a table). Default false.", false}},
+              {"open_bottom", T::Bool, "Leave out the bottom (as a subject standing on a table). Default false.", false},
+              {"sh_degree", T::Number, "View-dependent colour: spherical-harmonics degree 0-3 (a sheen that changes with the "
+                                       "view). Default 0.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string kind = argString(a, "kind", "head");
                  if (kind != "head" && kind != "object") return {false, "kind must be head or object"};
@@ -1886,6 +1894,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
                  o.floaters = size_t(std::clamp(argNumber(a, "floaters", 12.0), 0.0, 1000.0));
                  o.interior = o.count / 20;
                  o.openBottom = argBool(a, "open_bottom", false);
+                 o.shDegree = int(std::clamp(argNumber(a, "sh_degree", 0.0), 0.0, 3.0));
                  doc.splats = makeTestCapture(kind == "head" ? makeTestHead(6) : makeTestObject(), o);
                  doc.splats.name = kind == "head" ? "Test Head" : "Test Mug";
                  doc.splatsChanged();

@@ -14,6 +14,7 @@
 
 #include <SDL3/SDL_log.h>
 
+#include <glm/gtc/packing.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
@@ -360,6 +361,36 @@ vec4 shadeAt(int i, int j) {
 #else
 vec4 shadeAt(int i, int j) { return texelFetch(uShade, vSlot * uSamples + j * (uN + 1) - (j * (j - 1)) / 2 + i); }
 #endif
+#ifdef TILES
+// Adaptive Detail tiles (render/MicroTilePages.h): on a tiled slot the stored normal tilts by the tiles' surface
+// gradient, interpolated from the page's slopes like the shading grid (so it does not depend on the drawn level),
+// and detail finer than the stored grid catches the light.
+flat in int vTilePage;
+flat in vec3 vTileGi, vTileGj;
+uniform samplerBuffer uTileSlope;
+uniform int uTilePageLevel, uTileSamples;
+vec2 tileSlopeAt(int i, int j, int m) { return texelFetch(uTileSlope, vTilePage * uTileSamples + j * (m + 1) - (j * (j - 1)) / 2 + i).rg; }
+vec3 tileGradient() {
+    int m = 1 << uTilePageLevel;
+    vec2 g = vIJ * (float(m) / float(uN));
+    float fi = clamp(g.x, 0.0, float(m)), fj = clamp(g.y, 0.0, float(m));
+    int i0 = min(int(fi), m - 1), j0 = min(int(fj), m - 1);
+    if (i0 + j0 > m - 1) {
+        if (fi >= fj) i0 = m - 1 - j0;
+        else j0 = m - 1 - i0;
+    }
+    float a = fi - float(i0), b = fj - float(j0);
+    vec2 s;
+    if (a + b <= 1.0 || i0 + j0 + 2 > m) {
+        vec3 w = clamp(vec3(1.0 - a - b, a, b), 0.0, 1.0);
+        s = tileSlopeAt(i0, j0, m) * w.x + tileSlopeAt(i0 + 1, j0, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    } else {
+        vec3 w = clamp(vec3(1.0 - b, a + b - 1.0, 1.0 - a), 0.0, 1.0);
+        s = tileSlopeAt(i0 + 1, j0, m) * w.x + tileSlopeAt(i0 + 1, j0 + 1, m) * w.y + tileSlopeAt(i0, j0 + 1, m) * w.z;
+    }
+    return vTileGi * s.x + vTileGj * s.y;
+}
+#endif
 vec3 octNormal(vec2 v) {
     vec2 e = v * 2.0 - 1.0;
     vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
@@ -396,6 +427,9 @@ void microFetch() {
     }
     w = clamp(w, 0.0, 1.0);
     vec3 n = octNormal(s0.xy) * w.x + octNormal(s1.xy) * w.y + octNormal(s2.xy) * w.z;
+#ifdef TILES
+    if (vTilePage >= 0) n = normalize(n) - tileGradient();
+#endif
     vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
     float c = dot(c3, w);
     gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
@@ -876,10 +910,63 @@ void main() {
 }
 )";
 
-// 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse).
-const char* kSplatVS = R"(#version 330 core
+// 3D Gaussian splats (EWA projection of each 3D covariance to a screen-space ellipse), with the view-dependent
+// colour of their spherical harmonics (the 3DGS basis, core/Splats.h evalSH) for the direction they are seen from.
+// That colour is evaluated once per splat by a pre-pass (kSplatColorFS: one RGBA32F texel a splat) when the eye moves,
+// not per quad corner; the splat shader reads it (uColorSource 1) or, to compare, evaluates it itself (2).
+const char* kSplatSH = R"(
+uniform samplerBuffer uSplatSH; // bands 1-3: coefficient-major rgb, packed 4 to a texel (half floats)
+uniform int uShDegree;          // 1-3
+uniform int uShTexels;          // texels per splat in uSplatSH
+uniform mat3 uShFrame;          // world -> the cloud's own frame (the one its SH were captured in)
+uniform vec3 uEye;
+uniform int uSplatColorWidth;   // texels a row of the pre-pass's colour texture
+vec3 viewColor(vec3 base, vec3 centre, int splat) {
+    float f[48];
+    for (int i = 0; i < uShTexels; ++i) {
+        vec4 v = texelFetch(uSplatSH, splat * uShTexels + i);
+        f[4 * i] = v.x; f[4 * i + 1] = v.y; f[4 * i + 2] = v.z; f[4 * i + 3] = v.w;
+    }
+    vec3 d = normalize(uShFrame * (centre - uEye));
+    float x = d.x, y = d.y, z = d.z, xx = x * x, yy = y * y, zz = z * z;
+    #define SH(j) vec3(f[3 * (j) - 3], f[3 * (j) - 2], f[3 * (j) - 1])
+    vec3 c = base + 0.4886025119029199 * (-y * SH(1) + z * SH(2) - x * SH(3));
+    if (uShDegree > 1) {
+        c += 1.0925484305920792 * x * y * SH(4) - 1.0925484305920792 * y * z * SH(5) +
+             0.31539156525252005 * (2.0 * zz - xx - yy) * SH(6) - 1.0925484305920792 * x * z * SH(7) +
+             0.5462742152960396 * (xx - yy) * SH(8);
+        if (uShDegree > 2)
+            c += -0.5900435899266435 * y * (3.0 * xx - yy) * SH(9) + 2.890611442640554 * x * y * z * SH(10) -
+                 0.4570457994644658 * y * (4.0 * zz - xx - yy) * SH(11) +
+                 0.3731763325901154 * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * SH(12) -
+                 0.4570457994644658 * x * (4.0 * zz - xx - yy) * SH(13) + 1.445305721320277 * z * (xx - yy) * SH(14) -
+                 0.5900435899266435 * x * (xx - 3.0 * yy) * SH(15);
+    }
+    #undef SH
+    return c;
+}
+)";
+
+// The pre-pass (drawn over the colour texture with kBgVS): texel (x, y) = splat y * width + x, its view colour unclamped.
+// (A fragment pass: transform feedback stalled 100-400 ms a frame on Mesa while orbiting.)
+const char* kSplatColorFS = R"(
+uniform samplerBuffer uSplats;
+uniform int uSplatCount;
+out vec4 fragColor;
+void main() {
+    int i = int(gl_FragCoord.y) * uSplatColorWidth + int(gl_FragCoord.x);
+    if (i >= uSplatCount) discard;
+    vec4 t0 = texelFetch(uSplats, i * 4);
+    vec4 t3 = texelFetch(uSplats, i * 4 + 3);
+    fragColor = vec4(viewColor(t3.rgb, t0.xyz, i), 1.0);
+}
+)";
+
+const char* kSplatVS = R"(
 layout(location = 0) in uint aIndex;
 uniform samplerBuffer uSplats;
+uniform sampler2D uSplatColor;     // the pre-pass's view colours, one RGBA32F texel per splat
+uniform int uColorSource;          // 0: the plain colour, 1: the pre-pass's, 2: evaluated here (per corner)
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec2 uViewport;
@@ -892,7 +979,7 @@ void main() {
     vec4 t0 = texelFetch(uSplats, base);     // centre, opacity
     vec4 t1 = texelFetch(uSplats, base + 1); // covariance xx xy xz yy
     vec4 t2 = texelFetch(uSplats, base + 2); // covariance yz zz
-    vec4 t3 = texelFetch(uSplats, base + 3); // colour
+    vec4 t3 = texelFetch(uSplats, base + 3); // plain colour (unclamped)
     vec4 cam = uView * vec4(t0.xyz, 1.0);
     vec4 clip = uProj * cam;
     float depth = -cam.z;
@@ -917,7 +1004,10 @@ void main() {
     vec2 px = corner.x * 3.0 * min(sqrt(l1), 1024.0) * axis1 + corner.y * 3.0 * min(sqrt(l2), 1024.0) * axis2;
     gl_Position = clip + vec4(px / uViewport * 2.0 * clip.w, 0.0, 0.0);
     vOffset = corner * 3.0;
-    vColor = vec4(t3.rgb, t0.w * uOpacity);
+    vec3 color = uColorSource == 1
+                     ? texelFetch(uSplatColor, ivec2(int(aIndex) % uSplatColorWidth, int(aIndex) / uSplatColorWidth), 0).rgb
+               : uColorSource == 2 ? viewColor(t3.rgb, t0.xyz, int(aIndex)) : t3.rgb;
+    vColor = vec4(clamp(color, 0.0, 1.0), t0.w * uOpacity);
 }
 )";
 
@@ -939,7 +1029,7 @@ constexpr GLenum kTexture6 = 0x84C6; // kTexture6 (its tangents)
 constexpr GLenum kRgb = 0x1907, kRgb8 = 0x8051; // GL_RGB, GL_RGB8
 // PBR view: ORM 8, emissive 9, environment 10, BRDF table 11.
 constexpr GLenum kTexture8 = 0x84C8, kTexture9 = 0x84C9, kTexture10 = 0x84CA, kTexture11 = 0x84CB;
-constexpr GLenum kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
+constexpr GLenum kRgba16f = 0x881A, kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
 
 GLuint compile(GLenum type, const char* src, std::string& error, const char* prefix = nullptr) {
     GLuint s = gl::CreateShader(type);
@@ -1070,12 +1160,21 @@ bool Renderer::init(std::string& error) {
     if (!wireLineProgram_) return false;
     bgProgram_ = link(kBgVS, kBgFS, error);
     if (!bgProgram_) return false;
-    splatProgram_ = link(kSplatVS, kSplatFS, error);
-    if (!splatProgram_) return false;
+    {
+        const std::string head = std::string("#version 330 core\n") + kSplatSH;
+        splatProgram_ = link((head + kSplatVS).c_str(), kSplatFS, error);
+        if (!splatProgram_) return false;
+        splatColorProgram_ = link(kBgVS, (head + kSplatColorFS).c_str(), error);
+        if (!splatColorProgram_) return false;
+    }
     gl::GenVertexArrays(1, &splatVao_);
     gl::GenBuffers(1, &splatData_);
     gl::GenBuffers(1, &splatOrder_);
     gl::GenTextures(1, &splatTexture_);
+    gl::GenBuffers(1, &splatShData_);
+    gl::GenTextures(1, &splatShTexture_);
+    gl::GenFramebuffers(1, &splatColorFbo_);
+    gl::GenTextures(1, &splatColorTexture_);
     gl::BindVertexArray(splatVao_);
     gl::BindBuffer(GL_ARRAY_BUFFER, splatOrder_);
     gl::EnableVertexAttribArray(0);
@@ -1111,7 +1210,7 @@ bool Renderer::init(std::string& error) {
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr | kFocus;
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | ((features & kFocus) ? kFocus : kTiles);
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
@@ -1120,9 +1219,10 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     };
     if (p.failed) return simpler(); // (not every frame again)
     std::string prefix = "#version 330 core\n";
-    if (features & kMicro) prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : "#define MICRO\n";
+    if (features & kMicro)
+        prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : (features & kTiles) ? "#define MICRO\n#define TILES\n" : "#define MICRO\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
-    if (features & kPrim) prefix += "#define PRIM\n";
+    if ((features & kPrim) && !(features & kMicro)) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
@@ -1369,6 +1469,26 @@ size_t Renderer::microPendingShading() const {
     return total;
 }
 
+size_t Renderer::microTilePages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->pages();
+    return total;
+}
+
+bool Renderer::microTilePagesWantFrame() const {
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePagesWantFrame()) return true;
+    return false;
+}
+
+size_t Renderer::microTilePageBytes() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->gpuBytes();
+    return total;
+}
+
 void Renderer::takeFocusSplit(double* out) {
     for (MeshSlot& s : slots_)
         if (s.micro && s.micro->focus()) s.micro->focus()->takeSplit(out);
@@ -1424,9 +1544,14 @@ void Renderer::shutdown() {
     deleteProgram(wireLineProgram_);
     deleteProgram(bgProgram_);
     deleteProgram(splatProgram_);
+    deleteProgram(splatColorProgram_);
     gl::DeleteBuffers(1, &splatData_);
     gl::DeleteBuffers(1, &splatOrder_);
     gl::DeleteTextures(1, &splatTexture_);
+    gl::DeleteBuffers(1, &splatShData_);
+    gl::DeleteTextures(1, &splatShTexture_);
+    gl::DeleteFramebuffers(1, &splatColorFbo_);
+    gl::DeleteTextures(1, &splatColorTexture_);
     gl::DeleteVertexArrays(1, &splatVao_);
     if (viewFbo_) {
         gl::DeleteFramebuffers(1, &viewFbo_);
@@ -1442,9 +1567,10 @@ void Renderer::shutdown() {
     }
 }
 
-void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
-    if (version == splatVersion_) return;
+void Renderer::syncSplats(const SplatCloud& c, uint64_t version, bool viewColor) {
+    if (version == splatVersion_ && viewColor == splatShWanted_) return;
     splatVersion_ = version;
+    splatShWanted_ = viewColor;
     const GLint maxTexels = gl::maxTextureBufferTexels();
     const size_t n = std::min(c.size(), size_t(std::max(maxTexels, 0)) / 4);
     std::vector<glm::vec4> texels(n * 4);
@@ -1459,19 +1585,63 @@ void Renderer::syncSplats(const SplatCloud& c, uint64_t version) {
         texels[i * 4 + 0] = glm::vec4(p, c.opacities[i]);
         texels[i * 4 + 1] = glm::vec4(S[0][0], S[0][1], S[0][2], S[1][1]);
         texels[i * 4 + 2] = glm::vec4(S[1][2], S[2][2], 0.0f, 0.0f);
-        texels[i * 4 + 3] = glm::vec4(glm::clamp(c.color(i), glm::vec3(0.0f), glm::vec3(1.0f)), 1.0f);
+        texels[i * 4 + 3] = glm::vec4(c.color(i), 1.0f); // (clamped in the shader, after the view-dependent part)
     }
     gl::BindBuffer(GL_TEXTURE_BUFFER, splatData_);
     gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(texels.size() * sizeof(glm::vec4)), texels.data(), GL_STATIC_DRAW);
     gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
     gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, splatData_);
+    // Bands 1-3 as half floats, 4 to a texel: 96 bytes a splat at degree 3. A cloud whose SH don't fit the buffer
+    // limit shows its plain colour (never fewer splats).
+    const size_t perSplat = size_t(3 * (c.shCount() - 1)), shTexels = (perSplat + 3) / 4;
+    splatShDegree_ = 0;
+    if (viewColor && shTexels > 0 && n * shTexels <= size_t(std::max(maxTexels, 0))) {
+        std::vector<uint16_t> halves(n * shTexels * 4, 0);
+        const size_t K = size_t(c.shCount());
+        for (size_t i = 0; i < n; ++i)
+            for (size_t j = 1; j < K; ++j)
+                for (int ch = 0; ch < 3; ++ch)
+                    halves[i * shTexels * 4 + (j - 1) * 3 + size_t(ch)] = glm::packHalf1x16(c.sh[i * K + j][ch]);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, splatShData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(halves.size() * sizeof(uint16_t)), halves.data(), GL_STATIC_DRAW);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, kRgba16f, splatShData_);
+        splatShDegree_ = c.shDegree;
+        splatShTexels_ = int(shTexels);
+        splatShFrame_ = glm::transpose(glm::mat3_cast(c.transformRotation()));
+    } else {
+        gl::BindBuffer(GL_TEXTURE_BUFFER, splatShData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW); // (frees the last cloud's)
+    }
+    // The pre-pass's output: one view colour a splat (16 bytes), rows of up to 4096, refilled when the eye moves. Too many
+    // rows for the driver: the splat shader evaluates the colour per corner (as before the pre-pass).
+    GLint maxSize = 0;
+    gl::GetIntegerv(0x0D33 /* GL_MAX_TEXTURE_SIZE */, &maxSize);
+    const int width = std::max(1, std::min(4096, int(maxSize))), rows = int((n + size_t(width) - 1) / size_t(width));
+    splatColorWidth_ = splatShDegree_ > 0 && rows <= maxSize ? width : 0;
+    gl::BindTexture(GL_TEXTURE_2D, splatColorTexture_);
+    gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32F), splatColorWidth_, splatColorWidth_ ? std::max(rows, 1) : 0, 0, GL_RGBA,
+                   GL_FLOAT, nullptr);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+    if (splatColorWidth_) {
+        GLint fbo = 0;
+        gl::GetIntegerv(0x8CA6 /* GL_FRAMEBUFFER_BINDING */, &fbo);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, splatColorFbo_);
+        gl::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, splatColorTexture_, 0);
+        if (gl::CheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) splatColorWidth_ = 0;
+        gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+    }
+    splatColorFresh_ = false;
     gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     splatCount_ = GLsizei(n);
     lastSortView_ = glm::mat4(0.0f); // force a re-sort
 }
 
-void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity) {
+void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity,
+                          bool viewColor, bool perVertexSh) {
     if (splatCount_ == 0) return;
     // Back-to-front order, re-sorted only when the camera moves (16-bit counting sort).
     if (view != lastSortView_) {
@@ -1499,12 +1669,59 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
         gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(n * sizeof(uint32_t)), splatSorted_.data(), GL_STREAM_DRAW);
         gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     }
+    const int shDegree = viewColor ? splatShDegree_ : 0;
+    const int colorSource = shDegree == 0 ? 0 : perVertexSh || splatColorWidth_ == 0 ? 2 : 1;
+    const glm::vec3 eye(glm::inverse(view)[3]);
+    const auto shUniforms = [&](GLuint prog) {
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplats"), 0);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplatSH"), 1);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uShDegree"), shDegree);
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uShTexels"), splatShTexels_);
+        gl::UniformMatrix3fv(gl::GetUniformLocation(prog, "uShFrame"), 1, GL_FALSE, glm::value_ptr(splatShFrame_));
+        gl::Uniform3fv(gl::GetUniformLocation(prog, "uEye"), 1, glm::value_ptr(eye));
+        gl::Uniform1i(gl::GetUniformLocation(prog, "uSplatColorWidth"), std::max(splatColorWidth_, 1));
+    };
+    if (shDegree > 0) {
+        gl::ActiveTexture(GL_TEXTURE1);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatShTexture_);
+        gl::ActiveTexture(GL_TEXTURE0);
+        gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
+    }
+    // The view colours, once a splat, when the eye has moved (they depend on nothing else the camera does).
+    if (colorSource == 1 && (!splatColorFresh_ || eye != splatColorEye_)) {
+        splatColorFresh_ = true;
+        splatColorEye_ = eye;
+        GLint fbo = 0, viewport[4] = {}, scissor = 0;
+        gl::GetIntegerv(0x8CA6 /* GL_FRAMEBUFFER_BINDING */, &fbo);
+        gl::GetIntegerv(0x0BA2 /* GL_VIEWPORT */, viewport);
+        gl::GetIntegerv(GL_SCISSOR_TEST, &scissor);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, splatColorFbo_);
+        gl::Viewport(0, 0, splatColorWidth_, (splatCount_ + splatColorWidth_ - 1) / splatColorWidth_);
+        gl::Disable(GL_SCISSOR_TEST);
+        gl::Disable(GL_DEPTH_TEST);
+        gl::Disable(GL_BLEND);
+        gl::UseProgram(splatColorProgram_);
+        shUniforms(splatColorProgram_);
+        gl::Uniform1i(gl::GetUniformLocation(splatColorProgram_, "uSplatCount"), splatCount_);
+        gl::BindVertexArray(emptyVao_);
+        gl::DrawArrays(GL_TRIANGLES, 0, 3);
+        gl::BindFramebuffer(GL_FRAMEBUFFER, GLuint(fbo));
+        gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        if (scissor) gl::Enable(GL_SCISSOR_TEST);
+    }
     gl::UseProgram(splatProgram_);
     gl::UniformMatrix4fv(gl::GetUniformLocation(splatProgram_, "uView"), 1, GL_FALSE, glm::value_ptr(view));
     gl::UniformMatrix4fv(gl::GetUniformLocation(splatProgram_, "uProj"), 1, GL_FALSE, glm::value_ptr(proj));
     gl::Uniform2f(gl::GetUniformLocation(splatProgram_, "uViewport"), float(fbWidth), float(fbHeight));
     gl::Uniform1f(gl::GetUniformLocation(splatProgram_, "uOpacity"), opacity);
-    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplats"), 0);
+    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uColorSource"), colorSource);
+    shUniforms(splatProgram_);
+    gl::Uniform1i(gl::GetUniformLocation(splatProgram_, "uSplatColor"), 2);
+    if (colorSource == 1) {
+        gl::ActiveTexture(kTexture2);
+        gl::BindTexture(GL_TEXTURE_2D, splatColorTexture_);
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
     gl::ActiveTexture(GL_TEXTURE0);
     gl::BindTexture(GL_TEXTURE_BUFFER, splatTexture_);
     gl::Enable(GL_DEPTH_TEST);
@@ -1517,6 +1734,13 @@ void Renderer::drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWi
     gl::Disable(GL_BLEND);
     gl::DepthMask(GL_TRUE);
     gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+    if (shDegree > 0) {
+        gl::ActiveTexture(GL_TEXTURE1);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::ActiveTexture(kTexture2);
+        gl::BindTexture(GL_TEXTURE_2D, 0);
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
 }
 
 namespace {
@@ -2405,6 +2629,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
         s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
+        s.micro->drawAbove = currentTierConfig().budgets.microDrawAbove; // close-ups past the stored level (SF_TIER_MICRO_DRAW_ABOVE)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
         s.fresh = true;                           // (back to a mesh: a full upload)
@@ -3391,7 +3616,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (settings.floorGrid) drawFloorGrid(camera, view, proj, settings); // (under everything: the Parts paint over it)
     if (drawList_.empty() || !settings.showMesh) {
         if (!references_.empty()) drawReferences(false, view, proj, camera.ortho, viewAspect);
-        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
+        if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor,
+                                          settings.splatShPerVertex);
         gl::UseProgram(0);
         return;
     }
@@ -3520,7 +3746,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::Disable(GL_BLEND);
     }
     gl::BindVertexArray(0);
-    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity);
+    if (settings.showSplats) drawSplats(view, proj, fbWidth, fbHeight, settings.splatOpacity, settings.splatViewColor,
+                                          settings.splatShPerVertex);
     gl::UseProgram(0);
 }
 
@@ -3880,7 +4107,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
-                                       (s.micro && s.micro->focus() ? kFocus : 0));
+                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
@@ -3909,6 +4136,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     const size_t budget = triangleBudget(settings);
     const float target = settings.microTargetPx * (moving ? 2.0f : 1.0f);
     // (the budget is shared by the micro Parts on screen: each gets it whole; one is the usual case)
+    s.micro->flatShading = flat; // (flat shading draws the stored grid, nothing above it: MicroRenderer::maxDrawLevel)
     const_cast<MeshSlot&>(s).microDrawn = s.micro->draw(p->id, frameCull_, frameProj_, frameViewport_, budget, target);
     lastDrawn_ += s.microDrawn;
 }
@@ -4023,17 +4251,23 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && coarse)
         std::fprintf(stderr, "coarse lod: still %.2f s, moving %d, stroking %d, pending %zu, per triangle %.3g ms\n", settings.stillSeconds,
                      int(settings.motionProxy), int(settings.stroking), s.coarsePending.size(), gpuMsPerTriangle_);
-    if (coarse && !settings.motionProxy && !settings.stroking && s.coarsePending.empty()) {
-        constexpr double kStillDelay = 0.15;
-        double stillMs = 100.0;
-        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) stillMs = std::atof(e); // (tests)
+    if (coarse && s.coarsePending.empty()) { // (a stroke with the view still decides as at rest: coarseDraw, gh#184)
+        CoarseFrame f;
+        f.moving = settings.motionProxy;
+        f.stroking = settings.stroking;
+        f.stillSeconds = settings.stillSeconds;
+        if (const char* e = std::getenv("SF_STILL_FRAME_MS"); e && std::atof(e) > 0.0) f.stillFrameMs = std::atof(e); // (tests)
         // (no frame measured yet: the calibrated rate, else the budget as half a 60 Hz frame's worth of triangles)
         const double perTriangle = gpuMsPerTriangle_ > 0.0 ? gpuMsPerTriangle_
                                    : triangleRateM_ > 0.0 ? 1e-3 / triangleRateM_
                                                           : (1000.0 / 60.0 * 0.5) / double(std::max<size_t>(budget, 1));
-        if (double(s.drawnTriangles) * perTriangle > stillMs) previewOnly_ = true;
-        else if (settings.stillSeconds >= kStillDelay) coarse = false;
-        else stillWanted_ = true;
+        f.fullFrameMs = double(s.drawnTriangles) * perTriangle;
+        switch (coarseDraw(f)) {
+        case CoarseDraw::Full: coarse = false; break;
+        case CoarseDraw::Preview: previewOnly_ = true; break;
+        case CoarseDraw::UntilStill: stillWanted_ = true; break;
+        case CoarseDraw::Coarse: break;
+        }
     }
     if (static const bool log = std::getenv("SF_COARSE_LOG") != nullptr; log && s.coarse && !coarse)
         std::fprintf(stderr, "coarse lod: not drawn (per-triangle %d, wireframe %d, drawn %zu, budget %zu)\n", int(perTriangle),

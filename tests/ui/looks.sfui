@@ -129,6 +129,22 @@ expect_value style_popup_role_edge == 0
 run ui_look popup_colors=role
 wait 0.2
 expect_value style_popup_role_edge == 1
+# The guide window is a Learn pop-up: role edge, strip and surface by role, as before with Plain.
+click "Help##menu.help"
+click "Your first sculpt (10 min)##help.first_sculpt"
+wait 0.2
+expect_value guide_open == 1
+expect_value guide_role_edge == 1
+shot guide-role
+run ui_look popup_colors=plain
+wait 0.2
+expect_value guide_role_edge == 0
+shot guide-plain
+run ui_look popup_colors=role
+wait 0.2
+expect_value guide_role_edge == 1
+key shift+f1
+expect_value guide_open == 0
 run_fails ui_look outlines=loud
 run_fails ui_look scheme=solarized
 run_fails ui_look look=neon

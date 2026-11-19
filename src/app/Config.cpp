@@ -30,6 +30,7 @@
 #include "core/Multires.h"
 #include "core/Script.h"
 #include "core/Units.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -537,7 +538,7 @@ void App::initActions() {
         "Turn the micro level into a regular mesh in a new Part (for export or tools that need real geometry).");
     add("geometry.micro_export", "Export Displacement", "Tool > Geometry", nullptr,
         [this] {
-            const std::string path = (std::filesystem::path(defaultBakeFolder(doc_)) / (doc_.assetName() + "_micro_displacement.exr")).string();
+            const std::string path = pathToUtf8(pathFromUtf8(defaultBakeFolder(doc_)) / pathFromUtf8(doc_.assetName() + "_micro_displacement.exr"));
             runCommand("micro_export_displacement", {{"path", path}});
         },
         nullptr, "micro_export_displacement", nullptr, [this] { return hasMicro(doc_.mesh) && doc_.mesh.hasUvs(); },

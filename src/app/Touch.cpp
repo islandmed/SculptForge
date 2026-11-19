@@ -33,6 +33,7 @@ void App::touchEvent(const SDL_Event& e) {
 #if SDL_VERSION_ATLEAST(3, 4, 0)
     if (e.type == SDL_EVENT_PINCH_BEGIN || e.type == SDL_EVENT_PINCH_UPDATE || e.type == SDL_EVENT_PINCH_END) {
         touchNativePinch_ = true;
+        if (e.type == SDL_EVENT_PINCH_BEGIN) ++penDiag_.pinches;
         if (e.type == SDL_EVENT_PINCH_UPDATE && !ImGui::GetIO().WantCaptureMouse &&
             canvasRect().contains(mouseX_, mouseY_)) {
             camera_.zoom(pinchZoomSteps(e.pinch.scale));
@@ -48,6 +49,7 @@ void App::touchEvent(const SDL_Event& e) {
         ++penDiag_.penTouchEvents;
         return;
     }
+    if (e.type == SDL_EVENT_FINGER_DOWN) ++penDiag_.fingers;
     if (e.type == SDL_EVENT_FINGER_DOWN && palmGuard()) { // a palm (palmGuard): never part of a gesture
         // ... unless it's a trackpad's: that is never a palm (pen in one hand, trackpad in the other)
         const SDL_TouchDeviceType t = f.touchID == kUiTestTrackpad ? SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE

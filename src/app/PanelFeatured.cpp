@@ -14,6 +14,7 @@
 #include "core/Featured.h"
 #include "core/Image.h"
 #include "render/GL.h"
+#include "core/Utf8Path.h"
 
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -125,7 +126,7 @@ void App::fetchFeatured(UpdateJob& job, const std::string& source, const std::st
     }
     writeFile(dir + kFeedFile, body);
     for (const auto& e : fs::directory_iterator(fsPath(dir), ec)) { // thumbnails of entries that left the feed
-        const std::string n = e.path().filename().string();
+        const std::string n = pathToUtf8(e.path().filename());
         if (n.rfind("featured-", 0) == 0 && !keep.count(n)) fs::remove(e.path(), ec);
     }
     job.featured = std::move(items);
@@ -141,7 +142,7 @@ void App::applyFeaturedJob(const UpdateJob& job) {
         std::error_code ec;
         if (!prefDir_.empty())
             for (const auto& e : fs::directory_iterator(fsPath(prefDir_), ec)) {
-                const std::string n = e.path().filename().string();
+                const std::string n = pathToUtf8(e.path().filename());
                 if (n == kFeedFile || n.rfind("featured-", 0) == 0) fs::remove(e.path(), ec);
             }
         return;

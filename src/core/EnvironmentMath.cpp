@@ -4,6 +4,7 @@
 
 #include "core/BakeImage.h"
 #include "core/Parallel.h"
+#include "core/Utf8Path.h"
 
 #define STBI_NO_STDIO
 #include <stb_image.h>
@@ -482,7 +483,7 @@ bool loadEnvironment(int index, EnvImage& out, std::string& error) {
     default: break;
     }
     const std::string& path = list[size_t(index)].path;
-    std::string ext = fsPath(path).extension().string();
+    std::string ext = pathToUtf8(fsPath(path).extension());
     for (char& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
     if (ext == ".exr") {
         int w = 0, h = 0, ch = 0;

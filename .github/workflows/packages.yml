@@ -222,7 +222,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
-        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y flatpak flatpak-builder xvfb
+        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends flatpak flatpak-builder elfutils xvfb
       - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
         uses: actions/cache@v5
         with:
@@ -693,6 +693,78 @@ jobs:
 
   # The SHA-256 of every package this run built, as an artifact of its own: release.yml publishes these files only if
   # each one still has exactly this checksum and its attestation (tools/release/verify_staged.py).
+  wheels:
+    # The Python package (pip install sculptforge; pyproject.toml, docs/guide/python-package.md): the engine only, for
+    # CPython 3.12-3.14, each wheel installed in a clean environment and tested there (tests/python) by cibuildwheel.
+    # release.yml's job pypi publishes these files (Trusted Publishing, from tags). New in 0.13.8: a red wheel never
+    # holds the app's release (continue-on-error; job pypi then publishes nothing).
+    name: Python wheels ${{ matrix.name }}
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    continue-on-error: true
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x86_64, id: linux-x86_64, os: ubuntu-24.04 }
+          - { name: Linux aarch64, id: linux-aarch64, os: ubuntu-24.04-arm }
+          - { name: macOS universal2, id: macos, os: macos-15 }
+          - { name: Windows x64, id: windows, os: windows-2022 }
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}', persist-credentials: false }
+      - uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ matrix.id }}-${{ hashFiles('cmake/Fetch.cmake') }}
+          restore-keys: deps-${{ github.job }}-${{ matrix.id }}-
+      - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e # v4.3.5 (settings: pyproject.toml)
+        with:
+          output-dir: wheelhouse
+      - name: Wheels are named for this version and these platforms
+        shell: bash
+        run: |
+          v=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          ls -l wheelhouse
+          n=$(ls wheelhouse/sculptforge-$v-cp31[234]-*.whl | wc -l | tr -d " ") # (BSD wc pads with spaces)
+          [ "$n" = 3 ] || { echo "::error::expected 3 wheels of sculptforge $v, found $n"; exit 1; }
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: wheelhouse/*.whl
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pywheels-${{ matrix.id }}
+          path: wheelhouse/*.whl
+          retention-days: 14
+
+  wheel-sums:
+    name: Record wheel checksums
+    needs: wheels
+    if: ${{ !cancelled() && needs.wheels.result == 'success' }}
+    continue-on-error: true # (as job wheels: an incomplete set records nothing, and job pypi publishes nothing)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: 'pywheels-*'
+      - run: |
+          n=$(ls dist/*.whl | wc -l | tr -d " ")
+          [ "$n" = 12 ] || { echo "::error::expected 12 wheels (4 platforms x 3 Pythons), found $n"; exit 1; }
+          cd dist && sha256sum * > ../SHA256SUMS.wheels.txt && cat ../SHA256SUMS.wheels.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staged-sums-wheels
+          path: SHA256SUMS.wheels.txt
+          retention-days: 14
+
   sums:
     name: Record checksums
     needs: [linux, flatpak, vfx, macos, windows]

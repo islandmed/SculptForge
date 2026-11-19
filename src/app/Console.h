@@ -89,7 +89,8 @@ private:
     App* app_ = nullptr; // for the input callback
     bool closeRequested_ = false; // backtick typed into the input
     bool pythonMode_ = false;
-    bool pythonMore_ = false; // a Python block is open: the next line continues it ("..." prompt)
+    bool pythonMore_ = false;
+    bool startupChecked_ = false; // Run at start-up scripts were looked for // a Python block is open: the next line continues it ("..." prompt)
     std::mutex pendingMutex_;
     std::vector<std::string> pendingFiles_;
 };

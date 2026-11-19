@@ -258,6 +258,7 @@ private:
     bool huionStream_ = false;
     bool mouseSteps_ = true; // (mouse_steps off: motion events without xrel / yrel)
     bool lateRight_ = false, driverRightHeld_ = false; // (right_late)
+    int kdeStream_ = 0; // 1: tablet-protocol button and pointer click (pen_stream kde); 2: the pointer click only (kde_pointer)   // pen_stream kde: the compositor maps the barrel buttons to a right / middle click and moves its own pointer with the pen (#216)
     int driverRight_ = 0; // pen_stream right_after / right_first: the driver clicks the right mouse button for a pen button, after / before the pen's event
     // pen_rest on: the pen lies still in range and, as a real one does, sends a hair of tilt and sub-pixel motion
     // every frame (phoenix 11-05) until pen_rest off.
@@ -278,6 +279,7 @@ private:
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
+    std::vector<int16_t> baseMicro_; // (snapshot: the micro level's grid, for micro_moved)
     std::map<std::string, double> remembered_;
     std::map<std::string, std::vector<std::string>> rememberedItems_; // remember_items NAME SCOPE
     // Simulated SpaceMouse (spacemouse* steps): an SDL virtual joystick with a SpaceMouse Compact's ids.

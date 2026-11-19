@@ -517,6 +517,13 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
     return L;
 }
 
+CoarseDraw coarseDraw(const CoarseFrame& f) {
+    constexpr double kStillDelay = 0.15;
+    if (f.moving) return CoarseDraw::Coarse;
+    if (f.fullFrameMs > f.stillFrameMs) return CoarseDraw::Preview;
+    return f.stillSeconds >= kStillDelay ? CoarseDraw::Full : CoarseDraw::UntilStill;
+}
+
 std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, const UploadOrder& order,
                                          const std::vector<uint32_t>& dirty) {
     std::vector<uint32_t> changed;

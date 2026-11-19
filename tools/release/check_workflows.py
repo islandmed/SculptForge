@@ -37,6 +37,7 @@ MEMBER_ENV = "member-release"
 SIGNING = "secrets.UPDATE_SIGNING_KEY"
 SIGNPATH = "secrets.SIGNPATH_API_TOKEN"
 SIGNING_ENVS = {"release", MEMBER_ENV}
+SUMS_JOBS = ("sums", "wheel-sums")  # packages.yml: checksums of attested files, nothing of their own to attest
 ATTEST = re.compile(r"uses:\s*actions/attest-build-provenance@[0-9a-f]{40}\b")
 PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}(\s+#\s*\S.*)?$")
 
@@ -176,9 +177,9 @@ def check(files):
             errs.append("packages.yml: no job reuse running tools/release/staged_run.py --before-run")
         for job, lines in jobs(pk).items():
             body = "\n".join(lines)
-            if job != "sums" and "upload-artifact" in body and not ATTEST.search(body):
+            if job not in SUMS_JOBS and "upload-artifact" in body and not ATTEST.search(body):
                 errs.append(f"packages.yml: job {job} uploads packages without a pinned actions/attest-build-provenance step")
-            elif job != "sums" and "upload-artifact" in body and paths(body, "path") != paths(body, "subject-path"):
+            elif job not in SUMS_JOBS and "upload-artifact" in body and paths(body, "path") != paths(body, "subject-path"):
                 errs.append(f"packages.yml: job {job} attests {sorted(paths(body, 'subject-path'))} but uploads {sorted(paths(body, 'path'))}"
                             " (verify refuses an unattested file)")
     it = files.get("integrations.yml")
@@ -247,10 +248,17 @@ def check(files):
         errs.append("release.yml: no job verify running tools/release/verify_staged.py")
     if environment(rj.get("publish", [])) != "release":
         errs.append("release.yml: job publish isn't in `environment: release` (the only holder of UPDATE_SIGNING_KEY)")
-    for job in ("publish", "publish-members"):
+    for job in ("publish", "publish-members") + (("pypi",) if "pypi" in rj else ()):
         body = "\n".join(rj.get(job, []))
         if not re.search(r"needs:.*\bverify\b", body) or "verify_staged.py" not in body:
-            errs.append(f"release.yml: job {job} must need verify and re-check the checksums (verify_staged.py --sums-only)")
+            errs.append(f"release.yml: job {job} must need verify and re-check the checksums (verify_staged.py)")
+    # The wheels never hold the app (packages.yml jobs wheels/wheel-sums): verify's check of them may fail alone.
+    vbody = "\n".join(rj.get("verify", []))
+    wstep = re.search(r"\n      - id: wheels\n(.*?)(?=\n      - |\Z)", vbody, re.S)
+    if wstep and "continue-on-error: true" not in wstep.group(1):
+        errs.append("release.yml: job verify's step wheels must be continue-on-error (the wheels never hold the app release)")
+    if "pypi" in rj and (re.search(r"secrets\.", "\n".join(rj["pypi"])) or environment(rj["pypi"]) != "pypi"):
+        errs.append("release.yml: job pypi must be in `environment: pypi` and read no secret (Trusted Publishing only)")
     for job, lines in rj.items():
         got = [x.strip() for x in lines if SIGNPATH in x]
         if got and (got != ["SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}"] and not all(
@@ -424,6 +432,19 @@ jobs:
 """
 
 
+PYPI = """  pypi:
+    needs: [locate, build, verify, publish]
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - run: python3 tools/release/verify_staged.py dist sums/SHA256SUMS.wheels.txt
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist
+"""
+
+
 def self_test():
     cases = {
         "good": ({"release.yml": GOOD}, 0),
@@ -515,6 +536,18 @@ def self_test():
             "signing-binaries-unsigned", "windows-unsigned")}, 1),
         "signing intermediate attested nowhere": ({"release.yml": GOOD, "packages.yml": SIGNED.replace(
             "signing-binaries-unsigned", "binaries-unsigned")}, 1),
+        "wheels check may fail alone": ({"release.yml": GOOD.replace(
+            "      - run: python3 tools/release/verify_staged.py dist sums\n",
+            "      - run: python3 tools/release/verify_staged.py dist sums\n      - id: wheels\n        continue-on-error: true\n"
+            "        run: python3 tools/release/verify_staged.py wheels s\n", 1)}, 0),
+        "wheels check holds the app": ({"release.yml": GOOD.replace(
+            "      - run: python3 tools/release/verify_staged.py dist sums\n",
+            "      - run: python3 tools/release/verify_staged.py dist sums\n      - id: wheels\n"
+            "        run: python3 tools/release/verify_staged.py wheels s\n", 1)}, 1),
+        "pypi good": ({"release.yml": GOOD + PYPI}, 0),
+        "pypi without verify": ({"release.yml": GOOD + PYPI.replace("verify_staged.py", "x.py")}, 1),
+        "pypi with a token": ({"release.yml": GOOD + PYPI.replace("packages-dir: dist", "password: ${{ secrets.PYPI_TOKEN }}")}, 1),
+        "pypi outside its environment": ({"release.yml": GOOD + PYPI.replace("    environment: pypi\n", "")}, 1),
         "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]

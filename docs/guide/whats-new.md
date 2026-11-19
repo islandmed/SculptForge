@@ -5,6 +5,45 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.8
+
+```features
+date: 2026-11-18
+tagline: 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
+highlight: Python scripts can add their own buttons and panels
+highlight: Splats show the sheen that changes as you orbit
+highlight: Files with non-English names open on Windows again
+highlight: Size and Intensity follow the pen as it hovers above the tablet
+title: Finer detail up close
+line: Zoom in on a micro level in smooth shading and the view draws up to two levels finer than the stored grid, following the surface's curve, with no extra memory or file size. Brushes and picks are unchanged.
+action: guide:micro-levels.md
+title: Buttons and panels from Python
+line: A Python script can add its own panels of buttons, sliders and check boxes under File > Script, and actions to the command palette, shelves and My Panel.
+action: guide:python.md
+```
+
+- Scripts and tools that use SculptForge's Python API or command line can be under any licence (new scripting
+  exception).
+- **Python package**: download the wheel for your platform from the release page and `pip install` it: the sculpting
+  engine in your own Python, for procedural assets, batch exports and pipeline tests (PyPI coming).
+- **Scripts can add buttons and panels**: a Python script can add actions (command palette, shelves, My Panel, keys)
+  and panels of labels, buttons, sliders and check boxes under **File > Script**. Scripts ticked under **Edit >
+  Preferences > Scripts > Run at start-up** bring theirs back at every start; a script that changed since you trusted
+  it does not run until you trust it again.
+- **Splats with view-dependent colour**: captures with spherical harmonics (SH 1-3) now show the sheen and highlights
+  that change as you orbit, as splat viewers do, and keep them when you turn and save them.
+- **What's New since your last version**: after an update the window shows the features of every version you skipped,
+  newest first (the first eight, then "and N more improvements"), each with its Try it button.
+- **Size and Intensity follow the pen**: press S (or U) with a pen in range and move it above the tablet; the size
+  follows live, a tap keeps it. Pressing straight down on the slider's knob still drags it.
+- **The guide stands out**: the User Guide window has its own colour now, with an edge, a strip and a lighter page, so
+  it no longer blends into the app.
+- **Smooth on a Micro level**: a big Smooth no longer leaves a diamond lattice of fine creases (after a big Flatten,
+  for example).
+- **Files with non-English names** open on Windows again: a model with a Japanese name, a folder in Cyrillic or
+  Korean, an emoji in the name no longer closes SculptForge.
+
 ## Version 0.13.7
 
 ```features
@@ -15,6 +54,26 @@ highlight: Hold Space to slide a selection while you draw it
 highlight: Type an exact value on any slider
 highlight: A portable copy on a USB stick that carries your settings, brushes and library
 highlight: Python scripting in the app
+title: Circles for Mask, Select, Cut
+line: Draw a circle or an ellipse from its centre to mask, select or cut a round area in one drag. Pick Circle Mask in the Mask tool (B), or Select Circle and Cut Circle in Tool > Cut.
+image: images/wn-0137-circles.jpg
+action: guide:masking.md
+title: Slide a selection as you draw
+line: Hold Space while you drag a rectangle, lasso or circle to move the whole shape, then let go to keep sizing it. It works for Mask, Select and Cut.
+image: images/wn-0137-slide.jpg
+action: guide:masking.md
+title: Type any value on a slider
+line: Double-click (or Ctrl+click) any slider or number, type the value and press Enter; Esc cancels. Now it works in every panel, the top bar and Brush Lab.
+image: images/wn-0137-slider.jpg
+action: guide:interface.md
+title: Your setup on a USB stick
+line: The Windows portable .zip keeps your settings, brushes and library in a folder next to the program, so your workbench follows you from PC to PC. Unzip it anywhere and run it.
+image: images/wn-0137-usb.jpg
+action: guide:installing.md#a-portable-copy-a-usb-stick
+title: Script SculptForge in Python
+line: Turn it on in Edit > Preferences > Scripts, then open the console and click Python: loops, conditions and every command, each run one undo step. Scripts are programs, so run only ones you trust.
+image: images/wn-0137-python.jpg
+action: guide:python.md
 ```
 
 - **Brush thumbnails show the alpha**: a brush with an alpha shows it pressed into the ball in the brush's own stroke
@@ -48,6 +107,14 @@ tagline: Insert works on meshes with subdivision levels, heavy meshes no longer 
 highlight: Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail
 highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window
 highlight: A public benchmark you can run in one command
+title: Insert keeps every level
+line: Add a horn, an ear or any shape to a mesh that has subdivision levels: it becomes its own Part and every level keeps its detail. Parts > Append > Insert on the model.
+image: images/wn-0136-insert.jpg
+action: guide:parts.md
+title: No freeze after a heavy stroke
+line: On a very dense mesh, Undo, Save or a click right after a stroke no longer freezes the window.
+image: images/wn-0136-nofreeze.jpg
+action: guide:sculpting.md
 ```
 
 - **Benchmark scene pack**: download a pack of our own sculpts and run `sculptforge --benchmark-pack bench-pack --out
@@ -63,10 +130,14 @@ highlight: A public benchmark you can run in one command
 
 ```features
 date: 2026-11-16
-tagline: A plugin sandbox security fix, and AI agents get batches, checkpoints and the scene as data.
-highlight: Plugins run on wasmtime 50.0.2, a security fix: a plugin can no longer stop SculptForge or grow its memory without limit
-highlight: Batch and checkpoints for AI agents: a list of commands runs as one undo step that rolls back whole if one fails
-highlight: AI agents read the scene as data: every result comes back as structured numbers, and the scene can be read without changing it
+tagline: Safer plugins, and AI agents that can run a list of commands as one undo step.
+highlight: Safer plugins: a plugin can no longer stop SculptForge or use up your memory without limit
+highlight: AI agents can run a list of commands as one undo step that rolls back whole if one fails
+highlight: AI agents can read the scene as plain numbers without changing it
+title: Safer plugins
+line: A plugin can no longer stop SculptForge or use up your memory, so trying one from a pack is safer. Plugins still have no access to your files or the network.
+image: images/wn-0135-plugins.jpg
+action: guide:packs-and-macros.md#plugins
 ```
 
 - **Blender 5.3 supported**: the Blender bridge is tested on Blender 4.2 LTS, 5.2 and 5.3.
@@ -84,6 +155,10 @@ tagline: Saves on Windows retry instead of failing, and a short note from the me
 highlight: On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar
 highlight: A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it
 highlight: Membership links in the app carry a small source tag, so we can see which one helps
+title: Saves that don't give up
+line: On Windows, a save that meets a busy or read-only file tries again instead of failing, and if it still can't save, the status bar names the file.
+image: images/wn-0134-save.jpg
+action: guide:projects.md
 ```
 
 - **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar

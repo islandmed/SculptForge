@@ -5,6 +5,7 @@
 // shading, baking down and displacement maps. The brushes are in MicroSculpt.cpp, the commands in
 // MicroCommands.cpp.
 #include "core/Micro.h"
+#include "core/MicroTiles.h"
 #include "core/AtomicRef.h"
 #include "core/FocusDetail.h"
 
@@ -54,7 +55,7 @@ size_t MicroMesh::microVertices() const {
 
 size_t MicroMesh::bytes() const {
     return disp.capacity() * sizeof(int16_t) + mask.capacity() + triRange.capacity() * sizeof(uint16_t) +
-           edgeNeighbor.capacity() * sizeof(uint32_t) + dirtyBits.capacity() * sizeof(uint64_t);
+           edgeNeighbor.capacity() * sizeof(uint32_t) + dirtyBits.capacity() * sizeof(uint64_t) + (tiles ? tiles->bytes() : 0);
 }
 
 void MicroMesh::clearDirty() {
@@ -78,6 +79,7 @@ int MicroMesh::widen(float need) {
     rescaled = true;
     reach.all = true;
     if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
+    if (tiles) tiles->rescale(div); // (Adaptive Detail tiles hold deltas in the same units)
     ++revision;
     return div;
 }
@@ -203,6 +205,7 @@ MicroMesh& mutableMicro(Mesh& m) {
         m.micro = std::make_shared<MicroMesh>(*kept);
         kept->focus.reset(); // and the stream goes on with this Mesh
         m.micro->ink = std::move(kept->ink); // (so does the stroke history: its undo steps are this Mesh's)
+        if (m.micro->tiles) m.micro->tiles = std::make_shared<MicroTiles>(*m.micro->tiles); // (the copy's own tiles)
     }
     return *m.micro;
 }
@@ -267,6 +270,158 @@ Cell cellAt(const float wc[3], uint32_t n) {
     return c;
 }
 
+} // namespace
+
+glm::vec3 decodeShadeNormal(uint32_t v) {
+    const float x = float(v & 255u) / 255.0f * 2.0f - 1.0f, y = float((v >> 8) & 255u) / 255.0f * 2.0f - 1.0f;
+    glm::vec3 n(x, y, 1.0f - std::abs(x) - std::abs(y));
+    const float t = std::max(-n.z, 0.0f);
+    n.x += n.x >= 0.0f ? -t : t;
+    n.y += n.y >= 0.0f ? -t : t;
+    const float len = glm::length(n);
+    return len > 0.0f ? n / len : glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+namespace {
+// A triangle's page frame: its corners in corner order, and the page cell's edge vectors.
+struct PageFrame {
+    glm::vec3 ei, ej;
+    PageFrame(const Mesh& m, uint32_t tri, uint32_t M) {
+        const glm::uvec3 t = m.triangles[tri];
+        const glm::vec3 c0 = m.positions[t[0]];
+        ei = (m.positions[t[1]] - c0) / float(M), ej = (m.positions[t[2]] - c0) / float(M);
+    }
+    // Slopes (height per cell along i, j) -> the surface gradient on the triangle's plane, and back.
+    glm::vec3 gradient(glm::vec2 s) const {
+        const float a11 = glm::dot(ei, ei), a12 = glm::dot(ei, ej), a22 = glm::dot(ej, ej), det = a11 * a22 - a12 * a12;
+        if (std::abs(det) < 1e-30f) return glm::vec3(0.0f);
+        return ei * ((s.x * a22 - s.y * a12) / det) + ej * ((s.y * a11 - s.x * a12) / det);
+    }
+    glm::vec2 slopes(const glm::vec3& g) const { return {glm::dot(g, ei), glm::dot(g, ej)}; }
+};
+template <class Value> glm::vec2 pageStencil(Value&& v, int I, int J, int M) {
+    const float v0 = v(I, J);
+    const bool ip = I + 1 + J <= M, im = I > 0, jp = I + J + 1 <= M, jm = J > 0;
+    const float di = ip && im ? (v(I + 1, J) - v(I - 1, J)) * 0.5f : ip ? v(I + 1, J) - v0 : im ? v0 - v(I - 1, J) : 0.0f;
+    const float dj = jp && jm ? (v(I, J + 1) - v(I, J - 1)) * 0.5f : jp ? v(I, J + 1) - v0 : jm ? v0 - v(I, J - 1) : 0.0f;
+    return {di, dj};
+}
+} // namespace
+
+void microTileSlopes(const Mesh& m, uint32_t tri, uint32_t pageSegments, const int16_t* values, float* out) {
+    const MicroMesh& mm = *m.micro;
+    const MicroTiles& tiles = *mm.tiles;
+    const int M = int(pageSegments);
+    auto own = [&](int i, int j) { return float(values[MicroMesh::index(uint32_t(i), uint32_t(j), pageSegments)]); };
+    auto put = [&](int i, int j, glm::vec2 s) {
+        float* o = out + size_t(MicroMesh::index(uint32_t(i), uint32_t(j), pageSegments)) * 2;
+        o[0] = s.x, o[1] = s.y;
+    };
+    for (int J = 0; J <= M; ++J)
+        for (int I = 0; I + J <= M; ++I) put(I, J, pageStencil(own, I, J, M));
+    const PageFrame F(m, tri, pageSegments);
+    auto other = [&](uint32_t t, int I, int J) { // another triangle's surface gradient at its page point (I, J)
+        auto v = [&](int i, int j) { return float(tiles.pageValue(t, pageSegments, uint32_t(i), uint32_t(j))); };
+        return PageFrame(m, t, pageSegments).gradient(pageStencil(v, I, J, M));
+    };
+    // Shared edges: the average of both sides' gradients (0 next to a triangle without tiles: it draws none).
+    for (int e = 0; e < 3; ++e) {
+        const uint32_t nb = mm.edgeNeighbor.size() > size_t(tri) * 3 + 2 ? mm.edgeNeighbor[size_t(tri) * 3 + size_t(e)] : MicroMesh::kNone;
+        if (nb == MicroMesh::kNone) continue;
+        const uint32_t t2 = nb >> 2, e2 = nb & 3;
+        const bool tiled = tiles.hasTiles(t2);
+        for (int k = 1; k < M; ++k) {
+            uint32_t i, j, i2, j2;
+            MicroMesh::edgePoint(e, uint32_t(k), pageSegments, i, j);
+            if (!tiled) {
+                put(int(i), int(j), glm::vec2(0.0f));
+                continue;
+            }
+            MicroMesh::edgePoint(int(e2), pageSegments - uint32_t(k), pageSegments, i2, j2);
+            const glm::vec3 g = (F.gradient(pageStencil(own, int(i), int(j), M)) + other(t2, int(i2), int(j2))) * 0.5f;
+            put(int(i), int(j), F.slopes(g));
+        }
+    }
+    // Corners: the average over the triangles around the vertex.
+    const glm::uvec3 tv = m.triangles[tri];
+    const int cornerI[3] = {0, M, 0}, cornerJ[3] = {0, 0, M};
+    for (int q = 0; q < 3; ++q) {
+        glm::vec3 g(0.0f);
+        int count = 0;
+        bool untiled = false;
+        for (uint32_t t : m.vertexTriangles(tv[q])) {
+            if (!tiles.hasTiles(t)) {
+                untiled = true;
+                break;
+            }
+            const glm::uvec3 o = m.triangles[t];
+            const int q2 = o[0] == tv[q] ? 0 : o[1] == tv[q] ? 1 : 2;
+            g += t == tri ? F.gradient(pageStencil(own, cornerI[q], cornerJ[q], M)) : other(t, cornerI[q2], cornerJ[q2]);
+            ++count;
+        }
+        put(cornerI[q], cornerJ[q], untiled || count == 0 ? glm::vec2(0.0f) : F.slopes(g / float(count)));
+    }
+}
+
+namespace {
+glm::vec3 drawPointUntiled(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading);
+}
+
+glm::vec3 microDrawPoint(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading, int pageLevel) {
+    const glm::vec3 p = drawPointUntiled(m, tri, level, i, j, shading);
+    const MicroMesh& mm = *m.micro;
+    if (pageLevel < level || !mm.tiles || !mm.tiles->hasTiles(tri)) return p;
+    const uint32_t M = 1u << pageLevel, sh = uint32_t(pageLevel - level), ii = i << sh, jj = j << sh;
+    const int16_t v = mm.tiles->pageValue(tri, M, ii, jj);
+    if (v == 0) return p;
+    MicroTriangle T;
+    T.set(m, tri, mm.n);
+    const glm::vec3 w = MicroTiles::pageWeights(M, ii, jj);
+    const float wc[3] = {w.x, w.y, w.z};
+    glm::vec3 s, nn;
+    T.evalWeights(wc, s, nn);
+    return p + nn * (float(v) * mm.step);
+}
+
+namespace {
+glm::vec3 drawPointUntiled(const Mesh& m, uint32_t tri, int level, uint32_t i, uint32_t j, const uint32_t* shading) {
+    const MicroMesh& mm = *m.micro;
+    if (level <= mm.level) {
+        const uint32_t sc = mm.n >> level;
+        return microPoint(m, tri, i * sc, j * sc);
+    }
+    const uint32_t sh = uint32_t(level - mm.level), s = 1u << sh, msk = s - 1;
+    const uint32_t I = i >> sh, J = j >> sh, fi = i & msk, fj = j & msk;
+    if (fi == 0 && fj == 0) return microPoint(m, tri, I, J);
+    struct Corner {
+        uint32_t i, j, w, key;
+    } c[3];
+    if (fi + fj <= s) c[0] = {I, J, s - fi - fj, 0}, c[1] = {I + 1, J, fi, 0}, c[2] = {I, J + 1, fj, 0};
+    else c[0] = {I + 1, J + 1, fi + fj - s, 0}, c[1] = {I, J + 1, s - fi, 0}, c[2] = {I + 1, J, s - fj, 0};
+    MicroTriangle T;
+    T.set(m, tri, mm.n);
+    for (Corner& k : c) { // the corner's weights towards the base vertices in index order (both triangles beside an edge agree)
+        const uint32_t cnt[3] = {mm.n - k.i - k.j, k.i, k.j};
+        k.key = cnt[T.slot[0]] * (mm.n + 1) + cnt[T.slot[1]];
+    }
+    if (c[0].key < c[1].key) std::swap(c[0], c[1]);
+    if (c[1].key < c[2].key) std::swap(c[1], c[2]);
+    if (c[0].key < c[1].key) std::swap(c[0], c[1]);
+    const float inv = 1.0f / float(s);
+    const float w0 = float(c[0].w) * inv, w1 = float(c[1].w) * inv, w2 = float(c[2].w) * inv;
+    const glm::vec3 q0 = microPoint(m, tri, c[0].i, c[0].j), q1 = microPoint(m, tri, c[1].i, c[1].j), q2 = microPoint(m, tri, c[2].i, c[2].j);
+    glm::vec3 f = q0 * w0;
+    f += q1 * w1;
+    f += q2 * w2;
+    if (!shading) return f;
+    const uint32_t* g = shading + size_t(tri) * mm.samples;
+    const glm::vec3 n0 = decodeShadeNormal(g[MicroMesh::index(c[0].i, c[0].j, mm.n)]), n1 = decodeShadeNormal(g[MicroMesh::index(c[1].i, c[1].j, mm.n)]),
+                    n2 = decodeShadeNormal(g[MicroMesh::index(c[2].i, c[2].j, mm.n)]);
+    glm::vec3 pull = n0 * (w0 * glm::dot(f - q0, n0));
+    pull += n1 * (w1 * glm::dot(f - q1, n1));
+    pull += n2 * (w2 * glm::dot(f - q2, n2));
+    return f - pull * 0.75f;
+}
 } // namespace
 
 glm::vec3 microPointAt(const Mesh& m, uint32_t tri, const float wc[3], glm::vec3* normal) {
@@ -1023,6 +1178,11 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
+    if (!tileKeys.empty() && !mm.tiles) {
+        mm.tiles = std::make_shared<MicroTiles>();
+        mm.tiles->resize(mm.baseTriangles);
+        mm.tiles->residentBudget = MicroTiles::defaultResidentBudget();
+    }
     if (mm.focus) mm.focus->ensureFull(mm, tris, true); // (undo writes full tiles only)
     const size_t S = samples;
     // Values kept in another step size (the range grew since): convert to the current one.
@@ -1103,13 +1263,54 @@ void MicroUndo::swapWith(Mesh& m) {
         }, 64);
         for (uint32_t t : tris) mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
     }
+    // Adaptive Detail tiles (core/MicroTiles.h): undo subtracts each tile's change and frees the tiles the stroke
+    // made; redo makes them again (zero) and adds the change back. Journaled as the root tiles are.
+    if (!tileKeys.empty() && mm.tiles) {
+        MicroTiles& tiles = *mm.tiles;
+        const bool undo = tilesApplied;
+        std::vector<int16_t> change(tileKeys.size() * MicroTiles::kSamples, 0);
+        if (microUnpackTiles(tilePacked.data(), tilePacked.size(), tileKeys.size(), MicroTiles::kSamples, change.data())) {
+            for (size_t k = 0; k < tileKeys.size(); ++k) {
+                int16_t* c = change.data() + k * MicroTiles::kSamples;
+                uint32_t p = 0;
+                for (uint32_t j = 0; j <= MicroTiles::kN; ++j)
+                    for (uint32_t i = 0; i + j <= MicroTiles::kN; ++i, ++p) {
+                        int v;
+                        if (p == 0) v = tileFirsts[k];
+                        else if (i > 0) v = int(c[p - 1]) + int(c[p]);
+                        else v = int(c[MicroTiles::index(0, j - 1)]) + int(c[p]);
+                        c[p] = int16_t(std::clamp(v, -32767, 32767));
+                    }
+            }
+            const float ratio = step / mm.step;
+            const int sgn = undo ? -1 : 1;
+            for (size_t k = 0; k < tileKeys.size(); ++k) {
+                const uint64_t key = tileKeys[k];
+                if (undo && tileBorn[k]) { // born in the stroke: gone again
+                    tiles.release(key);
+                    mm.markDirty(MicroTiles::keyTri(key));
+                    continue;
+                }
+                bool born = false;
+                MicroTiles::Tile* t = undo ? tiles.resident(key) : tiles.obtain(key, born);
+                if (!t) continue;
+                for (uint32_t p = 0; p < MicroTiles::kSamples; ++p) {
+                    const float c = ratio == 1.0f ? float(change[k * MicroTiles::kSamples + p]) : float(change[k * MicroTiles::kSamples + p]) * ratio;
+                    t->delta[p] = int16_t(std::clamp(int(t->delta[p]) + sgn * int(std::lround(c)), -32767, 32767));
+                }
+                mm.markDirty(MicroTiles::keyTri(key));
+            }
+            tilesApplied = !tilesApplied;
+            tiles.trim(); // (back within the resident budget)
+        }
+    }
     for (uint32_t t : tris) mm.markDirty(t);
     ++mm.revision;
 }
 
 size_t MicroUndo::bytes() const {
     return tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
-           mask.size() + (swapWhole && whole ? whole->bytes() : 0);
+           mask.size() + tileKeys.size() * (sizeof(uint64_t) + 1 + sizeof(int16_t)) + tilePacked.size() + (swapWhole && whole ? whole->bytes() : 0);
 }
 
 // ---------------------------------------------------------------------------

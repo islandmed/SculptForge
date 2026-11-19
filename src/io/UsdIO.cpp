@@ -7,6 +7,7 @@
 #include "core/Units.h"
 #include "io/TextureExport.h"
 #include "io/Zip.h"
+#include "core/Utf8Path.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -33,7 +34,7 @@ namespace {
 std::filesystem::path fsPath(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = fsPath(path).extension().string();
+    std::string ext = pathToUtf8(fsPath(path).extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext;
 }

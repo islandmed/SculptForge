@@ -189,7 +189,7 @@ file formats and what SculptForge does with a capture are in [Gaussian splats](s
 **File > Export > Gaussian Splats (.ply)** saves the selected splat object as a standard 3D Gaussian Splatting PLY
 (Blender has no splat export of its own), which SculptForge, SuperSplat, Postshot and most tools open. By default it
 applies the object's transform; turn off **Apply Object Transform** to write the splats as they are in the object. A
-turned splat keeps its plain colour but loses its view-dependent colour, because that would point the wrong way.
+turned splat keeps its view-dependent colour: it turns with the splat, so the capture looks the same from the turned view.
 
 > **Note:** Blender's own **Apply > All Transforms** doesn't update a splat's rotations and spherical harmonics yet
 > (Blender 5.3 release notes), so move splat objects with their transform and let SculptForge or the export apply it.

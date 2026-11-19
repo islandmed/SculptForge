@@ -8,6 +8,7 @@
 #include "core/Micro.h"
 #include "core/MicroStore.h"
 #include "core/ThreadPool.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <bit>
@@ -579,7 +580,7 @@ std::shared_ptr<FocusDetail> FocusDetail::attach(const std::string& path, Mesh& 
     fd->path_ = path;
     if (!fd->mapFile(error) || !fd->loadIndex(error)) return nullptr;
     if (fd->tris_ != m.triangles) {
-        error = "The detail file " + std::filesystem::path(path).filename().string() + " belongs to another mesh";
+        error = "The detail file " + fileNameUtf8(path) + " belongs to another mesh";
         return nullptr;
     }
     if (m.normals.size() != m.vertexCount()) m.recomputeAllNormals();

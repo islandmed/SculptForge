@@ -84,6 +84,8 @@ inline float popupLift = 0.05f; // how far a role pop-up's surface (and its butt
 inline bool rolePopups = true;
 inline const ImVec4& edge(Role r) { return roleEdge[int(r)]; }
 inline const ImVec4& ink(Role r) { return roleInk[int(r)]; }
+// `c`, moved towards `toward` only as far as it takes to reach `ratio` (WCAG contrast) on `bg`.
+ImVec4 readableOn(const ImVec4& c, const ImVec4& bg, const ImVec4& toward, float ratio);
 const char* roleIcon(Role r); // Lucide: lightbulb, graduation cap, sparkles, triangle alert, octagon alert
 
 inline ImU32 u32(const ImVec4& c, float alpha = 1.0f) { return ImGui::ColorConvertFloat4ToU32(ImVec4(c.x, c.y, c.z, c.w * alpha)); }

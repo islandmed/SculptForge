@@ -13,6 +13,7 @@
 #include "app/NativeDialog.h"
 #include "app/BrandMark.h"
 #include "app/CardPaint.h"
+#include "app/HwProfileUi.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 
@@ -122,18 +123,30 @@ bool App::supportCardTestMode() const {
 bool App::supportCardOpen() const { return supportCard_ && !supportCard_->closing; }
 
 
+// The plea (the full card, the small cards, the appeal) never shows to a member: signed in for member builds, verified, a
+// Studio build, or Android while its APKs are members-only (kAndroidMembersOnly, Support.h).
+bool App::pleaBlocked() const {
+#ifdef __ANDROID__
+    if (kAndroidMembersOnly) return true;
+#endif
+    return supportCardPrefs_.supporter || memberSignedIn() || studioMembership();
+}
+
 void App::launchSupportCard(bool firstRun, int64_t now, bool testMode) {
-    // A studio build is a Studio member's: no membership card in it (core/StudioProfile.h).
-    const SupportCardReason reason =
-        isStudioBuild() ? SupportCardReason::None : supportCardDue(supportCardPrefs_, firstRun, testMode);
+    const SupportCardReason reason = pleaBlocked() ? SupportCardReason::None : supportCardDue(supportCardPrefs_, firstRun, testMode);
     if (reason == SupportCardReason::None) return;
     supportCardPrefs_.shownAt = now; // (the week before a small card may show starts now)
     saveProjectPrefs(); // (recorded before it shows: a crash can't bring it back at once)
-    if (showWelcome_) { // the first-run welcome follows the card
-        showWelcome_ = false;
-        welcomeAfterCard_ = true;
-    }
-    showSupportCard(reason);
+    supportCardQueued_ = true; // it waits for the welcome and the tier card (tickSupportCardQueue): one first-run box at a time
+}
+
+// The queued full card opens once the first-run boxes are away, so the one on top is always the one that answers.
+void App::tickSupportCardQueue() {
+    if (!supportCardQueued_ || supportCard_) return;
+    if (pleaBlocked()) { supportCardQueued_ = false; return; }
+    if (showWelcome_ || whatsNewOpen() || quickTourOpen_ || hardwareCalibrating() || (hwProfile_ && hwProfile_->tierCard)) return;
+    supportCardQueued_ = false;
+    showSupportCard(SupportCardReason::FirstRun);
 }
 
 void App::showSupportCard(SupportCardReason reason) {
@@ -147,10 +160,6 @@ void App::closeSupportCard() {
     if (!supportCard_ || supportCard_->closing) return;
     supportCard_->closing = true;
     supportCard_->closingAt = nowSeconds();
-    if (welcomeAfterCard_) {
-        welcomeAfterCard_ = false;
-        showWelcome_ = true;
-    }
     redrawIn(0.0);
 }
 
@@ -340,7 +349,7 @@ void App::drawSupportCard() {
          {"One quote for the whole studio: any number of artists, each with everything in Member",
           "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
           "Isolated: a private release channel, no outside connections",
-          "First response within 2 business days; up to 3 custom items a month", nullptr},
+          "First response within 12 hours; up to 3 custom items a month", nullptr},
          "Get a quote", "Get a quote##card.studio", kStudioPageUrl, "Tell us your team size, platforms and pipeline"},
     };
     const float gap = 22.0f * k, footer = 62.0f * k, tierH = 350.0f * k;
@@ -554,7 +563,7 @@ int64_t App::memberClock() const { return int64_t(std::time(nullptr)) + memberCl
 void App::memberMoment(MemberMoment m) {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
     if (m == MemberMoment::None || memberCard_ != MemberMoment::None || memberVerifying_ || appealPending_ || appealOpen_) return;
-    if (studioMembership() || !memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode, m)) return;
+    if (pleaBlocked() || !memberMomentAllowed(supportCardPrefs_, memberSignedIn(), memberClock(), testMode, m)) return;
     memberMomentPending_ = m; // (the latest moment's words)
     redrawIn(0.0);
 }
@@ -630,13 +639,13 @@ bool App::appealUpdateCheckOff() const {
 
 void App::startupUpdateMoment() {
     // A member or a Studio build never gets the card, so nothing stays owed to it.
-    if (supportCardPrefs_.supporter || memberSignedIn() || studioMembership()) supportCardPrefs_.updateOwed = false;
+    if (pleaBlocked()) supportCardPrefs_.updateOwed = false;
     if (updatedThisStart_ || supportCardPrefs_.updateOwed) memberMoment(MemberMoment::Updated);
 }
 
 void App::launchAppeal() {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
-    if (!appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
+    if (pleaBlocked() || !appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
     appealPending_ = true;
     appealOwesUpdate_ = memberMomentPending_ == MemberMoment::Updated;
     memberMomentPending_ = MemberMoment::None; // (an update's small card steps aside, and comes at the next start)

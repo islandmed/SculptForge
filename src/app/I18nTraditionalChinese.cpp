@@ -770,16 +770,18 @@ constexpr Entry kTraditionalChinese[] = {
     {"Multithreading", "多執行緒"},
     {"Predictive Strokes", "預測筆畫"},
     {"Draft Strokes", "草稿筆畫"},
-    {"Keep Strokes Editable", "保持筆畫可編輯"},
+    {"Keep Strokes Editable (Experimental)", "保持筆畫可編輯（實驗性）"},
     {"On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or "
      "taken out later and the strokes over it follow exactly. Each stroke sculpts and undoes exactly "
      "as before. Strokes that move the base (big Standard, Clay and Inflate brushes, Move on the "
      "base) or use the Stencil fix the strokes they reach in place; so does a stroke once 20 others "
-     "sit on it. Off when memory is low.",
+     "sit on it. Off when memory is low."
+     " Experimental: a tester reports Move results can snap back with it on; we're checking.",
      "在微細分層級上，每一筆都會保留構成它的筆觸點，之後可以移動、變更或移除，其上的筆畫會精確跟"
      "隨。每一筆的雕刻與復原都與先前完全相同。會移動基底的筆畫（大型 Standard、Clay"
      "、Inflate 筆刷，以及在基底上的 Move）或使用模板的筆畫，會把觸及的筆畫固定在原"
-     "處；一筆上方疊了 20 筆後也會被固定。記憶體不足時關閉。"},
+     "處；一筆上方疊了 20 筆後也會被固定。記憶體不足時關閉。"
+     "實驗性功能：有測試者回報開啟後 Move 的結果可能會彈回，我們正在檢查。"},
     {"%d threads", "%d 個執行緒"},
     {"Memory", "記憶體"},
     {"Hardware profile", "硬體設定檔"},
@@ -5414,8 +5416,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. Let go of Shift while dragging to keep it round.", "Ctrl+Shift+從圓心拖曳圓形以保留內側並隱藏其餘；加上 Alt 以隱藏內側。拖曳中放開 Shift 以保持正圓。"},
     {"Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.", "Ctrl+從圓心拖曳圓形並遮罩其內一切；Ctrl+Alt+拖曳解除遮罩。拖曳時按 Shift 保持正圓；用 Tool > Masking 的選項從角落拖曳。包含遠側。"},
     // --- Python scripting (app/Python.h, PanelPython.cpp, Console.cpp) ---
-    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them: nothing you open can start one.",
-     "Python 指令碼可以做到此電腦上任何程式能做的事。請只執行你信任的指令碼。指令碼只會在你執行時運行：你開啟的任何內容都無法啟動指令碼。"},
+    {"A Python script can do anything a program on this computer can. Only run scripts you trust. Scripts run only when you run them, or at start-up if you tick one below; nothing you open can start one.",
+     "Python 指令碼可以做到此電腦上任何程式能做的事。請只執行你信任的指令碼。指令碼只會在你執行時運行，或在下方勾選後於啟動時運行；你開啟的任何內容都無法啟動指令碼。"},
     {"Commands",
      "命令"},
     {"Enable Python scripts",
@@ -5434,6 +5436,16 @@ constexpr Entry kTraditionalChinese[] = {
      "指令碼"},
     {"The .py files in this folder are listed under File > Script. Packages you install into its site-packages folder can be imported.",
      "此資料夾中的 .py 檔案會列在檔案 > 指令碼下。安裝到其 site-packages 資料夾的套件可以匯入。"},
+    {"Run at start-up",
+     "啟動時執行"},
+    {"Ticked scripts run each time SculptForge starts (with Python on), so the buttons and panels they add are there. A script that changed doesn't run until you tick it again.",
+     "勾選的指令碼會在每次啟動 SculptForge 時執行（需開啟 Python），讓它們加入的按鈕和面板都在。指令碼有變更後，要再勾選一次才會執行。"},
+    {"Trust this version",
+     "信任此版本"},
+    {"changed, didn't run",
+     "已變更，未執行"},
+    {"The script changed since you chose to run it at start-up, so it didn't run. Look at what changed; if you trust it, this runs it at start-up from now on (it doesn't run it now).",
+     "此指令碼在你選擇啟動時執行之後已變更，所以沒有執行。請檢查變更內容；如果你信任它，之後每次啟動都會執行（現在不會執行）。"},
 };
 
 } // namespace

@@ -6,6 +6,96 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.8] - 2026-11-18
+
+### Added
+- Micro close-ups: in smooth shading the viewport can draw up to two levels finer than the stored micro grid when the
+  camera is close (three on Extreme tier hardware), the surface between stored points following the model's curvature,
+  with no new data in memory or on disk and within the usual triangle budget; flat shading shows the stored grid as
+  before, and picks and brushes are unchanged. Head-on it softens the stored creases by at most 10 of 255 levels, with
+  no seam; measured on the floor tier's billion-triangle Focus Detail scene (x3): 240 px stroke p99 156 -> 116 ms,
+  orbit 62.7 -> 72.0 fps, memory unchanged (2.2 GB). SF_TIER_MICRO_DRAW_ABOVE sets the extra levels (0 = as before).
+  Credit: Aymen G on Discord (idea).
+- **Python package: methods for the common steps**: `sf.Document.open(path)`, `doc.save(path)` by file name (project,
+  OBJ, GLB/glTF, USD, FBX, PLY, STL), `doc.stroke(brush, points)` with the path as a NumPy array, `remesh`,
+  `decimate`, `subdivide`, subdivision levels (`divide()`, `subdivision_levels`, `subdivision_level`),
+  `clear_mask`/`invert_mask`, `add_part`/`rename_part`/`remove_part`, `sf.command(name)`. Each runs the same command
+  as the command line, with the same result; type hints throughout.
+- **SculptForge Scripting Exception 1.0** (LICENSE-EXCEPTION.md): programs, scripts, add-ons and tools that use
+  SculptForge only through its Python API, command line, MCP server or plug-in SDK may be under any licence;
+  SculptForge itself stays GPL-3.0-or-later.
+- **The Python package** (coming to PyPI as `sculptforge`; CPython 3.12-3.14 on Windows x64, macOS universal2 and
+  Linux x86_64/aarch64): every command, the mesh, masks, face groups, paint, Parts, layers and selection sets as NumPy
+  arrays, type hints, `sculptforge.CommandError`. Saves and exports write to a temporary file and replace the target
+  in one step, so a failed or interrupted export never leaves a half-written file. Engine only: no window, no network,
+  no port. Guide: The Python package; examples in examples/python.
+- **Python wheels on the release page**: every release carries the `sculptforge` wheels (CPython 3.12-3.14, Windows
+  x64, macOS universal2, Linux x86_64/aarch64), checked against their recorded checksums and build attestations and
+  listed in the signed SHA256SUMS.txt; `pip install <wheel link>`.
+- **Python scripts add to the interface** (`sf.ui`, Edit > Preferences > Scripts): actions (command palette, shelves,
+  My Panel, keys) and panels of labels, buttons, sliders and check boxes under File > Script, drawn by SculptForge's
+  own controls. **Run at start-up** (off, per script, only for files in the Scripts folder): the script's bytes are
+  read once, hashed and run from memory; if they differ from the version you trusted, nothing runs, the status bar
+  says why, and **Trust this version** brings it back. A studio policy of `"python": {"scripts": "never"}` also stops
+  start-up runs. A timer on the main thread (`sf.ui.timer`) keeps other toolkits' windows, such as PySide, alive
+  beside the app. Requested by Tpqz_ on Discord and chris_gardner on Discord.
+- Gaussian splats show their view-dependent colour (spherical harmonics, degree 1-3, the 3D Gaussian Splatting layout)
+  in the viewport, evaluated for the direction each splat is seen from (not on the Essential hardware tier, where
+  splats keep their plain colour).
+- What's New after an update covers every version since the one last used ("New since 0.13.5"): up to 8 feature cards,
+  newest version first, then "and N more improvements" (opens the What's New chapter). A fresh install and Help >
+  What's New still show the newest version.
+
+### Changed
+- The `sculptforge` Python module is now a package (`sculptforge/` with the compiled `_core` and type stubs), also in
+  the VFX Reference Platform builds; `import sculptforge` is unchanged.
+- Turning splats (Flip, Turn 90) and saving them as PLY or .splat, or exporting a turned splat object from Blender
+  with Apply Object Transform, now turns their view-dependent colour with them instead of dropping it to the plain
+  colour.
+- **User Guide window** has the Learn pop-up treatment: a teal edge and top strip and the graduation cap icon in the
+  title, and a page and contents a step off the app's panels, readable in every look (Preferences > Interface > Look >
+  Pop-up colours: Plain keeps the old look).
+- Keep Strokes Editable (experimental) now has its checkbox in Preferences > Performance; a tester reports Move
+  results can snap back with it on, and we're checking (reported by ebarranco).
+- Studio memberships: the first support response now comes within 12 hours (was 2 business days), in the support card
+  and the Studios guide page.
+- **Preferences > Tablet > Troubleshooting details** also lists the touch devices (a tablet's touch surface included),
+  whether palm rejection is on, and how many wheel, finger-touch and pinch events reached the view.
+
+### Fixed
+- On a mesh of millions of triangles, the view switched to its lighter preview of the mesh from the moment the pen
+  went down until the stroke's first dabs showed, so fine creases near the brush could fade out and pop back as a
+  stroke began. With the view still, a stroke now keeps the full detail from its first frame; the lighter preview is
+  only for turning the view. This is the likely cause of the strokes seen appearing beside the brush in #184 (reported
+  by @HG4Science); we'll confirm with them on this version.
+- With a graphics tablet, the S / U / O pop-up stood still while the pen moved above the tablet (it looked frozen) and
+  only changed once the tip came down; a hovering pen now sets the value live like the mouse, and a tap keeps it
+  without sculpting (#184, reported by @HG4Science).
+- First start: the "Tuned for your machine" box answers its first tap or click. The membership card no longer opens on
+  top of it (it waits, one box at a time: welcome, tier box, then the membership card), and no membership card, appeal
+  or small card shows to a member or in the members-only Android build (for now). Reported by ebarranco.
+- **Tool > Masking > Adjust on micro detail**: Invert, Blur, Sharpen, Grow, Shrink, Clear and All now change the micro
+  level's own mask, the one its brushes and the viewport use (before, they changed only the base mesh's mask, so
+  nothing happened on a micro level, with or without Keep Strokes Editable). Ctrl+click Blur and Ctrl+click Invert on
+  the background work there too; each is one undo step. Reported by noved_.
+- **Micro levels on OpenGL over D3D12** (Windows on ARM laptops, WSL): a few strokes on a micro level no longer make
+  the graphics driver drop the GPU ("Removing Device"). On that layer the strokes' updates now go to the GPU as
+  copies.
+- **Smooth and Smooth Peaks on a Micro level with a big brush** left a regular lattice of fine creases along the micro
+  triangles (most visible after a big Flatten). The brush now smooths every point of the level, as a small brush and a
+  plain mesh do. A big Smooth on a Micro level now works at the level's own fine scale, like a plain mesh: it also
+  smooths fine detail under the brush, which it used to leave as it was, while big forms smooth as on a plain mesh.
+  Fixes #220.
+- Windows: SculptForge closed with no message on opening or importing a file whose name has characters outside the
+  system code page (gh#223, reported by @maxyui77). The window title, the status line, Open, Import and drag and drop,
+  project open and save, the Sculpt Timeline sidecar and pack create/install now read and write names as UTF-8
+  (core/Utf8Path.h). A command that fails with an error now says why in the status line instead of closing the app.
+- **View jumps with the pen's side buttons** (#216, thanks @Calavera00): letting go of a side button that turned the
+  view left that orbit's start state behind, so the next turn began from the view as the last one began (or about its
+  old pivot) and the view shifted and zoomed while the brush ring stayed where it was. Both buttons, any action. A
+  turn a mouse button began (KDE turns the pen's buttons into a right and a middle click) also follows the pointer
+  once it moves it, instead of the pen's own samples driving it a second time.
+
 ## [0.13.7] - 2026-11-17
 
 ### Added

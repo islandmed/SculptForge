@@ -1293,6 +1293,10 @@ step_status() {
     echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"
     echo "   Release:  https://github.com/$REPO/releases/tag/$T"
     echo "   Replies:  sfmonitor posts release-replies-$V.md (after reading it). Then update the handoff note."
+    # (cadence.md 11-17: the comms start the moment the release is verified, with no relay; never fails the release)
+    local todo="release-${V//./}-todo.md" msg="v$V live: run release-${V//./}-todo.md now (reply drafts: $PWD/release-replies-$V.md)"
+    herdr agent prompt sfmonitor "$msg" >/dev/null 2>&1 && echo "   sfmonitor: prompted ($todo)" ||
+        echo "   WARNING: couldn't prompt sfmonitor; run: herdr agent prompt sfmonitor \"$msg\""
 }
 
 started=

@@ -122,6 +122,22 @@ void coarseAttributes(CoarseLevels& levels, const Mesh& mesh, std::vector<uint32
 // Whether the cells' colours and mask are there exactly where the mesh has them.
 bool coarseAttributesMatch(const CoarseLevels& levels, const Mesh& mesh);
 
+// A frame of a mesh that may draw at its coarse levels (over the triangle budget, levels built, no edit waiting for
+// them): what it draws. The view moving: coarse. Still: full detail once it has been still kStillDelay seconds and one
+// full frame fits the still-frame budget; coarse until then (UntilStill: one more frame is wanted), and for good if
+// a full frame doesn't fit (Preview: the info line says "Preview detail"). A stroke with the view still is at rest
+// too (gh#184: dropping to coarse from the pen going down to the stroke's first upload faded the creases around the
+// brush out and back in on a 10M head).
+enum class CoarseDraw { Full, Coarse, UntilStill, Preview };
+struct CoarseFrame {
+    bool moving = false;        // RenderSettings::motionProxy
+    bool stroking = false;      // RenderSettings::stroking (no say: the frame decides as at rest)
+    double stillSeconds = 0.0;  // how long the view has been still
+    double fullFrameMs = 0.0;   // one full frame's estimated GPU time
+    double stillFrameMs = 100.0;
+};
+CoarseDraw coarseDraw(const CoarseFrame& f);
+
 // The measured GPU time per drawn triangle (ms; 0 = none yet), a moving average of whole-frame timer queries, after
 // one more frame: `gpuMs` for `triangles`, of which `cpuBeforeDrawMs` the CPU spent before the 3D view's first draw
 // (the UI, an action, the upload: the GPU waits through it inside the query). Frames too small to say, and samples

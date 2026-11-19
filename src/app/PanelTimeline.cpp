@@ -14,6 +14,7 @@
 
 #include "core/Json.h"
 #include "core/Timeline.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 

@@ -1,0 +1,36 @@
+# Script-made interface (sf.ui, app/Python.h): a script declares an action and a panel; SculptForge draws them with
+# its own widgets in File > Script, puts the action on a shelf, and runs the script's callbacks, each one undo step.
+run ui_look look=classic layout=classic        # the classic palette bar (Script##palette.script)
+run new_sphere subdivisions=2
+expect_value triangles == 320
+click "Preferences##palette.preferences"
+click "Scripts##preferences.scripts"
+click "Enable Python scripts##prefs.python"
+expect_value python_enabled == 1
+key escape
+
+key `
+click "Console/Python##console_mode1"
+type Console/##console "sf.ui.action('test.grow', 'Grow', lambda: sf.run('subdivide'), icon='sparkles', help='Adds a level')"
+key enter
+type Console/##console "p = sf.ui.panel('test', 'Test tools'); p.label('Made by a script'); p.button('test.grow')"
+key enter
+type Console/##console "p.slider('res', 'Resolution', 64, 16, 256, integer=True); p.checkbox('flag', 'Flag', on_change=lambda v: print('flag is', v))"
+key enter
+type Console/##console "sf.ui.place('test.grow', 'top')"
+key enter
+expect_value shelf_has_script.py.test.grow == 1
+key `
+
+# The panel is a section of the Script palette; its button runs the action as one undo step.
+click "Script##palette.script"
+click "Test tools##script.py.test"
+expect_text "Made by a script"
+shot python_panel
+click "Grow##script.py.test.grow"
+expect_value triangles == 1280
+run undo
+expect_value triangles == 320
+click "Flag"
+key `
+expect_text "flag is True"

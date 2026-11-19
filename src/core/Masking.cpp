@@ -3,6 +3,8 @@
 #include "core/Masking.h"
 
 #include "core/Commands.h"
+#include "core/Micro.h"
+#include "core/MicroHistory.h"
 #include "core/VertexPaint.h"
 #include "core/ScreenSelect.h"
 #include "core/Sculpt.h"
@@ -12,6 +14,7 @@
 #include <cctype>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -65,6 +68,149 @@ bool repeatPass(Mesh& mesh, int iterations, F next) {
 float smoothstep01(float e0, float e1, float x) {
     float t = std::clamp((x - e0) / std::max(e1 - e0, 1e-6f), 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
+}
+
+// --- A micro level's own mask (MicroMesh::mask, one value per grid point: what its brushes and the renderer use) ---
+
+enum class MicroMaskOp { Clear, All, Invert, Blur, Sharpen, Grow, Shrink };
+
+// One neighbourhood pass over every visible tile: each point from its neighbours inside its tile, then the copies of a
+// point on a shared edge or corner combined (averaged; Grow the largest, Shrink the smallest), as a stroke stitches.
+void microMaskPass(const Mesh& m, MicroMesh& mm, MicroMaskOp op, std::vector<uint8_t>& out) {
+    const uint32_t n = mm.n, S = mm.samples;
+    const std::vector<uint8_t>& in = mm.mask;
+    out = in;
+    poolFor(mm.baseTriangles, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t) {
+            if (m.triangleHidden(uint32_t(t))) continue;
+            const uint8_t* g = in.data() + t * S;
+            uint8_t* o = out.data() + t * S;
+            for (uint32_t j = 0; j <= n; ++j)
+                for (uint32_t i = 0; i + j <= n; ++i) {
+                    const float v = float(g[MicroMesh::index(i, j, n)]);
+                    float sum = 0.0f, lo = v, hi = v;
+                    int count = 0;
+                    auto at = [&](int di, int dj) {
+                        const int a = int(i) + di, c = int(j) + dj;
+                        if (a < 0 || c < 0 || uint32_t(a + c) > n) return;
+                        const float u = float(g[MicroMesh::index(uint32_t(a), uint32_t(c), n)]);
+                        sum += u, lo = std::min(lo, u), hi = std::max(hi, u), ++count;
+                    };
+                    at(1, 0), at(-1, 0), at(0, 1), at(0, -1), at(1, -1), at(-1, 1);
+                    const float avg = count ? sum / float(count) : v;
+                    float r = v;
+                    if (op == MicroMaskOp::Blur) r = 0.5f * v + 0.5f * avg;
+                    else if (op == MicroMaskOp::Sharpen) r = ((v + (v - avg)) - 127.5f) * 1.25f + 127.5f;
+                    else if (op == MicroMaskOp::Grow) r = hi;
+                    else if (op == MicroMaskOp::Shrink) r = lo;
+                    o[MicroMesh::index(i, j, n)] = uint8_t(std::clamp(std::lround(r), 0L, 255L));
+                }
+        }
+    }, 64);
+    auto combine = [&](int a, int c) {
+        return op == MicroMaskOp::Grow ? std::max(a, c) : op == MicroMaskOp::Shrink ? std::min(a, c) : (a + c + 1) / 2;
+    };
+    poolFor(mm.baseTriangles, [&](size_t b, size_t e) { // (each shared edge once, by the lower visible triangle)
+        for (size_t t = b; t < e; ++t) {
+            if (m.triangleHidden(uint32_t(t))) continue;
+            const glm::uvec3 tt = m.triangles[t];
+            uint8_t* g = out.data() + t * S;
+            for (int ed = 0; ed < 3; ++ed) {
+                const uint32_t nb = mm.edgeNeighbor[t * 3 + size_t(ed)];
+                if (nb == MicroMesh::kNone) continue;
+                const uint32_t u = nb >> 2;
+                const int f = int(nb & 3);
+                const bool hiddenU = m.triangleHidden(u);
+                if (!hiddenU && u < t) continue;
+                uint8_t* h = out.data() + size_t(u) * S;
+                const bool reversed = m.triangles[u][f] != tt[ed];
+                for (uint32_t k = 1; k < n; ++k) {
+                    uint32_t i, j, i2, j2;
+                    MicroMesh::edgePoint(ed, k, n, i, j);
+                    MicroMesh::edgePoint(f, reversed ? n - k : k, n, i2, j2);
+                    uint8_t& x = g[MicroMesh::index(i, j, n)];
+                    uint8_t& y = h[MicroMesh::index(i2, j2, n)];
+                    x = hiddenU ? y : (y = uint8_t(combine(x, y)));
+                }
+            }
+        }
+    }, 64);
+    auto corner = [&](uint32_t t, uint32_t v) -> uint8_t& {
+        const glm::uvec3 tt = m.triangles[t];
+        const int c = tt.x == v ? 0 : tt.y == v ? 1 : 2;
+        return out[size_t(t) * S + (c == 0 ? 0 : c == 1 ? MicroMesh::index(n, 0, n) : MicroMesh::index(0, n, n))];
+    };
+    poolFor(m.vertexCount(), [&](size_t b, size_t e) {
+        for (size_t v = b; v < e; ++v) {
+            const IndexRing ring = m.vertexTriangles(uint32_t(v));
+            int value = -1, held = -1;
+            for (uint32_t t : ring) {
+                const int x = corner(t, uint32_t(v));
+                if (m.triangleHidden(t)) held = x;
+                else value = value < 0 ? x : combine(value, x);
+            }
+            if (held >= 0) value = held; // (hidden triangles keep theirs)
+            if (value >= 0)
+                for (uint32_t t : ring) corner(t, uint32_t(v)) = uint8_t(value);
+        }
+    }, 4096);
+}
+
+// Applies `op` to the micro level's mask (`iterations` passes of the neighbourhood ops, each about one base edge
+// ring as on the base mesh) and returns the undo step, or null when nothing changed. Kept strokes it reaches are
+// fixed in place (the mask is part of what their replay starts from).
+std::shared_ptr<MicroUndo> microMaskAdjust(Mesh& mesh, MicroMaskOp op, int iterations) {
+    if (!mesh.micro || !microMatches(mesh)) return nullptr;
+    const bool neighbourhood = op == MicroMaskOp::Blur || op == MicroMaskOp::Sharpen || op == MicroMaskOp::Grow || op == MicroMaskOp::Shrink;
+    if (!mesh.micro->hasMask() && (neighbourhood || op == MicroMaskOp::Clear)) return nullptr;
+    MicroMesh& mm = mutableMicro(mesh);
+    mm.ensureTopology(mesh);
+    const size_t S = mm.samples;
+    const bool added = !mm.hasMask();
+    if (added) mm.mask.assign(mm.disp.size(), 0);
+    std::vector<uint8_t> old = mm.mask;
+    if (op == MicroMaskOp::Clear) {
+        std::fill(mm.mask.begin(), mm.mask.end(), uint8_t(0));
+    } else if (op == MicroMaskOp::All || op == MicroMaskOp::Invert) {
+        poolFor(mm.baseTriangles, [&](size_t b, size_t e) {
+            for (size_t t = b; t < e; ++t) {
+                if (mesh.triangleHidden(uint32_t(t))) continue;
+                uint8_t* g = mm.mask.data() + t * S;
+                for (size_t k = 0; k < S; ++k) g[k] = op == MicroMaskOp::All ? uint8_t(255) : uint8_t(255 - g[k]);
+            }
+        }, 64);
+    } else {
+        // (the base mesh's pass reaches one edge ring; the grid has n points along a base edge. Sharpen is mostly a
+        // contrast step: once per iteration, as on the base.)
+        const int per = op == MicroMaskOp::Sharpen ? 1 : int(std::min<uint32_t>(mm.n, 16));
+        std::vector<uint8_t> next;
+        for (int i = 0; i < std::max(1, iterations) * per; ++i) {
+            microMaskPass(mesh, mm, op, next);
+            if (next == mm.mask) break;
+            mm.mask.swap(next);
+        }
+    }
+    auto u = std::make_shared<MicroUndo>();
+    u->step = mm.step, u->samples = mm.samples, u->maskAdded = added;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t)
+        if (!std::equal(old.begin() + std::ptrdiff_t(t * S), old.begin() + std::ptrdiff_t((t + 1) * S), mm.mask.begin() + std::ptrdiff_t(t * S)))
+            u->tris.push_back(t);
+    const bool cleared = op == MicroMaskOp::Clear;
+    if (u->tris.empty()) {
+        if (added) std::vector<uint8_t>().swap(mm.mask);
+        return nullptr;
+    }
+    u->mask.resize(u->tris.size() * S);
+    for (size_t k = 0; k < u->tris.size(); ++k) std::copy_n(old.data() + size_t(u->tris[k]) * S, S, u->mask.data() + k * S);
+    if (cleared) { // (freed, as on the base mesh: undo makes it again, MicroUndo::maskAdded)
+        std::vector<uint8_t>().swap(mm.mask);
+        u->maskAdded = true;
+    }
+    if (added || cleared) mm.maskDirty = true;
+    for (uint32_t t : u->tris) mm.markDirty(t);
+    ++mm.revision;
+    if (MicroHistory* h = microHistory(mesh, false)) h->bakeMeeting(u->tris);
+    return u;
 }
 
 } // namespace
@@ -425,12 +571,18 @@ void registerMaskingCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     // Wraps a mask operation as an undoable command.
     auto add = [&registry](std::string name, std::string label, std::string description, std::vector<ParamSpec> params,
-                           std::function<bool(Mesh&, const Args&)> op) {
+                           std::function<bool(Mesh&, const Args&)> op, std::optional<MicroMaskOp> micro = std::nullopt) {
         registry.add({std::move(name), std::move(description), std::move(params),
-                      [label, op](Document& doc, const Args& a) -> CommandResult {
+                      [label, op, micro](Document& doc, const Args& a) -> CommandResult {
                           if (doc.mesh.vertexCount() == 0) return {false, "The mesh is empty"};
                           UndoRecord record = UndoRecord::captureMask(doc.mesh, label);
-                          if (!op(doc.mesh, a)) return {true, label + ": mask unchanged"};
+                          // A micro level brushes and draws with its own mask (per grid point): the op changes that
+                          // one, and the base mesh's only when it has one (Invert or All would mask the whole cage).
+                          const bool onMicro = micro && doc.mesh.micro;
+                          if (onMicro) record.micro = microMaskAdjust(doc.mesh, *micro, std::clamp(int(argNumber(a, "iterations", 1)), 1, 100));
+                          const bool base = (!onMicro || doc.mesh.hasMask()) && op(doc.mesh, a);
+                          if (!record.micro && !base) return {true, label + ": mask unchanged"};
+                          if (!base) record.mask = {};
                           doc.undo.push(std::move(record));
                           doc.modified = true;
                           return {true, label};
@@ -440,19 +592,19 @@ void registerMaskingCommands(CommandRegistry& registry) {
     auto iters = [](const Args& a) { return std::clamp(int(argNumber(a, "iterations", 1)), 1, 100); };
 
     add("mask_clear", "Clear Mask", "Remove the mask so every vertex can be sculpted again.", {},
-        [](Mesh& m, const Args&) { return maskClear(m); });
+        [](Mesh& m, const Args&) { return maskClear(m); }, MicroMaskOp::Clear);
     add("mask_all", "Mask All", "Mask every visible vertex (protects the whole mesh from brushes).", {},
-        [](Mesh& m, const Args&) { return maskAll(m); });
+        [](Mesh& m, const Args&) { return maskAll(m); }, MicroMaskOp::All);
     add("mask_invert", "Invert Mask", "Invert the mask of visible vertices: masked becomes free and vice versa.", {},
-        [](Mesh& m, const Args&) { return maskInvert(m); });
+        [](Mesh& m, const Args&) { return maskInvert(m); }, MicroMaskOp::Invert);
     add("mask_blur", "Blur Mask", "Soften the mask edges by averaging with neighbouring vertices.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskBlur(m, iters(a)); });
+        [iters](Mesh& m, const Args& a) { return maskBlur(m, iters(a)); }, MicroMaskOp::Blur);
     add("mask_sharpen", "Sharpen Mask", "Tighten soft mask edges, pushing values towards fully masked or free.",
-        {iterations}, [iters](Mesh& m, const Args& a) { return maskSharpen(m, iters(a)); });
+        {iterations}, [iters](Mesh& m, const Args& a) { return maskSharpen(m, iters(a)); }, MicroMaskOp::Sharpen);
     add("mask_grow", "Grow Mask", "Expand the masked region by one edge ring per iteration.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskGrow(m, iters(a)); });
+        [iters](Mesh& m, const Args& a) { return maskGrow(m, iters(a)); }, MicroMaskOp::Grow);
     add("mask_shrink", "Shrink Mask", "Contract the masked region by one edge ring per iteration.", {iterations},
-        [iters](Mesh& m, const Args& a) { return maskShrink(m, iters(a)); });
+        [iters](Mesh& m, const Args& a) { return maskShrink(m, iters(a)); }, MicroMaskOp::Shrink);
     add("mask_by_cavity", "Mask by Cavity",
         "Mask concave areas (creases, folds, pores), replacing the current mask - e.g. to protect detail while smoothing.",
         {{"strength", T::Number, "Mask value in the deepest cavities (0-1). Default 1.", false},

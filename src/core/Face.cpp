@@ -6,6 +6,7 @@
 #include "core/Multires.h"
 #include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
+#include "core/Utf8Path.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -1299,7 +1300,7 @@ bool loadFaceTake(const std::string& path, MorphAnimation& out, std::string& err
     std::stringstream ss;
     ss << f.rdbuf();
     if (!parseFaceTake(ss.str(), out, error)) return false;
-    out.name = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().string();
+    out.name = stemUtf8(path);
     return true;
 }
 

@@ -57,12 +57,28 @@ struct SplatCloud {
     // Uniform scale and rotation of `transform`.
     float transformScale() const;
     glm::quat transformRotation() const;
-    // Bakes `transform` into the splats. View-dependent colour (SH degree >= 1)
-    // is dropped when the rotation is not identity, because it would point the
-    // wrong way. Returns false if SH data was dropped.
-    bool bakeTransform();
+    // Bakes `transform` into the splats; the view-dependent colour (SH degree >= 1)
+    // turns with them (rotateSH), so every splat looks the same from the turned view.
+    void bakeTransform();
     // Removes splats by predicate; keeps every array in sync.
     template <class Pred> size_t removeIf(Pred pred);
+};
+
+// View-dependent colour, in the 3DGS spherical-harmonic basis (the reference rasterizer's eval_sh, so .ply captures
+// look as their tools show them): `coeffs` one splat's (degree + 1)^2 coefficients, DC first; `dir` the unit direction
+// from the camera to the splat in the cloud's own frame. Unclamped display colour (0.5 + the sum).
+glm::vec3 evalSH(const glm::vec3* coeffs, int degree, const glm::vec3& dir);
+
+// The SH coefficients of splats turned by a rotation: a splat seen from direction d before is seen from R d after,
+// with the same colour (evalSH(turned, R d) == evalSH(coeffs, d)). One matrix per band (3x3, 5x5, 7x7), built once
+// per rotation and applied per splat; the DC term never changes.
+class ShRotation {
+public:
+    ShRotation(const glm::mat3& rotation, int degree);
+    void apply(glm::vec3* coeffs) const; // one splat's coefficients, in place
+private:
+    int degree_;
+    float band_[3][49]; // band l+1: (2l+3)^2 row-major
 };
 
 // Drops faint and outlying splats (floaters). Returns how many were removed.

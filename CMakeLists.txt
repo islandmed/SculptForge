@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.13.7 LANGUAGES C CXX)
+project(SculptForge VERSION 0.13.8 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -117,6 +117,7 @@ add_library(sculptforge_core STATIC
   src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
   src/core/FileReplace.cpp
+  src/core/Utf8Path.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
   src/core/DataDir.cpp
@@ -175,6 +176,7 @@ add_library(sculptforge_core STATIC
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp
+  src/core/MicroTiles.cpp
   src/core/FocusDetail.cpp
   src/core/FocusBench.cpp
   src/core/MultiresCommands.cpp
@@ -338,7 +340,15 @@ add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Pro
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_ai PUBLIC sculptforge_core Threads::Threads)
-if(WIN32)
+# OFF: no HTTP transport at all (the Python wheels: no libcurl to bundle, and a library that never reaches the network);
+# the AI service commands then say so.
+option(SCULPTFORGE_HTTP "HTTPS for AI services and the brush gallery (WinHTTP or libcurl)" ON)
+if(NOT SCULPTFORGE_HTTP)
+  target_compile_definitions(sculptforge_ai PRIVATE SF_NO_HTTP)
+  if(WIN32)
+    target_link_libraries(sculptforge_ai PRIVATE ws2_32)
+  endif()
+elseif(WIN32)
   target_link_libraries(sculptforge_ai PRIVATE winhttp ws2_32)
 else()
   find_package(CURL QUIET)
@@ -570,6 +580,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/render/Renderer.cpp
     src/render/UvView.cpp
     src/render/MicroFocus.cpp
+    src/render/MicroTilePages.cpp
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
@@ -619,8 +630,9 @@ if(SCULPTFORGE_BUILD_APP)
     # Per-monitor DPI v2 from the first instruction (a window moved between 100 % and 150 % monitors stays sharp
     # and SDL reports each monitor's scale); MSVC merges it into the manifest the linker writes. (SDL 3 also asks
     # for it at start-up; the manifest covers what runs before, and other toolchains rely on that.)
-    if(MSVC)
+    if(MSVC) # (the same manifest, UTF-8 code page included, for the command-line program: its argv and paths)
       target_sources(sculptforge PRIVATE packaging/windows/sculptforge.manifest)
+      target_sources(sculptforge-cli PRIVATE packaging/windows/sculptforge.manifest)
     endif()
   endif()
   if(APPLE)
@@ -675,7 +687,7 @@ if(MSVC)
   set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
   include(InstallRequiredSystemLibraries)
 endif()
-install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
+install(FILES LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)
 # A studio build: the profile's folder (packs, preferences, logo) where core/StudioProfile.h looks for it.
 if(SCULPTFORGE_STUDIO_PROFILE)
@@ -863,16 +875,39 @@ if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
   endif()
 endif()
 if(SCULPTFORGE_BUILD_PYTHON)
+  # The package `sculptforge` (python/sculptforge: __init__.py, type stubs) around the compiled sculptforge._core. In the
+  # build folder it is laid out as installed, in python-package/ (not python/: the app's Python home), for the tests.
+  # The wheel (pyproject.toml, scikit-build-core) installs only component python.
   pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp src/python/CoreCalls.cpp)
-  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
+  set(SF_PY_PACKAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/python-package/sculptforge)
+  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME _core LIBRARY_OUTPUT_DIRECTORY ${SF_PY_PACKAGE_DIR})
+  foreach(cfg ${CMAKE_CONFIGURATION_TYPES}) # (multi-config generators: no Release/ subfolder)
+    string(TOUPPER ${cfg} CFG)
+    set_target_properties(sculptforge_python PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${CFG} ${SF_PY_PACKAGE_DIR})
+  endforeach()
   target_link_libraries(sculptforge_python PRIVATE sculptforge_core sculptforge_ai)
   target_compile_definitions(sculptforge_python PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
-  set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
-      CACHE STRING "Where to install the Python module")
-  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR})
+  file(GLOB SF_PY_PACKAGE_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/python/sculptforge/*)
+  add_custom_command(TARGET sculptforge_python POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SF_PY_PACKAGE_FILES} ${SF_PY_PACKAGE_DIR})
+  if(SKBUILD) # a wheel: the package at the root of site-packages
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "." CACHE STRING "Where to install the Python package")
+  else()
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
+        CACHE STRING "Where to install the Python package")
+  endif()
+  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
+  install(FILES ${SF_PY_PACKAGE_FILES} DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
   if(SCULPTFORGE_BUILD_TESTS)
-    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=$<TARGET_FILE_DIR:sculptforge_python>
+    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
              ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python.py)
+    # The package's own suite (the wheels run it too), here also against sculptforge-cli: the same bytes from both.
+    execute_process(COMMAND ${Python_EXECUTABLE} -c "import pytest, numpy" RESULT_VARIABLE SF_NO_PYTEST OUTPUT_QUIET ERROR_QUIET)
+    if(SF_NO_PYTEST EQUAL 0)
+      add_test(NAME python_package COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
+               SF_CLI=$<TARGET_FILE:sculptforge-cli> ${Python_EXECUTABLE} -m pytest -q -p no:cacheprovider
+               ${CMAKE_CURRENT_SOURCE_DIR}/tests/python)
+    endif()
   endif()
 endif()
 
@@ -928,6 +963,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
     set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
   endif()
+  if(MSVC AND SCULPTFORGE_BUILD_APP) # the manifest's UTF-8 code page took effect, in the app and in the command-line program (gh#223)
+    add_test(NAME windows_utf8_codepage COMMAND sculptforge --acp-selftest)
+    add_test(NAME windows_utf8_codepage_cli COMMAND sculptforge-cli --acp-selftest)
+  endif()
   if(TARGET sculptforge_pyhost) # Python scripting's host starts from the build folder (packages run it on their install)
     add_test(NAME python_selftest COMMAND sculptforge --python-selftest)
   endif()
@@ -972,6 +1011,12 @@ if(SCULPTFORGE_BUILD_TESTS)
   # Every Micro stroke editable (core/MicroHistory.h): edit ms vs how deep the stroke is (tests/tools/ink_replay_bench.cpp).
   add_executable(sf_ink_replay_bench tests/tools/ink_replay_bench.cpp)
   target_link_libraries(sf_ink_replay_bench PRIVATE sculptforge_core)
+  # Detail per stroke (10x scoreboard axis 3): edge width and line FWHM one alpha dab resolves on a Micro level, and its cost (tests/tools/detail_bench.cpp).
+  add_executable(sf_detail_bench tests/tools/detail_bench.cpp)
+  target_link_libraries(sf_detail_bench PRIVATE sculptforge_core)
+  # Adaptive Detail tiles, step 0 (10x scoreboard axis 2): a standalone tile-store prototype's memory, undo ring, page re-resolve and LOD walk on the floor (tests/tools/tiles_probe_bench.cpp).
+  add_executable(sf_tiles_probe_bench tests/tools/tiles_probe_bench.cpp)
+  target_link_libraries(sf_tiles_probe_bench PRIVATE sculptforge_core)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)
@@ -1236,12 +1281,21 @@ if(SCULPTFORGE_BUILD_TESTS)
     endfunction()
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
+    if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
+    endif()
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
+    sculptforge_ui_test(guide_window_look_2880 guide_window_look --size 2880x1800)
+    sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
     sculptforge_ui_test(prefs_updates_1440 prefs_updates --size 1440x900) # the installer's update-check box lands on this switch
     sculptforge_ui_test(prefs_updates_2880 prefs_updates --size 2880x1620)
+    sculptforge_ui_test(keep_strokes_editable_checkbox_1440 keep_strokes_editable_checkbox --size 1440x900)
+    sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
+    sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
     file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)
     foreach(script ${SCULPTFORGE_PERF_TESTS})
@@ -1294,16 +1348,6 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
-    # Label no_d3d12: tests that the Windows PC's WSL GPU path (Mesa's OpenGL on D3D12, ~/Work/.sf/pc.sh) can't run and
-    # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
-    # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
-    # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    # ui_micro_mask_kelvin: the same first micro-displacement frame (D3D12: Removing Device, twice at the 0.12.13 stage).
-    foreach(t ui_micro_levels ui_micro_mask_kelvin)
-      if(TEST ${t})
-        set_tests_properties(${t} PROPERTIES LABELS "ui;no_d3d12")
-      endif()
-    endforeach()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
@@ -1311,18 +1355,30 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Hardware tiers: the first-run card, the tier chip, Turbo, the panel (tests/ui/hardware_tier.sfui).
     # Also at 2880 px wide, so the 200 % top bar has room for the chip and the bolt (the shots show them).
     sculptforge_ui_test(hardware_tier_2880 hardware_tier --size 2880x1620)
+    sculptforge_ui_test(first_run_modal_order_2880 first_run_modal_order --size 2880x1620)
     if(TEST ui_hardware_tier)
       set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # Putting the first-run tier card away: every way, first press, any scale, nothing under it sculpted (#161).
     if(TEST ui_tier_card_click)
-      set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
+      set_tests_properties(ui_tier_card_click ui_first_run_modal_order ui_first_run_modal_order_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # One Alpha palette in the Classic and the SculptForge layout: the same controls reachable (tests/ui/alpha_layouts.sfui,
     # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
+    if(TARGET sculptforge_pyhost)
+      sculptforge_ui_test(python_ui_1440 python_ui --size 1440x900) # script-made interface (sf.ui)
+      sculptforge_ui_test(python_ui_2880 python_ui --size 2880x1800)
+      sculptforge_ui_test(python_startup_1440 python_startup --size 1440x900)
+    endif()
     sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
+    # Adaptive Detail tiles drawn, before/after at three zooms (tests/ui/micro_tiles_closeup.sfui): the READY shots.
+    sculptforge_ui_test(micro_tiles_closeup_1440 micro_tiles_closeup --size 1440x900)
+    sculptforge_ui_test(micro_tiles_closeup_2880 micro_tiles_closeup --size 2880x1800)
     sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
     # Space slides a Mask / Select / Cut shape while it is dragged out (tests/ui/selection_space.sfui, #214), at the review sizes.
+    sculptforge_ui_test(whats_new_since_1440 whats_new_since --size 1440x900)
+    sculptforge_ui_test(whats_new_since_2880 whats_new_since --size 2880x1800)
+    sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
     sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
@@ -1395,6 +1451,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_1440 open_unicode_name --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_2880 open_unicode_name --size 2880x1800)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
     sculptforge_ui_test(paint_intensity_1440 paint_intensity --size 1440x900) # #164: the top bar's Intensity at 1440

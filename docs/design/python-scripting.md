@@ -5,8 +5,8 @@ scripts that add their own buttons and panels; their own Qt windows beside the a
 
 ## Phases
 
-1. **Python in the console and script files** (this note's first part, built).
-2. **Script-made interface**: actions (menu items, shelf buttons), and panels of labels, buttons, sliders and check
+1. **Python in the console and script files** (built).
+2. **Script-made interface** (built): actions (menu items, shelf buttons), and panels of labels, buttons, sliders and check
    boxes, declared by a script and drawn by SculptForge's own interface.
 3. **An event-loop hook for other toolkits** (PySide windows beside the app): a timer on the main thread. Needs its
    own security review (below) before it ships.
@@ -77,7 +77,7 @@ What SculptForge guarantees:
   `--python-selftest` prints it, and every package job fails unless it says "none" (input/CEO, 11-17). A package whose
   runtime is missing has no Python and says why in the status bar.
 
-## P2: script-made interface (plan)
+## P2: script-made interface
 
 ```python
 import sculptforge as sf
@@ -99,23 +99,37 @@ p.button("cleanup.run")
   Controls are drawn by our widgets from a list the host hands over; values live in the app (no Python per frame),
   and a change calls the script's callback once (a slider: when released).
 - Script UI lives as long as the session. To have it at every start, the user ticks **Run at start-up** for that
-  script in Preferences > Scripts (an explicit opt-in per file, remembered in python.json by path and content hash: a
-  script that changed asks again). Nothing else runs at start-up.
+  script in Preferences > Scripts, the only auto-run path, kept tight (input/CEO condition, 11-17): opt-in per script;
+  listed there with its off switch (ticked scripts gone from the folder stay listed); only files directly in the
+  Scripts folder (canonical path check, at tick time and at start); remembered with the file's SHA-256 in python.json; a
+  mismatch doesn't run, says why in the status bar and the console, and Preferences offers Trust this version (one
+  click; it doesn't run it then); Python off or the policy's never: nothing runs. The file is read once: the bytes
+  hashed are the bytes run (Host::runSource), so a change after the check can't run. tests/ui/python_startup.sfui.
 - Floor tier: nothing per frame unless a script panel is on screen; a script action costs what any action costs.
 
-## P3: other toolkits (plan, security review below)
+## P3: other toolkits
 
-`sf.ui.timer(callback, ms)` calls `callback` on the main thread, between frames, at most every `ms` (the app keeps a
-next-due time; while no timer is registered nothing runs). A PySide script calls `app.processEvents()` from it, so
-its windows stay alive beside SculptForge without a second thread touching the scene.
+`sf.ui.timer(callback, ms)` calls `callback` on the main thread, between frames, about every `ms` (at least 10 ms).
+The host keeps the next due time in an atomic (steady clock); the main loop's wait ends at it
+(`PythonScripting::timerWake`) and each loop pass runs the due callbacks (`tickTimers`), as one undo batch, then the
+frame is drawn only if something changed (frameKey). With no timer set, or Python never loaded, both are a pointer
+check: nothing per frame, no wake-ups. A PySide script calls `app.processEvents()` from it, so its windows stay alive
+beside SculptForge, their signals arrive on the main thread, and no second thread touches the scene.
 
-### Security review for P3 (to complete before P3 is READY)
+### Security review (P3)
 
-- What runs: only callbacks a user-run script registered; they stop when the script's timers are cleared or the
-  app quits. No timer survives a restart unless the script itself is a Run at start-up script.
-- Attack surface: SculptForge adds none (no listener, port, IPC or file it watches). Qt itself may open what the
-  script asks for; that is the script's code, under the same trusted-code rule.
-- Failure modes: a callback that raises is turned off with a message (it doesn't fire again); one that takes too
-  long blocks the frame like any script; Qt's own event loop is never entered with exec() from the main thread
-  (documented: processEvents only).
-- Review: second opinions on the diff and the reviewer's FULL lane.
+The hook adds a way for code that is already running to keep running later. It adds no way for code to start.
+
+- **What can run.** Only callbacks that a script the user ran registered (console, Scripts list, Run script file, a
+  ticked Run at start-up script). No file, pack, layout, macro, project or AI tool registers a timer; timers live in
+  memory and none survives a restart (a Run at start-up script registers its own again: its SHA-256 is checked first).
+- **Attack surface.** SculptForge opens nothing for it: no listener, port, socket, pipe, IPC or watched file. A
+  toolkit the script imports may open what the script asks it to (a Qt window talks to the window system; Qt's own
+  networking only if the script uses it): that is the script's code, under the trusted-code rule the guide states.
+- **Threads.** Callbacks run on the main thread holding the GIL; a toolkit's other threads can't change the scene
+  (mainThreadOnly). Qt's QApplication made from a timer is on the main thread, as Qt requires.
+- **Failure.** A callback that raises is stopped with its traceback (it can't spin errors every frame); one that
+  blocks freezes the window like any long script (stated in the guide: never exec()). SystemExit in a callback is
+  ignored. The interval floor (10 ms) keeps a careless 0 from spinning the CPU.
+- **Policy.** `python.scripts: never` keeps the host from loading, so no timer can exist.
+- **Reviewed by:** second opinions on the diff (second-opinion/outbox/python-app-p3-review) and the FULL review lane.

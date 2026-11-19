@@ -61,8 +61,10 @@
 #include "core/ImageTo3D.h"
 #include "core/Project.h"
 #include "core/Script.h"
+#include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "core/Utf8Path.h"
 
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
@@ -1058,7 +1060,8 @@ bool App::wantsFrames(double now) const {
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
-           renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
+           renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
+           renderer_.microTilePagesWantFrame(); // Adaptive Detail tiles: pages for what came into view, on the next frame
 }
 
 uint64_t App::frameKey() const {
@@ -1230,6 +1233,8 @@ int App::run() {
             int timeout = io.WantTextInput ? kCaretTickMs : kIdleTickMs;
             if (redrawAt_ > 0.0) timeout = std::clamp(int((redrawAt_ - t0) * 1000.0) + 1, 0, timeout);
             if (panelsActiveUntil_ > t0) timeout = std::min(timeout, 16); // a hovered panel window's tooltips
+            if (double in = 0.0; python_ && python_->timerWake(in)) // a script's timer (sf.ui.timer)
+                timeout = std::clamp(int(in * 1000.0) + 1, 0, timeout);
             if (SDL_WaitEventTimeout(&e, timeout)) {
                 onEvent(e);
             } else if (io.WantTextInput) {
@@ -1240,6 +1245,7 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        if (python_) python_->tickTimers(); // a script's due timers (what they change shows through frameKey)
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
         if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())
@@ -2001,6 +2007,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
+        ++penDiag_.wheel;
+        if (penInProximity_) ++penDiag_.wheelPenInRange;
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
             !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
@@ -2158,6 +2166,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     // side button) is not a new click, which would arm the menu again in the middle of the drag.
     if (button == SDL_BUTTON_RIGHT && rightClick_.down && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) return;
     dragFromPen_ = lastInputPen_;
+    pointerDragMoved_ = false;
     doc_.syncBvh();
     if (button == SDL_BUTTON_LEFT && erasing() && eraserAction() != PenAction::Invert && eraserAction() != PenAction::Smooth) {
         // The eraser end set to Erase mask or Nothing (Preferences > Tablet).
@@ -2344,7 +2353,23 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
-    if (!fromPen && penInProximity_) penLeft();
+    // A view drag a mouse button began (a compositor that maps the pen's barrel buttons to a right / middle click, KDE's
+    // tablet defaults, sends the click as the pointer's) is the pointer's to the end once the pointer moves it, as
+    // strayMouseMotion keeps a pen's drag the pen's: the pointer moves with the pen, so the pen's own samples between its
+    // events were a second path for the same drag. Each one reset the right click's slop, and the drag never began or was
+    // carried twice (#216). (A pointer that never moves, a driver's click only: the pen's samples are the drag.) The pen
+    // is not gone for that pointer (it would let go of the side buttons held), the drag goes by the pointer's position,
+    // not SDL's steps (which the pen's own mouse events may have moved on), and at the pen's view speed.
+    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll;
+    const bool pointerDrag = viewDrag && !dragFromPen_;
+    const bool withPen = !fromPen && pointerDrag && penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
+    if (!fromPen && penInProximity_ && !withPen) penLeft();
+    if (withPen) {
+        dx = x - mouseX_;
+        dy = y - mouseY_;
+    }
+    if (!fromPen && pointerDrag) pointerDragMoved_ = true;
+    if (fromPen && pointerDrag && pointerDragMoved_) return;
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
@@ -2397,13 +2422,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         }
     }
     // Preferences > Tablet > View speed: the pen's view drags (tip or side button) by its own amount per pixel.
-    if (fromPen && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
+    if ((fromPen || withPen) && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
         dx *= uiPrefs_.tablet.viewSpeed;
         dy *= uiPrefs_.tablet.viewSpeed;
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy, !fromPen); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !(fromPen || withPen)); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2606,6 +2631,7 @@ void App::onMouseUp() {
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
+    pointerDragMoved_ = false;
     penNavButton_ = 0;
 }
 
@@ -3367,7 +3393,7 @@ void App::openFileDialog() {
 
 // Opens models, brushes or reference images based on the file type.
 void App::openPath(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = extensionUtf8(path);
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (Image::isImagePath(path)) {
         if (takeReferenceDrop(path)) return; // View > Reference images showing: it becomes one (ReferenceImages.cpp)
@@ -3515,7 +3541,7 @@ void App::processPendingFiles() {
             insertType_ = "mesh";
             insertMeshKey_ = "file";
             insertMeshValue_ = f.path;
-            status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
+            status_ = "Insert " + fileNameUtf8(f.path) +
                       ": drag on the model to place it. Esc or a brush stops.";
             break;
         case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
@@ -3570,7 +3596,8 @@ void App::syncScene() {
         scene.back().pbr = renderSettings_.pbr();
     }
     renderer_.syncScene(scene);
-    renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
+                         splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
     updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;
@@ -3635,7 +3662,7 @@ void App::updateUndoNotice() {
 void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
-                           : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                           : fileNameUtf8(doc_.path);
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.

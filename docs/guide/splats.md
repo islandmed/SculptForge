@@ -45,7 +45,9 @@ palette to place them:
 | **Clean floaters** | Removes faint splats and stray outliers around the subject |
 
 The palette also shows the number of splats and their spherical-harmonic degree (for example "1250000 splats
-(SH 3)"), and has:
+(SH 3)"). A capture with SH 1 or more shows its view-dependent colour (the sheen and highlights that change as you
+orbit), as splat viewers do; on the Essential hardware tier they show their plain colour, to keep the view
+smooth. The palette has:
 
 - **Show** and **Show mesh** to show or hide the capture and the sculpt.
 - An **opacity** slider (0.05 to 1) to see the sculpt through the capture.
@@ -79,8 +81,8 @@ file type: PLY (for SuperSplat, Postshot and most tools), glTF (`.glb` with `KHR
 OpenUSD (`.usda` / `.usdz`). The `splat_save` command also writes `.splat`.
 
 Placement you made with **Flip**, **Turn 90** and **Fit** is kept exactly in glTF and USD. PLY has no
-placement, so it is baked into the splats; if the capture was rotated, view-dependent colour (spherical
-harmonics above degree 0) is dropped from the PLY, because it would point the wrong way.
+placement, so it is baked into the splats; the view-dependent colour (spherical harmonics up to degree 3) turns
+with them, so the saved capture looks the same from every side as it does in SculptForge.
 
 When you export USD (**File > Export USD / USDZ...**) with splats loaded, they are included in the same file
 as a `ParticleField3DGaussianSplat` prim next to the meshes.

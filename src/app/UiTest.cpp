@@ -109,6 +109,7 @@
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
+//                            whats_new_more (improvements past its cards), whats_new_scrolled (1 once its cards scrolled),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
@@ -141,6 +142,8 @@
 //                            $NAME+K or $NAME-K (see remember)
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft
+//                            (micro grid points masked at least half / partly),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
 //                            and selection_w / selection_h (from there to the cursor), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
@@ -257,6 +260,8 @@
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
+//   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
+//   python_startup append TEXT  the same, adding the line TEXT to each script between its check and its run
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
@@ -302,6 +307,7 @@
 //   pen_button N down|up [at X Y]   side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click;
 //                            at: the event carries that position (window fractions) instead of the pen's, as a
 //                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
+//   pen_move X Y [S]         the same to a point of the window (fractions): a fixed path, whatever the view does
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -329,7 +335,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
+//   pen_stream ink|huion|kde|kde_pointer|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -409,8 +415,10 @@
 #include "core/BrushLibrary.h"
 #include "core/CloseHoles.h"
 #include "core/ListSort.h"
+#include "core/Micro.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
+#include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
 #include "core/Primitives.h"
 #include "core/Script.h"
@@ -699,6 +707,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return sum / double((bx - ax) * (by - ay));
     }
     if (name == "triangles") return double(m.triangleCount());
+    // Adaptive Detail tiles (core/MicroTiles.h): tiles alive on the active Part's Micro level; delta pages on the GPU.
+    if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
+    if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
@@ -724,6 +735,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "threads") return double(ThreadPool::shared().threads()); // the shared pool's size now (workers + the caller)
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
     if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
+    if (name == "keep_strokes_editable") return app_.uiPrefs_.keepStrokesEditable ? 1.0 : 0.0;
     if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
     if (name == "fast_upload") return app_.uiPrefs_.fastUpload ? 1.0 : 0.0;
     if (name == "live_move_active") return app_.liveMove_.active ? 1.0 : 0.0; // (a Move drag drawn by the GPU)
@@ -1268,6 +1280,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
+    if (name == "guide_role_edge") return app_.guide_.roleShown() ? 1.0 : 0.0; // the guide window drew its Learn edge + strip
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "parts") return double(doc.partCount());
@@ -1337,6 +1350,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // entries (versions in full, then groups) and its open sections.
     if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
     if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_scrolled") return app_.whatsNewScrolled() ? 1.0 : 0.0;
+    if (name == "whats_new_more") return double(app_.whatsNewMore());
     if (name == "whats_new_tries") return double(app_.whatsNewTries_);
     if (name == "whats_new_contents") return double(app_.guide_.whatsNewContents().size());
     if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
@@ -1416,6 +1431,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "masked") {
         size_t n = 0;
         for (float v : m.mask) n += v > 0.5f;
+        return double(n);
+    }
+    if (name == "micro_moved") { // micro grid points whose height changed since `snapshot` (-1: no micro level or snapshot)
+        if (!m.micro || baseMicro_.size() != m.micro->disp.size()) return -1.0;
+        size_t n = 0;
+        const int16_t* d = m.micro->disp.data();
+        for (size_t i = 0; i < baseMicro_.size(); ++i) n += d[i] != baseMicro_[i];
+        return double(n);
+    }
+    if (name == "micro_masked" || name == "micro_mask_soft") { // micro grid points masked (>= half) / partly masked
+        if (!m.micro) return -1.0;
+        size_t n = 0;
+        for (uint8_t v : m.micro->mask) n += name == "micro_masked" ? v >= 128 : v > 2 && v < 253;
         return double(n);
     }
     if (name == "mask_soft") { // vertices partly masked (a blurred edge)
@@ -1872,10 +1900,10 @@ enum class StepVerb { None,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
-    GeneratorStub, Env, Run, RunFails, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
+    GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
-    PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
+    PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, Shot,
@@ -1948,7 +1976,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"generator_stub", StepVerb::GeneratorStub},
         {"env", StepVerb::Env},
         {"run", StepVerb::Run},
-        {"run_fails", StepVerb::RunFails},
+        {"run_fails", StepVerb::RunFails}, {"python_startup", StepVerb::PythonStartup},
         {"first_run_language", StepVerb::FirstRunLanguage},
         {"support_card", StepVerb::SupportCard},
         {"member_card", StepVerb::MemberCard},
@@ -1977,7 +2005,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_drag_item", StepVerb::PenDragItem},
         {"pen_tap", StepVerb::PenTap},
         {"pen_button", StepVerb::PenButton},
-        {"pen_hover", StepVerb::PenHover},
+        {"pen_hover", StepVerb::PenHover}, {"pen_move", StepVerb::PenMove},
         {"pen_enter", StepVerb::PenEnter},
         {"pen_drag", StepVerb::PenDrag},
         {"pen_pressure", StepVerb::PenPressure},
@@ -3575,6 +3603,20 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::PythonStartup: { // python_startup [append TEXT]: TEXT is added to each script after its check
+        const std::string append = w.size() > 2 && w[1] == "append" ? restOf(lineText_, 2) + "\n" : std::string();
+        run([this, append] {
+            PythonScripting& py = app_.python();
+            if (!append.empty())
+                py.afterStartupCheck = [append](const std::string& path) {
+                    const std::filesystem::path p(std::u8string(path.begin(), path.end()));
+                    std::ofstream(p, std::ios::binary | std::ios::app) << append;
+                };
+            py.runStartupScripts(true);
+            py.afterStartupCheck = nullptr;
+        });
+        break;
+    }
     case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused ($SCRIPT_DIR as for run)
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
@@ -3621,7 +3663,10 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return false;
             }
         }
-        run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
+        run([this, firstRun, testMode] {
+            app_.launchSupportCard(firstRun, app_.memberClock(), testMode);
+            app_.tickSupportCardQueue(); // (a start's next frame: it opens now unless a first-run box is up)
+        });
         break;
     }
     case StepVerb::MemberCard: {
@@ -3946,6 +3991,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
         break;
     }
@@ -4082,6 +4128,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.05f);
         break;
     }
+    case StepVerb::PenMove: { // the hovering pen to a point of the window (not of the model, which turns under it)
+        if (!need(2)) return false;
+        const float x = num(1, 0.5f), y = num(2, 0.5f), seconds = num(3, 0.4f);
+        auto from = std::make_shared<ImVec2>();
+        auto to = std::make_shared<ImVec2>();
+        steps_.push_back([this, from, to, x, y, seconds](float t) {
+            if (t == 0.0f) {
+                *from = penIn_ ? penAt_ : mouse_;
+                if (!penIn_) penProximity(true);
+                int ww = 0, wh = 0;
+                SDL_GetWindowSize(app_.window_, &ww, &wh);
+                *to = ImVec2(x * float(ww), y * float(wh));
+            }
+            const float k = std::min(t / seconds, 1.0f);
+            penMove(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
+            return t >= seconds;
+        });
+        wait(0.05f);
+        break;
+    }
     case StepVerb::PenEnter: {
         // The pen comes into range at u, v straight away (put down elsewhere on the tablet, no hover there).
         if (!need(2)) return false;
@@ -4142,6 +4208,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4619,7 +4686,7 @@ void Demo::penMove(float x, float y) {
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
-    if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
+    if (huionStream_ || kdeStream_ != 0) mouseMotion(x, y, kDriverMouse); // ... and the driver moves it too
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4733,6 +4800,14 @@ void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     e.pbutton.y = at ? at->y : penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
+    // KDE maps the barrel buttons to mouse buttons in the compositor: the tablet protocol's button event, then the pointer's
+    // click, at the pointer (where the pen is).
+    static const int kKdeMouse[] = {0, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
+    if (kdeStream_ != 0 && button >= 1 && button <= 2) {
+        if (kdeStream_ == 1) app_.handleEvent(e);
+        mouseButton(down, kKdeMouse[button], kDriverMouse);
+        return;
+    }
     if (driverRight_ == 2 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
     app_.handleEvent(e);
     if (driverRight_ == 1 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4875,7 +4950,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
-                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
                 "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {

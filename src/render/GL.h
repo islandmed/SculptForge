@@ -105,6 +105,7 @@ constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_R16UI = 0x8234;
 constexpr GLenum GL_RED_INTEGER = 0x8D94;
 constexpr GLenum GL_R16I = 0x8233;
+constexpr GLenum GL_RG16F = 0x822F;
 constexpr GLenum GL_RGBA32UI = 0x8D70;
 constexpr GLbitfield GL_MAP_INVALIDATE_RANGE_BIT = 0x0004;
 constexpr GLbitfield GL_DEPTH_BUFFER_BIT = 0x0100;
@@ -240,5 +241,13 @@ const char* load(ProcLoader loader);
 GLint maxTextureBufferTexels();
 uint32_t bufferChunkTexels(uint32_t natural);
 void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+// Partial buffer updates as GPU copies (render/BufferUpload.h): on Mesa's OpenGL over D3D12, whose glBufferSubData into
+// busy texture buffers removes the device; elsewhere BufferSubData (copies cost large micro strokes a third of their frame
+// rate on Mesa/Apple, 11-17). setTestCopyUploads: 1/0 forces it (`gl_limits copies=`, tests only), -1 the driver's.
+bool copyUploads();
+void setTestCopyUploads(int copies);
+// Can this context still draw offscreen (a 4x4 framebuffer completes, no GL error)? false once the GPU dropped the device
+// (Mesa's OpenGL over D3D12: "D3D12: Removing Device"). Clears pending GL errors first.
+bool contextHealthy();
 
 } // namespace gl

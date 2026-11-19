@@ -198,6 +198,10 @@ inline bool appealDue(const SupportCardPrefs& p, std::string_view version, bool 
     return p.starts >= kAppealFromStart && p.appealVersion != version;
 }
 
+// Android APKs are members-only for now (tablets: members first, then free), so no membership card of any kind shows in
+// them. Set this false when the tablet build goes free: the plea rules then apply as on desktop (App::pleaBlocked).
+inline constexpr bool kAndroidMembersOnly = true;
+
 enum class SupportCardReason { None, FirstRun, Manual };
 
 // The full card at launch: the first start after install only (Help > Support and the welcome open it by hand).

@@ -158,6 +158,9 @@ const std::string& HelpShown();
 // before its ImGui::Begin / BeginPopupModal and PopRole right after, so menus and tooltips opened inside keep the plain
 // colours (Begin draws the surface, edge and title bar); then RoleStrip inside it, first thing: the strip across its
 // top and, in a title bar, the role's icon after the title. Nothing moves: only colours, the strip and the icon.
+// The surface PushRole gives a role pop-up (`lift` < 0: theme::popupLift; `wash`: how much of the role's colour), for
+// children that paint their own background.
+ImVec4 RoleSurface(theme::Role role, float lift = -1.0f, float wash = 0.05f);
 void PushRole(theme::Role role);
 void PopRole();
 void RoleStrip(theme::Role role);

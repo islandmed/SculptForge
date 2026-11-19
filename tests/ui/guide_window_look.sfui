@@ -1,0 +1,42 @@
+# The User Guide window is a Learn pop-up (Theme.h Role): edge, strip and a page a step off the app's panels in every
+# look, and Plain (Preferences > Interface > Look > Pop-up colours) keeps the old panel colours. Shots for the look review.
+# CMake runs it at 1440x900, 2880x1800 and 800x1280.
+run new_sphere subdivisions=3
+run ui_look look=forge scheme=neutral layout=sculptforge popup_colors=role
+key shift+f1
+wait 0.3
+expect_value guide_open == 1
+expect_value guide_role_edge == 1
+shot forge-role
+run ui_look popup_colors=plain
+wait 0.2
+expect_value guide_role_edge == 0
+shot forge-plain
+run ui_look popup_colors=role
+run ui_look look=classic layout=classic
+wait 0.2
+expect_value guide_role_edge == 1
+shot classic-role
+run ui_look popup_colors=plain
+wait 0.2
+shot classic-plain
+run ui_look popup_colors=role
+run ui_look look=phosphor
+wait 0.2
+expect_value guide_role_edge == 1
+shot phosphor-role
+run ui_look popup_colors=plain
+wait 0.2
+shot phosphor-plain
+run ui_look popup_colors=role
+run ui_look look=blueprint
+wait 0.2
+expect_value guide_role_edge == 1
+shot blueprint-role
+run ui_look popup_colors=plain
+wait 0.2
+shot blueprint-plain
+run ui_look popup_colors=role
+run ui_look look=forge scheme=nord layout=sculptforge
+wait 0.2
+shot nord-role
