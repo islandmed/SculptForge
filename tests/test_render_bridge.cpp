@@ -4,7 +4,7 @@
 // The render bridge (ai/RenderBridge.h): the render stage (camera, lights, settings), the helper's command line and
 // help, what may be started and with which environment, the helper's fingerprint, and whole renders through
 // tests/data/render_bridge/fake_usdrecord (a Python stand-in for usdrecord). With OpenUSD's own usdrecord on PATH the
-// USD written for the bridge is also rendered for real (Storm); without it that test says so and is skipped.
+// USD written for the bridge is also rendered for real (Storm); without it, or where it has no GPU (macOS CI), that test says so and is skipped.
 #include "TestHarness.h"
 
 #include "ai/RenderBridge.h"
@@ -387,6 +387,12 @@ TEST(render_bridge_usd_renders_in_openusd) {
     std::string err;
     CHECK(job.start(helper, info, r, {{"Sphere", &sphere}}, "Sphere", env, err));
     while (job.poll() == rb::State::Running) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // A GPU-less runner (the macOS CI one: no Metal device) makes Storm abort in IOGPU before it draws: nothing of ours to
+    // test there, so say so. With a GPU, or any other failure, the check below still holds.
+    if (job.state() != rb::State::Done && job.error().find("IOGPUMetalResource") != std::string::npos) {
+        std::printf("  render_bridge_usd_renders_in_openusd: skipped (usdrecord has no GPU here: Storm needs a Metal device)\n");
+        return;
+    }
     if (job.state() != rb::State::Done) std::printf("  usdrecord: %s\n", job.error().c_str());
     CHECK(job.state() == rb::State::Done);
     Image image;
