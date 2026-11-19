@@ -52,7 +52,7 @@ public:
     // two seconds; only while a list of them is drawn).
     std::string scriptsFolder() const;
     const std::vector<std::string>& scripts();
-    // The .py files in the folders of SCULPTFORGE_SCRIPT_PATH (core/ScriptPath.h; a studio profile's scriptPaths): listed in
+    // The .py files directly in the folders of SCULPTFORGE_SCRIPT_PATH (top level only; core/ScriptPath.h; a studio profile's scriptPaths): listed in
     // the Script menu, run only by a click, never at start-up (that stays scripts() and its SHA-256 trust). A file name
     // in the Scripts folder hides the same name there. Empty under a policy that says never. Same scan as scripts().
     const std::vector<std::string>& pathScripts();
