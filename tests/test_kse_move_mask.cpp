@@ -3,7 +3,7 @@
 //
 // A tester's report on a micro level (80K base triangles, a 5M micro level), Keep Strokes Editable on: Move moved the
 // surface and it snapped back at the release; Tool > Masking > Adjust (Invert, Blur, ...) did nothing. The promises,
-// with the option off and on: a Move keeps exactly what the last drag left (the cage path, the grid's path with a mask
+// with the option off and on: a Move keeps exactly what the last drag left (the cage path, with and without a mask
 // near, and Move along normals), through the strokes that follow; Adjust changes the mask the micro level brushes and
 // draws with (its own per grid point), with an undo step that brings the old one back.
 #include "TestHarness.h"
@@ -72,7 +72,7 @@ void moveKeeps(bool keep, MoveKind kind) {
     Document doc = microDoc(keep);
     Sculptor& sc = doc.sculptor;
     standardStroke(doc, glm::vec3(-0.05f, 0.0f, 1.0f)); // (brushes work: a kept stroke under the Move)
-    if (kind == MoveKind::MaskNear) { // a mask beside the Move: the grid's per-point rule
+    if (kind == MoveKind::MaskNear) { // a mask beside the Move: the cage holds it
         CHECK(sc.beginStroke(doc.mesh, "Mask"));
         sc.dabMask(doc.mesh, doc.bvh, dabAt(glm::vec3(0.25f, 0.0f, 1.0f), 0.08f, 1.0f), noSymmetry());
         doc.undo.push(sc.endStroke());

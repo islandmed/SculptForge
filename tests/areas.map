@@ -269,6 +269,7 @@ test_ink                    sculpt
 test_micro                  mesh
 test_micro_history          sculpt
 test_micro_mask_grab        mesh
+test_micro_move_folds       mesh
 test_multires*              mesh
 test_part*                  mesh
 test_primitives_insert      mesh
