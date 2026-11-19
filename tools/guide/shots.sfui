@@ -315,12 +315,14 @@ wait 0.2
 shot guides-with
 click "Wire##view.wire"
 
-# Make sculptable (scan-to-sculptable.md): splats made from our starter head sculpt, the review with its face landmarks
+# Make sculptable (scan-to-sculptable.md): splats made from our starter head sculpt (the sculpt then hidden, as with a
+# real capture), the review with its face landmarks
 # and loops (the mouth corners and chin dragged onto the lips and chin, as the panel asks), and the finished quads.
 run new_starter_mesh name=human-head levels=3
 wait_idle 20
 run mesh_to_splats count=1000000
 wait_idle 20
+click "Parts/##eye Human Head"
 camera 0 0
 click "Show mesh"
 wait 0.3

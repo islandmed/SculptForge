@@ -13,7 +13,9 @@
 #include "core/Texture.h"
 #include "core/ThreadPool.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 using namespace sf;
 
@@ -413,4 +415,42 @@ TEST(sculptable_deterministic) {
     CHECK(a.scan.positions == b.scan.positions && a.scan.colors == b.scan.colors);
     CHECK(a.mesh.positions == b.mesh.positions && a.mesh.triangles == b.mesh.triangles && a.mesh.colors == b.mesh.colors);
     CHECK(a.guides.size() == b.guides.size());
+}
+
+// A smooth curve stays smooth: no voxel terraces (they read as contour rings on a forehead). On a dense sphere
+// capture at the default Detail, face normals follow the sphere's and the surface keeps its radius.
+TEST(sculptable_surface_no_terraces) {
+    const SplatCloud c = makeTestCapture(makeIcosphere(6), TestCaptureOptions{400000});
+    SplatSurfaceOptions o; // Detail 256, smoothing 6
+    Mesh m;
+    std::string err;
+    CHECK(splatSurface(c, o, m, err));
+    CHECK(watertight(m));
+    const glm::vec3 centre = m.bounds().center();
+    std::vector<float> tilt; // degrees between each face normal and the sphere's normal there
+    double r = 0, r2 = 0;
+    for (const glm::uvec3& t : m.triangles) {
+        const glm::vec3 a = m.positions[t.x], b = m.positions[t.y], d = m.positions[t.z];
+        const glm::vec3 n = glm::cross(b - a, d - a);
+        if (glm::length(n) < 1e-12f) continue;
+        const glm::vec3 radial = glm::normalize((a + b + d) / 3.0f - centre);
+        tilt.push_back(glm::degrees(std::acos(std::clamp(glm::dot(glm::normalize(n), radial), -1.0f, 1.0f))));
+    }
+    for (const glm::vec3& p : m.positions) {
+        const double l = glm::length(p - centre);
+        r += l;
+        r2 += l * l;
+    }
+    r /= double(m.vertexCount());
+    const double rms = std::sqrt(std::max(0.0, r2 / double(m.vertexCount()) - r * r));
+    std::sort(tilt.begin(), tilt.end());
+    double mean = 0;
+    for (float a : tilt) mean += a;
+    mean /= double(tilt.size());
+    const float p99 = tilt[tilt.size() * 99 / 100];
+    std::printf("  no_terraces: tilt mean %.2f p99 %.2f deg, radius %.4f rms %.5f (voxel %.4f)\n", mean, p99, r, rms,
+                2.08 / 256.0);
+    CHECK(std::abs(r - 1.0) < 0.02);
+    CHECK(mean < 2.3); // a 0/1 solid: 2.95 and 9.91; the density's crossing: 1.83 and 5.26
+    CHECK(p99 < 6.5);
 }

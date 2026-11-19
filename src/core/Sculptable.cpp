@@ -446,7 +446,18 @@ bool splatSurface(const SplatCloud& cloud, const SplatSurfaceOptions& o, Mesh& o
     const size_t n = grid.size();
     std::vector<uint8_t> wall(n);
     const float threshold = std::max(o.threshold, 1e-4f);
-    for (size_t i = 0; i < n; ++i) wall[i] = grid.values[i] > threshold ? 1 : 0;
+    // The log of the density as 0..255, the threshold at 128 (a Gaussian's log is a parabola, so the final surface
+    // finds where the density crosses the threshold between voxels; a 0/1 solid alone puts it on voxel steps, which
+    // read as contour rings on gentle curves). 0 and 255 are about 12 times below and above the threshold.
+    std::vector<uint8_t> level(n);
+    parallelFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const float d = grid.values[i];
+            wall[i] = d > threshold ? 1 : 0;
+            const float g = d > 0.0f ? std::clamp(0.5f + 0.2f * std::log(d / threshold), 0.0f, 1.0f) : 0.0f;
+            level[i] = uint8_t(std::lround(255.0f * g));
+        }
+    }, 1 << 16);
     std::vector<float>().swap(grid.values);
     morph(wall, dims, closeRadius, true);
     if (!tick(progress, 0.62f)) return fail("Cancelled");
@@ -526,7 +537,14 @@ bool splatSurface(const SplatCloud& cloud, const SplatSurfaceOptions& o, Mesh& o
 
     const auto t2 = Clock::now();
     {
-        std::vector<float> field(solid.begin(), solid.end());
+        // Cells where the density agrees with the solid keep it; the rest (closed gaps, filled holes, dropped
+        // floaters) are firmly inside or outside, as before.
+        std::vector<float> field(n);
+        for (size_t i = 0; i < n; ++i) {
+            const float g = float(level[i]) / 255.0f;
+            field[i] = solid[i] ? (g > 0.5f ? g : 1.0f) : (g < 0.5f ? g : 0.0f);
+        }
+        std::vector<uint8_t>().swap(level);
         std::vector<uint8_t>().swap(solid);
         std::vector<uint8_t>().swap(visited);
         blurField(field, dims);
