@@ -96,7 +96,9 @@ def pe_cert(data):
     return data[off:off + size] if off > 0 and size > 0 else None
 
 
-TEST_CERTS = (b"SculptForge Test", "SculptForge Test".encode("utf-16-be"))  # SignPath's test policy: a self-signed certificate, never for a release
+# SignPath's test policy: a self-signed certificate, never for a release ("Test certificate for 'SculptForge [OSS]'" in the
+# OSS org; "SculptForge Test" in the self-test and the old trial org)
+TEST_CERTS = tuple(t.encode(e) for t in ("SculptForge Test", "Test certificate for 'SculptForge") for e in ("utf-8", "utf-16-be"))
 
 
 def signed_problem(name, data):
@@ -184,6 +186,7 @@ def self_test():
             "all unsigned": (unsigned, unsigned, unsigned, 3),
             "installer test-signed": (fake_pe(True, cert=b"CN=SculptForge Test"), signed, signed, 1),
             "mcpb exe test-signed": (signed, signed, fake_pe(True, cert=b"x CN=SculptForge Test x"), 1),
+            "zip exe OSS test-signed": (signed, fake_pe(True, cert=b"CN=Test certificate for 'SculptForge [OSS]'"), signed, 1),
         }.items():
             dd = Path(d) / name.replace(" ", "_")
             dd.mkdir()

@@ -128,7 +128,7 @@ and `v*` tags only:
    `.zip` (and build_mcpb.py the `.mcpb`), so all three carry signed exes.
 2. The NSIS installer goes (artifact configuration `SIGNPATH_CONFIG_INSTALLER`, default `installer`) and comes back signed.
 3. `tools/ci/verify_signed.ps1` (Get-AuthenticodeSignature = Valid, with a timestamp) checks every returned file, then
-   the exes inside the installer's `.zip` and the `.mcpb`. A failed or missing signature fails the job: no unsigned
+   the exes and our DLLs inside the installer's `.zip` and the `.mcpb` (not the Python and MSVC runtime DLLs). A failed or missing signature fails the job: no unsigned
    package is ever staged under `SIGNING=signpath`. A release policy that waits for approval holds the job up to
    `SIGNPATH_TIMEOUT` seconds (default 3600) per request.
 4. The job's summary and a notice say `Windows: signed (SignPath, <subject>)` or `Windows: unsigned (SIGNING off)`;
@@ -179,8 +179,8 @@ Once the Foundation's OSS subscription is active, paste the XML above and set `S
 (No third-party DLL is shipped: SDL and every other dependency are linked into the exes. Upstream binaries must never go
 to SignPath under our subscription.)
 
-**Test signing** (a policy `test-signing` with a self-signed "SculptForge Test" certificate, looks worse to users than
-unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
+**Test signing** (a policy `test-signing` with a self-signed certificate, "Test certificate for 'SculptForge [OSS]'", looks
+worse to users than unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
 do it (check_workflows.py), the notice says `Windows: test-signed (not for release ...)`, `verify_signed.ps1 -Test` accepts the
 untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
 `release.sh --stage` and `verify_staged.py --require-signed` refuse the test certificate anyway).
