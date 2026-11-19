@@ -22,7 +22,7 @@ name: Packages
 # Runners: repository variables SF_RUNNER_* (Settings > Secrets and variables > Actions > Variables) name other
 # runners for these build-and-test jobs; unset, they are GitHub's standard ones. No job here gets a secret except
 # Windows x64, and that one only the SignPath token, only in the two signing steps, only with the repository variable
-# SIGNING=signpath on a run for main, staging or a tag (docs/releasing.md "Windows code signing"; the rules are
+# SIGNING=signpath on a run for staging or a tag (docs/releasing.md "Windows code signing"; the rules are
 # tools/release/check_workflows.py). Everything else about signing is in that job.
 
 on:
@@ -451,13 +451,16 @@ jobs:
     runs-on: ${{ vars.SF_RUNNER_WIN || 'windows-2022' }}
     env:
       # Code signing (SignPath Foundation). Off unless the repository variable SIGNING is `signpath`; then the exes are
-      # signed before the installer and .zip are made and the installer after, and any failure fails the job (never an
-      # unsigned package under SIGNING=signpath). Only runs for main, staging and release tags sign: a dispatch from
-      # another branch builds unsigned (it can never be promoted: staged_run.py wants a push to staging or main).
+      # signed before the installer and .zip are made and the installer after. Each release-policy request waits for the
+      # maintainer's approval in SignPath at most SIGNPATH_TIMEOUT seconds (default 1800; scripts/release.sh wakes the
+      # approver): not approved in time, denied or failed, that part ships unsigned as before signing existed, and the
+      # notice says so (never a stuck release). A signature SignPath returned that doesn't verify still fails the job.
+      # Only runs for staging and release tags sign (what a release promotes or builds): main and a dispatch from another
+      # branch build unsigned, so no approval is asked for a run that is never released.
       # SIGN_TEST: a maintainer's workflow_dispatch with sign_test signs with the TEST policy instead (self-signed
       # test certificate; the packages say "test-signed (not for release)" and can't be promoted).
       SIGN_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_test == true }}
-      SIGN: ${{ (vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) }}
+      SIGN: ${{ (vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) }}
       SIGN_POLICY: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || vars.SIGNPATH_SIGNING_POLICY_SLUG }}
     steps:
       - uses: actions/checkout@v7
@@ -560,6 +563,8 @@ jobs:
           retention-days: 1
       - name: Signing - SignPath signs the binaries
         if: env.SIGN == 'true'
+        id: sign-binaries
+        continue-on-error: ${{ env.SIGN_TEST != 'true' }} # not approved in time: the unsigned exes ship (the test dry run fails instead)
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -568,11 +573,11 @@ jobs:
           signing-policy-slug: ${{ env.SIGN_POLICY }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_CONFIG_BINARIES || 'binaries' }}
           github-artifact-id: ${{ steps.sign-binaries-in.outputs.artifact-id }}
-          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '3600' }} # a release policy may wait for an approval
+          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '1800' }} # the release policy waits for an approval
           output-artifact-directory: signing/binaries-signed
           parameters: "${{ vars.SIGNPATH_PARAMS == '1' && format('version: {0}', toJSON(env.SF_VERSION)) || '' }}" # the artifact configurations declare `version` only with SignPath's OSS plan (docs/releasing.md); the trial has no parameters
       - name: Signing - signed binaries replace the built ones (the installer and .zip take them), checked
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
         shell: pwsh
         run: |
           foreach ($f in Get-ChildItem signing\binaries -File) {
@@ -609,13 +614,13 @@ jobs:
           python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); sys.exit(0 if any(x.endswith('/bin/portable.txt') for x in n) else 1)" (Get-Item build\SculptForge-*-windows-*.zip).FullName
           if ($LASTEXITCODE -ne 0) { throw "the .zip has no bin/portable.txt" }
       - name: Signing - the installer, for SignPath
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
         shell: pwsh
         run: |
           New-Item -ItemType Directory signing\installer | Out-Null
           Copy-Item build\SculptForge-*-windows-*.exe signing\installer
       - name: Signing - upload the unsigned installer
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
         id: sign-installer-in
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -623,7 +628,9 @@ jobs:
           path: signing/installer/*
           retention-days: 1
       - name: Signing - SignPath signs the installer
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        id: sign-installer
+        continue-on-error: ${{ env.SIGN_TEST != 'true' }} # not approved in time: the unsigned installer ships
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -632,11 +639,11 @@ jobs:
           signing-policy-slug: ${{ env.SIGN_POLICY }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_CONFIG_INSTALLER || 'installer' }}
           github-artifact-id: ${{ steps.sign-installer-in.outputs.artifact-id }}
-          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '3600' }}
+          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '1800' }}
           output-artifact-directory: signing/installer-signed
           parameters: "${{ vars.SIGNPATH_PARAMS == '1' && format('version: {0}', toJSON(env.SF_VERSION)) || '' }}" # the artifact configurations declare `version` only with SignPath's OSS plan (docs/releasing.md); the trial has no parameters
       - name: Signing - signed installer replaces the built one, checked
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-installer.outcome == 'success'
         shell: pwsh
         run: |
           foreach ($f in Get-ChildItem signing\installer -File) {
@@ -648,7 +655,7 @@ jobs:
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python tools/release/build_mcpb.py --cli build/Release/sculptforge-cli.exe --version auto --platform win32 --out "build/SculptForge-{version}-windows-x86_64.mcpb"
       - name: Signing - the .zip and .mcpb carry the signed exes and DLLs
-        if: env.SIGN == 'true'
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
         shell: pwsh
         run: |
           # every .exe, and the DLLs we built (the ones sent to SignPath); the Python and MSVC runtime DLLs ship as their makers
@@ -665,15 +672,24 @@ jobs:
         env:
           SIGNING_VAR: ${{ vars.SIGNING }}
           REF_NAME: ${{ github.ref }}
+          BINARIES: ${{ steps.sign-binaries.outcome }}
+          INSTALLER: ${{ steps.sign-installer.outcome }}
+          WAIT: ${{ vars.SIGNPATH_TIMEOUT || '1800' }}
         run: |
+          $why = "SignPath request not approved within $([int]$env:WAIT / 60) min, denied or failed (see the Signing steps)"
           if ($env:SIGN_TEST -eq 'true') {
             $subject = (Get-AuthenticodeSignature (Get-Item build\SculptForge-*-windows-*.exe).FullName).SignerCertificate.Subject
             $line = "Windows: test-signed (not for release; SignPath test policy, $subject)"
+          } elseif ($env:SIGN -eq 'true' -and $env:BINARIES -ne 'success') {
+            $line = "Windows: unsigned ($why)"
+          } elseif ($env:SIGN -eq 'true' -and $env:INSTALLER -ne 'success') {
+            $subject = (Get-AuthenticodeSignature build\Release\sculptforge.exe).SignerCertificate.Subject
+            $line = "Windows: partly signed (exes signed by SignPath, $subject; installer unsigned: $why)"
           } elseif ($env:SIGN -eq 'true') {
             $subject = (Get-AuthenticodeSignature (Get-Item build\SculptForge-*-windows-*.exe).FullName).SignerCertificate.Subject
             $line = "Windows: signed (SignPath, $subject)"
           } elseif ($env:SIGNING_VAR -eq 'signpath') {
-            $line = "Windows: unsigned (SIGNING=signpath ignored on $env:REF_NAME: only main, staging and tags sign)"
+            $line = "Windows: unsigned (SIGNING=signpath ignored on $env:REF_NAME: only staging and tags sign)"
           } else {
             $line = 'Windows: unsigned (SIGNING off)'
           }

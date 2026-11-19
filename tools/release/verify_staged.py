@@ -11,9 +11,9 @@
    in packages.yml), checked with `gh attestation verify`: signed by this repository's packages.yml, for exactly SHA,
    in run ID; with --staged also from a push to REF (default refs/heads/staging; refs/heads/main when main's run built
    it). SHA is the commit the run built: the tagged one, or one with the same build-input key (tools/release/staged_run.py).
-3. --require-signed (release.yml passes it when the repository variable SIGNING is signpath): the Windows installer,
-   and the exes inside the .zip and the .mcpb, carry an Authenticode signature. packages.yml signs and verifies them
-   (SignPath), but a staged run built before signing was turned on would otherwise be promoted unsigned, silently.
+3. Windows: the installer, and the exes inside the .zip and the .mcpb, never carry SignPath's TEST certificate (a dry
+   run's; always checked). Unsigned is allowed: with SIGNING=signpath a release-policy request not approved in time
+   ships unsigned (docs/releasing.md "Windows code signing"). --require-signed (by hand) also refuses unsigned ones.
 """
 import argparse
 import hashlib
@@ -101,30 +101,31 @@ def pe_cert(data):
 TEST_CERTS = tuple(t.encode(e) for t in ("SculptForge Test", "Test certificate for 'SculptForge") for e in ("utf-8", "utf-16-be"))
 
 
-def signed_problem(name, data):
+def signed_problem(name, data, require=True):
     cert = pe_cert(data)
     if cert is None:
-        return [f"{name}: not code-signed (SIGNING=signpath: rebuild the packages, release.sh --rebuild)"]
+        return [f"{name}: not code-signed (--require-signed)"] if require else []
     if any(t in cert for t in TEST_CERTS):
         return [f"{name}: signed with SignPath's TEST certificate (self-signed, not for release)"]
     return []
 
 
-def check_signed(dist):
-    """Problems: Windows executables (installer, and inside the .zip and .mcpb) without a signature."""
+def check_signed(dist, require=True):
+    """Problems: Windows executables (installer, and inside the .zip and .mcpb) signed with the test certificate, or
+    (require) without a signature."""
     errs = []
     for p in sorted(Path(dist).iterdir()):
         if "windows" not in p.name:
             continue
         if p.suffix == ".exe":
-            errs += signed_problem(p.name, p.read_bytes())
+            errs += signed_problem(p.name, p.read_bytes(), require)
         elif p.suffix in (".zip", ".mcpb"):
             with zipfile.ZipFile(p) as z:
                 exes = [n for n in z.namelist() if n.lower().endswith(".exe")]
                 if not exes:
                     errs.append(f"{p.name}: holds no .exe to check")
                 for n in exes:
-                    errs += signed_problem(f"{p.name}: {n}", z.read(n))
+                    errs += signed_problem(f"{p.name}: {n}", z.read(n), require)
     return errs
 
 
@@ -198,6 +199,8 @@ def self_test():
                     z.writestr("x/readme.txt", "text")
             if len(check_signed(dd)) != want:
                 bad.append(f"check_signed {name}: {check_signed(dd)}")
+            if len(check_signed(dd, require=False)) != (1 if "test-signed" in name else 0): # unsigned ships; test-signed never
+                bad.append(f"check_signed lax {name}: {check_signed(dd, require=False)}")
         dd = Path(d) / "noexe"
         dd.mkdir()
         with zipfile.ZipFile(dd / "SculptForge-1-windows-x86_64.zip", "w") as z:
@@ -228,8 +231,8 @@ def main():
     errs = ["no recorded checksums"] if not sums else check_sums(a.dist, sums)
     if not errs and not a.sums_only:
         errs = [e for p in sorted(Path(a.dist).iterdir()) if (e := check_attestation(p, a.repo, a.run, a.sha, a.staged, a.ref))]
-    if not errs and a.require_signed:
-        errs = check_signed(a.dist)
+    if not errs:
+        errs = check_signed(a.dist, a.require_signed)
     for e in errs:
         print(f"::error::{e}")
     if errs:

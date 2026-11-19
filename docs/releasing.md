@@ -120,21 +120,37 @@ Tokens: only `publish` holds a token that can write.
 
 Packages are built once and promoted unchanged, so Windows signing happens in packages.yml's Windows job, not at
 promotion (macOS notarization is separate and not done yet). The repository variable **`SIGNING`** switches it on:
-`signpath` signs, anything else (the default) is the unsigned path, unchanged. With it on, on runs for `main`, `staging`
-and `v*` tags only:
+`signpath` signs, anything else (the default) is the unsigned path, unchanged. With it on, on runs for `staging` and
+`v*` tags only (what a release promotes or builds from the tag; main's runs never ask for an approval):
 
 1. `sculptforge.exe`, `sculptforge-cli.exe` and any DLL in `build/Release` go to SignPath (artifact configuration
    `SIGNPATH_CONFIG_BINARIES`, default `binaries`) and come back signed, **before** cpack makes the installer and
    `.zip` (and build_mcpb.py the `.mcpb`), so all three carry signed exes.
 2. The NSIS installer goes (artifact configuration `SIGNPATH_CONFIG_INSTALLER`, default `installer`) and comes back signed.
 3. `tools/ci/verify_signed.ps1` (Get-AuthenticodeSignature = Valid, with a timestamp) checks every returned file, then
-   the exes and our DLLs inside the installer's `.zip` and the `.mcpb` (not the Python and MSVC runtime DLLs). A failed or missing signature fails the job: no unsigned
-   package is ever staged under `SIGNING=signpath`. A release policy that waits for approval holds the job up to
-   `SIGNPATH_TIMEOUT` seconds (default 3600) per request.
-4. The job's summary and a notice say `Windows: signed (SignPath, <subject>)` or `Windows: unsigned (SIGNING off)`;
-   `release.sh --stage` prints that line and stops if `SIGNING=signpath` and the packages are unsigned. release.yml's
-   `verify` also refuses staged Windows packages without a signature when `SIGNING=signpath` (`verify_staged.py
-   --require-signed`), so a run staged before the switch can't be promoted unsigned: use `--rebuild`.
+   the exes and our DLLs inside the installer's `.zip` and the `.mcpb` (not the Python and MSVC runtime DLLs). A signature
+   that came back and doesn't verify fails the job.
+4. The job's summary and a notice say `Windows: signed (SignPath, <subject>)`, `Windows: partly signed (...)`,
+   `Windows: unsigned (<why>)` or `Windows: unsigned (SIGNING off)`; `release.sh --stage` prints that line.
+
+**Approvals never block the train.** The release policy needs the maintainer's approval in SignPath for every request
+(two per release: the binaries, then the installer), and we release daily. So:
+- Each request waits at most `SIGNPATH_TIMEOUT` seconds (default 1800, 30 minutes). Not approved in time, denied or
+  failed (SignPath down), the step fails *without* failing the job (`continue-on-error`, release policy only) and the
+  unsigned build ships, exactly as before signing existed: binaries not signed = the whole Windows build unsigned (no
+  installer request then); installer not signed = `partly signed` (signed exes in an unsigned installer, .zip and .mcpb
+  signed). The test policy's dry run still fails loudly.
+- `release.sh --stage` (and `--rebuild`, whose Release run builds and signs) watches its run while it waits (one API read
+  every 90 s, only with `SIGNING=signpath`). When the Windows job starts a request it wakes **input** through herdr
+  (`SignPath approval needed for SculptForge X.Y.Z (the binaries): approve the request waiting in
+  https://app.signpath.io/Web/<org>/SigningRequests as hello@ by HH:MM ...`). input approves it in Chrome, signed in as
+  hello@ (the approver account). SignPath also mails hello@ about it.
+- Not fully signed is a warning, never a stop: `release.sh --stage` prints it, and the release checklist (step `status`)
+  prints `Windows: NOT FULLY SIGNED this release: <why>` with the line to put in the release notes and #announcements.
+  The next release asks again.
+- A test-signed package is always refused: `release.sh --stage` stops, and release.yml's `verify` (`verify_staged.py`)
+  refuses SignPath's test certificate in the installer, .zip or .mcpb. Unsigned passes `verify` (`--require-signed`, by
+  hand only, refuses that too).
 
 SignPath artifact configurations (project SculptForge; both zips are flat, files at the root). SignPath Foundation requires the
 product name and version on every signed file, set and enforced: the exes (and the installer's NSIS version resource,
@@ -183,9 +199,11 @@ to SignPath under our subscription.)
 worse to users than unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
 do it (check_workflows.py), the notice says `Windows: test-signed (not for release ...)`, `verify_signed.ps1 -Test` accepts the
 untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
-`release.sh --stage` and `verify_staged.py --require-signed` refuse the test certificate anyway).
+`release.sh --stage` and `verify_staged.py` refuse the test certificate anyway).
 
 **One-time setup in SignPath (the maintainer; the workflow only submits requests).** In the SculptForge organization:
+0. Install the **SignPath GitHub App** (github.com/apps/signpath) on this repository only. Without it every request fails
+   with "Failed to retrieve GitHub App token" (seen in the 11-18 dry run).
 1. *Trusted build systems*: add **GitHub.com** to the organization and link it to the project. Without it the first request
    fails with "Trusted build system is not allowed to log into the organization" (seen in the 11-17 dry run).
 2. *Artifact configurations* `binaries` and `installer` (the XML above, with the `version` parameter), set as the project's.
