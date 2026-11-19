@@ -1,0 +1,51 @@
+# Shift with the Paint brush smooths the COLOUR and never the shape (queue: smooth / blur vertex colours). A noisy colour
+# patch (red and blue strokes across each other), then a Shift stroke over it: the colours even out (paint_rough drops),
+# no vertex moves, and Ctrl+Z takes the whole stroke back. With a sculpt brush and Rgb on, Shift still smooths the shape.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+run set_color color=ff0000
+action draw.paint
+expect_value paint_mode == 1
+stroke 0.3 0.4 0.7 0.4
+stroke 0.3 0.5 0.7 0.5
+run set_color color=0000ff
+stroke 0.35 0.45 0.65 0.45
+stroke 0.3 0.55 0.7 0.55
+run set_color color=00ff00
+stroke 0.4 0.35 0.4 0.65
+stroke 0.5 0.35 0.5 0.65
+stroke 0.6 0.35 0.6 0.65
+snapshot
+remember paint_rough noisy
+remember paint_mean_g mean_noisy
+shot before-smooth
+
+hold shift
+stroke 0.28 0.4 0.72 0.6
+stroke 0.28 0.6 0.72 0.4
+hold none
+expect_value moved == 0
+expect_value paint_rough < $noisy*0.8
+shot after-smooth
+
+# One undo step, the colours back exactly.
+key ctrl+z
+expect_value paint_rough >= $noisy*0.999
+expect_value paint_rough <= $noisy*1.001
+expect_value moved == 0
+key ctrl+shift+z
+
+# Painting still paints (Shift let go): a red stroke still changes the mean.
+expect_value paint_mode == 1
+
+# A sculpt brush with Rgb on: Shift smooths the shape as before (and paints nothing).
+action draw.paint
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+snapshot
+remember paint_rough sculpted
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved > 0

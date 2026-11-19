@@ -191,6 +191,8 @@
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
+//                            paint_rough (how uneven the vertex paint is: the mean distance, sRGB 0-255, between a vertex's colour
+//                            and its neighbours' average; Shift with the Paint brush lowers it),
 //                            brush_color_r / brush_color_g / brush_color_b (the brush's colour, sRGB 0-255: what C picks)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
 //                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
@@ -723,6 +725,18 @@ double Demo::query(const std::string& name, bool& known) const {
         double sum = 0.0;
         for (const glm::vec3& c : m.colors) sum += double(linearToSrgb(c)[k]);
         return 255.0 * sum / double(m.colors.size());
+    }
+    if (name == "paint_rough") {
+        if (!m.hasColors()) return 0.0;
+        double sum = 0.0;
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+            const auto ring = m.neighbors(v);
+            if (ring.empty()) continue;
+            glm::vec3 avg(0.0f);
+            for (uint32_t u : ring) avg += linearToSrgb(m.colors[u]);
+            sum += double(glm::distance(linearToSrgb(m.colors[v]), avg / float(ring.size())));
+        }
+        return 255.0 * sum / double(m.vertexCount());
     }
     if (name == "brush_color_r" || name == "brush_color_g" || name == "brush_color_b")
         return std::round(255.0f * linearToSrgb(app_.doc_.paintColor)[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2]);
