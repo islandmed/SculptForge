@@ -327,7 +327,9 @@ if(MSVC)
 else()
   # -ffp-contract=off: no fused multiply-adds, so a result doesn't depend on the optimisation level (distro
   # packages build at -O2; face_weights' fast path is tested to match a full evaluation exactly).
-  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
+  # -fno-fast-math: a packager's -ffast-math / -Ofast (CFLAGS come first, these win) would turn the brushes' NaN
+  # guards (std::isfinite, gh#229) into nothing.
+  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -fno-fast-math)
 endif()
 sculptforge_pch(sculptforge_core)
 set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/tinyexr_impl.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp

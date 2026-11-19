@@ -513,11 +513,11 @@ void App::registerShellActions() {
          "Front faces only: brushes leave the far side of thin parts alone.");
     flag("draw.connected_only", "Connected only", nullptr, "Brush", "", &uiPrefs_.connectedOnly,
          "Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, "
-         "the next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the "
+         "the next finger or a lip across a gap stay as they are. Saved with the "
          "preferences and the project.");
     flag("draw.view_falloff", "View falloff", nullptr, "Brush", "", &uiPrefs_.viewFalloff,
          "The brush falloff is measured on screen: everything inside the brush circle is reached, through the model "
-         "and out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too "
+         "and out the back, as a cylinder along the view. Turn on Connected only too "
          "to keep it to one piece.");
     add({"draw.dynamic", "Dynamic", nullptr,
          "Dynamic topology: brushes add triangles where they need detail and remove them "

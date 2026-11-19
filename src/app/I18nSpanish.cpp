@@ -3595,16 +3595,16 @@ constexpr Entry kSpanish[] = {
     {"Front faces only: brushes leave the far side of thin parts alone.",
      "Solo caras frontales: los pinceles no tocan el otro lado de las partes finas."},
     {"Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, the "
-     "next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the preferences and "
+     "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "Los pinceles solo llegan a la superficie unida al punto bajo el cursor, dentro del tamaño del pincel: la otra "
-     "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian (Connected Only de Blender). Se "
+     "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian. Se "
      "guarda con las preferencias y el proyecto."},
     {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too to keep "
+     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
      "it to one piece.",
      "La atenuación del pincel se mide en pantalla: se alcanza todo lo que está dentro del círculo del pincel, a "
-     "través del modelo y por detrás, como un cilindro en la dirección de la vista (Projected from View de Blender). "
+     "través del modelo y por detrás, como un cilindro en la dirección de la vista. "
      "Activa también Solo conectado para limitarlo a una pieza."},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+arrastrar pinta la máscara con el pincel; Ctrl+Alt+arrastrar la borra. Ctrl+arrastrar en el fondo la "
