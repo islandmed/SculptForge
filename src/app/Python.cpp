@@ -345,6 +345,7 @@ bool PythonScripting::load() {
     side.selectPart = [this](Document&, int i) { app_.runCommand("part_select", {{"index", double(i)}}); };
     side.write = [this](bool error, const std::string& text) { write(error, text); };
     side.place = [this](const std::string& id, bool panel, python::Place where) { return place(id, panel, where); };
+    side.windowHandle = [this]() -> uint64_t { return app_.nativeWindowHandle(); };
     const fs::path scripts = fsPath(scriptsFolder());
     if (!scripts.empty()) side.paths = {utf8(scripts), utf8(scripts / "site-packages")};
     std::string path;

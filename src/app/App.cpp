@@ -562,6 +562,15 @@ void App::glWindowAttributes() {
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
 }
 
+uint64_t App::nativeWindowHandle() const {
+    if (!window_) return 0;
+    const SDL_PropertiesID props = SDL_GetWindowProperties(window_);
+    if (!props) return 0;
+    if (void* p = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr)) return uint64_t(uintptr_t(p));
+    if (void* p = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr)) return uint64_t(uintptr_t(p));
+    return uint64_t(SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0));
+}
+
 void App::shareWindow(SDL_Window* window, SDL_GLContext context) {
     sharedWindow_ = window;
     sharedContext_ = context;

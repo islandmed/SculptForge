@@ -129,6 +129,24 @@ toolkit's own `exec()` loop: it would never give the main thread back.
 - What a timer's callback does to the scene is one undo step per tick, like any script.
 - Only the main thread may use the open scene: a toolkit's own threads get an error from `sf.run`.
 
+**Keep your window with SculptForge.** `sf.ui.main_window_handle()` returns SculptForge's main window as a native handle
+(an int): the window handle on Windows, the `NSWindow` pointer on macOS, the X11 window id on X11. Parent your window to
+it and it groups with SculptForge in the taskbar and stays on top of it. It is `None` on Wayland, which has no such
+handle, and when SculptForge runs without a window (offscreen, headless), so check for that. With PySide6:
+
+```python
+from PySide6.QtGui import QWindow
+
+handle = sf.ui.main_window_handle()
+win.show()                                   # the window has to exist before it can be given a parent
+if handle:
+    parent = QWindow.fromWinId(handle)
+    win.windowHandle().setTransientParent(parent)
+    win._sculptforge = parent                # keep it: Qt drops the parent when Python lets go of it
+```
+
+It only reads the handle, which a script could already find with the system's own calls; it opens nothing new.
+
 Install PySide for SculptForge's Python version into the Scripts folder's `site-packages` (see NumPy above):
 `python3.13 -m pip install --target "Documents/SculptForge/Scripts/site-packages" PySide6`.
 
@@ -214,6 +232,7 @@ A window that lists the Parts and subdivides the one you pick. It stays open bes
 ```python
 import sculptforge as sf
 from PySide6 import QtWidgets
+from PySide6.QtGui import QWindow
 
 app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 win = QtWidgets.QWidget()
@@ -238,6 +257,10 @@ button.clicked.connect(subdivide)
 refresh()
 win.show()
 timer = sf.ui.timer(app.processEvents, 30)   # Qt's events, on SculptForge's main thread
+handle = sf.ui.main_window_handle()          # stays on top of SculptForge (see "Keep your window with SculptForge")
+if handle:
+    win._sculptforge = QWindow.fromWinId(handle)
+    win.windowHandle().setTransientParent(win._sculptforge)
 app.lastWindowClosed.connect(lambda: sf.ui.cancel_timer(timer))
 ```
 

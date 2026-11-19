@@ -284,6 +284,17 @@ class _UI:
             raise KeyError(f"no action or panel {id!r}")
         if not sf._place(id, panel, places[where]):
             raise ValueError(f"{id!r} can't go in {where}" + (" (only actions go on shelves)" if panel else ""))
+    def main_window_handle(self):
+        """The native handle of SculptForge's main window, as an int: the HWND on Windows, the NSWindow pointer on
+        macOS, the X11 Window id on X11. None on Wayland (it has no such handle) and when SculptForge runs without a
+        window (offscreen, headless). Read-only. Use it to parent your own dialogs to SculptForge, so they group
+        with it in the taskbar and stay on top of it; with PySide6:
+
+            win = QWindow.fromWinId(sf.ui.main_window_handle())
+            dialog.show()
+            dialog.windowHandle().setTransientParent(win)
+        """
+        return sf._main_window_handle() or None
     def timer(self, callback, ms=30):
         """Calls callback() on SculptForge's main thread about every ms milliseconds (at least 10), between frames,
         until cancel_timer(). For other toolkits' windows: sf.ui.timer(qt_app.processEvents). A callback that fails
@@ -469,6 +480,10 @@ PYBIND11_EMBEDDED_MODULE(sculptforge, m) {
     }, "The Scripts folder (its .py files are listed under File > Script), or None when there is none.");
     m.def("_ui_touch", [] { ++g_uiRevision; });
     m.def("_timer_next", [](double seconds) { g_timerDue = seconds < 0.0 ? -1 : steadyNs() + int64_t(seconds * 1e9); });
+    m.def("_main_window_handle", [] {
+        mainThreadOnly();
+        return g_app.windowHandle ? g_app.windowHandle() : uint64_t(0);
+    });
     m.def("_place", [](const std::string& id, bool panel, int where) {
         mainThreadOnly();
         return g_app.place && g_app.place(id, panel, python::Place(where));

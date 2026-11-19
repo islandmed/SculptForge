@@ -59,6 +59,7 @@ struct Fixture {
     int appRuns = 0;      // commands that went through the app's side
     std::string loadError;
     std::vector<std::string> placed; // sf.ui.place calls
+    uint64_t windowHandle = 0;       // what the app says its main window is (0: none, as offscreen)
 
     Fixture() {
         SDL_SharedObject* lib = SDL_LoadObject(SF_PYHOST_PATH);
@@ -95,6 +96,7 @@ struct Fixture {
             placed.push_back((panel ? "panel:" : "action:") + id + "@" + std::to_string(int(where)));
             return !(panel && where != python::Place::MyPanel);
         };
+        side.windowHandle = [this] { return windowHandle; };
         char error[512] = "";
         host = create(python::kHostAbi, &side, error, int(sizeof error));
         if (!host) loadError = error;
@@ -346,6 +348,25 @@ TEST(python_host_script_interface) {
     CHECK(f.line("sf.ui.place('test', 'left')") == S::Error);
     CHECK(f.placed.size() == 3 && f.placed[0] == "action:test.grow@0" && f.placed[1] == "panel:test@4");
     CHECK(f.line("sf.ui.clear()") == S::Ok && f.host->ui().actions.empty());
+}
+
+// sf.ui.main_window_handle: the app's native window handle as an int, None when it has none (Wayland, offscreen).
+TEST(python_host_main_window_handle) {
+    Fixture& f = py();
+    if (!f.host) return;
+    f.windowHandle = 0;
+    f.clear();
+    CHECK(f.line("print(repr(sf.ui.main_window_handle()))") == S::Ok && contains(f.out, "None"));
+    f.windowHandle = 0x1234abcdef; // wider than 32 bits: an HWND or NSWindow* on a 64-bit OS
+    f.clear();
+    CHECK(f.line("h = sf.ui.main_window_handle(); print(type(h).__name__, h == 0x1234abcdef)") == S::Ok &&
+          contains(f.out, "int True"));
+    // Main thread only, like the rest of sf.ui.
+    f.clear();
+    CHECK(f.line("import threading; r = []; t = threading.Thread(target=lambda: r.append(sf.ui.main_window_handle())); "
+                 "t.start(); t.join(); print(len(r))") == S::Ok &&
+          contains(f.out, "0"));
+    f.windowHandle = 0;
 }
 
 // sf.ui.timer (P3): the app's loop asks when the next is due and runs the due ones on its own thread.
