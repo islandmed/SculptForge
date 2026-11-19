@@ -78,3 +78,28 @@ expect_value fast_upload == 0
 click "Live Move (Experimental)"
 expect_value live_move == 0
 click "Preferences##palette.preferences"
+
+# Big grabs on dense meshes (a million vertices or more, 100k in the grab; here the thresholds lowered for a small
+# sphere) move this way with the preference off; a small grab stays on the CPU.
+env SF_LIVE_MOVE_VERTICES 1000
+env SF_LIVE_MOVE_REGION 100000000
+expect_value live_move == 1
+stroke 0.86 0.5 0.98 0.38 0.6 hold
+wait 0.3
+expect_value live_move_active == 0
+expect_value moved > 0
+release
+key ctrl+z
+env SF_LIVE_MOVE_REGION 1
+snapshot
+stroke 0.86 0.5 0.98 0.38 0.6 hold
+wait 0.3
+expect_value moved == 0
+expect_value live_move_active == 1
+release
+expect_value moved_sum > $plain*0.999
+expect_value moved_sum < $plain*1.001
+key ctrl+z
+env SF_LIVE_MOVE_VERTICES 100000000
+env SF_LIVE_MOVE_REGION 100000
+expect_value live_move == 0

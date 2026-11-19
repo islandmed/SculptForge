@@ -1043,6 +1043,8 @@ UndoRecord Sculptor::endStroke() {
     active_ = false;
     grabVerts_.clear();
     grabAll_.clear();
+    grabStart_ = {}, grabStartTarget_ = {}, grabInfluence_ = {}, grabFirst_ = {}; // (a whole-head Move: ~100 MB)
+    grabCaptured_ = false;
     return std::move(record_);
 }
 
@@ -2129,6 +2131,8 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabMirrors_.clear();
     grabAll_.clear();
     grabLeaves_.clear();
+    grabCaptured_ = false;
+    grabTotal_ = glm::vec3(0.0f);
     if (!active_) return;
     if (mesh.micro) inkMesh_ = &mesh;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
@@ -2194,20 +2198,91 @@ void Sculptor::grabMove(Mesh& mesh, const glm::vec3& delta) {
     }
     if (grabVerts_.empty()) return;
     auto clock = std::chrono::steady_clock::now();
-    // One mirror after another (a vertex may be in two), each in parallel.
-    size_t begin = 0;
-    for (const auto& [end, m] : grabMirrors_) {
-        const glm::vec3 dm = m * delta;
-        scratch_.resize(end - begin);
-        poolFor(end - begin, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) scratch_[i] = dm * grabWeights_[begin + i];
-        });
-        displaceAll(mesh, std::span(grabVerts_).subspan(begin, end - begin), scratch_);
-        begin = end;
+    if (dynTopo_.active()) { // (the remesher records each touch: the moves one by one)
+        // One mirror after another (a vertex may be in two), each in parallel.
+        size_t begin = 0;
+        for (const auto& [end, m] : grabMirrors_) {
+            const glm::vec3 dm = m * delta;
+            scratch_.resize(end - begin);
+            poolFor(end - begin, [&](size_t b, size_t e) {
+                for (size_t i = b; i < e; ++i) scratch_[i] = dm * grabWeights_[begin + i];
+            });
+            displaceAll(mesh, std::span(grabVerts_).subspan(begin, end - begin), scratch_);
+            begin = end;
+        }
+    } else {
+        // Each vertex from where it was at the press by its weight times the whole move so far (grabTotal_): one
+        // call per pointer sample or one per frame (grabMoves) leaves the same bits, in time for the region alone.
+        if (!grabCaptured_) captureGrab(mesh);
+        grabTotal_ += delta;
+        std::vector<glm::vec3>& target = mesh.layerTarget(layer_);
+        const bool layered = !mesh.layers.empty();
+        const float weight = mesh.layerTargetWeight(layer_);
+        size_t begin = 0;
+        for (const auto& [end, m] : grabMirrors_) { // one mirror after another: a vertex in two takes both, in order
+            const glm::vec3 dm = m * grabTotal_;
+            poolFor(end - begin, [&](size_t b, size_t e) {
+                for (size_t i = begin + b; i < begin + e; ++i) {
+                    const float k = grabInfluence_[i];
+                    if (k <= 0.0f) continue;
+                    const uint32_t v = grabVerts_[i];
+                    const glm::vec3 dk = (dm * grabWeights_[i]) * k;
+                    if (grabFirst_[i]) {
+                        mesh.positions[v] = grabStart_[i] + dk;
+                        if (layered) target[v] = grabStartTarget_[i] + dk / weight;
+                    } else {
+                        mesh.positions[v] += dk;
+                        if (layered) target[v] += dk / weight;
+                    }
+                }
+            }, 4096);
+            begin = end;
+        }
     }
     timings.kernelMs += lapMs(clock);
     ++timings.dabs;
     timings.vertices += grabAll_.size();
+}
+
+void Sculptor::captureGrab(Mesh& mesh) {
+    grabCaptured_ = true;
+    // The stroke's record of the region (displaceAll with no move: the start positions, each vertex's influence).
+    const size_t n = grabVerts_.size();
+    grabInfluence_.resize(n);
+    size_t begin = 0;
+    for (const auto& [end, m] : grabMirrors_) {
+        scratch_.assign(end - begin, glm::vec3(0.0f));
+        displaceAll(mesh, std::span(grabVerts_).subspan(begin, end - begin), scratch_);
+        std::copy(influence_.begin(), influence_.begin() + std::ptrdiff_t(end - begin), grabInfluence_.begin() + std::ptrdiff_t(begin));
+        begin = end;
+    }
+    const std::vector<glm::vec3>& target = mesh.layerTarget(layer_);
+    grabStart_.resize(n);
+    grabStartTarget_.resize(mesh.layers.empty() ? 0 : n);
+    grabFirst_.assign(n, 1);
+    std::vector<uint64_t> seen;
+    if (grabMirrors_.size() > 1) seen.assign((mesh.vertexCount() + 63) / 64, 0);
+    for (size_t i = 0; i < n; ++i) {
+        const uint32_t v = grabVerts_[i];
+        if (!seen.empty()) {
+            grabFirst_[i] = !((seen[v >> 6] >> (v & 63)) & 1);
+            seen[v >> 6] |= uint64_t(1) << (v & 63);
+        }
+        grabStart_[i] = mesh.positions[v];
+        if (!grabStartTarget_.empty()) grabStartTarget_[i] = target[v];
+    }
+}
+
+void Sculptor::grabMoves(Mesh& mesh, std::span<const glm::vec3> deltas) {
+    if (deltas.empty()) return;
+    if (grabVerts_.empty() || (micro_.active() && microMesh_ == &mesh) || dynTopo_.active()) {
+        for (const glm::vec3& d : deltas) grabMove(mesh, d);
+        return;
+    }
+    // The whole move so far, sample by sample as grabMove adds it, then the region once.
+    for (size_t i = 0; i + 1 < deltas.size(); ++i) grabTotal_ += deltas[i];
+    timings.dabs += deltas.size() - 1;
+    grabMove(mesh, deltas.back());
 }
 
 void Sculptor::grabFinish(Mesh& mesh, BVH& bvh) {

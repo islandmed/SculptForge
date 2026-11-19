@@ -225,9 +225,14 @@ public:
     // Move brush: capture the region once, then drag it by world deltas.
     void beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
     void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta); // grabMove, then grabFinish
-    // The two halves: the positions (each pointer sample), then the normals and the BVH of what moved (once a
-    // frame: they depend only on where the vertices ended up, so the mesh is the same, bit for bit).
+    // The two halves: the positions (each pointer sample: each vertex from its start by the whole move so far), then
+    // the normals and the BVH of what moved (once a frame: they depend only on where the vertices ended up, so the
+    // mesh is the same, bit for bit).
     void grabMove(Mesh& mesh, const glm::vec3& delta);
+    // grabMove with each delta in turn, the region moved once: the same bits as one call per delta (a frame's
+    // pointer samples, App::flushGrab).
+    void grabMoves(Mesh& mesh, std::span<const glm::vec3> deltas);
+    size_t grabVertices() const { return grabAll_.size(); } // the Move grab's region (every vertex once)
     void grabFinish(Mesh& mesh, BVH& bvh);
 
     // Brushes that change mask or vertex paint call these before writing
@@ -571,6 +576,14 @@ private:
     std::vector<float> grabWeights_;
     std::vector<std::pair<size_t, glm::mat3>> grabMirrors_;
     std::vector<uint32_t> grabAll_, grabLeaves_;
+    // ... where each was at the first move (and its layer target), its influence then, whether this is its first
+    // run (a vertex near a mirror plane is in two), and the whole move so far (grabMove).
+    std::vector<glm::vec3> grabStart_, grabStartTarget_;
+    std::vector<float> grabInfluence_;
+    std::vector<uint8_t> grabFirst_;
+    glm::vec3 grabTotal_{0.0f};
+    bool grabCaptured_ = false;
+    void captureGrab(Mesh& mesh);
 
     // Layer brush: per-stroke height already applied to each vertex.
     void prepareLayer(const Mesh& mesh, float height);

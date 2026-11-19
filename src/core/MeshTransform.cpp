@@ -253,6 +253,7 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
     layered_ = !mesh.layers.empty();
     layer_ = layer >= 0 && layer < int(mesh.layers.size()) ? layer : -1;
     if (layer_ >= 0) invWeight_ = 1.0f / mesh.layers[size_t(layer_)].weight;
+    whole_ = verts_.size() == nv && mirrors_.size() == 1 && std::all_of(level_.begin(), level_.end(), [](uint16_t l) { return l == kLevels; });
     // Recording into a layer starts from the shape as shown; otherwise from the base.
     const auto& src = layer_ >= 0 ? mesh.positions : mesh.basePositions();
     base_.resize(verts_.size());

@@ -2699,11 +2699,13 @@ constexpr Entry kSpanish[] = {
      "al instante y levantar el lápiz es inmediato. La escultura final es exactamente la misma en ambos casos."},
     {"Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it follows "
      "the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, when you "
-     "lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move "
-     "works as before there).",
+     "lift the pen. Big drags on meshes of a million vertices or more always move this way; this turns it on for every mesh and size. Not "
+     "with masks, hidden parts, sculpt layers, micro levels, Connected Only or View falloff (Move works as before "
+     "there).",
      "Experimental. El arrastre del pincel Move lo dibuja la tarjeta gráfica desde donde empezó la superficie, así "
      "sigue al lápiz a la velocidad de la vista sea cual sea el tamaño de la malla; el movimiento en sí se aplica "
-     "una vez, exacto, al levantar el lápiz. No con máscaras, partes ocultas, capas de escultura, niveles micro, "
+     "una vez, exacto, al levantar el lápiz. Los arrastres grandes en mallas de un millón de vértices o más siempre se "
+     "mueven así; esta opción lo activa para todas las mallas y tamaños. No con máscaras, partes ocultas, capas de escultura, niveles micro, "
      "Solo conectado ni Ver atenuación (ahí Move funciona como antes)."},
     {"Experimental. On meshes of 2 million vertices or more, big brushes are worked out on their own thread; with "
      "this on, the dabs still being worked out are shown as a preview on the surface (as Predictive Strokes does), "

@@ -1454,6 +1454,7 @@ int App::run() {
         // the memory on Apple silicon: Lucy 28M stroke frame p99 31 -> 37 ms); light strokes keep overlapping.
         if (solverBound_ && (drag_ == Drag::Stroke || solverBusy())) waitLastFrame();
         flushGrab(); // Move: the pointer's moves since the last frame, as one
+        flushGizmoDrag(); // a Gizmo drag: where the pointer is now
         if (drainNextFrame_) { // (the stroke ended last frame: what waited for it runs now, its own frame)
             drainNextFrame_ = false;
             runDrainQueue();
@@ -2463,7 +2464,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
     case Drag::PartClick: partClickMove(x, y); break;
     case Drag::Select: selectionMove(x, y); break;
-    case Drag::Gizmo: gizmoDragTo(x, y); break;
+    case Drag::Gizmo:
+        if (interactiveStrokes_) gizmo_.pending = true, gizmo_.pendingAt = ImVec2(x, y); // (flushGizmoDrag, once a frame)
+        else gizmoDragTo(x, y);
+        break;
     case Drag::Guide: guideDragTo(x, y); break;
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
@@ -2856,11 +2860,12 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.connectedOnly = uiPrefs_.connectedOnly;
         p.viewFalloff = uiPrefs_.viewFalloff;
         grabPending_ = false;
+        grabQueued_.clear();
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
         liveMove_ = {};
-        if (liveMoveEnabled() && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+        if (liveMoveEnabled(doc_.sculptor.grabVertices()) && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
             !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
-            &displayedMesh() == &doc_.mesh)
+            &displayedMesh() == &doc_.mesh && Sculptor::copies(symmetry_).size() <= GhostStroke::kMaxMirrors) // (radial: the preview draws 8)
             liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
         grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
@@ -3209,17 +3214,24 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
 void App::queueGrab(const glm::vec3& delta) {
     // Move followed every pointer sample with a whole move of its region (positions, normals, BVH): at 240 samples
     // a second on 33M triangles a frame did several, the next frame got more samples, and the view stalled for
-    // seconds. Each sample still moves the positions (the cheap part); the normals and the BVH, which depend only on
-    // where the vertices end up, follow once a frame (flushGrab): the same mesh, bit for bit. Scripts and
-    // recordings do both at once.
-    doc_.sculptor.grabMove(doc_.mesh, delta);
+    // seconds. The normals and the BVH, which depend only on where the vertices end up, follow once a frame
+    // (flushGrab); in the app's loop so do the positions: a frame's samples move the region in one pass, each vertex
+    // by each sample in turn (Sculptor::grabMoves: the same bits; 7M triangles at 240 px cost ~30 ms a sample, so
+    // a slow frame took more samples and the next was slower). Scripts and recordings do it all at once.
     grabPending_ = true;
-    if (!interactiveStrokes_) flushGrab();
+    if (interactiveStrokes_) {
+        grabQueued_.push_back(delta);
+        return;
+    }
+    doc_.sculptor.grabMove(doc_.mesh, delta);
+    flushGrab();
 }
 
 void App::flushGrab() {
     if (!grabPending_) return;
     grabPending_ = false;
+    doc_.sculptor.grabMoves(doc_.mesh, grabQueued_);
+    grabQueued_.clear();
     doc_.sculptor.grabFinish(doc_.mesh, doc_.bvh);
 }
 
@@ -3608,7 +3620,7 @@ void App::syncScene() {
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
-        scene.back().model = s.transform;
+        scene.back().model = gizmoDrawnTransform(i);
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
         if (booleanResult && booleanPreviewDrawn(s.id)) scene.back().visible = false; // (the result stands in for it)

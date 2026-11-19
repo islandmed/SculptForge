@@ -329,6 +329,12 @@ public:
             if (s.id == id) return s.fullUploads;
         return 0;
     }
+    // Syncs of mesh slot `id` that sent vertices (tests): a Gizmo drag of a whole Part sends none until its release.
+    uint64_t vertexSyncs(uint32_t id) const {
+        for (const MeshSlot& s : slots_)
+            if (s.id == id) return s.vertexSyncs;
+        return 0;
+    }
     size_t patchCount(uint32_t id) const {
         for (const MeshSlot& s : slots_)
             if (s.id == id) return s.patches.size();
@@ -434,6 +440,7 @@ private:
     struct MeshSlot {
         uint32_t id = 0;
         uint64_t fullUploads = 0; // (tests)
+        uint64_t vertexSyncs = 0; // (tests) syncs that found vertices to send (the mesh marked dirty)
         bool remeshing = false;   // a stroke that changes this mesh's topology runs (dynamic topology)
         GLuint vao = 0, lineVao = 0;
         GLuint vertexBuffer = 0; // PackedVertex per GPU slot (render/Clusters.h)

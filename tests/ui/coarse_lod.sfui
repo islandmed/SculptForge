@@ -38,6 +38,22 @@ expect_value coarse_clusters == $before
 expect_value drawn_triangles <= 40000
 shot coarse-after-stroke
 
+# Live Move (a dense mesh's Move: the GPU draws the drag, nothing is edited until the pen lifts) draws in full while it
+# runs: only full clusters take the drag's preview, so coarse ones showed no drag at all on a 7M Voxel Remesh.
+env SF_LIVE_MOVE_VERTICES 1000
+env SF_LIVE_MOVE_REGION 1
+click "Move##brush.move"
+stroke 0.42 0.45 0.58 0.55 0.6 hold
+wait 0.3
+expect_value live_move_active == 1
+expect_value coarse_clusters == 0
+shot coarse-live-move
+release
+wait 0.6
+expect_value coarse_clusters > 0
+env SF_LIVE_MOVE_VERTICES 100000000
+env SF_LIVE_MOVE_REGION 100000
+
 # A still frame that fits: at rest, full detail (the real surface), and no "Preview detail".
 env SF_STILL_FRAME_MS 100000
 wait 1.2

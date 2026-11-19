@@ -641,7 +641,19 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             return true;
         }
         playingLayer_ = -1;
+        // A whole Part moved, turned or scaled evenly is drawn moved by one matrix while dragging (gizmo_.gpu).
+        gizmo_.gpu.assign(gizmo_.sessions.size(), 0);
+        const char* gpuEnv = std::getenv("SF_GIZMO_GPU"); // =0: every drag moves the vertices each frame (tests compare)
+        const bool similarity = !(h >= H::ScaleX && h <= H::ScaleZ) && !(gpuEnv && *gpuEnv == '0');
+        for (size_t k = 0; k < gizmo_.sessions.size() && similarity; ++k) {
+            const int st = gizmo_.parts[k];
+            const auto& data = doc_.parts[size_t(st)].data;
+            const bool shared = std::count_if(doc_.parts.begin(), doc_.parts.end(), [&](const Part& o) { return o.data == data; }) > 1;
+            gizmo_.gpu[k] = !shared && gizmo_.sessions[k].wholeRigid(doc_.partMesh(st));
+        }
     }
+    gizmo_.gpuModel = glm::mat4(1.0f);
+    gizmo_.pending = false;
     drag_ = Drag::Gizmo;
     return true;
 }
@@ -736,7 +748,9 @@ void App::gizmoDragTo(float x, float y) {
         return;
     }
     gizmo_.current = t;
+    gizmo_.gpuModel = t.matrix();
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
+        if (gizmo_.gpu[i]) continue; // (drawn by gizmoDrawnTransform; the release moves the vertices)
         const Part& s = doc_.parts[size_t(gizmo_.parts[i])];
         gizmo_.sessions[i].apply(doc_.partMesh(gizmo_.parts[i]), s.moved() ? t.inSpaceOf(s.transform) : t);
     }
@@ -747,7 +761,22 @@ void App::gizmoDragTo(float x, float y) {
     }
 }
 
+void App::flushGizmoDrag() {
+    if (!gizmo_.pending) return;
+    gizmo_.pending = false;
+    if (drag_ == Drag::Gizmo) gizmoDragTo(gizmo_.pendingAt.x, gizmo_.pendingAt.y);
+}
+
+glm::mat4 App::gizmoDrawnTransform(int index) const {
+    const glm::mat4& place = doc_.parts[size_t(index)].transform;
+    if (drag_ != Drag::Gizmo || gizmo_.handle == H::None) return place;
+    for (size_t k = 0; k < gizmo_.parts.size() && k < gizmo_.gpu.size(); ++k)
+        if (gizmo_.parts[k] == index && gizmo_.gpu[k]) return gizmo_.gpuModel * place;
+    return place;
+}
+
 void App::gizmoRelease() {
+    flushGizmoDrag(); // (where the pointer was let go)
     if (gizmo_.pendingSnap) {
         gizmo_.pendingSnap = false;
         if (dist2(gizmo_.startMouse, ImVec2(mouseX_, mouseY_)) < 16.0f && gizmo_.snapPart == doc_.activePart)
@@ -763,6 +792,10 @@ void App::gizmoRelease() {
     size_t moved = 0;
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
         const int st = gizmo_.parts[i];
+        if (i < gizmo_.gpu.size() && gizmo_.gpu[i]) { // drawn by a matrix while dragging: now the vertices move, once
+            const Part& s = doc_.parts[size_t(st)];
+            gizmo_.sessions[i].apply(doc_.partMesh(st), s.moved() ? gizmo_.current.inSpaceOf(s.transform) : gizmo_.current);
+        }
         const size_t n = gizmo_.sessions[i].movingVertices();
         UndoRecord r = gizmo_.sessions[i].finish(doc_.partMesh(st), doc_.partBvh(st), label);
         if (r.empty()) continue;
@@ -778,6 +811,8 @@ void App::gizmoRelease() {
     }
     gizmo_.sessions.clear();
     gizmo_.parts.clear();
+    gizmo_.gpu.clear();
+    gizmo_.gpuModel = glm::mat4(1.0f);
     gizmo_.wholeParts.clear();
     gizmo_.wholeStart.clear();
     if (moved == 0) return;
