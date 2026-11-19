@@ -110,10 +110,8 @@ into the surface.
 | Project (`.sfproj`) | Everything: layers, weights and the active layer |
 | OBJ, PLY, STL | The current blended shape only |
 
-Importing works the other way: glTF morph targets and FBX or USD blend shapes open as sculpt layers, with their names,
-weights and order (the 52 ARKit names stay as they are), and a file exported from SculptForge opens with the same layers
-it was made from: the offsets match to 1e-5 of a metre. Blender shape keys come across the same way through the
-[Blender add-on](blender.md), and layers go back to Blender as shape keys. See [Exporting](exporting.md).
+Importing works the other way: glTF morph targets and FBX or USD blend shapes open as sculpt layers. See
+[Exporting](exporting.md).
 
 ## Scripting
 

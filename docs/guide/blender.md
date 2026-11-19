@@ -214,15 +214,11 @@ SculptForge with `--blender` loads what Blender last sent.
   programs. Set the add-on's exchange folder to a folder both can reach, start SculptForge yourself with
   `SCULPTFORGE_BLENDER_EXCHANGE` set to it, and send.
 - **Linked duplicates** (objects sharing one mesh) all show the last one received.
-- **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes (a key you
-  add in Blender goes to SculptForge as a layer the next time you send).
+- **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes.
 - **Subdivision levels** don't go to Blender: it receives the level you're on (like Bridge files).
-- **Sculpt layers and shape keys** go both ways. A layer arrives in Blender as a **shape key** (Basis plus one key per
-  layer, with its name and weight), so the 52 [facial shapes](facial-shapes.md) keep their ARKit names. A shape key
-  sent from Blender arrives in SculptForge as a [sculpt layer](layers.md) with its name and value, in the same order;
-  each key counts from the Basis (not from the key it is "relative to"), and a key limited by a vertex group or a
-  slider range is sent as it is. With **Apply modifiers** on, the keys are baked into the sent mesh and don't travel.
-  Textures stay in SculptForge.
+- **Sculpt layers** arrive as **shape keys** (Basis plus one key per layer, with its name and weight), so the 52
+  [facial shapes](facial-shapes.md) keep their ARKit names. Shape keys don't come back from Blender, and textures
+  stay in SculptForge.
 - **Nothing arrives in SculptForge?** Check **File > Blender > Receive automatically**, or choose **Receive from
   Blender**. **Nothing arrives in Blender?** Click **Receive from SculptForge**; automatic receiving starts after the
   first send from that Blender session.

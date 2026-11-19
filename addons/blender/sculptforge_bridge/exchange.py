@@ -418,20 +418,6 @@ def read_shapes(path):
     return nv, shapes
 
 
-def write_shapes(path, nv, shapes):
-    """The same file read_shapes reads, for Blender -> SculptForge: `shapes` is a list of (name, weight, indices,
-    offsets) with offsets (N, 3) in Blender's axes, in the object's own space (like its Bridge file: SculptForge
-    applies the object's matrix_world to them as it does to the positions). Written for a shape key (its offsets
-    from the Basis); SculptForge turns each into a sculpt layer."""
-    out = [b"SFSHAPES", struct.pack("<III", 1, nv, len(shapes))]
-    for name, weight, idx, off in shapes:
-        raw = name.encode("utf-8")
-        idx = np.asarray(idx, dtype="<u4")
-        off = np.asarray(off, dtype="<f4").reshape(-1, 3)
-        out += [struct.pack("<I", len(raw)), raw, struct.pack("<fI", float(weight), len(idx)), idx.tobytes(), off.tobytes()]
-    _write_atomically(path, b"".join(out))
-
-
 # --------------------------------------------------------------------------------------------------
 # SculptForge: running? installed where? start it
 # --------------------------------------------------------------------------------------------------

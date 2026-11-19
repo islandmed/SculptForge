@@ -314,17 +314,6 @@ def test_splats_through_sculptforge(tmp, cli):
 # ---------------------------------------------------------------------------- through SculptForge
 
 
-def test_write_read_shapes(tmp):
-    shapes = [("A b", 0.25, np.array([0, 3, 7]), np.array([[0.5, 0, 0], [0, -1.5, 0.25], [1, 2, 3]])),
-              ("Empty", 1.5, np.zeros(0, dtype=np.int64), np.zeros((0, 3))), ("\u00fc", -0.5, np.array([9]), np.array([[1e-4, 0, 0]]))]
-    path = os.path.join(tmp, "x.shapes")
-    exchange.write_shapes(path, 12, shapes)
-    nv, got = exchange.read_shapes(path)
-    check(nv == 12 and [g[0] for g in got] == [s[0] for s in shapes], "write_shapes / read_shapes: names and order")
-    check(all(abs(g[1] - s[1]) < 1e-7 and (g[2] == s[2]).all() and np.abs(g[3] - s[3]).max(initial=0.0) < 1e-7 for g, s in zip(got, shapes)),
-          "write_shapes / read_shapes: weights, indices and offsets")
-
-
 def test_round_trip_through_sculptforge(tmp, cli):
     root = os.path.join(tmp, "exchange")
     out = exchange.outbox(root)
@@ -434,66 +423,6 @@ def test_shapes_through_sculptforge(tmp, cli):
     check(len(eyes) == 1 and eyes[0].get("shapes"), "the Eyes Part has its eyeLook shapes too")
 
 
-def test_shape_keys_through_sculptforge(tmp, cli):
-    """Blender -> SculptForge -> Blender: shape keys written as the add-on writes them (offsets from the Basis, object
-    space, a rotated, scaled, mirrored object) become sculpt layers on receive and come back as the same shapes: names,
-    order, weights and offsets (world space, as SculptForge sends them) within 1e-5; a key that moves nothing stays."""
-    root = os.path.join(tmp, "keys")
-    out = exchange.outbox(root)
-    os.makedirs(out)
-    mesh = grid_with_ngon()
-    nv = len(mesh[0])
-    rng = np.random.default_rng(5)
-    specs = [("Smile", 0.5, 0.05), ("mouthSmileLeft", 0.0, 0.03), ("Brow Up #2 \u00fc", 1.0, 0.08), ("Empty", 0.4, 0.0),
-             ("Overdrive", 1.5, 0.02), ("Negative", -0.5, 0.04)]
-    objects = [("Keyed", matrix(rotation((1.0, 2.0, 0.5), 37.0), (1.5, 0.5, 2.0), (0.3, -1.2, 2.0))),
-               ("Keyed.mirrored", matrix(np.eye(3), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)))]
-    sent = {}
-    entries = []
-    for k, (name, m) in enumerate(objects):
-        mirrored = np.linalg.det(m[:3, :3]) < 0
-        arrays, _ = object_arrays(mesh, mirrored, k + 20)
-        shapes = []
-        for key, weight, size in specs:
-            idx = np.sort(rng.choice(nv, nv // 2, replace=False)) if size else np.zeros(0, dtype=np.int64)
-            off = rng.normal(0.0, size, (len(idx), 3)).astype(np.float32).astype(np.float64)
-            shapes.append((key, weight, idx, off))
-        file, shape_file = "r1_%03d.Bridge" % k, "r1_%03d.shapes" % k
-        exchange.write_bridge(os.path.join(out, file), name, **arrays)
-        exchange.write_shapes(os.path.join(out, shape_file), nv, shapes)
-        entries.append({"name": name, "file": file, "shapes": shape_file, "matrix_world": m.tolist()})
-        sent[name] = (m, shapes)
-    exchange.write_manifest(out, entries, "test")
-    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; blender_send folder="%s"' % (root, root)],
-                       capture_output=True, text=True)
-    print(r.stdout.strip())
-    check(r.returncode == 0, "sculptforge-cli blender_receive; blender_send with shape keys (%s)" % r.stderr.strip())
-    if r.returncode:
-        return
-    folder = exchange.inbox(root)
-    manifest = exchange.read_manifest(folder)
-    for entry in manifest["objects"]:
-        name = entry["name"]
-        if name not in sent:
-            continue
-        m, shapes = sent[name]
-        check(bool(entry.get("shapes")), "%s: SculptForge sends its layers back as shapes" % name)
-        if not entry.get("shapes"):
-            continue
-        got_nv, got = exchange.read_shapes(os.path.join(folder, entry["shapes"]))
-        check(got_nv == nv, "%s: shapes file vertex count" % name)
-        check([g[0] for g in got] == [s[0] for s in shapes], "%s: the same shape names in the same order" % name)
-        check(all(abs(g[1] - s[1]) < 1e-6 for g, s in zip(got, shapes)), "%s: the same weights (also outside 0..1)" % name)
-        worst = 0.0
-        for g, s in zip(got, shapes):
-            want = np.zeros((nv, 3))
-            want[s[2]] = s[3] @ m[:3, :3].T  # SculptForge sends world-space offsets
-            have = np.zeros((nv, 3))
-            have[g[2]] = g[3]
-            worst = max(worst, float(np.abs(have - want).max()))
-        check(worst < 1e-5, "%s: offsets within 1e-5 (%.3g)" % (name, worst))
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", help="sculptforge-cli, for the round trip through SculptForge")
@@ -503,14 +432,12 @@ def main():
         test_canonical_and_reverse()
         test_bridge_round_trip(tmp)
         test_manifest(tmp)
-        test_write_read_shapes(tmp)
         test_splat_files(tmp)
         test_splat_bake()
         if args.cli:
             test_splats_through_sculptforge(tmp, args.cli)
             test_round_trip_through_sculptforge(tmp, args.cli)
             test_shapes_through_sculptforge(tmp, args.cli)
-            test_shape_keys_through_sculptforge(tmp, args.cli)
     if failures:
         print("%d check(s) failed" % len(failures))
         return 1

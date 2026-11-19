@@ -242,7 +242,6 @@ test_packs                  io
 test_unicode_paths          io
 test_plugins                io
 test_part_io                io
-test_layers_roundtrip       io
 test_map_export             io
 test_bake                   io
 test_camera                 render
