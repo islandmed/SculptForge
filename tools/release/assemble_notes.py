@@ -17,7 +17,9 @@ A fragment is front matter only (changes/README.md has the format):
 
 Keys: whats_new (a bullet for docs/guide/whats-new.md, which the app shows), highlight (a line for the version's
 feature block and the update feed), added / changed / fixed / removed / security (a CHANGELOG.md entry in that
-section), testers (bullets for the #testers checklist). Every key may repeat; a value continues on lines indented
+section), testers (bullets for the #testers checklist), member_request: true (the What's New bullets end
+"*Requested by a member*", the highlights "(requested by a member)") with member_credit: @handle beside it (naming the
+member, only if they opted in; without member_request it is an error). Every key may repeat; a value continues on lines indented
 by two spaces.
 
   tools/release/assemble_notes.py X.Y.Z             what would change (nothing written)
@@ -26,6 +28,8 @@ by two spaces.
   tools/release/assemble_notes.py X.Y.Z --testers   print the #testers checklist (post it with the preview build)
   tools/release/assemble_notes.py X.Y.Z --highlights  the version's highlight lines, What's New's and the fragments'
                                                     (release.sh uses them when HIGHLIGHTS is not set)
+  tools/release/assemble_notes.py X.Y.Z --member-requests  how many fragments are member requests (run before --apply, which
+                                                    deletes them): latest.json's support.member_requests_this_release
   tools/release/assemble_notes.py --check           every fragment parses (ctest release_notes runs --self-test)
 """
 import re
@@ -36,6 +40,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SECTIONS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]  # Keep a Changelog's order
 KEYS = {"whats_new", "highlight", "testers"} | {s.lower() for s in SECTIONS}
+META = {"member_request", "member_credit"}  # tag the note's What's New text; not content of their own
 
 
 class NoteError(Exception):
@@ -55,8 +60,8 @@ def parse(path):
         km = re.match(r"([a-z_]+):[ \t]*(.*)$", line)
         if km and not line[0].isspace():
             key = km.group(1)
-            if key not in KEYS:
-                raise NoteError(f"{path}:{n}: unknown key '{key}' (known: {', '.join(sorted(KEYS))})")
+            if key not in KEYS | META:
+                raise NoteError(f"{path}:{n}: unknown key '{key}' (known: {', '.join(sorted(KEYS | META))})")
             out.setdefault(key, [])
             item = None
             if km.group(2).strip():
@@ -76,7 +81,22 @@ def parse(path):
             item = len(out[key]) - 1
     if not any(out.get(k) for k in KEYS):
         raise NoteError(f"{path}: empty (give at least a whats_new or a CHANGELOG line)")
+    if "member_request" in out and out["member_request"] != ["true"]:
+        raise NoteError(f"{path}: member_request must be 'true' (leave the key out otherwise)")
+    if "member_credit" in out:
+        if "member_request" not in out:
+            raise NoteError(f"{path}: member_credit needs 'member_request: true' (it names who asked)")
+        if len(out["member_credit"]) != 1:
+            raise NoteError(f"{path}: member_credit wants one @handle or short name (never invented)")
     return out
+
+
+def requested_by(f):
+    """(What's New bullet tag, highlight tag) for a fragment: '' when no member asked, the credit only if given."""
+    if "member_request" not in f:
+        return "", ""
+    who = f["member_credit"][0] if f.get("member_credit") else "a member"
+    return f" *Requested by {who}*", f" (requested by {who})"
 
 
 def fragments(root):
@@ -128,8 +148,8 @@ def changelog(text, frags):
 
 def whats_new(text, version, frags):
     """docs/guide/whats-new.md with the fragments' bullets (and highlights) in the version's section, made if new."""
-    bullets = [b for _, f in frags for b in f.get("whats_new", [])]
-    highlights = [h for _, f in frags for h in f.get("highlight", [])]
+    bullets = [b + requested_by(f)[0] for _, f in frags for b in f.get("whats_new", [])]
+    highlights = [h + requested_by(f)[1] for _, f in frags for h in f.get("highlight", [])]
     if not bullets and not highlights:
         return text
     ev = re.escape(version)
@@ -192,6 +212,9 @@ def run(root, version, mode):
             print(b)
         print(f"{len(frags)} note fragment(s) parse")
         return 1 if bad else 0
+    if mode == "--member-requests":  # before the bump: --apply deletes the fragments
+        print(sum(1 for _, f in frags if "member_request" in f))
+        return 0
     if mode == "--testers":
         sys.stdout.write(testers(version, frags))
         return 0
@@ -199,7 +222,7 @@ def run(root, version, mode):
         wn = (root / "docs" / "guide" / "whats-new.md").read_text(encoding="utf-8")
         m = re.search(rf"^## Version {re.escape(version)}[ \t]*\n+```features\n(.*?)^```", wn, re.M | re.S)
         lines = re.findall(r"^highlight:[ \t]*(.+)$", m.group(1), re.M) if m else []
-        lines += [h for _, f in frags for h in f.get("highlight", [])]
+        lines += [h + requested_by(f)[1] for _, f in frags for h in f.get("highlight", [])]
         lines = list(dict.fromkeys(lines))  # a fragment's highlight already in the block counts once
         sys.stdout.write("".join(h + "\n" for h in lines))
         return 0
@@ -271,6 +294,36 @@ def self_test():
             raise AssertionError("unknown key accepted")
         except NoteError as e:
             assert "bad.md:2: unknown key 'whatsnew'" in str(e), e
+        (t / "changes/bad.md").unlink()
+        # member_request / member_credit tag the What's New text (and only that); the count feeds latest.json.
+        (t / "changes/m1.md").write_text(
+            "---\nwhats_new: **Smooth colour**: smoother.\nhighlight: Smooth colour\nmember_request: true\n"
+            "member_credit: @someone\n---\n")
+        (t / "changes/m2.md").write_text("---\nwhats_new: **Anon**: yes.\nmember_request: true\n---\n")
+        (t / "changes/m3.md").write_text("---\nwhats_new: **Plain**: no tag.\n---\n")
+        frags = fragments(t)
+        wn = whats_new((t / "docs/guide/whats-new.md").read_text(), "0.3.0", frags)
+        assert "highlight: Smooth colour (requested by @someone)\n" in wn, wn
+        assert "- **Smooth colour**: smoother. *Requested by @someone*\n" in wn, wn
+        assert "- **Anon**: yes. *Requested by a member*\n" in wn and "- **Plain**: no tag.\n" in wn, wn
+        counted = Path(tmp) / "count.txt"
+        with open(counted, "w") as out:
+            saved, sys.stdout = sys.stdout, out
+            try:
+                run(t, "0.3.0", "--member-requests")
+            finally:
+                sys.stdout = saved
+        assert counted.read_text() == "2\n", counted.read_text()
+        for body, msg in (("member_credit: @someone\n", "member_credit needs 'member_request: true'"),
+                          ("member_request: yes\n", "member_request must be 'true'")):
+            (t / "changes/m3.md").write_text("---\nwhats_new: x.\n" + body + "---\n")
+            try:
+                fragments(t)
+                raise AssertionError("bad member key accepted: " + body)
+            except NoteError as e:
+                assert msg in str(e), e
+        for m in ("m1", "m2", "m3"):
+            (t / f"changes/{m}.md").unlink()
         # Long entries wrap at 118 columns with a two-space hang.
         w = wrap("word " * 40, "- ", "  ")
         assert all(len(l) <= 118 for l in w.splitlines()) and w.splitlines()[1].startswith("  word"), w
@@ -287,7 +340,7 @@ def main(argv):
         print(__doc__)
         return 2
     mode = argv[1] if len(argv) == 2 else "--dry-run"
-    if mode not in ("--dry-run", "--apply", "--testers", "--highlights", "--check"):
+    if mode not in ("--dry-run", "--apply", "--testers", "--highlights", "--member-requests", "--check"):
         print(__doc__)
         return 2
     try:
