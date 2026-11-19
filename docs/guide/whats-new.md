@@ -9,11 +9,10 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: unreleased
-tagline: The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and sculpt layers round trip with Blender.
+tagline: The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes.
 highlight: The Gizmo and the Move brush now follow the pen on meshes of millions of triangles
 highlight: Crisp Flatten cuts ridges and steep walls clean, with Symmetry on too
 highlight: Quad Remesh finishes on grainy, scanned sculpts, and Cancel stops it at once
-highlight: Sculpt layers make the round trip with Blender as shape keys
 highlight: Big micro levels settle back to a smooth view right after your strokes
 title: Dense meshes follow the pen
 line: On a mesh of millions of triangles, a high Voxel Remesh say, the Gizmo's Move, Rotate and Scale and the Move brush now keep up with the pen.
@@ -21,9 +20,6 @@ action: guide:gizmo.md
 title: Crisp Flatten cuts clean
 line: Crisp Flatten cuts ridges and steep walls flat without teeth, shards or folded triangles, with a big brush on a dense mesh and with Symmetry on.
 action: guide:sculpting.md
-title: Layers round trip with Blender
-line: Shape keys sent from Blender arrive as sculpt layers with their names, values and order, and go back as shape keys; glTF, FBX and USD exports keep the same layers.
-action: guide:layers.md
 ```
 
 ## Version 0.13.8
