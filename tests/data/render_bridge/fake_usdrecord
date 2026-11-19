@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+# SculptForge - open source digital sculpting
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""A stand-in for OpenUSD's usdrecord in the render bridge tests (tests/test_render_bridge.cpp, tests/ui/render_bridge.sfui):
+--help prints usdrecord's options, a render checks the stage the app wrote and writes a small PNG of the requested
+width (the height from the camera's apertures, as usdrecord does). The renderer "Broken" fails like a delegate that
+can't load; "Slow" takes 30 seconds (Stop)."""
+import os
+import re
+import struct
+import sys
+import time
+import zlib
+
+HELP = """usage: usdrecord [-h] [--mask PRIMPATH[,PRIMPATH...]] [--camera CAMERA]
+                 [--renderer {Storm,Broken,Slow}] [--imageWidth IMAGEWIDTH]
+                 [--renderSettingsPrimPath RENDERSETTINGSPRIMPATH] [--disableCameraLight]
+                 usdFilePath outputImagePath
+  --renderer {Storm,Broken,Slow}, -r {Storm,Broken,Slow}
+                        Hydra renderer plugin to render with
+"""
+
+
+def png(path, w, h):
+    rows = b"".join(b"\x00" + bytes((x * 255 // max(w - 1, 1), y * 255 // max(h - 1, 1), 128, 255)[i % 4]
+                                    for x in range(w) for i in range(4)) for y in range(h))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    with open(path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) +
+                chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def main(argv):
+    if "--help" in argv or "-h" in argv:
+        print(HELP)
+        return 0
+    opts, pos, i = {}, [], 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--camera", "--renderer", "--imageWidth", "--renderSettingsPrimPath"):
+            opts[a] = argv[i + 1]
+            i += 2
+        elif a.startswith("--"):
+            opts[a] = True
+            i += 1
+        else:
+            pos.append(a)
+            i += 1
+    if len(pos) != 2:
+        print("usdrecord: error: the stage and the output image are required", file=sys.stderr)
+        return 2
+    if any(k.startswith("SF_") for k in os.environ):
+        print("fake_usdrecord: an SF_ variable reached the helper", file=sys.stderr)
+        return 5
+    stage, out = pos
+    text = open(stage, encoding="utf-8").read()
+    camera = opts.get("--camera", "")
+    if not camera.startswith("/") or 'def Camera "%s"' % camera.rsplit("/", 1)[-1] not in text:
+        print("usdrecord: camera not found: %s" % opts.get("--camera"), file=sys.stderr)
+        return 3
+    if not os.path.exists(os.path.join(os.path.dirname(stage), "scene.usda")):
+        print("usdrecord: cannot open sublayer scene.usda", file=sys.stderr)
+        return 3
+    renderer = opts.get("--renderer", "Storm")
+    if renderer == "Broken":
+        print("Coding Error: Failed to load the Broken render delegate", file=sys.stderr)
+        return 1
+    if renderer == "Slow":
+        time.sleep(30)
+    h_ap = float(re.search(r"horizontalAperture = ([0-9.e+-]+)", text).group(1))
+    v_ap = float(re.search(r"verticalAperture = ([0-9.e+-]+)", text).group(1))
+    w = int(opts.get("--imageWidth", 960))
+    w = min(w, 256)  # (a small image: enough to check the shape)
+    h = max(1, round(w * v_ap / h_ap))
+    if out.lower().endswith(".exr"):
+        print("fake_usdrecord: no EXR writer here", file=sys.stderr)
+        return 4
+    png(out, w, h)
+    print("Recording %s with %s (%d x %d)" % (stage, renderer, w, h))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

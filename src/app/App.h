@@ -1505,6 +1505,19 @@ private:
     // splat_train_psnr; NaN for other names.
     double splatTrainTestValue(const std::string& name);
     std::shared_ptr<struct SplatTrainUi> splatTrain_;
+    // File > Render with... (PanelRenderBridge.cpp, ai/RenderBridge.h): a still from a Hydra render delegate through
+    // the user's render helper, run as its own program; the Render window, Preferences > Render bridge.
+    void registerRenderBridgeUi();
+    CommandResult startRenderBridge();
+    void openRenderInEditor();
+    void pollRenderBridge();
+    void drawRenderBridgeOverlay(); // the Render window, the helper prompt
+    void drawRenderBridgePrefs();
+    void shutdownRenderBridge();    // (the still's texture, while the GL context is current)
+    bool renderBridgeBusy() const;
+    // UI test values: render_bridge_state, _window, _confirm, _ready, _renderers, _shown, _command; NaN otherwise.
+    double renderBridgeTestValue(const std::string& name);
+    std::shared_ptr<struct RenderBridgeUi> renderBridge_;
     std::string lastExportFolder_; // where the last export went: the default folder for baked maps
     // Cached UV wireframe of the active Part for the UV view: segments in 0..1 UV space.
     std::vector<glm::vec2> uvLines_;

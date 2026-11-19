@@ -528,6 +528,9 @@ std::string UserGuide::chapterFor(const std::string& palette, const std::string&
     if (starts("Color") || starts("Material")) return "vertex-paint.md";
     if (starts("File > Blender")) return "blender.md";
     if (starts("File > Maya")) return "maya.md";
+    if (starts("File > Render with") || idStarts("render.") || actionId == "file.render_with" ||
+        starts("Preferences > Render bridge"))
+        return "render-bridge.md";
     if (starts("File > Capture from phone") || actionId == "file.capture_phone") return "phone-capture.md";
     if (starts("File > Forge Deck") || actionId == "file.forge_deck") return "forge-deck.md";
     if (starts("File > Export") || idStarts("file.export") || actionId == "file.send_unreal" || actionId == "file.save_splats" ||

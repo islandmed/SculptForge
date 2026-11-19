@@ -335,7 +335,8 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
   src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GlbFetch.cpp src/ai/SpaceHealth.cpp src/ai/Tripo.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
-  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
+  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp src/ai/RenderBridge.cpp)
+target_include_directories(sculptforge_ai PRIVATE third_party/tinyexr) # (the render bridge reads EXR stills)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(Threads REQUIRED)
@@ -539,6 +540,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
     src/app/PanelSplatTrain.cpp
+    src/app/PanelRenderBridge.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp
     src/app/PanelBridge.cpp
@@ -1303,6 +1305,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(ui_async_stroke_undo PROPERTIES
                          ENVIRONMENT "SF_TRIANGLE_BUDGET=40000;SF_STILL_FRAME_MS=0.001;SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
+    sculptforge_ui_test(render_bridge_1440 render_bridge --size 1440x900) # File > Render with... (the Render window)
+    sculptforge_ui_test(render_bridge_2880 render_bridge --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
     file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)
     foreach(script ${SCULPTFORGE_PERF_TESTS})

@@ -452,6 +452,7 @@ void App::shutdown() {
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
+    shutdownRenderBridge(); // the still's texture
     clearPartThumbnails();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -718,6 +719,7 @@ int App::runUiTest(int w, int h, int fps) {
         pollBake();
         pollQRemesh();
         pollSplatTrain();
+        pollRenderBridge();
         pollSculptable();
         tickKeySequence(dt);
         updateCameraAspect();
@@ -975,6 +977,7 @@ int App::runRecording() {
         pollBake();
         pollQRemesh();
         pollSplatTrain();
+        pollRenderBridge();
         pollSculptable();
         updateCameraAspect();
 
@@ -1493,6 +1496,7 @@ int App::run() {
             pollBake();
             pollQRemesh();
             pollSplatTrain();
+            pollRenderBridge();
             pollSculptable();
         }
         tickProject(dt); // the title and autosave, asleep or not
@@ -3787,6 +3791,7 @@ void App::drawUi() {
     drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
+    drawRenderBridgeOverlay(); // the Render window, the render helper prompt (PanelRenderBridge.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)

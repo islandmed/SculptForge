@@ -17,6 +17,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/LitSphere.h"
+#include "core/ManagedPolicy.h"
 #include "core/StarterMeshes.h"
 #include "core/Units.h"
 
@@ -624,6 +625,7 @@ void App::drawPalette_File() {
     menuAction(*this, "file.export_fbx");
     menuAction(*this, "file.send_unreal");
     menuAction(*this, "file.save_splats");
+    if (policy::renderBridgeAllowed()) menuAction(*this, "file.render_with"); // (PanelRenderBridge.cpp)
     menuAction(*this, "pack.install"); // a review screen first (PanelPacks.cpp)
     ImGui::Separator();
     drawBridgeMenu();
@@ -771,6 +773,10 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.scripts", "Scripts")) {
         tray::Section section;
         drawPythonPrefs(); // Enable Python scripts (PanelPython.cpp)
+    }
+    if (subpalette("preferences.render_bridge", "Render bridge")) {
+        tray::Section section;
+        drawRenderBridgePrefs(); // the render helper, the image editor, the Renders folder (PanelRenderBridge.cpp)
     }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;

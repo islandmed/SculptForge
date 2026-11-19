@@ -1006,6 +1006,7 @@ void App::initActions() {
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
+    registerRenderBridgeUi();  // File > Render with... (PanelRenderBridge.cpp)
     registerSculptableUiActions(); // Splats > Make sculptable (PanelSculptable.cpp)
     registerVdmActions();      // Brush > Vector Displacement (PanelVdm.cpp)
     registerKelvinletActions(); // Brush > Kelvinlet & Capture: Capture from view (PanelKelvinlet.cpp)

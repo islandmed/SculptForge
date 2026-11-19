@@ -285,6 +285,7 @@ the system file exists, `SF_POLICY` is ignored, so an artist can't loosen it.
   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit", "files"]},
   "maya": {"link": "never"},
   "python": {"scripts": "never"},
+  "render": {"bridge": "allowed"},
   "audit": {"path": "//fs01/audit/sculptforge/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1example",
              "useFor": ["https://llm.acme.internal/"]},
@@ -311,6 +312,7 @@ code 2 when it is broken); use it to check a file before you deploy it.
 | `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start, and **Help > Connect an AI tool** is gone) |
 | `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window (the window never listens for them; **Let AI tools control this window** is locked off) |
 | `maya.link` | `"never"`: the [Maya Live link](maya.md#live-link) can't be turned on (the window never listens for Maya; the folder bridge still works) |
+| `render.bridge` | `"never"`: [Render with... (preview)](render-bridge.md) is gone (the menu item, the window and the `render_bridge` command; no render helper is ever started) |
 | `python.scripts` | `"never"`: [Python scripting](python.md) can't be turned on (Python is never loaded; command scripts and macros still work) |
 | `mcp.categories` | The kinds of command AI tools may use: `info` (read the scene), `edit` (change it in memory), `files` (open, save, export, bridges), `scripts` (macros), `network` (brush gallery, Unreal), `ai` (AI generation). Left out: all |
 | `audit.path`, `audit.maxMB`, `audit.keep` | Where the [audit log](#audit-log) goes, when it rotates (10 MB) and how many old files it keeps (5) |

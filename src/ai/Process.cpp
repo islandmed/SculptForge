@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ai/Process.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -13,6 +14,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <cstring>
+#include <cwchar>
 #else
 #include <cerrno>
 #include <cstring>
@@ -35,6 +38,25 @@ std::string pathString(const fs::path& p) {
     return std::string(s.begin(), s.end());
 }
 } // namespace
+
+std::vector<std::string> currentEnvironment() {
+    std::vector<std::string> out;
+#if defined(_WIN32)
+    if (wchar_t* block = GetEnvironmentStringsW()) {
+        for (const wchar_t* e = block; *e; e += std::wcslen(e) + 1)
+            if (*e != L'=') { // (skips the hidden "=C:=C:\\..." drive entries)
+                const int n = WideCharToMultiByte(CP_UTF8, 0, e, -1, nullptr, 0, nullptr, nullptr);
+                std::string u(n > 0 ? size_t(n - 1) : 0, '\0');
+                if (n > 1) WideCharToMultiByte(CP_UTF8, 0, e, -1, u.data(), n, nullptr, nullptr);
+                out.push_back(std::move(u));
+            }
+        FreeEnvironmentStringsW(block);
+    }
+#else
+    for (char** e = environ; e && *e; ++e) out.emplace_back(*e);
+#endif
+    return out;
+}
 
 std::string findOnPath(const std::string& name) {
     if (name.empty()) return {};
@@ -69,6 +91,9 @@ std::string findOnPath(const std::string& name) {
 
 ChildProcess::~ChildProcess() {
     if (started_ && !finished_) kill(0.5);
+#if defined(_WIN32)
+    if (job_) CloseHandle(job_); // kill-on-close: ends anything the finished child left running
+#endif
 }
 
 #if defined(_WIN32)
@@ -132,8 +157,27 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
         log = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
     }
     // The child inherits our environment; the overrides are only tool settings (RUST_LOG), so setting them
-    // on ourselves is harmless and avoids building an environment block.
-    for (const auto& [k, v] : env) _wputenv_s(widen(k).c_str(), widen(v).c_str());
+    // on ourselves is harmless and avoids building an environment block. A whole environment (setEnvironment)
+    // is a block of its own, sorted without case as Windows expects.
+    std::wstring block;
+    if (hasFullEnv_) {
+        std::vector<std::wstring> entries;
+        for (const std::string& e : fullEnv_) {
+            const size_t eq = e.find('=');
+            bool replaced = false;
+            for (const auto& kv : env)
+                if (eq != std::string::npos && _stricmp(e.substr(0, eq).c_str(), kv.first.c_str()) == 0) replaced = true;
+            if (!replaced && eq != std::string::npos && eq > 0) entries.push_back(widen(e));
+        }
+        for (const auto& [k, v] : env) entries.push_back(widen(k + "=" + v));
+        std::sort(entries.begin(), entries.end(), [](const std::wstring& a, const std::wstring& b) {
+            return _wcsicmp(a.c_str(), b.c_str()) < 0;
+        });
+        for (const std::wstring& e : entries) block += e + L'\0';
+        block += L'\0';
+    } else {
+        for (const auto& [k, v] : env) _wputenv_s(widen(k).c_str(), widen(v).c_str());
+    }
     STARTUPINFOW si{};
     si.cb = sizeof si;
     si.dwFlags = STARTF_USESTDHANDLES;
@@ -141,12 +185,29 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     si.hStdOutput = log;
     si.hStdError = log;
     PROCESS_INFORMATION pi{};
-    const BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    // Started suspended and put in a job of its own before it runs, so that kill() also ends what it starts
+    // (a launcher's real program, a renderer's worker processes) and closing the app ends them all.
+    const BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE,
+                                   CREATE_NO_WINDOW | CREATE_SUSPENDED |
+                                       (hasFullEnv_ ? CREATE_UNICODE_ENVIRONMENT : 0),
+                                   hasFullEnv_ ? block.data() : nullptr, nullptr, &si, &pi);
     if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
     if (!ok) {
         error = "Cannot start " + exe + " (error " + std::to_string(GetLastError()) + ")";
         return false;
     }
+    if (job_) CloseHandle(job_);
+    job_ = CreateJobObjectW(nullptr, nullptr);
+    if (job_) {
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (!SetInformationJobObject(job_, JobObjectExtendedLimitInformation, &limits, sizeof limits) ||
+            !AssignProcessToJobObject(job_, pi.hProcess)) {
+            CloseHandle(job_); // (a job we are in that forbids nesting): the child alone, as before
+            job_ = nullptr;
+        }
+    }
+    ResumeThread(pi.hThread);
     CloseHandle(pi.hThread);
     process_ = pi.hProcess;
     started_ = true;
@@ -156,6 +217,12 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
 }
 
 void ChildProcess::detach() {
+    if (job_) { // it outlives us: closing the job must no longer end it
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        SetInformationJobObject(job_, JobObjectExtendedLimitInformation, &limits, sizeof limits);
+        CloseHandle(job_);
+        job_ = nullptr;
+    }
     if (process_) CloseHandle(process_);
     process_ = nullptr;
     started_ = false;
@@ -174,9 +241,14 @@ bool ChildProcess::running() {
 }
 
 void ChildProcess::kill(double) {
-    if (!running()) return;
-    TerminateProcess(process_, 1);
-    wait();
+    if (running()) {
+        if (!job_ || !TerminateJobObject(job_, 1)) TerminateProcess(process_, 1);
+        wait();
+    } else if (job_) {
+        TerminateJobObject(job_, 1); // the child is gone but what it started is not
+    }
+    if (job_) CloseHandle(job_);
+    job_ = nullptr;
 }
 
 int ChildProcess::wait() {
@@ -209,8 +281,8 @@ bool ChildProcess::start(const std::string& program, const std::vector<std::stri
     argv.push_back(nullptr);
 
     std::vector<std::string> envStore;
-    for (char** e = environ; e && *e; ++e) {
-        const std::string entry(*e);
+    const std::vector<std::string> base = hasFullEnv_ ? fullEnv_ : currentEnvironment();
+    for (const std::string& entry : base) {
         bool replaced = false;
         for (const auto& kv : env)
             if (entry.compare(0, kv.first.size() + 1, kv.first + "=") == 0) replaced = true;

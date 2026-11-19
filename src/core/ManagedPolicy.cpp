@@ -120,6 +120,7 @@ Policy failClosed(const std::string& source, const std::string& error) {
     p.mcpLiveAllowed = false;
     p.mayaLinkAllowed = false;
     p.pythonAllowed = false;
+    p.renderBridgeAllowed = false;
     p.updateCheck = Lock::Off;
     return p;
 }
@@ -143,7 +144,7 @@ const std::vector<std::string>& aiProviderIds() {
 bool parsePolicy(const std::string& text, const std::string& source, Policy& out, std::string& error) {
     Json j;
     if (!Json::parseStrict(text, j, error)) return false;
-    if (!checkKeys(j, {"format", "version", "organization", "ai", "network", "mcp", "maya", "python", "audit", "signIn", "telemetry", "updates"},
+    if (!checkKeys(j, {"format", "version", "organization", "ai", "network", "mcp", "maya", "python", "render", "audit", "signIn", "telemetry", "updates"},
                    "", error))
         return false;
     if (j["format"].asString() != kPolicyFormat) return (error = "format must be \"sculptforge-policy\"", false);
@@ -203,6 +204,15 @@ bool parsePolicy(const std::string& text, const std::string& source, Policy& out
             const std::string v = py["scripts"].asString();
             if (v != "never" && v != "allowed") return (error = "python.scripts must be \"never\" or \"allowed\"", false);
             p.pythonAllowed = v == "allowed";
+        }
+    }
+    if (j.has("render")) {
+        const Json& r = j["render"];
+        if (!checkKeys(r, {"bridge"}, "render", error)) return false;
+        if (r.has("bridge")) {
+            const std::string v = r["bridge"].asString();
+            if (v != "never" && v != "allowed") return (error = "render.bridge must be \"never\" or \"allowed\"", false);
+            p.renderBridgeAllowed = v == "allowed";
         }
     }
     if (j.has("audit")) {
@@ -369,12 +379,18 @@ bool pythonAllowed(std::string* why) {
     return false;
 }
 
+bool renderBridgeAllowed(std::string* why) {
+    if (gPolicy.renderBridgeAllowed) return true;
+    if (why) *why = "Your studio's policy doesn't allow the render bridge (Render with...)";
+    return false;
+}
+
 std::vector<std::string> mcpCategories(std::string_view name, const std::vector<std::string>& paramNames) {
     static const char* kNetwork[] = {"brush_gallery_search", "brush_gallery_install", "unreal_editors", "unreal_send",
                                      "export_unreal"};
     static const char* kScripts[] = {"macro_run", "run_script", "python"};
     static const char* kBridges[] = {"bridge_send", "bridge_receive", "bridge_import", "bridge_export",
-                                     "blender_send", "blender_receive", "maya_send",     "maya_receive"};
+                                     "blender_send", "blender_receive", "maya_send",     "maya_receive", "render_bridge"};
     static const char* kAi[] = {"brush_ai", "image_to_3d", "text_to_3d", "comfyui_check"};
     auto in = [&](const auto& list) {
         for (const char* n : list)
@@ -432,6 +448,7 @@ std::string describe(const Policy& p) {
                                                         (p.mcpLiveAllowed ? "allowed" : "never") + ")");
     o << "; Maya Live link " << (p.mayaLinkAllowed ? "allowed" : "never");
     o << "; Python scripts " << (p.pythonAllowed ? "allowed" : "never");
+    o << "; render bridge " << (p.renderBridgeAllowed ? "allowed" : "never");
     o << "; audit log " << (p.auditPath.empty() ? "default path" : p.auditPath) << (p.auditRequired ? " (required)" : "");
     if (p.signInConfigured()) o << "; sign-in " << p.issuer;
     o << "; telemetry none (SculptForge has none)";
