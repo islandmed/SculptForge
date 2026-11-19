@@ -2133,12 +2133,10 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     if (mesh.micro) inkMesh_ = &mesh;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.
-    // A mask nearby (the micro level's own, or the base mesh's) takes the grid's per-point rule for the whole stroke: the
-    // cage can't hold a mask finer than its triangles (a faceted patch with a hard edge), the grid holds it per point.
-    bool gridGrab = microMoveAlongNormals;
-    if (!gridGrab && mesh.micro && (mesh.micro->hasMask() || mesh.hasMask()))
-        for (const SymCopy& m : copies(sym)) gridGrab = gridGrab || microMaskNear(mesh, bvh, m.point(p.center), p.radius);
-    if (gridGrab && microReady(mesh)) {
+    // A mask nearby stays on the cage too: displaceAll holds every base vertex whose triangles (and their neighbours', for
+    // the normals) carry it, so masked samples keep their bits. (Switching to the grid's along-the-normal rule there folded
+    // the surface into leaf-like lumps wherever the base's forms are smaller than the drag: its normals fan out over them.)
+    if (microMoveAlongNormals && microReady(mesh)) {
         for (const SymCopy& m : copies(sym)) {
             MicroDab d;
             d.op = MicroDab::Op::GrabBegin, d.type = BrushType::Move, d.center = m.point(p.center), d.radius = p.radius, d.focal = p.focal;

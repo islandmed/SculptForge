@@ -26,8 +26,10 @@ Document maskedMicroDoc() {
     Document doc = makeDoc(makeBenchSphere(20000));
     std::string err;
     CHECK(microDivide(doc.mesh, 4, err));
-    // A mask beside the Moves (the grid's per-point Move path), with a soft edge across the moved area.
+    // A mask beside the Moves, with a soft edge across the moved area, on the grid's per-point Move path (Move along normals:
+    // a default Move stays on the base cage beside a mask too, test_micro_move_folds.cpp).
     Sculptor& sc = doc.sculptor;
+    sc.microMoveAlongNormals = true;
     DabParams p;
     p.center = glm::normalize(glm::vec3(0.12f, 0.0f, 1.0f)), p.radius = 0.12f, p.strength = 1.0f, p.viewDir = -p.center;
     Symmetry none;

@@ -143,7 +143,7 @@
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
-//                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft
+//                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft, micro_step
 //                            (micro grid points masked at least half / partly),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
 //                            and selection_w / selection_h (from there to the cursor), symmetry_x,
@@ -709,6 +709,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "triangles") return double(m.triangleCount());
     // Adaptive Detail tiles (core/MicroTiles.h): tiles alive on the active Part's Micro level; delta pages on the GPU.
+    if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
     if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());

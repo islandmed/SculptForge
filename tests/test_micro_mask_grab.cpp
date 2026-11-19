@@ -11,6 +11,7 @@
 #include "core/Benchmark.h"
 #include "core/Micro.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -145,12 +146,12 @@ TEST(micro_mask_move_scales_partial_masks) {
 }
 
 TEST(micro_mask_move_default_follows_the_painted_mask) {
-    // The default Move (the base cage below the micro level) over a mask takes the grid's per-point rule for the stroke: the
-    // cage holds nothing finer than its triangles (artist-qa: a faceted patch wider than the painted mask, a hard step at its
-    // edge, folds between two masks). So the held area IS the painted mask, with its soft falloff: every unmasked sample
-    // moves exactly as the unmasked stroke moves it, the partly masked ones at most (1 - mask) of it, the masked none.
+    // The default Move (the base cage below the micro level) over a mask stays on the cage (artist-qa 11-18: the grid's
+    // along-the-normal rule it switched to near a mask folded the surface into leaf-like lumps over base forms smaller than
+    // the drag; test_micro_move_folds.cpp). The cage holds every base vertex whose triangles, or their neighbours' (the
+    // normals), carry the mask: the masked samples keep their bits, the partly masked ones move at most (1 - mask) of what
+    // the unmasked stroke moves them, and the free surface a few base edges clear of the mask moves exactly as unmasked.
     Document masked = microDoc(3), free = microDoc(3);
-    free.sculptor.microMoveAlongNormals = true; // (the per-point rule, without a mask)
     maskFront(masked);
     CHECK(!masked.sculptor.microMoveAlongNormals);
     const geom::MicroSnapshot before = geom::microSnapshot(masked.mesh, kFront);
@@ -163,14 +164,31 @@ TEST(micro_mask_move_default_follows_the_painted_mask) {
     int atMask = -1;
     const float over = geom::maskedOvershoot(masked.mesh, before, after, ref, &atMask);
     const MicroMesh& mm = *masked.mesh.micro;
-    float worstFree = 0.0f;
+    std::vector<glm::vec3> maskedAt; // (the masked samples at base corners: enough to tell how far the mask is)
     for (size_t k = 0; k < before.tris.size(); ++k)
-        for (uint32_t s = 0; s < mm.samples; ++s)
-            if (mm.mask[size_t(before.tris[k]) * mm.samples + s] == 0)
-                worstFree = std::max(worstFree, glm::distance(after.points[k * mm.samples + s], ref.points[k * mm.samples + s]));
-    std::printf("  Move: worst excess over (1 - mask) x unmasked move %.2e; unmasked samples off the unmasked stroke by %.2e\n", over, worstFree);
-    CHECK(over < mm.step * kQuantisation);
-    CHECK(worstFree < mm.step * kQuantisation);
+        for (uint32_t s : {MicroMesh::index(0, 0, mm.n), MicroMesh::index(mm.n, 0, mm.n), MicroMesh::index(0, mm.n, mm.n)})
+            if (mm.mask[size_t(before.tris[k]) * mm.samples + s] > 0) maskedAt.push_back(before.points[k * mm.samples + s]);
+    const float clear = 5.0f * mm.baseEdge; // (the hold: two rings of base vertices around the masked triangles)
+    float worstFree = 0.0f;
+    size_t freeChecked = 0;
+    for (size_t k = 0; k < before.tris.size(); ++k)
+        for (uint32_t s = 0; s < mm.samples; ++s) {
+            const glm::vec3 b = before.points[k * mm.samples + s];
+            if (std::any_of(maskedAt.begin(), maskedAt.end(), [&](const glm::vec3& q) { return glm::distance(b, q) < clear; })) continue;
+            ++freeChecked;
+            worstFree = std::max(worstFree, glm::distance(after.points[k * mm.samples + s], ref.points[k * mm.samples + s]));
+        }
+    std::printf("  Move: worst excess over (1 - mask) x unmasked move %.2e (at mask %d); %zu samples clear of the mask off the "
+                "unmasked stroke by %.2e\n", over, atMask, freeChecked, worstFree);
+    // (the cage isn't quantised like the grid: a held vertex beside a free one turns the free one's normal a little, so the
+    // bounds are a hundredth of the stroke's largest move, a fraction of a micro edge here)
+    float largest = 0.0f;
+    for (size_t i = 0; i < before.points.size(); ++i) largest = std::max(largest, glm::distance(before.points[i], ref.points[i]));
+    std::printf("  (largest move %.3f)\n", largest);
+    CHECK(largest > 0.05f);
+    CHECK(over < 0.01f * largest);
+    CHECK(freeChecked > 0);
+    CHECK(worstFree < 0.01f * largest);
 }
 
 TEST(micro_base_mask_holds_micro_samples) {

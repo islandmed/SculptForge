@@ -29,7 +29,7 @@ orbit -40 0
 wait_idle 30
 expect_value moved_sum == $cage
 
-# A mask beside the brush (the micro level's own): Move takes the grid's rule and stays too.
+# A mask beside the brush (the micro level's own): Move stays on the cage, holds the mask, and stays too.
 brush_size 40
 hold ctrl
 stroke 0.66 0.62 0.67 0.63 0.4
@@ -41,13 +41,14 @@ brush_size 120
 snapshot
 stroke 0.52 0.58 0.58 0.50 0.6
 wait_idle 30
-remember micro_moved grid
-expect_value micro_moved > 0
+remember moved_sum held
+expect_value moved_sum > 0
+expect_value micro_moved == 0
 orbit 40 0
 wait_idle 30
 orbit -40 0
 wait_idle 30
-expect_value micro_moved == $grid
+expect_value moved_sum == $held
 shot after-move
 
 # Adjust on the micro level's mask: Invert swaps masked and free, Blur softens the edge; undo steps back.
