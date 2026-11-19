@@ -575,8 +575,18 @@ step_bump() {
         mkdir -p "$(dirname "$(testers_file)")"
         python3 tools/release/assemble_notes.py "$BASE" --testers >"$(testers_file)"
     fi
+    # Members' requests among the fragments, counted before they go: the feed step writes it to latest.json
+    # (support.member_requests_this_release). Added to what an earlier bump (a beta's) kept; no fragments, no change.
+    local mr=""
+    if ls changes/*.md 2>/dev/null | grep -v '/README.md$' >/dev/null; then
+        mr=$(python3 tools/release/assemble_notes.py "$BASE" --member-requests) || die "$mr" "fix that fragment in changes/, commit, push main"
+    fi
     # Note fragments (changes/<branch>.md) into CHANGELOG [Unreleased] and What's New X.Y.Z; the fragments go.
     out=$(python3 tools/release/assemble_notes.py "$BASE" --apply 2>&1) || die "$out" "fix that fragment in changes/, commit, push main"
+    if [ -n "$mr" ]; then
+        mkdir -p "$(dirname "$(member_requests_file)")"
+        echo $(( mr + $(cat "$(member_requests_file)" 2>/dev/null || echo 0) )) >"$(member_requests_file)"
+    fi
     grep -q 'written' <<<"$out" && echo "$out" | sed 's/^/   notes: /'
     # The What's New UI test checks the guide's newest three sections: pinned here to this version's.
     out=$(python3 tools/release/pin_whats_new_test.py "$BASE" 2>&1) || die "$out" "fix docs/guide/whats-new.md (its newest section must be '## Version $BASE'), commit, push main"
@@ -1097,9 +1107,9 @@ step_site() {
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
         card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
         python3 -I scripts/ai3d-health.py --write >/dev/null 2>&1 || true # (the free Spaces' health note rides the feed: no block = all up)
-        python3 - "$V" "$HIGHLIGHTS" <<'PY'
-import json, sys
-v, notes = sys.argv[1], sys.argv[2]
+        python3 - "$V" "$HIGHLIGHTS" "$(member_requests_file)" <<'PY'
+import json, os, sys
+v, notes, mr_file = sys.argv[1], sys.argv[2], sys.argv[3]
 lines = [l.strip() for l in open(notes, encoding="utf-8") if l.strip()]
 if not 3 <= len(lines) <= 5:
     sys.exit(f"{notes}: want 3-5 highlight lines, found {len(lines)}")
@@ -1109,6 +1119,17 @@ feed["version"], feed["highlights"] = v, lines
 def key(s):  # 0.11.0-beta.1 < 0.11.0, as src/core/UpdateCheck.cpp orders them
     n, _, pre = s.partition("-")
     return [int(x) for x in n.split(".")], (0, pre) if pre else (1, "")
+# The membership card's "N changes in this release were members' requests": this release's count, never the last one's.
+mr = int(open(mr_file).read().strip() or 0) if os.path.exists(mr_file) else 0
+support = feed.get("support", {})
+if mr > 0:
+    support["member_requests_this_release"] = mr
+else:
+    support.pop("member_requests_this_release", None)
+if support:
+    feed["support"] = support
+else:
+    feed.pop("support", None)
 pv = feed.get("channels", {}).get("preview", {}).get("version", "")
 if pv and key(pv) <= key(v):  # stable passed the beta: Preview is offered stable (the app checks this too)
     del feed["channels"]["preview"]
@@ -1307,6 +1328,9 @@ step_social() {
 }
 
 # A beta's #testers checklist (step bump writes it, step status names it): one place both checkouts see.
+# The count of member-request fragments the bump saw, outside the checkout like the testers checklist (the bump runs in the
+# batch checkout, the feed step in the main one); keyed by the stable version so a beta's count carries to its release.
+member_requests_file() { echo "${SF_TESTERS_DIR:-$HOME/Work/.sf/state/release-testers}/release-member-requests-${V%%-*}.txt"; }
 testers_file() { echo "${SF_TESTERS_DIR:-$HOME/Work/.sf/state/release-testers}/release-testers-$V.md"; }
 
 # release_signing_note: the release checklist's Windows line, from the run whose packages $T shipped (staging's Packages run, or

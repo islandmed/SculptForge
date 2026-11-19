@@ -374,8 +374,9 @@ automatically.
   "member_requests_this_release": N}` (any part may be left out). The app's daily update check keeps it, and the small
   card shows one true line from it in turn ("Members funded this month: ...", "Founding Members so far: N of 100...",
   "N changes in this release were members' requests."); without the block the card keeps its usual Founding Members
-  line. Only real numbers: `founding` from `website/founding.json`, the requests count from
-  `tools/release/assemble_notes.py X.Y.Z --member-requests` before the bump (fragments with `member_request: true`).
+  line. Only real numbers: `founding` from `website/founding.json`; `member_requests_this_release` is automatic: the bump counts the fragments with
+  `member_request: true` (`assemble_notes.py X.Y.Z --member-requests`) before it deletes them, and the feed step writes the
+  number (and drops last release's when there are none).
   Never anything that reads as urgency.
 - **Member Requests:** each approved request goes into sculptforge/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
