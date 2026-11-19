@@ -9,12 +9,14 @@
 
 #include "cli/McpAttach.h"
 #include "core/Commands.h"
+#include "core/Json.h"
 #include "link/AiLink.h"
 #include "link/AiLinkSession.h"
 
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <random>
 #include <sstream>
 #include <thread>
@@ -321,17 +323,42 @@ TEST(ai_link_attach_end_to_end) {
        << call(3, "live_connect", R"({"code":"000000"})") << "\n"         // wrong code
        << call(4, "live_connect", R"({"code":"314159"})") << "\n"         // right code
        << call(5, "mesh_info") << "\n"
+       << call(8, "live_connect") << "\n"                                // already connected
        << call(6, "live_disconnect") << "\n"
        << call(7, "mesh_info") << "\n";
     runMcpAttach(in, out, endpoint);
     app.join();
     const std::string o = out.str();
+    { // Each live_connect reply's isError matches what it says, and list_changed comes after the reply that caused it.
+        std::map<int, Json> replies;
+        int listChangedAt = -1, n = 0;
+        std::istringstream lines(o);
+        for (std::string l; std::getline(lines, l); ++n) {
+            Json j;
+            std::string perr;
+            CHECK(Json::parse(l, j, perr));
+            if (j["method"].asString() == "notifications/tools/list_changed" && listChangedAt < 0) listChangedAt = n;
+            else if (j.has("id")) replies[int(j["id"].asNumber())] = j;
+        }
+        CHECK(replies[3]["result"]["isError"].asBool(false)); // wrong code: refused
+        CHECK(!replies[4]["result"]["isError"].asBool(true)); // right code: connected
+        CHECK(replies[4]["result"]["content"][0]["text"].asString().find("Connected to SculptForge") == 0);
+        CHECK(!replies[8]["result"]["isError"].asBool(true)); // already connected: not an error
+        CHECK(listChangedAt >= 0);
+        int connectReplyAt = -1;
+        std::istringstream again(o);
+        n = 0;
+        for (std::string l; std::getline(again, l); ++n)
+            if (l.find("\"id\":4") != std::string::npos) connectReplyAt = n;
+        CHECK(connectReplyAt >= 0 && listChangedAt > connectReplyAt);
+    }
     CHECK(o.find("Not connected to SculptForge: call live_connect first") != std::string::npos);
     CHECK(o.find("wrong code") != std::string::npos);
     CHECK(o.find("Connected to SculptForge") != std::string::npos);
     CHECK(o.find("ran mesh_info") != std::string::npos);
     CHECK(o.find("notifications/tools/list_changed") != std::string::npos);
     CHECK(o.rfind("Not connected to SculptForge") > o.find("ran mesh_info")); // after Disconnect, refused again
+    CHECK(o.find("Already connected to SculptForge") != std::string::npos);
     listener.close();
     std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
 }

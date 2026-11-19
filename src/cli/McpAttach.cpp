@@ -99,6 +99,14 @@ private:
 
     void listChanged() { send(R"({"jsonrpc":"2.0","method":"notifications/tools/list_changed"})"); }
 
+    // A pairing approved inside live_connect changes the tool list: tell the client once the call's own reply is out,
+    // so it never refreshes tools while that call still looks pending.
+    void flushListChanged() {
+        if (!listChangedPending_) return;
+        listChangedPending_ = false;
+        listChanged();
+    }
+
     void dropConnection() {
         const bool was = paired_;
         conn_.close();
@@ -152,7 +160,7 @@ private:
     std::string pairingOutcome(const Json& msg) {
         if (msg["paired"].asBool()) {
             paired_ = true;
-            listChanged();
+            listChangedPending_ = true;
             return {};
         }
         if (msg.has("paired")) {
@@ -183,7 +191,12 @@ private:
 
     void toolsCall(const Json& id, const Json& msg) {
         const std::string name = msg["params"]["name"].asString();
-        if (name == "live_connect") return send(AiLinkSession::contentReply(id, textContent(connect(msg["params"]["arguments"]["code"].asString())), !paired_));
+        if (name == "live_connect") {
+            // connect() first: isError reads the state it leaves (argument evaluation order is unspecified).
+            const std::string text = connect(msg["params"]["arguments"]["code"].asString());
+            send(AiLinkSession::contentReply(id, textContent(text), !paired_));
+            return flushListChanged();
+        }
         if (name == "live_disconnect") {
             dropConnection();
             return send(AiLinkSession::resultReply(id, true, "Disconnected from SculptForge"));
@@ -268,6 +281,7 @@ private:
     std::string endpoint_, client_;
     link::AiLinkConn conn_;
     bool paired_ = false;
+    bool listChangedPending_ = false;
 };
 
 } // namespace
