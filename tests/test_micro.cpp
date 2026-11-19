@@ -1542,3 +1542,52 @@ TEST(micro_stroke_end_no_spikes_on_a_rough_surface) {
         CHECK(worst <= 2.0f * r);
     }
 }
+
+TEST(micro_smooth_never_shoots_points_out) {
+    // Smooth on a Micro level (Shift held) shot points out (a member's report, 11-18): a big dab (stride > 1) worked out
+    // the change on the coarse points and interpolated it onto fine points of other heights, raising a noisy level's
+    // peaks to 2.2x (701 -> 1542 units at r 0.4); fixed with #220 (every grid point to its own average). Smooth only averages:
+    // on a noisy level no displacement may end above the largest one it started with, and no surface point may move
+    // farther than that noise's peak-to-peak span, whatever the radius (stride 1 and the coarse strides), with and
+    // without a mask, over many overlapping dabs. Finite everywhere, and the copies stay stitched.
+    for (bool masked : {false, true})
+        for (float r : {0.03f, 0.12f, 0.4f}) {
+            Document doc = microDoc(4, 60000);
+            microNoise(doc.mesh, 0.004f, 80.0f, 3);
+            Symmetry sym;
+            sym.x = false;
+            if (masked) {
+                CHECK(doc.sculptor.beginStroke(doc.mesh, "Mask"));
+                for (int i = 0; i < 4; ++i) doc.sculptor.dabMask(doc.mesh, doc.bvh, dabAt(glm::normalize(glm::vec3(0.1f, 0, 1)), r * 0.6f, 0.6f), sym);
+                doc.undo.push(doc.sculptor.endStroke());
+            }
+            const MicroMesh& mm = *doc.mesh.micro;
+            int peak0 = 0;
+            for (size_t k = 0; k < mm.disp.size(); ++k) peak0 = std::max(peak0, std::abs(int(mm.disp[k])));
+            const std::vector<glm::vec3> surface = microSurface(doc.mesh);
+            for (int s = 0; s < 3; ++s) {
+                doc.sculptor.beginStroke(doc.mesh, "Smooth");
+                for (int i = 0; i < 24; ++i) {
+                    const float x = -0.3f + 0.6f * float(i) / 23.0f;
+                    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Smooth, dabAt(glm::normalize(glm::vec3(x, 0.02f * float(s), 1.0f)), r, 1.0f), sym);
+                }
+                doc.undo.push(doc.sculptor.endStroke());
+            }
+            int peak = 0;
+            for (size_t k = 0; k < mm.disp.size(); ++k) peak = std::max(peak, std::abs(int(mm.disp[k])));
+            const std::vector<glm::vec3> after = microSurface(doc.mesh);
+            float worst = 0.0f;
+            size_t bad = 0;
+            for (size_t k = 0; k < after.size(); ++k) {
+                if (!std::isfinite(after[k].x) || !std::isfinite(after[k].y) || !std::isfinite(after[k].z)) ++bad;
+                worst = std::max(worst, glm::distance(after[k], surface[k]));
+            }
+            const float span = 2.0f * float(peak0) * mm.step;
+            std::printf("  r %.2f%s: peak %d -> %d units, largest move %.5f (noise span %.5f), %zu not finite\n", r, masked ? " masked" : "",
+                        peak0, peak, worst, span, bad);
+            CHECK(bad == 0);
+            CHECK(peak <= peak0 + 1);
+            CHECK(worst <= span + mm.step);
+            CHECK(watertight(doc.mesh));
+        }
+}
