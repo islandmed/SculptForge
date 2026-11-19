@@ -4,10 +4,10 @@ whats_new: **Big micro levels settle after strokes**: on a base of millions of t
   and the view is smooth again.
 fixed: **Micro level 4 slow after strokes on big bases** (#184): after strokes on a base of about 2.5M triangles or
   more at micro level 4, every frame went through each base triangle again and loaded only a small batch of full
-  detail, so even a view held still stayed at about 9 frames a second. Unchanged frames now skip that pass, as much
+  detail, so even a view held still stayed at a few frames a second. Unchanged frames now skip that pass, as much
   of the wanted detail loads as fits the frame's time budget, and a full detail budget stops loading instead of
-  trying again each frame. Floor-tier laptop, 2.5M base at micro level 4 after Clay strokes: the view held still
-  went from 9 to over 50 frames a second (1.25M base: 18 to over 125).
+  trying again each frame. On a 2.5M base at micro level 4 the view held still after Clay strokes is smooth again
+  within a couple of seconds.
 testers:
   - Linux with a pen tablet (Wayland and X11), and any OS: a base of 2.5M+ triangles (Voxel Remesh high, then
     Subdivide twice), Tool > Geometry > Add Micro up to level 4; draw a few large Clay strokes, then hold still: the
