@@ -68,7 +68,9 @@ run brush_use name="Crisp Flatten"
 snapshot
 stroke 0.40 0.40 0.44 0.41
 expect_value moved > 0
-expect_value moved_raised < 0.001
+# (nothing rises along the stroke's plane: an undercut under the brow comes down flat into it, which along its own
+# downward normal reads as a rise, so moved_raised doesn't hold here)
+expect_value moved_raised_plane < 0.001
 wait_idle 30
 shot face_crisp
 key ctrl+z

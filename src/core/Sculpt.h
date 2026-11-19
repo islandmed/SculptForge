@@ -406,6 +406,10 @@ private:
     std::vector<glm::vec3> crispMoved_;
     std::vector<uint32_t> crispSlideVerts_; // (its relax's)
     std::vector<glm::vec3> crispSlide_;
+    std::vector<uint8_t> crispKeep_; // (a locked cut's region: the points not under its plane)
+    std::vector<uint32_t> crispRefit_; // (both: the BVH leaves to refit are theirs)
+    std::vector<SymCopy> crispCopies_; // (this dab's symmetry copies and their centres: a vertex is cut by the nearest one's)
+    std::vector<glm::vec3> crispCopyCenters_;
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
     void dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float handedness);
     // Kelvinlet.cpp: the Kelvinlet brushes and Detail Clone.
@@ -444,8 +448,9 @@ private:
     uint64_t snakeStroke_ = 0;
     float snakeTravel_ = 0.0f;
     // `moved`: only those vertices moved (their rings' normals are updated, not the whole region's leaves).
+    // `refitOnly`: only those vertices moved at all (the BVH refits their leaves, not every leaf the query found).
     void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock,
-                   const std::vector<uint32_t>* moved = nullptr);
+                   const std::vector<uint32_t>* moved = nullptr, const std::vector<uint32_t>* refitOnly = nullptr);
     void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().

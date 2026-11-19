@@ -1675,9 +1675,10 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
 // `clock`). The next mirror's query needs the new boxes; normals wait until every mirror moved its vertices
 // (updateDabNormals), so where mirrors overlap they are updated once.
 void Sculptor::finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock,
-                         const std::vector<uint32_t>* moved) {
+                         const std::vector<uint32_t>* moved, const std::vector<uint32_t>* refitOnly) {
     timings.kernelMs += lapMs(clock);
-    bvh.refitQueried(mesh);
+    if (refitOnly) bvh.refit(mesh, *refitOnly);
+    else bvh.refitQueried(mesh);
     timings.bvhMs += lapMs(clock);
     ++timings.dabs;
     timings.vertices += verts_.size();
@@ -1798,6 +1799,9 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     dabLeaves_.clear();
     lastLazyLeaves_.clear();
     const std::vector<SymCopy> all = copies(sym);
+    crispCopies_ = all; // (a crisp cut shares each vertex out among the copies: dabRecipeSingle)
+    crispCopyCenters_.clear();
+    for (const SymCopy& m : all) crispCopyCenters_.push_back(m.point(base.center));
     for (size_t k = 0; k < all.size(); ++k) {
         const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
@@ -1835,6 +1839,24 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         std::erase_if(verts_, [&](uint32_t v) { return glm::dot(nrm[v], p.viewDir) > 0.0f; });
         if (verts_.empty()) return;
     }
+    // A locked Flatten cut never moves a point below its plane (Crisp Flatten only cuts), and once a stroke has cut
+    // deep, as much of a dab's sphere lies under the facet as above it: those points leave the region here, before
+    // their weights. (A 240 px stroke across a scan, its thin parts cut flat, took half as many dabs, each with 2.5M
+    // points instead of 1.6M.) The region's own size still sets the edge, the batching and the normals' path.
+    const size_t regionCount = verts_.size();
+    if (r.crispEdge && r.planeLock && r.plane == BrushRecipe::Plane::Flatten && r.depth == 0.0f && r.pinch == 0.0f &&
+        r.drag <= 0.0f && r.smooth <= 0.0f && copy < lockedPlanes_.size() && lockedPlanes_[copy].first != glm::vec3(0.0f)) {
+        const auto [n, c] = lockedPlanes_[copy];
+        crispKeep_.resize(verts_.size());
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) crispKeep_[i] = glm::dot(pos[verts_[i]] - c, n) >= 0.0f;
+        }, 32768);
+        size_t kept = 0;
+        for (size_t i = 0; i < verts_.size(); ++i)
+            if (crispKeep_[i]) verts_[kept++] = verts_[i];
+        verts_.resize(kept);
+        if (verts_.empty()) return;
+    }
 
     const float rad = p.radius;
     const float s = std::clamp(p.strength, 0.0f, 1.0f) * p.pressure;
@@ -1848,7 +1870,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         // Full strength out to a hard edge, anti-aliased over about 2.5 vertex spacings so the boundary stays a
         // clean line instead of stair-stepping along the triangles (the spacing from the region's vertex count: a
         // triangle mesh has about one vertex per 0.87 e^2 of surface, and the region covers about pi r^2).
-        const float spacing = 1.9f / std::sqrt(float(verts_.size()));
+        const float spacing = 1.9f / std::sqrt(float(regionCount));
         edge = std::clamp(2.5f * spacing, 0.03f, 0.5f);
         exponent = 1.0f;
     }
@@ -1901,13 +1923,19 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         // Lock plane: the first dab's plane for the whole stroke (each symmetry copy its own).
         if (copy >= lockedPlanes_.size()) lockedPlanes_.resize(copy + 1, {glm::vec3(0.0f), glm::vec3(0.0f)});
         auto& [n, c] = lockedPlanes_[copy];
+        // (a crisp copy whose dab overlaps the first one's takes the mirror image of its plane: measured, the region was
+        // already part cut by the first copy, and the two planes no longer met on the mirror)
+        const bool mirrored = r.crispEdge && copy > 0 && copy < crispCopyCenters_.size() &&
+                              lockedPlanes_[0].first != glm::vec3(0.0f) &&
+                              glm::distance(crispCopyCenters_[copy], crispCopyCenters_[0]) < 2.0f * p.radius;
+        if (n == glm::vec3(0.0f) && mirrored) n = m.dir(lockedPlanes_[0].first), c = m.point(lockedPlanes_[0].second);
         if (n == glm::vec3(0.0f)) n = areaNormal, c = areaCenter;
         else dabLevel = glm::dot(areaCenter - c, n) / p.radius, areaNormal = n, areaCenter = c;
     }
     if (frameWanted_) {
         lastFrame = {p.center, areaNormal, areaCenter, true};
         frameWanted_ = false;
-        lastRegion_ = verts_.size();
+        lastRegion_ = regionCount;
         lastRegionRadius_ = p.radius;
     }
     // Crisp edge: the plane pulls all the way from the default Intensity up, as Clay does (clayPull). Pen pressure
@@ -1917,6 +1945,36 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     const bool crispMax = r.crispEdge && r.planeLock && (r.plane == BrushRecipe::Plane::Flatten ||
                                                          r.plane == BrushRecipe::Plane::Fill ||
                                                          r.plane == BrushRecipe::Plane::Scrape);
+    // Symmetry: where the copies' dabs overlap (a stroke along the mirror plane, a big brush) both planes reached the same
+    // vertices, each pulling its own way from the other's half-done cut, and the two sides slid across the mirror into each
+    // other (folds along the seam, 351 of them for three strokes stacked in artist-qa's close-up). Each vertex is now cut by
+    // the copy whose dab is nearest (the mirror plane between two mirrored copies, where their planes meet), and the copies
+    // that overlap pull the same way, their normals' mean (it lies in the mirror plane), so no point crosses it. Apart, each
+    // pulls straight along its own normal.
+    glm::vec3 pullDir = areaNormal;
+    const bool shared = crispMax && crispCopies_.size() > 1 && copy < crispCopies_.size();
+    if (shared) {
+        const glm::vec3 own = crispCopies_[copy].inverseDir(areaNormal); // (the source copy's normal)
+        glm::vec3 sum(0.0f);
+        for (size_t k = 0; k < crispCopies_.size(); ++k) {
+            const float apart = glm::distance(crispCopyCenters_[copy], crispCopyCenters_[k]) / p.radius;
+            const float t = std::clamp(2.0f - apart, 0.0f, 1.0f); // (all of it a radius apart or closer, none past two)
+            const float w = k == copy ? 1.0f : t * t * (3.0f - 2.0f * t);
+            sum += crispCopies_[k].dir(own) * w;
+        }
+        const float len = glm::length(sum);
+        if (len > 1e-6f && glm::dot(sum / len, areaNormal) > 0.3f) pullDir = sum / len; // (planes far apart: each its own)
+    }
+    const float pullDot = glm::dot(pullDir, areaNormal);
+    auto ownCopy = [&](const glm::vec3& x) { // (ties go to the first copy)
+        if (!shared) return true;
+        const float mine = glm::distance(x, crispCopyCenters_[copy]);
+        for (size_t k = 0; k < crispCopyCenters_.size(); ++k) {
+            const float other = glm::distance(x, crispCopyCenters_[k]);
+            if (k != copy && (other < mine || (other == mine && k < copy))) return false;
+        }
+        return true;
+    };
     const uint32_t stamp = uint32_t(strokeId_);
     if (crispMax && crispStamp_.size() != mesh.vertexCount()) {
         crispStamp_.resize(mesh.vertexCount(), 0);
@@ -1928,7 +1986,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     // of the way they went; the exact normals follow behind the brush and when the stroke ends. Only for a pure plane
     // pull with no mask or hidden part (where the move is the plane's alone).
     bool lazyNormals = crispMax && analyticNormals && !dynTopo_.active() && !draft_ &&
-                       verts_.size() >= kAdaptiveMinVertices && mesh.normals.size() == mesh.vertexCount() &&
+                       regionCount >= kAdaptiveMinVertices && mesh.normals.size() == mesh.vertexCount() &&
                        r.depth == 0.0f && r.pinch == 0.0f && r.drag <= 0.0f && r.smooth <= 0.0f;
     if (lazyNormals && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) { // (as dabSingle: masked regions only)
         std::atomic<bool> masked{false};
@@ -1965,6 +2023,10 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         const uint32_t v = verts_[i];
         const glm::vec3& x = pos[v];
         float f = weights_[i];
+        if (!ownCopy(x)) { // (another copy's vertex: its dab is nearer)
+            scratch_[i] = glm::vec3(0.0f);
+            continue;
+        }
         const float h = glm::dot(x - areaCenter, areaNormal);
         // Crisp edge on a locked plane: the height and facing this stroke found the vertex with (h is what is left
         // of that height), so every dab of the stroke asks the same of it.
@@ -1975,17 +2037,22 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             facing = crispFacing_[v];
         }
         if (r.crispEdge && r.plane != BrushRecipe::Plane::None && f > 0.0f) {
-            // Crisp edge: the surface turned away from the plane (the side of a box past its edge, the far side of
-            // a thin part) fades out between 85 and 60 degrees off it when cut, so a full pull doesn't fold it onto
-            // the plane as a flap (a 45 degree chamfer across a rounded edge still cuts). Below the plane only a
-            // surface nearly parallel to it fills (dips, not the faces beside a chamfer: those are 45 degrees off
-            // and filling them raised a lip along the facet), fading out between 37 and 23 degrees. (The surface
-            // beside a 45 degree chamfer stays clear of both, so the small turns its normals take as their
-            // neighbours move don't speckle the pull.)
+            // Crisp edge on a plane that follows the stroke: the surface turned away from the plane (the side of a box
+            // past its edge, the far side of a thin part) fades out between 85 and 60 degrees off it when cut, so a
+            // full pull doesn't fold it onto the plane as a flap (a 45 degree chamfer across a rounded edge still
+            // cuts). Below the plane only a surface nearly parallel to it fills (dips, not the faces beside a chamfer:
+            // those are 45 degrees off and filling them raised a lip along the facet), fading out between 37 and 23
+            // degrees. (The surface beside a 45 degree chamfer stays clear of both, so the small turns its normals take
+            // as their neighbours move don't speckle the pull.) On a locked plane a cut leaves no point partway: the
+            // plane pulls every point straight along one way, so the surface keeps the way it faced across the plane,
+            // and a steep wall or an undercut comes down flat onto the plane (a sliver lying in it). Held partway by
+            // its facing, each point of a near-vertical wall stopped at its own height, a row of standing teeth and
+            // shards (a member's crisp ridges, and the lip under an eye on a head).
+            const bool cutAll = crispMax && h0 >= 0.0f;
             const float lo = h0 < 0.0f ? 0.8f : 0.1f;
             const float hi = h0 < 0.0f ? 0.92f : 0.5f;
             const float t = std::clamp((facing - lo) / (hi - lo), 0.0f, 1.0f);
-            f *= t * t * (3.0f - 2.0f * t);
+            if (!cutAll) f *= t * t * (3.0f - 2.0f * t);
             // Where the tip's edge crosses material far from the plane (the ends of a cut through a ridge), the band
             // widens to three times the depth of the cut there, so the wall is a gentle slope instead of a cliff a few
             // vertices wide that the triangles can only show as ragged steps and spikes (a 45 degree wall still did, on a
@@ -2030,7 +2097,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             const float done = crispDone_[v];
             if (want > done) {
                 const float step = (want - done) / std::max(1.0f - done, 1e-6f);
-                d -= areaNormal * (h * step);
+                d -= pullDir * (h * step / pullDot);
                 crispDone_[v] = want;
                 if (lazyNormals) {
                     if (curvatureStamp_[v] != stamp) curvatureStamp_[v] = stamp, curvature_[v] = kKeepCurvature;
@@ -2086,7 +2153,9 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
                 if (!movedNow) continue;
                 // (only points inside the facet, the plane having taken them and their whole ring: one on its
                 // border would slide over the half-pulled points of the edge's band and fold a triangle there)
-                auto taken = [&](uint32_t u) { return crispStamp_[u] == stamp && crispDone_[u] >= 0.99f; };
+                // (and with symmetry, only among this copy's own points: the other copy's side of the mirror isn't cut yet in
+                // this dab, and the two sides would slide differently)
+                auto taken = [&](uint32_t u) { return crispStamp_[u] == stamp && crispDone_[u] >= 0.99f && ownCopy(pos[u]); };
                 if (!taken(v)) continue;
                 auto ring = mesh.polygonNeighbors(v);
                 if (ring.empty() || !std::all_of(ring.begin(), ring.end(), taken)) continue;
@@ -2121,8 +2190,14 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         displaceAll(mesh, verts_, scratch_);
     }
     adaptiveDab_ = lazyNormals;
-    // (a crisp dab's normals: around the points it moved, the relax's being among them, not its whole region)
-    finishDab(mesh, bvh, clock, crispMax && !lazyNormals ? &crispMovedVerts_ : nullptr);
+    // (a crisp dab's normals: around the points it moved, the relax's being among them, not its whole region; and
+    // the BVH's leaves around them, when they are few: most of a deep cut's leaves hold points the dab left as they were)
+    const bool fewMoved = crispMax && (crispMovedVerts_.size() + crispSlideVerts_.size()) * 4 < verts_.size();
+    if (fewMoved) {
+        crispRefit_.assign(crispMovedVerts_.begin(), crispMovedVerts_.end());
+        crispRefit_.insert(crispRefit_.end(), crispSlideVerts_.begin(), crispSlideVerts_.end());
+    }
+    finishDab(mesh, bvh, clock, crispMax && !lazyNormals ? &crispMovedVerts_ : nullptr, fewMoved ? &crispRefit_ : nullptr);
 }
 
 void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) {

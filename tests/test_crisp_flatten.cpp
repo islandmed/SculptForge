@@ -4,6 +4,7 @@
 // Crisp Flatten (Hard Surface pack; thanks _tfx on Discord): a flatten that cuts a clean, sharp boundary.
 // BrushRecipe::crispEdge (a hard tip with a thin anti-aliased band) and BrushRecipe::planeLock (the plane the
 // stroke starts on, kept for the whole stroke).
+#include "GeomInvariants.h"
 #include "TestHarness.h"
 
 #include "core/BrushRecipe.h"
@@ -13,6 +14,8 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
 
 using namespace sf;
 
@@ -616,4 +619,148 @@ TEST(crisp_flatten_invariant_crossing_planes_leave_a_clean_seam) {
     CHECK(inside > 200);
     CHECK(nProud == 0);
     CHECK(spikes == 0);
+}
+
+namespace {
+
+// A dab path over the unit sphere: `n` dabs from direction `from` to `to` (on the surface), seen head-on.
+std::vector<DabParams> sphereLine(glm::vec3 from, glm::vec3 to, int n, float radius, float strength, float pressure = 1.0f) {
+    std::vector<DabParams> dabs;
+    for (int i = 0; i < n; ++i) {
+        const glm::vec3 c = glm::normalize(glm::mix(from, to, float(i) / float(n - 1)));
+        DabParams p = dabAt(c, glm::vec3(0, 0, -1), radius, strength);
+        p.pressure = pressure;
+        dabs.push_back(p);
+    }
+    return dabs;
+}
+
+constexpr Symmetry kMirrorX{true, false, false};
+
+void typeStroke(Document& d, BrushType type, const std::vector<DabParams>& dabs) {
+    d.sculptor.beginStroke(d.mesh, "built");
+    for (const DabParams& p : dabs) d.sculptor.dab(d.mesh, d.bvh, type, p, kMirrorX);
+    d.undo.push(d.sculptor.endStroke());
+}
+
+// artist-qa's crisp_ridges close-up (tests/artist), in scene units: the dense sphere (1.31M triangles) with clay lumps
+// built along crossing lines and pinched into sharp ridges, near-vertical walls many vertices tall, with X symmetry on
+// (the app's default, as in the close-up).
+Document ridgedSphere() {
+    Document d = geom::denseSphere();
+    const glm::vec3 a0(-0.45f, 0.35f, 1), a1(0.45f, 0.30f, 1), b0(-0.50f, -0.20f, 1), b1(0.50f, -0.25f, 1), c0(-0.05f, 0.65f, 1),
+        c1(0.0f, -0.65f, 1);
+    for (int k = 0; k < 2; ++k) {
+        typeStroke(d, BrushType::Clay, sphereLine(a0, a1, 40, 0.25f, 0.8f));
+        typeStroke(d, BrushType::Clay, sphereLine(b0, b1, 40, 0.25f, 0.8f));
+    }
+    typeStroke(d, BrushType::Clay, sphereLine(c0, c1, 50, 0.25f, 0.8f));
+    typeStroke(d, BrushType::Inflate, sphereLine(glm::vec3(-0.3f, 0.05f, 1), glm::vec3(0.3f, 0.0f, 1), 30, 0.18f, 0.6f));
+    for (int k = 0; k < 2; ++k) {
+        typeStroke(d, BrushType::Pinch, sphereLine(a0, a1, 60, 0.14f, 0.8f));
+        typeStroke(d, BrushType::Pinch, sphereLine(b0, b1, 60, 0.14f, 0.8f));
+    }
+    typeStroke(d, BrushType::Pinch, sphereLine(c0, c1, 70, 0.14f, 0.8f));
+    typeStroke(d, BrushType::Crease, sphereLine(glm::vec3(-0.3f, 0.0f, 1), glm::vec3(0.3f, -0.05f, 1), 40, 0.1f, 0.6f));
+    return d;
+}
+
+// The close-up's spike count (tools/qa/closeup.py): moved vertices standing out of their ring (umbrella over mean edge
+// > 0.6, and over 3x their ring's median), after less before.
+int closeupSpikes(const std::vector<glm::vec3>& before, const Mesh& m) {
+    std::vector<uint32_t> moved;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v)
+        if (m.positions[v] != before[v]) moved.push_back(v);
+    const std::unordered_set<uint32_t> ms(moved.begin(), moved.end());
+    auto count = [&](const std::vector<glm::vec3>& p) {
+        std::unordered_map<uint32_t, float> k;
+        auto umbrella = [&](uint32_t v) {
+            auto it = k.find(v);
+            if (it != k.end()) return it->second;
+            if (!ms.count(v)) return k[v] = 0.0f; // (as the close-up: a ring vertex that did not move scores 0)
+            auto ring = m.neighbors(v);
+            glm::vec3 c(0.0f);
+            float e = 0.0f;
+            for (uint32_t u : ring) c += p[u], e += glm::distance(p[u], p[v]);
+            const float out = ring.empty() || e <= 0.0f ? 0.0f : glm::distance(p[v], c / float(ring.size())) / (e / float(ring.size()));
+            return k[v] = out;
+        };
+        int n = 0;
+        for (uint32_t v : moved) {
+            const float kv = umbrella(v);
+            if (kv <= 0.6f) continue;
+            std::vector<float> nb;
+            for (uint32_t u : m.neighbors(v)) nb.push_back(umbrella(u));
+            std::sort(nb.begin(), nb.end());
+            n += !nb.empty() && kv > 3.0f * nb[nb.size() / 2];
+        }
+        return n;
+    };
+    return std::max(count(m.positions) - count(before), 0);
+}
+
+// Cut-only against a symmetric stroke's planes: the most any vertex rose along the first dab's plane normal `n` or its
+// mirror image (the two copies overlap and pull one way, so both see every point go down).
+float planeRise(const std::vector<glm::vec3>& before, const Mesh& after, glm::vec3 n) {
+    const glm::vec3 m(-n.x, n.y, n.z);
+    float rise = 0.0f;
+    for (uint32_t v = 0; v < after.vertexCount(); ++v) {
+        const glm::vec3 d = after.positions[v] - before[v];
+        rise = std::max({rise, glm::dot(d, n), glm::dot(d, m)});
+    }
+    return rise;
+}
+
+Stroked mirroredStroke(Document& d, const BrushRecipe& r, const std::vector<DabParams>& dabs) {
+    Stroked s;
+    d.sculptor.beginStroke(d.mesh, r.name);
+    for (size_t i = 0; i < dabs.size(); ++i) {
+        d.sculptor.dabRecipe(d.mesh, d.bvh, r, dabs[i], kMirrorX);
+        if (i == 0) s.n = d.sculptor.lastFrame.normal, s.at = d.sculptor.lastFrame.areaCenter;
+    }
+    d.undo.push(d.sculptor.endStroke());
+    return s;
+}
+
+} // namespace
+
+// Ridges cut with Crisp Flatten, X symmetry on (a member's teeth and shards, artist-qa's crisp_ridges close-up): three
+// strokes stacked on one path across the ridges and the mirror plane, then one big brush (a region of more than 150k
+// vertices: the big brush path) from one side to the other. Where the two copies' dabs overlap, each vertex is cut once,
+// by its own side's plane, and nothing slides across the mirror: no triangle folds over a neighbour (the close-up's
+// > 120 degree crease), no spike stands out of the cut, nothing rises along the stroke's planes and both sides match.
+// (Before: 76 folds stacked, 1555 folds / 185 spikes for the big brush and the sides 0.34 apart; the close-up on the app's
+// own sphere had 351 folds / 30 spikes stacked, 1893 / 181 big.)
+TEST(crisp_flatten_replay_ridges_stacked_and_big_brush) {
+    Document d = ridgedSphere();
+    const BrushRecipe r = builtin("Crisp Flatten");
+    const std::vector<uint32_t> mirror = geom::mirrorMapX(geom::denseSphereFixture().mesh); // (the sphere's own pairs)
+    const float symBefore = geom::symmetryError(d.mesh, mirror); // (the built ridges' own: float noise of the mirrored brushes)
+    std::vector<glm::vec3> before = d.mesh.positions;
+    float stackedRise = 0.0f;
+    for (int k = 0; k < 3; ++k) {
+        const std::vector<glm::vec3> was = d.mesh.positions;
+        const Stroked st = mirroredStroke(d, r, sphereLine(glm::vec3(-0.15f, 0.4f, 1), glm::vec3(0.15f, -0.4f, 1), 40, 0.25f, 0.6f));
+        stackedRise = std::max(stackedRise, planeRise(was, d.mesh, st.n));
+    }
+    const size_t stackedFolds = geom::foldedFaces(before, d.mesh);
+    const int stackedSpikes = closeupSpikes(before, d.mesh);
+    before = d.mesh.positions;
+    const Stroked big = mirroredStroke(d, r, sphereLine(glm::vec3(-0.4f, 0.0f, 1), glm::vec3(0.4f, 0.0f, 1), 30, 1.05f, 1.0f));
+    const size_t bigFolds = geom::foldedFaces(before, d.mesh);
+    const int bigSpikes = closeupSpikes(before, d.mesh);
+    const float bigRise = planeRise(before, d.mesh, big.n);
+    const float sym = geom::symmetryError(d.mesh, mirror);
+    size_t region = 0;
+    for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) region += d.mesh.positions[v] != before[v];
+    std::printf("  ridges: stacked x3 %zu folds / %d spikes (rise %.2g), big brush (%zu moved) %zu folds / %d spikes (rise %.2g), "
+                "symmetry %.2g (built %.2g)\n", stackedFolds, stackedSpikes, stackedRise, region, bigFolds, bigSpikes, bigRise, sym, symBefore);
+    CHECK(region > 100000); // (each copy's own half of a region of about 180k: the big brush path)
+    CHECK(stackedFolds <= 10); // (8: undercuts of the pinched ridges lying flat in the plane)
+    CHECK(stackedSpikes == 0);
+    CHECK(bigFolds == 0);
+    CHECK(bigSpikes <= 4); // (1, against 185)
+    CHECK(stackedRise < 1e-5f);
+    CHECK(bigRise < 1e-5f);
+    CHECK(sym < symBefore + 1e-4f);
 }
