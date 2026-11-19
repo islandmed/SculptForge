@@ -637,7 +637,13 @@ void App::drawQRemeshContents() {
         ui::HelpText("Quad Remesh", nullptr, "Remeshing in the background. The result replaces the Part when it's done.",
                      kQRemeshPath);
         ImGui::SameLine();
-        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) qremesh_->cancel->store(true);
+        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) {
+            // At once on any machine (gh#226): the job is let go here; its thread stops at its next Cancel check (a
+            // second or two on a slow one, in the longest steps) and its result, which nothing holds now, is dropped.
+            qremesh_->cancel->store(true);
+            qremesh_.reset();
+            status_ = "Quad Remesh cancelled";
+        }
         ui::HelpText("Cancel", nullptr, "Stop Quad Remesh; the Part stays as it is.", kQRemeshPath);
     } else {
         ui::ActionButton(*this, "geometry.qremesh", ImVec2(half, 0));

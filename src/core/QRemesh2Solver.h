@@ -108,18 +108,26 @@ struct SparseMatrix {
 template <class S>
 class Multigrid {
 public:
-    void build(const SparseMatrix<S>& A) {
+    // False when `cancelled` said so between levels (the finest coarsening takes a second or two on a dense proxy).
+    bool build(const SparseMatrix<S>& A, const std::function<bool()>& cancelled = {}) {
         levels_.clear();
         levels_.push_back({A, {}, {}});
+        cancel_ = &cancelled, stopped_ = false;
         while (levels_.back().A.n > 400 && levels_.size() < 30) {
+            if (cancelled && cancelled()) return false;
             Level& f = levels_.back();
             Level c;
-            if (!coarsen(f, c)) break;
+            if (!coarsen(f, c)) {
+                if (stopped_) return false;
+                break;
+            }
             if (c.A.n * 10 > f.A.n * 9) break;
             levels_.push_back(std::move(c));
         }
         dense_.clear();
-        if (levels_.back().A.n <= 2500) factorCoarsest();
+        if (levels_.back().A.n <= 2500 && !factorCoarsest()) return false;
+        cancel_ = nullptr;
+        return true;
     }
     // z = M^{-1} r (one V-cycle from zero).
     void apply(const std::vector<S>& r, std::vector<S>& z) const {
@@ -132,6 +140,8 @@ public:
     size_t levels() const { return levels_.size(); }
 
 private:
+    const std::function<bool()>* cancel_ = nullptr; // during build only
+    bool stopped_ = false;
     struct Level {
         SparseMatrix<S> A;
         std::vector<uint32_t> agg; // fine unknown -> coarse unknown (this level -> next)
@@ -152,6 +162,7 @@ private:
     // Aggregates: an unaggregated unknown takes its unaggregated neighbours; leftovers join the neighbour they're
     // most strongly coupled to.
     bool coarsen(Level& f, Level& c) {
+        auto stop = [&] { return stopped_ = stopped_ || (cancel_ && *cancel_ && (*cancel_)()); }; // (build's Cancel)
         const SparseMatrix<S>& A = f.A;
         const size_t n = A.n;
         f.agg.assign(n, ~0u);
@@ -179,6 +190,7 @@ private:
             }
             ++nc;
         }
+        if (stop()) return false;
         for (int pass = 0; pass < 4; ++pass)
             for (size_t i = 0; i < n; ++i) {
                 if (f.agg[i] != ~0u) continue;
@@ -200,7 +212,7 @@ private:
             }
         for (size_t i = 0; i < n; ++i)
             if (f.agg[i] == ~0u) f.agg[i] = nc++, f.phase[i] = S(1.0);
-        if (nc == 0 || nc >= n) return false;
+        if (nc == 0 || nc >= n || stop()) return false;
         // Smoothed aggregation: P = (I - w D^-1 A) P0 (w = 2/3), so coarse corrections are smooth and the V-cycle
         // converges in a few dozen iterations instead of hundreds.
         const double w = 2.0 / 3.0;
@@ -235,6 +247,7 @@ private:
                     f.rRow[k] = uint32_t(i), f.rVal[k] = conjOf(f.pVal[m]);
                 }
         }
+        if (stop()) return false;
         // Galerkin: Ac = P^H A P, row by row in parallel: AP (rows fine, columns coarse), then each coarse row I
         // from the fine rows of P's column I (the transpose), ascending, so the sums don't depend on the threads.
         std::vector<uint32_t> apOff, apCol;
@@ -245,6 +258,7 @@ private:
                 for (uint32_t m = f.pOff[j]; m < f.pOff[j + 1]; ++m) add(f.pCol[m], A.val[k] * f.pVal[m]);
             }
         });
+        if (stop()) return false;
         rowProduct(nc, nc, c.A.off, c.A.col, c.A.val, [&](size_t I, auto&& add) {
             for (uint32_t m = f.rOff[I]; m < f.rOff[I + 1]; ++m) {
                 const uint32_t i = f.rRow[m];
@@ -324,13 +338,14 @@ private:
     }
 
     // Dense Cholesky (A = L L^H) of the coarsest level.
-    void factorCoarsest() {
+    bool factorCoarsest() { // false on Cancel (O(n^3): a second or two at 2500)
         const SparseMatrix<S>& A = levels_.back().A;
         const size_t n = A.n;
         dense_.assign(n * n, S{});
         for (size_t i = 0; i < n; ++i)
             for (uint32_t k = A.off[i]; k < A.off[i + 1]; ++k) dense_[i * n + A.col[k]] = A.val[k];
         for (size_t j = 0; j < n; ++j) {
+            if ((j & 63) == 0 && cancel_ && *cancel_ && (*cancel_)()) return false;
             double d = realOf(dense_[j * n + j]);
             for (size_t k = 0; k < j; ++k) d -= absq(dense_[j * n + k]);
             d = std::sqrt(std::max(d, 1e-300));
@@ -341,6 +356,7 @@ private:
                 dense_[i * n + j] = s / d;
             }
         }
+        return true;
     }
     void solveCoarsest(const std::vector<S>& b, std::vector<S>& x) const {
         const size_t n = b.size();
@@ -437,7 +453,7 @@ int pcg(const std::function<void(const std::vector<S>&, std::vector<S>&)>& mul, 
     for (; it < maxIt; ++it) {
         const double rn = std::sqrt(rr);
         if (rn < tol * bn) break;
-        if ((it & 7) == 0 && cancelled && cancelled()) {
+        if (cancelled && cancelled()) { // every iteration: one iteration is a few ms, Cancel answers at once
             stop = true;
             return it;
         }

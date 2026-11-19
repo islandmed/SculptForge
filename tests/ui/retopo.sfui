@@ -88,8 +88,9 @@ remember triangles before_cancel
 click "QRemesh/Quad Remesh"
 expect_value qremesh_running == 1
 click "QRemesh/Cancel"
-wait_idle 60
+expect_value qremesh_running == 0  # at once (gh#226): the job is let go on the click, not when its thread next looks
 expect_status "cancelled"
+wait_idle 60
 expect_value triangles == $before_cancel
 expect_value quads == 0
 

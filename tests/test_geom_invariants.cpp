@@ -27,6 +27,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cctype>
+#include <chrono>
 #include <cstdarg>
 #include <cstdlib>
 #include <deque>
@@ -527,6 +528,47 @@ TEST(quad_remesh_invariant_closed_quads_on_the_form) {
         expect(inwardFaces(out) == 0 && nonFinite(out) == 0, "quad remesh: faces inside out or NaN");
         expect(offSphere(out) < 0.01f, "quad remesh strayed %.4f off the form", offSphere(out));
         expect(std::abs(dv) < 0.01, "quad remesh changed the volume by %.2f%%", 100.0 * dv);
+    });
+}
+
+// Quad remesh on a dense grainy sphere (gh#226: grain was taken for hard edges and tips, the layout never finished):
+// closed quads on the form (within the grain and a little), the volume (1%), faces outwards, in bounded time; and a
+// cancelled run writes nothing.
+TEST(quad_remesh_invariant_grainy_sphere_closed_on_the_form) {
+    guarded("quad_remesh_invariant_grainy_sphere_closed_on_the_form", [] {
+        Mesh src = makeIcosphere(7); // 327k triangles: the dense path
+        src.recomputeAllNormals();
+        const float grain = 0.004f; // along the normals, up to 0.4% of the radius either way
+        uint32_t state = 12345u;
+        for (size_t v = 0; v < src.positions.size(); ++v) {
+            state = state * 1664525u + 1013904223u;
+            src.positions[v] += src.normals[v] * (grain * (2.0f * float(state >> 8) / float(1u << 24) - 1.0f));
+        }
+        src.recomputeAllNormals();
+        QRemeshOptions o;
+        o.targetQuads = 4000;
+        Mesh out;
+        std::string err;
+        int calls = 0;
+        expect(!qremesh(src, o, out, err, [&](float) { return ++calls < 40; }) && out.triangleCount() == 0,
+               "a cancelled quad remesh wrote a result");
+        QRemeshStats st;
+        const auto t0 = std::chrono::steady_clock::now();
+        const bool ok = qremesh(src, o, out, err, {}, &st);
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        const TopologyReport t = topologyReport(out);
+        const double dv = volumeChange(meshVolume(src), meshVolume(out));
+        std::printf(
+            "  grainy quad remesh: %zu faces (%.1f%% quads), non-manifold %zu, boundary %zu, off sphere %.4f, volume "
+            "%+.3f%%, %.1f s\n",
+            t.faces, 100.0f * t.quadFraction(), t.nonManifoldEdges, t.boundaryEdges, offSphere(out), 100.0 * dv, secs);
+        expect(ok, "quad remesh failed: %s", err.c_str());
+        expect(t.manifold() && t.boundaryEdges == 0, "quad remesh left holes or non-manifold edges");
+        expect(t.quadFraction() > 0.95f, "quad remesh left %.1f%% triangles", 100.0f * (1.0f - t.quadFraction()));
+        expect(inwardFaces(out) == 0 && nonFinite(out) == 0, "quad remesh: faces inside out or NaN");
+        expect(offSphere(out) < grain + 0.01f, "quad remesh strayed %.4f off the form", offSphere(out));
+        expect(std::abs(dv) < 0.01, "quad remesh changed the volume by %.2f%%", 100.0 * dv);
+        expect(secs < timeLimit(20.0), "quad remesh took %.1f s on 327k grainy triangles", secs);
     });
 }
 

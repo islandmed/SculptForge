@@ -58,6 +58,10 @@ public:
     const std::vector<Term>& expr(uint32_t v) const { return expr_[v]; }
     double constant(uint32_t v) const { return cst_[v]; }
     size_t lostIntegers() const { return lost_; }
+    // Cancel inside a constraint: one can rewrite thousands of long expressions (its pivot's users). Once it said
+    // so, stopped() holds and the eliminator is unfinished (the caller gives up).
+    std::function<bool()> cancelled;
+    bool stopped() const { return stopped_; }
 
     void constrain(const std::vector<Term>& row, double c) {
         // Substitute.
@@ -120,7 +124,12 @@ public:
             if (t.var != p) e.push_back({t.var, -t.a / ap});
         const double ec = -k / ap;
         // Replace p in every expression using it.
+        size_t done = 0;
         for (uint32_t q : users_[p]) {
+            if ((++done & 255) == 0 && cancelled && cancelled()) {
+                stopped_ = true;
+                return;
+            }
             if (!elim_[q]) continue;
             auto& ex = expr_[q];
             double ap2 = 0.0;
@@ -151,6 +160,7 @@ public:
     }
 
 private:
+    bool stopped_ = false;
     void addUser(uint32_t var, uint32_t q) {
         auto& u = users_[var];
         if (!u.empty() && u.back() == q) return;
@@ -227,7 +237,7 @@ int conjugateGradients(const ReducedOp& A, const std::vector<double>& b, const s
     for (; it < maxIt; ++it) {
         const double rn = std::sqrt(blockSum(n, [&](size_t i) { return r[i] * r[i]; }));
         if (rn < tol * bn) break;
-        if ((it & 31) == 0 && cancelled && cancelled()) {
+        if (cancelled && cancelled()) { // every iteration (gh#226: a 2000-iteration solve held Cancel for minutes)
             stop = true;
             return it;
         }
@@ -254,12 +264,15 @@ int conjugateGradients(const ReducedOp& A, const std::vector<double>& b, const s
 }
 } // namespace
 
-bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out, const std::function<bool()>& cancelled) {
+bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out,
+                  const std::function<bool()>& cancelled, const std::function<void(float)>& progress) {
     static const bool timing = std::getenv("SF_QREMESH_TIMING") != nullptr;
     const size_t nt = p.T.size(), nv = p.P.size();
     const size_t nc = 3 * nt;
     if (nt == 0) return false;
     StageClock clock("grid map");
+    // Cancel between the stages and every few thousand steps of the long loops (gh#226: the setup ran 7 s unchecked).
+    auto stopNow = [&] { return cancelled && cancelled(); };
 
     // 1. Comb along a breadth-first spanning tree of the triangles.
     std::vector<uint8_t> tree(nc, 0), seen(nt, 0);
@@ -296,6 +309,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     }
     // Sanity: tree edges have match 0.
     clock.lap("comb");
+    if (stopNow()) return false;
     // 2. Cut graph: interior edges off the tree, pruned.
     std::vector<uint8_t> cut(nc, 0), open(nv, 0);
     for (uint32_t c = 0; c < nc; ++c) {
@@ -336,6 +350,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     for (uint32_t c = 0; c < nc; ++c) cutEdges += cut[c] && p.opp[c] > c;
 
     clock.lap("cut graph");
+    if (stopNow()) return false;
     // 3. Wedges: corners of a vertex joined across edges that are neither open nor cut.
     std::vector<uint32_t> parent(nc);
     std::iota(parent.begin(), parent.end(), 0u);
@@ -367,6 +382,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     }
 
     Eliminator el;
+    el.cancelled = cancelled;
     for (uint32_t i = 0; i < 2 * copies; ++i) el.add(0);
     auto U = [&](uint32_t corner) { return 2 * copyOf[corner]; };
 
@@ -383,6 +399,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     {
         std::vector<uint8_t> done(nv, 0);
         for (uint32_t c = 0; c < nc; ++c) {
+            if (el.stopped() || ((c & 15) == 0 && stopNow())) return false;
             const uint32_t v = p.T[c / 3][c % 3];
             if (field.vertexIndex[v] == 0 || open[v] || done[v]) continue;
             done[v] = 1;
@@ -394,6 +411,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     }
     // Feature lines on lattice lines.
     for (uint32_t c = 0; c < nc; ++c) {
+        if (el.stopped() || ((c & 15) == 0 && stopNow())) return false;
         if (!p.feature[c]) continue;
         const uint32_t t = c / 3, k = c % 3;
         const vec3 e = p.P[p.T[t][(k + 1) % 3]] - p.P[p.T[t][k]];
@@ -406,6 +424,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     }
     // Seams: across each cut edge, (u, v) on the far side = R^m (u, v) + integer shift.
     for (uint32_t c = 0; c < nc; ++c) {
+        if (el.stopped() || ((c & 15) == 0 && stopNow())) return false;
         if (!cut[c] || p.opp[c] < c) continue;
         const uint32_t o = p.opp[c], t = c / 3, g = o / 3, k = c % 3;
         const int m = field.match[c];
@@ -436,6 +455,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         std::fprintf(stderr, "  grid map: expressions max %zu terms, %zu in all\n", maxLen, total);
     }
     clock.lap("wedges + elimination");
+    if (el.stopped() || stopNow()) return false;
     // 4. Free unknowns. The reduced system C^T K C y = C^T (b - K d) (x = C y + d) is applied without forming it:
     // the cut tree makes C fill in (a transition is the composition of everything below it), C^T K C would not fit.
     const size_t nvar = el.size(), ncopy = 2 * size_t(copies);
@@ -616,6 +636,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     // Multigrid preconditioner on a sparse stand-in for C^T K C: each wedge unknown mapped to its main free real
     // unknown only (the integer fill-in dropped), integer unknowns on their own diagonal.
     clock.lap("free unknowns + K, C");
+    if (stopNow()) return false;
     Multigrid<double> mg;
     {
         std::vector<int64_t> mainOf(ncopy, -1);
@@ -638,9 +659,10 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         for (size_t j = 0; j < nf; ++j) trips.push_back({(uint64_t(j) << 32) | j, el.kind(freeVars[j]) != 0 ? diag[j] : reg});
         SparseMatrix<double> As;
         As.build(nf, trips);
-        mg.build(As);
+        if (!mg.build(As, cancelled)) return false;
     }
     clock.lap("multigrid build");
+    if (stopNow()) return false;
     // The integer unknowns (singularity positions, seam shifts, feature lines) couple across the whole cut tree, which
     // the stand-in leaves out: they get an exact dense block A_ii = S^T K S (S: their columns of C), and the
     // preconditioner is a symmetric block Gauss-Seidel over (integers, reals, integers).
@@ -648,7 +670,8 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     for (size_t j = 0; j < nf; ++j)
         if (el.kind(freeVars[j]) != 0) intIdx[j] = uint32_t(intVars.size()), intVars.push_back(uint32_t(j));
     const size_t mi = intVars.size();
-    std::vector<double> Aii(mi * mi, 0.0);
+    // (Only allocated when used: with many singularities mi runs to tens of thousands, gigabytes as a dense block.)
+    std::vector<double> Aii(mi > 0 && mi <= 4000 ? mi * mi : 0, 0.0);
     if (mi > 0 && mi <= 4000) {
         // S rows (per wedge unknown: its integer terms) and W = K S.
         std::vector<std::vector<std::pair<uint32_t, double>>> S(ncopy);
@@ -684,6 +707,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
         for (size_t a = 0; a < m; ++a)
             for (size_t b = 0; b < m; ++b) Lii[a * m + b] = Aii[size_t(liveInts[a]) * mi + liveInts[b]];
         for (size_t j = 0; j < m; ++j) {
+            if ((j & 63) == 0 && cancelled && cancelled()) return false; // O(m^3): seconds at a few thousand
             double d = Lii[j * m + j];
             for (size_t k = 0; k < j; ++k) d -= Lii[j * m + k] * Lii[j * m + k];
             d = std::sqrt(std::max(d, 1e-300));
@@ -694,6 +718,7 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
                 Lii[i * m + j] = s2 / d;
             }
         }
+        return true;
     };
     auto solveInts = [&](std::vector<double>& rhsI) { // in place, over liveInts
         const size_t m = liveInts.size();
@@ -740,10 +765,18 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
     std::vector<double> y(nf, 0.0);
     std::vector<uint8_t> fixed(nf, 0);
     bool stop = false;
-    if (useIntBlock) factorInts(fixed);
+    if (useIntBlock && !factorInts(fixed)) return false;
     clock.lap("integer block");
-    int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, cancelled, stop, precond);
+    // The first solve is most of the time with many singularities (2000 iterations, a minute or two at 5000 integer
+    // unknowns): the bar moves with its iterations (CG asks `cancelled` once per iteration).
+    int asked = 0;
+    const std::function<bool()> firstSolve = [&] {
+        if (progress && (++asked & 15) == 0) progress(0.6f * float(asked) / 2000.0f);
+        return cancelled && cancelled();
+    };
+    int iters = conjugateGradients(op, rhs, fixed, y, 1e-4, 2000, firstSolve, stop, precond);
     if (stop) return false;
+    if (progress) progress(0.6f);
     clock.lap("first solve");
     // Before rounding: scale the map so its area (the number of unit squares, i.e. quads) is the wanted count. The
     // constraints are homogeneous, so a scaled solution is still a solution; distortion near singularities and
@@ -793,10 +826,13 @@ bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& o
             for (size_t k = take; k < dist.size(); ++k) rest.push_back(dist[k].second);
             left.swap(rest);
             static const double midTol = std::getenv("SF_QR2_TOL") ? std::atof(std::getenv("SF_QR2_TOL")) : 1e-2;
-            if (useIntBlock) factorInts(fixed);
+            if (useIntBlock && !factorInts(fixed)) return false;
             iters += conjugateGradients(op, rhs, fixed, y, left.empty() ? 1e-4 : midTol, left.empty() ? 2000 : 500, cancelled, stop, precond);
             if (stop) return false;
             ++rounds;
+            if (progress)
+                progress(0.6f +
+                         0.4f * float(intFree.size() - left.size()) / float(std::max<size_t>(intFree.size(), 1)));
         }
     }
     clock.lap("rounding + re-solves");

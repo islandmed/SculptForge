@@ -1,12 +1,21 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf, docs/testing-flow.md).
-//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape sphere|cube|torus|horn|starter:<id>]
-//                   [--target Q] [--voxel-res R]
-// One CSV row per run on stdout: path, input triangles, run, total ms, the time between progress marks (stages), the
-// output size and the Hausdorff / mean distance to the input (% of the bounding-box diagonal, quadQuality).
-// SF_QREMESH_TIMING=1 adds Quad Remesh's own per-stage lines on stderr.
+// sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf,
+// docs/testing-flow.md).
+//   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape
+//   sphere|cube|torus|horn|starter:<id>]
+//                   [--target Q] [--voxel-res R] [--cancel-after MS] [--noise A] [--holes N] [--detail KIND]
+//                   [--symmetry x|y|z]
+// --noise A: every vertex moved along its normal by up to A x the bounding-box diagonal (scan or pore-like grain);
+// --holes N: N round holes punched through the surface (open boundaries, as a sculpt with deleted faces).
+// --detail KIND: a whole-surface detail_pass (pores, skin, wrinkles, scales, scars), as a finished sculpt has.
+// --cancel-after MS: Cancel each run MS ms after it starts (from another thread, as the app's button does) and print
+// the Cancel latency (gh#226: how long the remesh takes to notice and return). One CSV row per run on stdout: path,
+// input triangles, run, total ms, the time between progress marks (stages), the output size and the Hausdorff / mean
+// distance to the input (% of the bounding-box diagonal, quadQuality). SF_QREMESH_TIMING=1 adds Quad Remesh's own
+// per-stage lines on stderr.
+#include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Primitives.h"
 #include "core/QRemesh.h"
@@ -14,12 +23,14 @@
 #include "core/Voxel.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace sf;
@@ -77,6 +88,47 @@ Mesh sphere(size_t tris, bool bumpy, const std::string& shape) {
     return m;
 }
 
+// Awkward inputs (gh#226): grain along the normals and holes (seeded, so every run gets the same mesh).
+Mesh roughen(Mesh m, float noise, int holes) {
+    const float diag = glm::length(m.bounds().extent());
+    uint32_t state = 12345u;
+    auto rnd = [&] {
+        state = state * 1664525u + 1013904223u;
+        return float(state >> 8) / float(1u << 24);
+    };
+    if (noise > 0.0f) {
+        m.recomputeAllNormals();
+        for (size_t v = 0; v < m.positions.size(); ++v) m.positions[v] += m.normals[v] * (noise * diag * (2.0f * rnd() - 1.0f));
+    }
+    if (holes > 0) {
+        std::vector<glm::vec3> centers;
+        for (int h = 0; h < holes; ++h) centers.push_back(m.positions[size_t(rnd() * float(m.positions.size() - 1))]);
+        const float r = 0.03f * diag;
+        std::vector<glm::uvec3> kept;
+        for (const glm::uvec3& t : m.triangles) {
+            bool in = false;
+            for (const glm::vec3& c : centers) in |= glm::length(m.positions[t.x] - c) < r;
+            if (!in) kept.push_back(t);
+        }
+        Mesh cut; // positions and triangles only: the per-triangle attributes don't survive the cut
+        cut.positions = std::move(m.positions);
+        cut.triangles = std::move(kept);
+        m = std::move(cut);
+    }
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    return m;
+}
+
+Mesh withDetail(const Mesh& m, const std::string& kind) {
+    CommandRegistry reg;
+    Document doc;
+    doc.setMesh(m);
+    const CommandResult r = reg.execute(doc, "detail_pass", {{"kind", kind}});
+    if (!r.ok) std::fprintf(stderr, "detail_pass %s: %s\n", kind.c_str(), r.message.c_str());
+    return doc.mesh;
+}
+
 // FNV-1a over the result's positions and triangles: a speed change that must not change the result keeps it.
 uint64_t meshHash(const Mesh& m) {
     uint64_t h = 1469598103934665603ull;
@@ -99,7 +151,10 @@ std::vector<long> parseList(const char* s) {
 } // namespace
 
 int main(int argc, char** argv) {
-    int runs = 5, target = 5000, voxelRes = 200;
+    int runs = 5, target = 5000, voxelRes = 200, cancelAfter = -1, holes = 0;
+    float noise = 0.0f;
+    std::string detail;
+    int symmetry = -1;
     bool bumpy = false;
     std::vector<long> sizes = {1000, 10000, 100000, 1000000};
     std::string paths = "qr2,legacy,voxel", shape = "sphere";
@@ -113,9 +168,18 @@ int main(int argc, char** argv) {
         else if (a == "--voxel-res" && more) voxelRes = std::atoi(argv[++i]);
         else if (a == "--bumpy") bumpy = true;
         else if (a == "--shape" && more) shape = argv[++i];
+        else if (a == "--cancel-after" && more) cancelAfter = std::atoi(argv[++i]);
+        else if (a == "--noise" && more) noise = float(std::atof(argv[++i]));
+        else if (a == "--holes" && more) holes = std::atoi(argv[++i]);
+        else if (a == "--detail" && more)
+            detail = argv[++i];
+        else if (a == "--symmetry" && more)
+            symmetry = argv[++i][0] - 'x'; // x, y or z (the app's Symmetry)
         else {
-            std::fprintf(stderr, "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
-                                 "[--shape sphere|cube|torus|horn|starter:<id>] [--target Q] [--voxel-res R]\n");
+            std::fprintf(stderr,
+                         "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
+                         "[--shape sphere|cube|torus|horn|starter:<id>] [--target Q] [--voxel-res R] [--cancel-after "
+                         "MS] [--noise A] [--holes N] [--detail KIND] [--symmetry x|y|z]\n");
             return 2;
         }
     }
@@ -123,7 +187,19 @@ int main(int argc, char** argv) {
     std::vector<std::string> summary;
     std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash\n");
     for (long n : sizes) {
-        const Mesh src = sphere(size_t(n), bumpy, shape);
+        Mesh src = noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
+                                             : sphere(size_t(n), bumpy, shape);
+        if (!detail.empty()) src = withDetail(src, detail);
+        if (const char* path =
+                std::getenv("SF_BENCH_SOURCE")) { // SF_BENCH_SOURCE=<file>: the input as OBJ (to open it in the app)
+            if (std::FILE* fo = std::fopen(path, "w")) {
+                for (const glm::vec3& q : src.positions)
+                    std::fprintf(fo, "v %g %g %g\n", q.x, q.y, q.z);
+                for (const glm::uvec3& q : src.triangles)
+                    std::fprintf(fo, "f %u %u %u\n", q.x + 1, q.y + 1, q.z + 1);
+                std::fclose(fo);
+            }
+        }
         for (const char* path : {"qr2", "legacy", "voxel"}) {
             if (("," + paths + ",").find("," + std::string(path) + ",") == std::string::npos) continue;
             std::vector<double> totals;
@@ -135,7 +211,17 @@ int main(int argc, char** argv) {
                 const auto t0 = Clock::now();
                 auto last = t0;
                 float lastF = 0.0f;
+                std::atomic<bool> cancel{false};
+                Clock::time_point cancelAt{};
+                std::thread canceller;
+                if (cancelAfter >= 0)
+                    canceller = std::thread([&] {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(cancelAfter));
+                        cancelAt = Clock::now();
+                        cancel = true;
+                    });
                 auto mark = [&](float f) {
+                    if (cancel) return false;
                     const auto now = Clock::now();
                     if (f != lastF) {
                         char b[48];
@@ -156,6 +242,7 @@ int main(int argc, char** argv) {
                     QRemeshOptions o; // the UI defaults (App::startQRemesh with retopo_ untouched)
                     o.method = std::string(path) == "legacy" ? QRemeshMethod::Legacy : QRemeshMethod::V2;
                     o.targetQuads = target;
+                    o.symmetryAxis = symmetry >= 0 && symmetry <= 2 ? symmetry : -1;
                     QRemeshStats st;
                     ok = qremesh(src, o, out, error, mark, &st);
                     if (const char* dump = std::getenv("SF_BENCH_DUMP")) { // SF_BENCH_DUMP=<file>: the (last) result as OBJ
@@ -168,6 +255,13 @@ int main(int argc, char** argv) {
                     q = st.quality;
                 }
                 const double total = ms(t0, Clock::now());
+                if (canceller.joinable()) {
+                    canceller.join();
+                    std::printf("CANCEL %s %zu: asked at %.0f ms, returned %.0f ms later (%s)\n", path, src.triangleCount(),
+                                ms(t0, cancelAt), total - ms(t0, cancelAt), ok ? "finished anyway" : error.c_str());
+                    std::fflush(stdout);
+                    continue;
+                }
                 if (!ok) {
                     std::fprintf(stderr, "%s %ld: %s\n", path, n, error.c_str());
                     continue;
