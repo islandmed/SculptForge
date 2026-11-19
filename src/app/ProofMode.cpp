@@ -133,7 +133,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                       return makeBenchHead(size_t(1) << 20);
                                   }
                                   return std::move(d.mesh);
-                              }, 8};
+                              }, kCoreBytesPerMicroTriangle};
         return {s};
     }
     return {};

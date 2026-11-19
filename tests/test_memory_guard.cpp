@@ -5,6 +5,7 @@
 // is skipped with a clear message, and Subdivide / Divide / micro / remesh know what they'd need.
 #include "TestHarness.h"
 
+#include "core/Benchmark.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
 
@@ -70,4 +71,22 @@ TEST(memory_command_need) {
     CHECK(!c.enough);
     CHECK(commandShortMessage("Subdivide", c) == "Subdivide needs ~0.8 GB free, 0.5 GB available.");
     setAvailableMemoryOverride(0);
+}
+
+TEST(memory_core_scene_need) {
+    // core-800m, measured on the floor tier: 805M micro triangles, 1.66 GB resident + 2.56 GB graphics buffers, a 0.6 GB scene file.
+    const CoreSceneNeed n = coreSceneNeed(800);
+    CHECK(n.ramBytes == size_t(6.4e9));
+    CHECK(n.diskBytes == size_t(0.64e9));
+    CHECK(coreSceneShortMessage("core-800m", 800, 16 * kGB, 100 * kGB, true).empty());
+    CHECK(coreSceneShortMessage("core-800m", 800, 0, 0, true).empty()); // unknown: go on
+    // a small machine: the plain message, with the figures, never an out-of-memory
+    CHECK(coreSceneShortMessage("core-800m", 800, size_t(1.3 * double(kGB)), 100 * kGB, true) ==
+          "core-800m skipped: needs ~6.4 GB free, 1.3 GB available. Close other apps and run again");
+    CHECK(coreSceneShortMessage("core-800m", 800, 8 * kGB, 100 * kGB, true).empty());  // 6.4 GB + the margin fits
+    CHECK(!coreSceneShortMessage("core-800m", 800, 7 * kGB, 100 * kGB, true).empty()); // 7 GB does not
+    // a full disk: the message names the file's need; an existing scene file needs none
+    const std::string disk = coreSceneShortMessage("core-800m", 800, 16 * kGB, kGB / 2, true);
+    CHECK(disk == "core-800m skipped: needs ~0.9 GB of free disk space for its scene file (written once), 0.5 GB free. Free some space and run again");
+    CHECK(coreSceneShortMessage("core-800m", 800, 16 * kGB, kGB / 2, false).empty());
 }

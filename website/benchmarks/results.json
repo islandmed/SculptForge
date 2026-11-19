@@ -2934,6 +2934,486 @@
       "stroke_set": "standard/1",
       "raw": "raw/floor-core-100m-3.json",
       "tier": "floor"
+    },
+    {
+      "name": "SculptForge",
+      "date": "2026-11-19T02:13:50Z",
+      "sculptforge": {
+        "version": "0.13.8",
+        "commit": "d25dfe753"
+      },
+      "hardware": {
+        "cpu": "Apple MacBook Pro (16-inch, M1 Pro, 2021)",
+        "gpu": "Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8",
+        "gpu_name": "Apple M1 Pro (G13S C0)",
+        "driver": "4.6 (Core Profile) Mesa 26.1.8",
+        "hw_tier": "Floor",
+        "ram_gb": 30.9,
+        "logical_cores": 10,
+        "os": "Arch Linux ARM (Linux 7.1.13-3-1-ARCH aarch64)",
+        "framebuffer": [
+          1920,
+          1080
+        ]
+      },
+      "vsync": false,
+      "runs": [
+        {
+          "label": "800M micro",
+          "triangles": 805306368,
+          "phases": [
+            {
+              "name": "clay small",
+              "fps": 181.1,
+              "frame_ms": {
+                "p50": 3.97,
+                "p95": 17.9,
+                "p99": 23.8,
+                "max": 224.33,
+                "mean": 5.52
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 224.3,
+              "brush_radius_px": 25,
+              "lag_ms": {
+                "p50": 8.74,
+                "p95": 39.59,
+                "p99": 57.53,
+                "max": 245.79,
+                "mean": 11.6
+              },
+              "lag_px": {
+                "p50": 5.28,
+                "p95": 46.85,
+                "p99": 66.68,
+                "max": 276.97,
+                "mean": 9.54
+              }
+            },
+            {
+              "name": "clay large",
+              "fps": 123.8,
+              "frame_ms": {
+                "p50": 7.04,
+                "p95": 14.14,
+                "p99": 21.49,
+                "max": 26.16,
+                "mean": 8.08
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 26.2,
+              "brush_radius_px": 120,
+              "lag_ms": {
+                "p50": 19.82,
+                "p95": 31.38,
+                "p99": 34.53,
+                "max": 43.91,
+                "mean": 20.43
+              },
+              "lag_px": {
+                "p50": 17.29,
+                "p95": 26.22,
+                "p99": 31.83,
+                "max": 42.1,
+                "mean": 17.2
+              }
+            },
+            {
+              "name": "240 px brush",
+              "fps": 79.1,
+              "frame_ms": {
+                "p50": 8.86,
+                "p95": 30.91,
+                "p99": 41.32,
+                "max": 51.78,
+                "mean": 12.64
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 51.8,
+              "brush_radius_px": 240,
+              "lag_ms": {
+                "p50": 34.38,
+                "p95": 56.72,
+                "p99": 63.62,
+                "max": 66.62,
+                "mean": 35.82
+              },
+              "lag_px": {
+                "p50": 32.18,
+                "p95": 44.61,
+                "p99": 47.92,
+                "max": 50.7,
+                "mean": 32.31
+              }
+            },
+            {
+              "name": "orbit",
+              "fps": 211.3,
+              "frame_ms": {
+                "p50": 4.46,
+                "p95": 7.99,
+                "p99": 9.34,
+                "max": 15.61,
+                "mean": 4.73
+              },
+              "worst_stall_ms": 15.6
+            },
+            {
+              "name": "still",
+              "fps": 141.1,
+              "frame_ms": {
+                "p50": 6.49,
+                "p95": 12.38,
+                "p99": 24.6,
+                "max": 24.6,
+                "mean": 7.08
+              },
+              "worst_stall_ms": 24.6
+            },
+            {
+              "name": "close-up",
+              "fps": 378.1,
+              "frame_ms": {
+                "p50": 2.51,
+                "p95": 3.08,
+                "p99": 6.05,
+                "max": 13.84,
+                "mean": 2.65
+              },
+              "worst_stall_ms": 13.8
+            }
+          ],
+          "peak_ram_mb": 1650,
+          "gpu_buffers_mb": 2563,
+          "worst_stall_ms": 224.3
+        }
+      ],
+      "machine": "Low-end budget, simulated (SF_HW_SIMULATE=floor): Apple M1 Pro laptop, Linux (run 1 of 3)",
+      "scene": "core-800m",
+      "stroke_set": "standard/1",
+      "hw_simulate": "floor",
+      "raw": "raw/floor-core-800m-1.json",
+      "tier": "floor"
+    },
+    {
+      "name": "SculptForge",
+      "date": "2026-11-19T02:14:40Z",
+      "sculptforge": {
+        "version": "0.13.8",
+        "commit": "d25dfe753"
+      },
+      "hardware": {
+        "cpu": "Apple MacBook Pro (16-inch, M1 Pro, 2021)",
+        "gpu": "Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8",
+        "gpu_name": "Apple M1 Pro (G13S C0)",
+        "driver": "4.6 (Core Profile) Mesa 26.1.8",
+        "hw_tier": "Floor",
+        "ram_gb": 30.9,
+        "logical_cores": 10,
+        "os": "Arch Linux ARM (Linux 7.1.13-3-1-ARCH aarch64)",
+        "framebuffer": [
+          1920,
+          1080
+        ]
+      },
+      "vsync": false,
+      "runs": [
+        {
+          "label": "800M micro",
+          "triangles": 805306368,
+          "phases": [
+            {
+              "name": "clay small",
+              "fps": 176.9,
+              "frame_ms": {
+                "p50": 3.92,
+                "p95": 17.39,
+                "p99": 29.6,
+                "max": 216.21,
+                "mean": 5.65
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 216.2,
+              "brush_radius_px": 25,
+              "lag_ms": {
+                "p50": 8.71,
+                "p95": 36.78,
+                "p99": 58.28,
+                "max": 239.4,
+                "mean": 11.47
+              },
+              "lag_px": {
+                "p50": 5.27,
+                "p95": 42.1,
+                "p99": 67.53,
+                "max": 274.09,
+                "mean": 9.32
+              }
+            },
+            {
+              "name": "clay large",
+              "fps": 129.4,
+              "frame_ms": {
+                "p50": 6.57,
+                "p95": 13.24,
+                "p99": 15.57,
+                "max": 30.34,
+                "mean": 7.73
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 30.3,
+              "brush_radius_px": 120,
+              "lag_ms": {
+                "p50": 19.44,
+                "p95": 31.15,
+                "p99": 35.02,
+                "max": 41.7,
+                "mean": 20.05
+              },
+              "lag_px": {
+                "p50": 17.08,
+                "p95": 24.61,
+                "p99": 28.95,
+                "max": 45.5,
+                "mean": 16.79
+              }
+            },
+            {
+              "name": "240 px brush",
+              "fps": 100,
+              "frame_ms": {
+                "p50": 6.78,
+                "p95": 24.6,
+                "p99": 36.26,
+                "max": 58.35,
+                "mean": 10
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 58.4,
+              "brush_radius_px": 240,
+              "lag_ms": {
+                "p50": 32.54,
+                "p95": 55.65,
+                "p99": 63.5,
+                "max": 65.93,
+                "mean": 33.88
+              },
+              "lag_px": {
+                "p50": 30.72,
+                "p95": 42.32,
+                "p99": 47.93,
+                "max": 56.93,
+                "mean": 30.29
+              }
+            },
+            {
+              "name": "orbit",
+              "fps": 209.2,
+              "frame_ms": {
+                "p50": 4.33,
+                "p95": 8.26,
+                "p99": 10.19,
+                "max": 20.96,
+                "mean": 4.78
+              },
+              "worst_stall_ms": 21
+            },
+            {
+              "name": "still",
+              "fps": 140.6,
+              "frame_ms": {
+                "p50": 5.6,
+                "p95": 11.69,
+                "p99": 26.66,
+                "max": 26.66,
+                "mean": 7.11
+              },
+              "worst_stall_ms": 26.7
+            },
+            {
+              "name": "close-up",
+              "fps": 325,
+              "frame_ms": {
+                "p50": 2.81,
+                "p95": 5.84,
+                "p99": 7.67,
+                "max": 11.61,
+                "mean": 3.08
+              },
+              "worst_stall_ms": 11.6
+            }
+          ],
+          "peak_ram_mb": 1656,
+          "gpu_buffers_mb": 2563,
+          "worst_stall_ms": 216.2
+        }
+      ],
+      "machine": "Low-end budget, simulated (SF_HW_SIMULATE=floor): Apple M1 Pro laptop, Linux (run 2 of 3)",
+      "scene": "core-800m",
+      "stroke_set": "standard/1",
+      "hw_simulate": "floor",
+      "raw": "raw/floor-core-800m-2.json",
+      "tier": "floor"
+    },
+    {
+      "name": "SculptForge",
+      "date": "2026-11-19T02:15:31Z",
+      "sculptforge": {
+        "version": "0.13.8",
+        "commit": "d25dfe753"
+      },
+      "hardware": {
+        "cpu": "Apple MacBook Pro (16-inch, M1 Pro, 2021)",
+        "gpu": "Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8",
+        "gpu_name": "Apple M1 Pro (G13S C0)",
+        "driver": "4.6 (Core Profile) Mesa 26.1.8",
+        "hw_tier": "Floor",
+        "ram_gb": 30.9,
+        "logical_cores": 10,
+        "os": "Arch Linux ARM (Linux 7.1.13-3-1-ARCH aarch64)",
+        "framebuffer": [
+          1920,
+          1080
+        ]
+      },
+      "vsync": false,
+      "runs": [
+        {
+          "label": "800M micro",
+          "triangles": 805306368,
+          "phases": [
+            {
+              "name": "clay small",
+              "fps": 179.1,
+              "frame_ms": {
+                "p50": 3.86,
+                "p95": 17.8,
+                "p99": 25.03,
+                "max": 217.65,
+                "mean": 5.58
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 217.6,
+              "brush_radius_px": 25,
+              "lag_ms": {
+                "p50": 8.74,
+                "p95": 36.99,
+                "p99": 57.47,
+                "max": 237.06,
+                "mean": 11.44
+              },
+              "lag_px": {
+                "p50": 5.28,
+                "p95": 43.35,
+                "p99": 69.21,
+                "max": 268.07,
+                "mean": 9.37
+              }
+            },
+            {
+              "name": "clay large",
+              "fps": 124.5,
+              "frame_ms": {
+                "p50": 7.45,
+                "p95": 13.71,
+                "p99": 16.4,
+                "max": 34.56,
+                "mean": 8.03
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 34.6,
+              "brush_radius_px": 120,
+              "lag_ms": {
+                "p50": 19.93,
+                "p95": 31.14,
+                "p99": 34.94,
+                "max": 41.8,
+                "mean": 20.45
+              },
+              "lag_px": {
+                "p50": 17.39,
+                "p95": 25.74,
+                "p99": 29.88,
+                "max": 34.47,
+                "mean": 17.21
+              }
+            },
+            {
+              "name": "240 px brush",
+              "fps": 78.9,
+              "frame_ms": {
+                "p50": 8.59,
+                "p95": 33.27,
+                "p99": 40.04,
+                "max": 54.73,
+                "mean": 12.67
+              },
+              "brush": "Clay",
+              "worst_stall_ms": 54.7,
+              "brush_radius_px": 240,
+              "lag_ms": {
+                "p50": 35.21,
+                "p95": 55.6,
+                "p99": 63.04,
+                "max": 66.03,
+                "mean": 36.18
+              },
+              "lag_px": {
+                "p50": 32.53,
+                "p95": 44.25,
+                "p99": 47.67,
+                "max": 48.05,
+                "mean": 32.61
+              }
+            },
+            {
+              "name": "orbit",
+              "fps": 208.3,
+              "frame_ms": {
+                "p50": 4.33,
+                "p95": 8.16,
+                "p99": 10.5,
+                "max": 16.01,
+                "mean": 4.8
+              },
+              "worst_stall_ms": 16
+            },
+            {
+              "name": "still",
+              "fps": 140,
+              "frame_ms": {
+                "p50": 5.58,
+                "p95": 11.61,
+                "p99": 13.7,
+                "max": 13.7,
+                "mean": 7.14
+              },
+              "worst_stall_ms": 13.7
+            },
+            {
+              "name": "close-up",
+              "fps": 310.7,
+              "frame_ms": {
+                "p50": 2.91,
+                "p95": 6.32,
+                "p99": 7.77,
+                "max": 12.1,
+                "mean": 3.22
+              },
+              "worst_stall_ms": 12.1
+            }
+          ],
+          "peak_ram_mb": 1645,
+          "gpu_buffers_mb": 2563,
+          "worst_stall_ms": 217.6
+        }
+      ],
+      "machine": "Low-end budget, simulated (SF_HW_SIMULATE=floor): Apple M1 Pro laptop, Linux (run 3 of 3)",
+      "scene": "core-800m",
+      "stroke_set": "standard/1",
+      "hw_simulate": "floor",
+      "raw": "raw/floor-core-800m-3.json",
+      "tier": "floor"
     }
   ]
 }

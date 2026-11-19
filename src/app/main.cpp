@@ -117,7 +117,8 @@ void usage() {
         "                           brush (standard-33m: 33M; standard-100m: 104M, needs ~16 GB free; standard: 15M + 33M). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
-        "  --benchmark core-<N>m    The same head at N million micro triangles (core-100m, core-400m, core-800m ...)\n"
+        "  --benchmark core-<N>m    The same head at N million micro triangles (core-100m, core-400m, core-800m: 805M, about 4.2 GB of\n"
+        "                           memory and a 0.6 GB scene file, written once; too little of either is a message and exit 1)\n"
         "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
         "  --benchmark-pack DIR     The scene pack (the folder with pack.json, from sculptforge.app/benchmarks): its scenes\n"
         "                           from the entry level up, the standard strokes on each; add --out results.json (no video\n"
@@ -321,7 +322,7 @@ static int runMain(int argc, char** argv) {
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
                     options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-100m" && options.benchmarkScene != "standard-1b" &&
                     sf::coreSceneMillions(options.benchmarkScene) == 0) {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b or core-<N>m)\n", argv[i]);
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b, core-100m, core-200m, core-400m, core-800m or core-<N>m)\n", argv[i]);
                     return 1;
                 }
             }
@@ -400,7 +401,7 @@ static int runMain(int argc, char** argv) {
     if (const int millions = sf::coreSceneMillions(options.benchmarkScene)) { // research: micro triangles in memory, the project written once
         std::string error;
         if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }, millions).empty()) {
-            std::fprintf(stderr, "%s: %s\n", options.benchmarkScene.c_str(), error.c_str());
+            std::fprintf(stderr, "%s\n", error.c_str()); // (it names the scene itself: too little memory or disk is a message, not a crash)
             return 1;
         }
     }

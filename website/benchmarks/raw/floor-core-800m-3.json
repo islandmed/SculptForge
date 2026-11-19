@@ -1,0 +1,637 @@
+{
+  "schema": "sculptforge-benchmark/1",
+  "sculptforge": {
+    "version": "0.13.8",
+    "commit": "d25dfe753"
+  },
+  "date": "2026-11-19T02:15:31Z",
+  "hardware": {
+    "cpu": "Apple MacBook Pro (16-inch, M1 Pro, 2021)",
+    "logical_cores": 10,
+    "ram_gb": 30.9,
+    "os": "Arch Linux ARM (Linux 7.1.13-3-1-ARCH aarch64)",
+    "gpu": "Apple M1 Pro (G13S C0), OpenGL 4.6 (Core Profile) Mesa 26.1.8",
+    "gpu_name": "Apple M1 Pro (G13S C0)",
+    "driver": "4.6 (Core Profile) Mesa 26.1.8",
+    "hw_tier": "Floor",
+    "framebuffer": [
+      1920,
+      1080
+    ],
+    "ui_scale": 1
+  },
+  "settings": {
+    "vsync": false,
+    "video": false,
+    "pointer_hz": 240,
+    "stroke_seconds": 6,
+    "scene": "core-800m",
+    "stroke_set": "standard/1",
+    "hw_simulate": "floor",
+    "input": "scripted pointer samples into App::onMouseMove (the mouse / pen handler)",
+    "lag": "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)"
+  },
+  "runs": [
+    {
+      "label": "800M micro",
+      "triangles": 805306368,
+      "vertices": 393218,
+      "build_seconds": 0.71,
+      "first_frame_seconds": 4.31,
+      "shaded_seconds": 4.31,
+      "loaded_ram_mb": 1255,
+      "ram_mb": 1472,
+      "peak_ram_mb": 1645,
+      "gpu_buffers_mb": 2563,
+      "gpu_driver_mb": 3380,
+      "worst_stall_ms": 217.6,
+      "phases": [
+        {
+          "name": "clay small",
+          "brush": "Clay",
+          "brush_radius_px": 25,
+          "worst_stall_ms": 217.6,
+          "seconds": 6.01,
+          "frames": 1076,
+          "fps": 179.1,
+          "frame_ms": {
+            "p50": 3.86,
+            "p95": 17.8,
+            "p99": 25.03,
+            "max": 217.65,
+            "mean": 5.58
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0,
+              "p95": 0.03,
+              "p99": 0.03,
+              "max": 0.55,
+              "mean": 0.01
+            },
+            "sculpt": {
+              "p50": 0.09,
+              "p95": 13.11,
+              "p99": 18.95,
+              "max": 112.03,
+              "mean": 1.58
+            },
+            "ui": {
+              "p50": 0.31,
+              "p95": 0.97,
+              "p99": 1.31,
+              "max": 7.22,
+              "mean": 0.46
+            },
+            "upload": {
+              "p50": 2.72,
+              "p95": 3.55,
+              "p99": 5,
+              "max": 103.88,
+              "mean": 1.77
+            },
+            "draw": {
+              "p50": 0.5,
+              "p95": 1.65,
+              "p99": 1.93,
+              "max": 3.2,
+              "mean": 0.71
+            },
+            "swap_wait": {
+              "p50": 0.17,
+              "p95": 4.93,
+              "p99": 5.54,
+              "max": 8.74,
+              "mean": 1.05
+            }
+          },
+          "triangles_drawn": {
+            "p50": 629632,
+            "p95": 629824,
+            "p99": 629824,
+            "max": 629824,
+            "mean": 629632.89
+          },
+          "gpu_ms": {
+            "p50": 2.97,
+            "p95": 4.35,
+            "p99": 6.01,
+            "max": 6.94,
+            "mean": 3.13
+          },
+          "gpu_frames": 1076,
+          "render_triangle_budget": 2000000,
+          "lag_ms": {
+            "p50": 8.74,
+            "p95": 36.99,
+            "p99": 57.47,
+            "max": 237.06,
+            "mean": 11.44
+          },
+          "lag_px": {
+            "p50": 5.28,
+            "p95": 43.35,
+            "p99": 69.21,
+            "max": 268.07,
+            "mean": 9.37
+          },
+          "spacing_floor_ms": 1.9,
+          "lag_adjusted_ms": {
+            "p50": 6.84,
+            "p95": 35.09,
+            "p99": 55.57,
+            "max": 235.16,
+            "mean": 9.55
+          },
+          "dabs": 1105,
+          "pointer_samples": 1441,
+          "path_px": 5932,
+          "release_ms": 61.7,
+          "release_done_ms": 68.9,
+          "stroke_work_ms": {
+            "kernel": 1352.3,
+            "normals": 98.6,
+            "bvh": 0,
+            "dynamic_topology": 0,
+            "uploads": 1904,
+            "upload_frames": 1076,
+            "vertices_moved": 347213311
+          },
+          "preview_lag_px": {
+            "p50": 5.28,
+            "p95": 43.35,
+            "p99": 69.21,
+            "max": 268.07,
+            "mean": 9.37
+          },
+          "pointer_speed_px_s": 987
+        },
+        {
+          "name": "clay large",
+          "brush": "Clay",
+          "brush_radius_px": 120,
+          "worst_stall_ms": 34.6,
+          "seconds": 6.01,
+          "frames": 748,
+          "fps": 124.5,
+          "frame_ms": {
+            "p50": 7.45,
+            "p95": 13.71,
+            "p99": 16.4,
+            "max": 34.56,
+            "mean": 8.03
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0.01,
+              "p95": 0.02,
+              "p99": 0.02,
+              "max": 0.03,
+              "mean": 0.01
+            },
+            "sculpt": {
+              "p50": 0,
+              "p95": 8.93,
+              "p99": 11.2,
+              "max": 13.67,
+              "mean": 2.53
+            },
+            "ui": {
+              "p50": 0.38,
+              "p95": 1.31,
+              "p99": 1.79,
+              "max": 3.64,
+              "mean": 0.58
+            },
+            "upload": {
+              "p50": 3.87,
+              "p95": 6.42,
+              "p99": 7.48,
+              "max": 9.35,
+              "mean": 4.09
+            },
+            "draw": {
+              "p50": 0.57,
+              "p95": 0.84,
+              "p99": 1,
+              "max": 21.31,
+              "mean": 0.63
+            },
+            "swap_wait": {
+              "p50": 0.17,
+              "p95": 0.22,
+              "p99": 0.25,
+              "max": 16.29,
+              "mean": 0.2
+            }
+          },
+          "triangles_drawn": {
+            "p50": 678464,
+            "p95": 761792,
+            "p99": 764736,
+            "max": 764928,
+            "mean": 683551.06
+          },
+          "gpu_ms": {
+            "p50": 4.71,
+            "p95": 7.15,
+            "p99": 8.03,
+            "max": 21.57,
+            "mean": 4.94
+          },
+          "gpu_frames": 748,
+          "render_triangle_budget": 2000000,
+          "lag_ms": {
+            "p50": 19.93,
+            "p95": 31.14,
+            "p99": 34.94,
+            "max": 41.8,
+            "mean": 20.45
+          },
+          "lag_px": {
+            "p50": 17.39,
+            "p95": 25.74,
+            "p99": 29.88,
+            "max": 34.47,
+            "mean": 17.21
+          },
+          "spacing_floor_ms": 9.1,
+          "lag_adjusted_ms": {
+            "p50": 10.82,
+            "p95": 22.02,
+            "p99": 25.82,
+            "max": 32.68,
+            "mean": 11.34
+          },
+          "dabs": 330,
+          "pointer_samples": 1442,
+          "path_px": 5932,
+          "release_ms": 3.7,
+          "release_done_ms": 12.9,
+          "stroke_work_ms": {
+            "kernel": 656.6,
+            "normals": 615.9,
+            "bvh": 0,
+            "dynamic_topology": 0,
+            "uploads": 3060.6,
+            "upload_frames": 748,
+            "vertices_moved": 13806489
+          },
+          "preview_lag_px": {
+            "p50": 17.39,
+            "p95": 25.74,
+            "p99": 29.88,
+            "max": 34.47,
+            "mean": 17.21
+          },
+          "pointer_speed_px_s": 987
+        },
+        {
+          "name": "240 px brush",
+          "brush": "Clay",
+          "brush_radius_px": 240,
+          "worst_stall_ms": 54.7,
+          "seconds": 6.01,
+          "frames": 474,
+          "fps": 78.9,
+          "frame_ms": {
+            "p50": 8.59,
+            "p95": 33.27,
+            "p99": 40.04,
+            "max": 54.73,
+            "mean": 12.67
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0.01,
+              "p95": 0.02,
+              "p99": 0.03,
+              "max": 0.04,
+              "mean": 0.01
+            },
+            "sculpt": {
+              "p50": 0,
+              "p95": 24.24,
+              "p99": 32.3,
+              "max": 47.61,
+              "mean": 5.47
+            },
+            "ui": {
+              "p50": 0.79,
+              "p95": 2.33,
+              "p99": 4.2,
+              "max": 6.4,
+              "mean": 1.02
+            },
+            "upload": {
+              "p50": 4.99,
+              "p95": 7.57,
+              "p99": 9.41,
+              "max": 9.62,
+              "mean": 5
+            },
+            "draw": {
+              "p50": 0.84,
+              "p95": 1.46,
+              "p99": 2.13,
+              "max": 3.01,
+              "mean": 0.92
+            },
+            "swap_wait": {
+              "p50": 0.2,
+              "p95": 0.29,
+              "p99": 0.44,
+              "max": 11.45,
+              "mean": 0.24
+            }
+          },
+          "triangles_drawn": {
+            "p50": 874816,
+            "p95": 1198784,
+            "p99": 1273152,
+            "max": 1291008,
+            "mean": 929571.92
+          },
+          "gpu_ms": {
+            "p50": 6.04,
+            "p95": 9.05,
+            "p99": 10.09,
+            "max": 10.58,
+            "mean": 6.24
+          },
+          "gpu_frames": 474,
+          "render_triangle_budget": 2000000,
+          "lag_ms": {
+            "p50": 35.21,
+            "p95": 55.6,
+            "p99": 63.04,
+            "max": 66.03,
+            "mean": 36.18
+          },
+          "lag_px": {
+            "p50": 32.53,
+            "p95": 44.25,
+            "p99": 47.67,
+            "max": 48.05,
+            "mean": 32.61
+          },
+          "spacing_floor_ms": 18.2,
+          "lag_adjusted_ms": {
+            "p50": 16.97,
+            "p95": 37.37,
+            "p99": 44.81,
+            "max": 47.8,
+            "mean": 18.03
+          },
+          "dabs": 165,
+          "pointer_samples": 1442,
+          "path_px": 5932,
+          "release_ms": 9,
+          "release_done_ms": 37,
+          "stroke_work_ms": {
+            "kernel": 1062.7,
+            "normals": 1106,
+            "bvh": 0,
+            "dynamic_topology": 0,
+            "uploads": 2370,
+            "upload_frames": 474,
+            "vertices_moved": 19046158
+          },
+          "preview_lag_px": {
+            "p50": 32.53,
+            "p95": 44.25,
+            "p99": 47.67,
+            "max": 48.05,
+            "mean": 32.61
+          },
+          "pointer_speed_px_s": 987
+        },
+        {
+          "name": "orbit",
+          "worst_stall_ms": 16,
+          "seconds": 10,
+          "frames": 2083,
+          "fps": 208.3,
+          "frame_ms": {
+            "p50": 4.33,
+            "p95": 8.16,
+            "p99": 10.5,
+            "max": 16.01,
+            "mean": 4.8
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0.01,
+              "p95": 0.02,
+              "p99": 0.03,
+              "max": 0.27,
+              "mean": 0.01
+            },
+            "sculpt": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0,
+              "mean": 0
+            },
+            "ui": {
+              "p50": 0.8,
+              "p95": 2.26,
+              "p99": 3.35,
+              "max": 10.54,
+              "mean": 1.13
+            },
+            "upload": {
+              "p50": 2.82,
+              "p95": 3.24,
+              "p99": 3.52,
+              "max": 15.89,
+              "mean": 2.01
+            },
+            "draw": {
+              "p50": 0.57,
+              "p95": 1.85,
+              "p99": 2.38,
+              "max": 4.42,
+              "mean": 0.83
+            },
+            "swap_wait": {
+              "p50": 0.14,
+              "p95": 5.13,
+              "p99": 6.31,
+              "max": 11.7,
+              "mean": 0.84
+            }
+          },
+          "triangles_drawn": {
+            "p50": 928704,
+            "p95": 955456,
+            "p99": 958080,
+            "max": 1291008,
+            "mean": 923177.05
+          },
+          "gpu_ms": {
+            "p50": 3.52,
+            "p95": 4.18,
+            "p99": 5.35,
+            "max": 9.45,
+            "mean": 3.61
+          },
+          "gpu_frames": 2082,
+          "render_triangle_budget": 2000000
+        },
+        {
+          "name": "still",
+          "worst_stall_ms": 13.7,
+          "seconds": 0.61,
+          "frames": 85,
+          "fps": 140,
+          "frame_ms": {
+            "p50": 5.58,
+            "p95": 11.61,
+            "p99": 13.7,
+            "max": 13.7,
+            "mean": 7.14
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0,
+              "p95": 0.01,
+              "p99": 0.02,
+              "max": 0.02,
+              "mean": 0
+            },
+            "sculpt": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0,
+              "mean": 0
+            },
+            "ui": {
+              "p50": 3.81,
+              "p95": 4.64,
+              "p99": 5.58,
+              "max": 5.58,
+              "mean": 3.87
+            },
+            "upload": {
+              "p50": 0.02,
+              "p95": 0.1,
+              "p99": 0.13,
+              "max": 0.13,
+              "mean": 0.03
+            },
+            "draw": {
+              "p50": 1.08,
+              "p95": 1.32,
+              "p99": 6.57,
+              "max": 6.57,
+              "mean": 1.15
+            },
+            "swap_wait": {
+              "p50": 0.18,
+              "p95": 6.85,
+              "p99": 7.13,
+              "max": 7.13,
+              "mean": 2.15
+            }
+          },
+          "triangles_drawn": {
+            "p50": 1291008,
+            "p95": 1291008,
+            "p99": 1291008,
+            "max": 1291008,
+            "mean": 1249011.95
+          },
+          "detail": "full",
+          "still_triangles": 1291008,
+          "still_gpu_ms": 4.9,
+          "gpu_ms": {
+            "p50": 4.89,
+            "p95": 5.71,
+            "p99": 6.04,
+            "max": 6.04,
+            "mean": 4.85
+          },
+          "gpu_frames": 86,
+          "render_triangle_budget": 2000000
+        },
+        {
+          "name": "close-up",
+          "worst_stall_ms": 12.1,
+          "seconds": 4,
+          "frames": 1244,
+          "fps": 310.7,
+          "frame_ms": {
+            "p50": 2.91,
+            "p95": 6.32,
+            "p99": 7.77,
+            "max": 12.1,
+            "mean": 3.22
+          },
+          "frame_split_ms": {
+            "events": {
+              "p50": 0,
+              "p95": 0.01,
+              "p99": 0.01,
+              "max": 0.02,
+              "mean": 0
+            },
+            "sculpt": {
+              "p50": 0,
+              "p95": 0,
+              "p99": 0,
+              "max": 0,
+              "mean": 0
+            },
+            "ui": {
+              "p50": 2.15,
+              "p95": 2.85,
+              "p99": 3.47,
+              "max": 4.94,
+              "mean": 2.16
+            },
+            "upload": {
+              "p50": 0.01,
+              "p95": 0.03,
+              "p99": 0.09,
+              "max": 0.11,
+              "mean": 0.02
+            },
+            "draw": {
+              "p50": 0.59,
+              "p95": 0.72,
+              "p99": 1.02,
+              "max": 2.74,
+              "mean": 0.61
+            },
+            "swap_wait": {
+              "p50": 0.11,
+              "p95": 3.36,
+              "p99": 4.64,
+              "max": 8.49,
+              "mean": 0.43
+            }
+          },
+          "triangles_drawn": {
+            "p50": 1182912,
+            "p95": 1183424,
+            "p99": 1183488,
+            "max": 1183488,
+            "mean": 1183011.7
+          },
+          "gpu_ms": {
+            "p50": 1.98,
+            "p95": 3.54,
+            "p99": 3.59,
+            "max": 4.87,
+            "mean": 2.21
+          },
+          "gpu_frames": 1244,
+          "render_triangle_budget": 2000000
+        }
+      ]
+    }
+  ]
+}

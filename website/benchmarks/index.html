@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge Benchmarks</title>
-  <meta name="description" content="Sculpting 6 to 201 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
+  <meta name="description" content="Sculpting 6 to 805 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
   <meta property="og:title" content="SculptForge benchmarks: a public scene pack, 6M to 201M triangles, measured on real computers">
-  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 201 million. Download the scene pack, run one command and compare for yourself.">
+  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 805 million. Download the scene pack, run one command and compare for yourself.">
   <meta property="og:url" content="https://sculptforge.app/benchmarks/">
   <link rel="canonical" href="https://sculptforge.app/benchmarks/">
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
@@ -76,9 +76,9 @@
 <body>
 <main>
   <p class="small"><a href="../index.html">SculptForge</a> / <a href="../guide/performance.html">Performance guide</a> / <a href="../performance/">What we're building</a></p>
-  <h1>33 to 201 million triangles, measured</h1>
+  <h1>33 to 805 million triangles, measured</h1>
   <p class="lede muted">Can an open-source sculpting app handle high-poly work? Don't take our word for it. These are
-    SculptForge's own numbers on a 15 and a 33 million triangle head and on micro-level scenes up to 201 million triangles, from a benchmark anyone can run with one command,
+    SculptForge's own numbers on a 15 and a 33 million triangle head and on micro-level scenes up to 805 million triangles, from a benchmark anyone can run with one command,
     on the same scene with the same strokes. Run it on your computer and compare.</p>
 
   <div class="card small" id="published">
@@ -125,6 +125,29 @@ sculptforge --benchmark core-100m</code></pre></li>
       <p>About a minute per size. A table shows the numbers; a JSON file and an MP4 of the run (with the numbers on
         screen) are saved. <a href="#submit">Send the JSON</a> to be listed here.</p></li>
   </ol>
+
+  <h2 id="repeat-805m">Repeat the 805 million triangle run</h2>
+  <div class="card small">
+    <p>The largest scene we list is <code>core-800m</code>: the same procedural head at micro level 5, <strong>805,306,368</strong> micro triangles,
+      held in memory. It is in SculptForge 0.13.9 and later. One command:</p>
+    <pre><code>SF_HW_SIMULATE=floor sculptforge --benchmark core-800m --benchmark-no-video --benchmark-out result.json</code></pre>
+    <p>Leave <code>SF_HW_SIMULATE=floor</code> off to run at your computer's own speed (it holds the program to the entry-level budget, as in the rows below;
+      on Windows set it first with <code>set SF_HW_SIMULATE=floor</code>). The first run writes the scene file once; every run after that opens it
+      (about a second here: 0.7 to 1.1 s). Send the JSON as <a href="#submit">below</a> to be listed.</p>
+    <ul>
+      <li><strong>What we measured</strong> (three runs, the evening of 2026-11-18, built from the 0.13.8 tag, commit d25dfe75, the program's own JSON for each:
+        <a href="raw/floor-core-800m-1.json">run 1</a>, <a href="raw/floor-core-800m-2.json">run 2</a>, <a href="raw/floor-core-800m-3.json">run 3</a>): orbit
+        <strong>208 to 211 frames a second</strong> (median 209); the 240 px Clay stroke <strong>79 to 100 frames a second</strong> with the stroke trailing the pointer by
+        <strong>63 to 64 ms</strong> at the 99th percentile; the slowest frames of that stroke 36 to 41 ms (99th percentile); worst stall 216 to 224 ms (the first small stroke).
+        Three runs on one laptop: a range, not a promise.</li>
+      <li><strong>The machine</strong>: an Apple M1 Pro laptop (10 cores, 30.9 GB, Linux), 1920 x 1080, vertical sync off, held to SculptForge's entry-level budget with
+        <code>SF_HW_SIMULATE=floor</code>. It is a fast laptop slowed down in software, not a real entry-level computer: your numbers will differ, in either direction.</li>
+      <li><strong>Memory</strong>: SculptForge held a peak of 1,645 to 1,656 MB (resident) plus 2,563 MB of graphics buffers; on integrated graphics those buffers are system memory, so about
+        <strong>4,200 MB in all</strong>. The program asks for about <strong>7 GB free</strong> before it starts, and stops with one line saying how much it needs and how much is free if you have less.
+        A computer with a separate graphics card needs the 2,563 MB on the card.</li>
+      <li><strong>Disk</strong>: the scene file is <strong>0.6 GB</strong> (609 MB), written once to the program's cache folder. It needs about 0.9 GB free to write; with less it stops with a message and writes nothing.</li>
+    </ul>
+  </div>
 
   <div class="grid2">
     <div class="card small">
@@ -213,7 +236,7 @@ python3 tools/benchmark/submit.py add result.json \
   const $ = (id) => document.getElementById(id);
   const rows = $("rows"), sceneSel = $("scene"), phaseSel = $("phase"), count = $("count");
   const SCENES = [["standard-15m", "Standard 15M (head)", "15M"], ["standard-33m", "Standard 33M (head)", "33M"],
-                  ["core-100m", "Core 100M (micro levels)", "100M micro"], ["core-200m", "Core 200M (micro levels)", "200M micro"], ["spheres", "Spheres (100M and older runs)", ""],
+                  ["core-100m", "Core 100M (micro levels)", "100M micro"], ["core-200m", "Core 200M (micro levels)", "200M micro"], ["core-800m", "Core 800M (micro levels, 3 runs)", "800M micro"], ["spheres", "Spheres (100M and older runs)", ""],
                   ["pack:creature-floor", "Scene pack: creature-floor (5.8M, entry level)", "creature-floor"],
                   ["pack:creature-standard", "Scene pack: creature-standard (23M)", "creature-standard"],
                   ["pack:creature-high", "Scene pack: creature-high (92M)", "creature-high"]];
