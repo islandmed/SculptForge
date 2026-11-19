@@ -82,7 +82,7 @@
     <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
     <aside class="news-bar" data-version="0.13.8" aria-label="Latest release">
       <div class="wrap news-bar-inner">
-        <a class="news-bar-link" href="guide/whats-new.html#version-0138"><span class="news-pill">New</span><span class="news-bar-text">New in 0.13.8: in our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 208 frames a second (benchmark scene, not a sculpt)</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <a class="news-bar-link" href="guide/whats-new.html#version-0138"><span class="news-pill">New</span><span class="news-bar-text">New in 0.13.8: in our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 209 frames a second (benchmark scene, not a sculpt)</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
         <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
     </aside>
@@ -111,7 +111,7 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
             <a class="btn" href="why.html">Why we're doing this</a>
           </div>
           <p class="hero-note">Linux, macOS and Windows. No account, no subscription.</p>
-          <p class="speed-line">Orbiting 104 million micro triangles, drawn at the detail the view allows, runs at 208 frames a second on our simulated entry-level tier and 657 on an RTX 3060. The raw results are published. <a href="benchmarks/">How we measure &rarr;</a></p>
+          <p class="speed-line">Orbiting 805 million micro triangles in our benchmark scene (not a sculpt) runs at 209 frames a second on an Apple M1 Pro limited to entry-level budgets (simulated) and 248 on an RTX 3060 (median of 4 runs). The slowest 1% of 240 px brush-stroke frames took 64 ms. <a href="fast/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
             <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
@@ -283,7 +283,8 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
         <div class="grid">
           <article class="card">
             <h3>Dense scans that keep up</h3>
-            <p>Orbiting 104 million micro triangles, drawn at the detail the view allows, averages 208 frames a second on our simulated entry-level tier (a capped M1 Pro laptop) and 657 on an RTX 3060. A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on the 3060. Big brushes still trail the pen. Every number is the median of three runs, with the raw results published.</p>
+            <p>Orbiting 805 million micro triangles in our benchmark scene (not a sculpt) averages 209 frames a second on an Apple M1 Pro limited to entry-level budgets (simulated), using 1.6 GB of memory; the slowest 1% of 240 px brush-stroke frames took 64 ms (three runs).</p>
+            <p>A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on an RTX 3060. Big brushes still trail the pen. Other numbers are the median of three runs, with the raw results published.</p>
           </article>
           <article class="card">
             <h3>Open file formats</h3>

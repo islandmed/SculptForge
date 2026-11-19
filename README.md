@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.8:</strong> 805 million triangles of detail still orbit at 208 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour (<a href="https://sculptforge.app/guide/micro-levels.md">how it works</a>)
+  <strong>New in 0.13.8:</strong> 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour (<a href="https://sculptforge.app/guide/micro-levels.md">how it works</a>)
 </p>
 
 <p align="center">
