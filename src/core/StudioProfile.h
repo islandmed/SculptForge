@@ -23,6 +23,7 @@
 //   "ai": false,                              // AI features (they may reach only allowed URLs)
 //   "packs": ["packs/acme.sfpack"],           // brushes, alphas, Lit Spheres, keymaps, macros (core/Pack.h)
 //   "brushPaths": ["/studio/brushes"],        // read-only brush shares (as SCULPTFORGE_BRUSH_PATH)
+//   "scriptPaths": ["/studio/scripts"],       // Python scripts listed in the Script menu (as SCULPTFORGE_SCRIPT_PATH)
 //   "preferences": "ui.json",                 // the first-start interface settings (layout, keys, scale)
 //   "branding": {"logo": "logo.png", "title": "Acme"}
 // }
@@ -48,7 +49,7 @@ struct StudioProfile {
     bool localNetwork = false;
     std::string updateFeed, updateMirror; // a URL (http/https) or a local file
     std::vector<std::string> allow;
-    std::vector<std::string> packs, brushPaths; // resolved (absolute when dir is set)
+    std::vector<std::string> packs, brushPaths, scriptPaths; // resolved (absolute when dir is set)
     std::string preferences;
     std::string logo, title;
 };

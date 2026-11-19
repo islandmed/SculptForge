@@ -49,6 +49,24 @@ std::string resolve(const std::string& dir, const std::string& p) {
 
 StudioStart gStudio;
 
+// Puts `dirs` ahead of what the environment variable already lists (':' separated, ';' on Windows).
+void prependSearchPath(const char* name, const std::vector<std::string>& dirs) {
+    if (dirs.empty()) return;
+#if defined(_WIN32)
+    const char sep = ';';
+#else
+    const char sep = ':';
+#endif
+    std::string value;
+    for (const std::string& d : dirs) value += (value.empty() ? "" : std::string(1, sep)) + d;
+    if (const char* old = std::getenv(name); old && *old) value += sep + std::string(old);
+#if defined(_WIN32)
+    _putenv_s(name, value.c_str());
+#else
+    setenv(name, value.c_str(), 1);
+#endif
+}
+
 } // namespace
 
 bool parseStudioProfile(const std::string& text, const std::string& dir, StudioProfile& out, std::string& error) {
@@ -56,7 +74,7 @@ bool parseStudioProfile(const std::string& text, const std::string& dir, StudioP
     if (!Json::parseStrict(text, j, error)) return false;
     if (!j.isObject()) return (error = "a studio profile is a JSON object", false);
     static const char* kKeys[] = {"format", "version", "id", "name", "offline", "updates", "allow", "localNetwork",
-                                  "ai", "packs", "brushPaths", "preferences", "branding"};
+                                  "ai", "packs", "brushPaths", "scriptPaths", "preferences", "branding"};
     for (const auto& [k, v] : j.members()) {
         bool known = false;
         for (const char* key : kKeys) known = known || k == key;
@@ -99,6 +117,10 @@ bool parseStudioProfile(const std::string& text, const std::string& dir, StudioP
     for (const Json& a : j["brushPaths"].items()) {
         if (a.asString().empty()) return (error = "brushPaths: empty path", false);
         p.brushPaths.push_back(a.asString());
+    }
+    for (const Json& a : j["scriptPaths"].items()) {
+        if (a.asString().empty()) return (error = "scriptPaths: empty path", false);
+        p.scriptPaths.push_back(a.asString());
     }
     if (const std::string& pr = j["preferences"].asString(); !pr.empty()) {
         if (!relativeOk(pr)) return (error = "preferences: paths stay inside the profile's folder", false);
@@ -195,20 +217,9 @@ StudioStart startStudioMode(const std::string& exeDir, const std::string& overri
     policy = withManagedPolicy(policy, policy::startPolicy(&s.messages));
     s.active = policy.offline;
     net::setNetworkPolicy(policy);
-    if (found && !s.profile.brushPaths.empty()) { // read-only shares, ahead of any already set
-        std::string value;
-#if defined(_WIN32)
-        const char sep = ';';
-#else
-        const char sep = ':';
-#endif
-        for (const std::string& d : s.profile.brushPaths) value += (value.empty() ? "" : std::string(1, sep)) + d;
-        if (const char* old = std::getenv("SCULPTFORGE_BRUSH_PATH"); old && *old) value += sep + std::string(old);
-#if defined(_WIN32)
-        _putenv_s("SCULPTFORGE_BRUSH_PATH", value.c_str());
-#else
-        setenv("SCULPTFORGE_BRUSH_PATH", value.c_str(), 1);
-#endif
+    if (found) { // read-only shares, ahead of any already set
+        prependSearchPath("SCULPTFORGE_BRUSH_PATH", s.profile.brushPaths);
+        prependSearchPath("SCULPTFORGE_SCRIPT_PATH", s.profile.scriptPaths);
     }
     if (found) installStudioPacks(s.profile, s.messages);
     gStudio = s;

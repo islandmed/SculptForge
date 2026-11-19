@@ -92,6 +92,7 @@ rez-env sculptforge -- sculptforge
 | `SF_POLICY` | A policy file, when there is no system-wide one (see [The policy file](#the-policy-file)) |
 | `SF_KEYCHAIN` | `none`: don't use the OS keychain (render nodes, CI); keys last for the session or come from the environment |
 | `SCULPTFORGE_BRUSH_PATH` | Read-only studio brush folders (`:`-separated, `;` on Windows) |
+| `SCULPTFORGE_SCRIPT_PATH` | Folders of Python scripts listed in **File > Script** (`:`-separated, `;` on Windows); run by a click only, never at start-up (see [Python scripting](python.md#script-files)) |
 | `SCULPTFORGE_STUDIO_BRUSHES` | With the Rez package: appended to `SCULPTFORGE_BRUSH_PATH` |
 | `SCULPTFORGE_BRUSH_GALLERY` | Use another community brush gallery index (a URL or a folder), for example an in-house mirror |
 | `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`) | Hugging Face token for the free image-to-3D models |
@@ -197,6 +198,7 @@ Your build is SculptForge with a **studio profile** baked in: one `studio.json` 
   "ai": false,
   "packs": ["packs/acme.sfpack"],
   "brushPaths": ["/studio/brushes"],
+  "scriptPaths": ["/studio/scripts"],
   "preferences": "ui.json",
   "branding": {"logo": "logo.png", "title": "Acme"}
 }
@@ -210,6 +212,7 @@ Your build is SculptForge with a **studio profile** baked in: one `studio.json` 
 | `ai` | `true` keeps the AI features; they can still reach only the URLs above |
 | `packs` | Your brushes, alphas, Lit Spheres, keymaps and macros as `.sfpack` files, installed at first start |
 | `brushPaths` | Read-only brush shares, as `SCULPTFORGE_BRUSH_PATH` |
+| `scriptPaths` | Python script folders, as `SCULPTFORGE_SCRIPT_PATH` |
 | `preferences` | The first-start interface settings: layout, shortcuts and UI scale (**Edit > Preferences > Interface** exports them) |
 | `branding` | Your logo in **Help > About** and a word in the title bar |
 

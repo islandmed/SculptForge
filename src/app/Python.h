@@ -52,6 +52,10 @@ public:
     // two seconds; only while a list of them is drawn).
     std::string scriptsFolder() const;
     const std::vector<std::string>& scripts();
+    // The .py files in the folders of SCULPTFORGE_SCRIPT_PATH (core/ScriptPath.h; a studio profile's scriptPaths): listed in
+    // the Script menu, run only by a click, never at start-up (that stays scripts() and its SHA-256 trust). A file name
+    // in the Scripts folder hides the same name there. Empty under a policy that says never. Same scan as scripts().
+    const std::vector<std::string>& pathScripts();
 
     // Output a script printed (any thread), shown in the console each frame.
     void drainOutput();
@@ -93,6 +97,7 @@ private:
     template <class F>
     Result run(F&& body);
     void write(bool error, const std::string& text);
+    void scan(); // scripts_ and pathScripts_, at most every two seconds
     void syncUi(); // the host's declared interface changed: actions and panels again
     bool place(const std::string& id, bool panel, python::Place where); // sf.ui.place
     void readPrefs() const;
@@ -110,7 +115,8 @@ private:
     python::UiState ui_;
     uint64_t uiRevision_ = 0;
     bool drawing_ = false;
-    std::vector<std::string> scripts_;
+    std::vector<std::string> scripts_, pathScripts_;
+    std::set<std::string> skippedPaths_; // search-path folders already reported as missing
     double scriptsScanned_ = -1e9;
     std::mutex outMutex_;
     std::vector<std::pair<bool, std::string>> out_;

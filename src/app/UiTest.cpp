@@ -1203,6 +1203,16 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "python_loads") return app_.python_ ? app_.python_->loads() : 0.0;
     if (name == "python_loaded") return app_.python_ && app_.python_->loaded() ? 1.0 : 0.0;
     if (name == "python_enabled") return app_.python().enabled() ? 1.0 : 0.0;
+    // Scripts from SCULPTFORGE_SCRIPT_PATH (tests/ui/python_script_path.sfui): how many are listed from the Scripts folder
+    // and from the path; whether Run at start-up refuses every one of the path's.
+    if (name == "python_scripts_listed") return double(app_.python().scripts().size());
+    if (name == "python_path_scripts") return double(app_.python().pathScripts().size());
+    if (name == "python_path_startup_refused") {
+        PythonScripting& py = app_.python();
+        bool all = true;
+        for (const std::string& p : py.pathScripts()) all = !py.setRunAtStartup(p, true) && !py.runsAtStartup(p) && all;
+        return all ? 1.0 : 0.0;
+    }
     if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
         const std::string id = name.substr(10);
         int n = 0;

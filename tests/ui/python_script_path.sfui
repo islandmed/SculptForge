@@ -1,0 +1,46 @@
+# SCULPTFORGE_SCRIPT_PATH (core/ScriptPath.h, app/Python.h): scripts in those folders are listed in File > Script, marked
+# with their folder, and run only by a click. The Scripts folder wins a name both hold, a missing or repeated folder is
+# skipped, sub-folders, hidden files and _helpers aren't listed, none can run at start-up, and a studio policy that says
+# never hides them.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+expect_value triangles == 320
+click "Preferences##palette.preferences"
+click "Scripts##preferences.scripts"
+click "Enable Python scripts##prefs.python"
+expect_value python_enabled == 1
+
+# Two folders of scripts in a temporary place, the path set for this process (os.putenv reaches the app's own getenv),
+# and one script of the same name as a path script in the Scripts folder.
+key `
+click "Console/Python##console_mode1"
+type Console/##console "import os, tempfile; t = tempfile.mkdtemp(); one = os.path.join(t, 'one'); two = os.path.join(t, 'two'); os.makedirs(os.path.join(one, 'sub')); os.makedirs(two); mk = lambda d, n: open(os.path.join(d, n), 'w').write('pass' + chr(10))"
+key enter
+type Console/##console "[mk(one, n) for n in ('alpha.py', 'beta.py', '_helper.py', '.hidden.py', 'notes.txt')]; mk(os.path.join(one, 'sub'), 'deep.py'); [mk(two, n) for n in ('beta.py', 'gamma.py')]"
+key enter
+type Console/##console "folder = sf.scripts_folder(); os.makedirs(folder, exist_ok=True); mk(folder, 'gamma.py')"
+key enter
+type Console/##console "os.putenv('SCULPTFORGE_SCRIPT_PATH', os.pathsep.join([one, os.path.join(t, 'missing'), two, one]))"
+key enter
+wait_real 2.5
+# Path scripts: alpha and beta from the first folder; two's beta (same name) and gamma (the Scripts folder has it) are hidden.
+expect_value python_path_scripts == 2
+expect_value python_scripts_listed == 1
+expect_text "SCULPTFORGE_SCRIPT_PATH: skipped"
+key `
+click "Script##palette.script"
+expect_text "alpha  (one)"
+expect_text "beta  (one)"
+shot python_script_path
+
+# Start-up stays the Scripts folder's: none of the path's scripts can be ticked.
+expect_value python_path_startup_refused == 1
+
+# A studio policy that says never lists none of them.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"python\":{\"scripts\":\"never\"}}"
+wait_real 2.5
+expect_value python_path_scripts == 0
+expect_value python_scripts_listed == 0
+run ui_policy json=""
+wait_real 2.5
+expect_value python_path_scripts == 2
