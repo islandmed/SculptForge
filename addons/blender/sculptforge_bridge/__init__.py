@@ -460,6 +460,26 @@ def _object_mode(context, objects):
 # --------------------------------------------------------------------------------------------------
 
 
+def shape_key_offsets(me):
+    """A mesh's shape keys as SculptForge sculpt layers: (name, weight, indices, offsets) for each key but the Basis,
+    the offsets (N, 3) being its points minus the Basis's (object space, Blender's axes; only moved points listed), at
+    the key's current value, in the order of Blender's key list. Empty when it has none. Each key counts against the
+    Basis, not against its "relative to" key, so a layer is the whole shape the key makes."""
+    keys = me.shape_keys
+    if keys is None or len(keys.key_blocks) < 2:
+        return []
+    nv = len(me.vertices)
+    basis = _get(keys.reference_key.data, "co", nv, np.float64, 3)
+    shapes = []
+    for key in keys.key_blocks:
+        if key == keys.reference_key or len(key.data) != nv:
+            continue
+        off = _get(key.data, "co", nv, np.float64, 3) - basis
+        idx = np.nonzero(np.any(off != 0.0, axis=1))[0]
+        shapes.append((key.name, key.value, idx, off[idx]))
+    return shapes
+
+
 def _write_objects(context, objects, folder, prefix, apply):
     """The objects' Bridge files in `folder`; returns their manifest entries."""
     depsgraph = context.evaluated_depsgraph_get() if apply else None
@@ -482,7 +502,13 @@ def _write_objects(context, objects, folder, prefix, apply):
             continue
         file = "%s%03d%s" % (prefix, k, exchange.EXT)
         exchange.write_bridge(os.path.join(folder, file), obj.name, **arrays)
-        entries.append({"name": obj.name, "file": file, "matrix_world": [list(row) for row in obj.matrix_world]})
+        entry = {"name": obj.name, "file": file, "matrix_world": [list(row) for row in obj.matrix_world]}
+        # Shape keys travel as sculpt layers (with modifiers applied the mesh is another one: its keys are baked in).
+        shapes = [] if apply else shape_key_offsets(obj.data)
+        if shapes:
+            entry["shapes"] = "%s%03d.shapes" % (prefix, k)
+            exchange.write_shapes(os.path.join(folder, entry["shapes"]), len(obj.data.vertices), shapes)
+        entries.append(entry)
     return entries
 
 

@@ -191,7 +191,14 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         std::vector<glm::vec2> texcoords;
         std::vector<glm::uvec3> triangles;
         if (uvs) {
-            std::vector<uint32_t> head(mesh.vertexCount(), ~0u), next; // glTF vertices of each mesh vertex
+            // Mesh vertex v keeps glTF index v (so an import, which welds by first occurrence, restores the order); the
+            // copies the seams need come after. A vertex no triangle uses keeps its slot with UV 0,0.
+            const uint32_t nv = mesh.vertexCount();
+            std::vector<uint32_t> head(nv, ~0u), next(nv, ~0u); // glTF vertices of each mesh vertex
+            std::vector<bool> used(nv, false);
+            source.resize(nv);
+            for (uint32_t v = 0; v < nv; ++v) source[v] = v;
+            texcoords.assign(nv, glm::vec2(0.0f));
             triangles.resize(mesh.triangleCount());
             for (size_t t = 0; t < mesh.triangleCount(); ++t)
                 for (int c = 0; c < 3; ++c) {
@@ -200,10 +207,17 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
                     uint32_t i = head[v];
                     while (i != ~0u && texcoords[i] != uv) i = next[i];
                     if (i == ~0u) {
-                        i = uint32_t(source.size());
-                        source.push_back(v);
-                        texcoords.push_back(uv);
-                        next.push_back(head[v]);
+                        if (!used[v]) {
+                            i = v;
+                            used[v] = true;
+                            texcoords[i] = uv;
+                        } else {
+                            i = uint32_t(source.size());
+                            source.push_back(v);
+                            texcoords.push_back(uv);
+                            next.push_back(~0u);
+                        }
+                        next[i] = head[v];
                         head[v] = i;
                     }
                     triangles[t][c] = i;

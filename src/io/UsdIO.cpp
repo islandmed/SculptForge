@@ -221,14 +221,22 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
                const MorphAnimation* animation, const glm::mat4& transform = glm::mat4(1.0f)) {
     const bool skinned = !mesh.layers.empty();
     const std::string meshPath = skinned ? "/" + root + "/" + prim + "/Mesh" : "/" + root + "/" + prim;
-    // Unique, valid names for the blend shapes.
-    std::vector<std::string> shapeNames;
-    std::set<std::string> used;
+    // Unique, valid prim names for the blend shapes, and the layer names as the shape tokens (a token may hold any text,
+    // so "Brow Up #2" or a non-ASCII name comes back from an import unchanged; quotes, backslashes and controls become "_").
+    std::vector<std::string> shapeNames, tokenNames;
+    std::set<std::string> used, usedTokens;
     for (const auto& l : mesh.layers) {
         std::string n = usdIdentifier(l.name), unique = n;
         for (int k = 2; used.count(unique); ++k) unique = n + "_" + std::to_string(k);
         used.insert(unique);
         shapeNames.push_back(unique);
+        std::string t = l.name.empty() ? unique : l.name;
+        for (char& c : t)
+            if (c == '"' || c == '\\' || static_cast<unsigned char>(c) < 0x20) c = '_';
+        std::string uniqueToken = t;
+        for (int k = 2; usedTokens.count(uniqueToken); ++k) uniqueToken = t + "_" + std::to_string(k);
+        usedTokens.insert(uniqueToken);
+        tokenNames.push_back(uniqueToken);
     }
 
     Mesh base;
@@ -321,7 +329,7 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
            (creased.empty() ? "none" : mesh.hasQuads() ? "catmullClark" : "loop") + "\"");
     writeSelectionSets(w, mesh, triFace, faces.size());
     if (skinned) {
-        w.array("uniform token[] skel:blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
+        w.array("uniform token[] skel:blendShapes", tokenNames, [&](const std::string& n) { w.s += quoted(n); });
         w.array("rel skel:blendShapeTargets", shapeNames, [&](const std::string& n) { w.s += "<" + meshPath + "/" + n + ">"; });
         w.line("rel skel:skeleton = </" + root + "/" + prim + "/Skel>");
         for (size_t k = 0; k < mesh.layers.size(); ++k) {
@@ -354,7 +362,7 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         w.line("rel skel:animationSource = </" + root + "/" + prim + "/Skel/Weights>");
         w.s += '\n';
         w.open("def SkelAnimation \"Weights\"");
-        w.array("uniform token[] blendShapes", shapeNames, [&](const std::string& n) { w.s += quoted(n); });
+        w.array("uniform token[] blendShapes", tokenNames, [&](const std::string& n) { w.s += quoted(n); });
         w.array("float[] blendShapeWeights", mesh.layers, [&](const SculptLayer& l) { w.num(l.weight); });
         if (animation && !animation->empty()) {
             // Keys for the shapes the animation names (the rest at their current weight), at time codes in frames.
