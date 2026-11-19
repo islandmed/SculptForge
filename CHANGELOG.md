@@ -6,6 +6,94 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.9] - 2026-11-19
+
+### Added
+- **805 million triangle benchmark you can repeat**: `sculptforge --benchmark core-800m` runs the standard strokes and
+  an orbit on the 805 million micro triangle head (core-100m, core-200m, core-400m and any core-<N>m work the same).
+  Before it writes the scene file (0.6 GB, once) or opens anything it checks free memory (about 8 GB: 6.4 GB and a
+  margin) and free disk (about 0.9 GB); with less it prints one line saying what it needs and what is free and exits,
+  instead of running out of memory. The /benchmarks page lists the three measured runs (orbit 208 to 211 frames a
+  second, 240 px stroke lag 63 to 64 ms at p99, on the entry-level budget) with the command, the memory and the disk
+  it needs.
+- **`SCULPTFORGE_SCRIPT_PATH`** (Python scripts): folders of `.py` files (top level only) listed under File > Script
+  after the Scripts folder's own (which wins a shared name), marked with their folder, like `SCULPTFORGE_BRUSH_PATH`
+  for brushes; a studio profile can set it with `scriptPaths`. They run only when clicked and can never be set to run
+  at start-up; a policy that says Python is never allowed hides them. Requested by a community member.
+- **`sf.ui.main_window_handle()`** (Python scripts): the main window's native handle as an int (window handle on
+  Windows, `NSWindow` pointer on macOS, X11 window id on X11; `None` on Wayland and without a window), so a script's
+  own PySide dialog can be made a transient child of SculptForge (taskbar grouping, stays on top, modality).
+  Read-only; it adds no new capability. Requested by a community member.
+- **Render with... (preview)** (File menu, off until set up in Edit > Preferences > Render bridge): renders the
+  visible Parts from the current view (camera, lens shift and orthographic views, an optional studio light of key,
+  fill, rim and a sky dome) through OpenUSD's `usdrecord` from your own USD install, so every Hydra render delegate it
+  finds can be picked. PNG or EXR, any size or the view's shape; the still shows in the Render window, is kept in the
+  Renders folder (Pictures > SculptForge Renders) and opens in the image editor you choose (any program, else the
+  system's default). The renderer runs as its own program: Stop ends it, a failed render shows the renderer's own
+  message, and the view stays usable meanwhile. The helper runs only after you confirm it, and asks again if its file
+  changes; it gets your environment without SculptForge's settings or API keys. The `render_bridge` command and
+  `sculptforge-cli --render-helper PATH` render headless; a studio policy can turn it off (`"render": {"bridge":
+  "never"}`). Requested by Oslen on Discord and Hameron on Discord.
+
+### Fixed
+- Crisp Flatten no longer leaves teeth, spiky shards and folded triangles where a cut crosses a ridge or a steep wall,
+  or where a stroke runs along the mirror plane with Symmetry on (stacked strokes and big brushes on a dense mesh were
+  the worst). Where the two mirrored copies of a stroke overlap, each point is now cut once, by its own side's plane,
+  and nothing slides across the mirror; a steep wall or an undercut comes down flat onto the cut instead of being held
+  partway up.
+- **Live mode** (`sculptforge-cli --mcp --attach`): a successful `live_connect` was reported to the AI tool as an
+  error, so some clients (Codex) kept listing only `live_connect`. The reply now reflects the connection after it is
+  made, and the tool-list-changed notice is sent after that reply. Reported by a community member.
+- **Hide and Isolate face group on micro detail**: H (hide the face group under the cursor), Shift+H (isolate it) and
+  Tool > Visibility now hide the micro detail of those triangles too (before, a model with a micro level kept drawing
+  everything, so nothing seemed to happen). Show All and Ctrl+Z bring it back.
+- **Ctrl+W and Mask by ... on micro detail**: Ctrl+W (Group from Mask) and Tool > Masking > Mask by Cavity, Peaks,
+  Colour, Facing, Face Group and Border now work on a micro level's own mask, the one its brushes and the viewport use
+  (before, they read or wrote only the base mesh's mask, so nothing happened on a micro level). Cavity, Peaks and
+  Facing follow the micro surface itself, down to its pores and ridges. Ctrl+W puts a base triangle in the new group
+  when most of its micro detail is masked, then clears the mask. Each op is one undo step.
+- **Face groups vanished after Add Micro**: with Show Face Groups on, a model with a micro level now shows its face
+  group colours, including groups made with Ctrl+W on the micro level (before, every group drew in one colour).
+- **Move on micro detail, slow drags**: a Move dragged over a micro level in many small steps (a pen moving slowly,
+  most of all a second Move next to a mask) could leave contour rings and a stepped band across the falloff, because
+  each small step was rounded on its own. The surface now comes out the same however many steps the drag takes.
+- Move on a Micro level with a mask nearby moves the surface underneath smoothly again, mouse and pen alike: it folded
+  the surface into leaf-like lumps and left crumpled speckle wherever the mesh's own forms were smaller than the drag.
+  The mask still holds exactly.
+- **Colour cells too small** (left shelf): the main and second colour are 30 px tall, the recent colours are at least
+  20 px and wrap to the column's width. Drag the column's inner edge to widen it (up to 168 px, double-click for the
+  default); the colour field grows with it and the width is kept in the layout. Classic and SculptForge layouts, every
+  look and UI scale. Requested by a member.
+- **Quad Remesh** no longer stops at 52% on a dense sculpt with surface grain (pores, scan noise, a rough brush
+  texture), and **Cancel** now stops it at once at any point, leaving the Part as it was. The grain's sharp little
+  edges were taken for hard edges and its bumps for sharp tips, so the layout grew hundreds of thousands of poles and
+  never finished; Cancel was only seen between steps. Grain is now told apart from real hard edges and tips, the bar
+  keeps moving through the long steps: on our test PC, 2.4 million triangle grainy sculpts at 50000 quads now finish
+  in 30 seconds to about 2 minutes (#226, reported by @maratcgartist). Fixes #226.
+- **Make sculptable**: the scan surface follows the splat density between voxels, so gentle curves no longer show
+  voxel terraces (contour rings) at any Detail; floaters, filled holes and closed gaps behave as before.
+- **Timelapse export and `--record`** (ffmpeg): every failure now ends in a status message and one log line naming the
+  cause (ffmpeg not found and how to install it; ffmpeg's exit code and last words; the file or folder that can't be
+  written; no frames). On Windows the encoder is started directly, no `cmd.exe` console window that stays black and
+  empty, and a stuck ffmpeg is stopped after a minute instead of hanging the export. ffmpeg is also found where
+  Homebrew (macOS), winget, Chocolatey and Scoop (Windows) put it, which a desktop-launched app's PATH misses. The
+  video is written beside the target and put in place at the end, so a failed export no longer leaves a half file or
+  loses the previous one.
+- The Gizmo and the Move brush were very slow on dense meshes (millions of triangles without a micro level, e.g. a
+  Voxel Remesh at a high resolution): every pointer sample moved the whole region, so a slow frame took more samples
+  and the next was slower. A Gizmo drag of a whole Part (no mask, nothing hidden) is now drawn by the graphics card
+  and the vertices move once when you let go; masked Gizmo drags and the Move brush move the vertices once a frame,
+  leaving the same surface as before. Big Move drags on meshes of a million vertices or more use Live Move
+  (Preferences > Performance) automatically. Floor-tier laptop, 7M triangles: Gizmo move 0.2 to 121 fps, Move brush
+  240 px 1.1 to 206 fps (the surface 12 ms behind the pen instead of 4 s). The move is applied when you lift the pen,
+  so a big drag on such a mesh ends with a short pause (about 0.1-0.5 s at 3-14M triangles).
+- **Micro level 4 slow after strokes on big bases** (#184): after strokes on a base of about 2.5M triangles or more at
+  micro level 4, every frame went through each base triangle again and loaded only a small batch of full detail, so
+  even a view held still stayed at a few frames a second. Unchanged frames now skip that pass, as much of the wanted
+  detail loads as fits the frame's time budget, and a full detail budget stops loading instead of trying again each
+  frame. On a 2.5M base at micro level 4 the view held still after Clay strokes is smooth again within a couple of
+  seconds.
+
 ## [0.13.8] - 2026-11-18
 
 ### Added

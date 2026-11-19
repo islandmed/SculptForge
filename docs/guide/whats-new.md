@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.9
 
 ```features
-date: unreleased
+date: 2026-11-19
 tagline: The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes.
 highlight: The Gizmo and the Move brush now follow the pen on meshes of millions of triangles
 highlight: Crisp Flatten cuts ridges and steep walls clean, with Symmetry on too
@@ -21,6 +21,35 @@ title: Crisp Flatten cuts clean
 line: Crisp Flatten cuts ridges and steep walls flat without teeth, shards or folded triangles, with a big brush on a dense mesh and with Symmetry on.
 action: guide:sculpting.md
 ```
+
+- **Shared script folders**: set `SCULPTFORGE_SCRIPT_PATH` (or a studio profile's `scriptPaths`) and the `.py` files
+  in those folders are listed under **File > Script**, marked with their folder.
+- **Script windows stay with SculptForge**: a script's own window (PySide, Qt) can be parented to SculptForge's main
+  window with `sf.ui.main_window_handle()`, so it groups with it in the taskbar and stays on top.
+- **Render with your renderer**: **File > Render with... (preview)** renders a still of your sculpt from the current
+  view with a renderer you already have (any Hydra render delegate your OpenUSD install finds), shows it, keeps it in
+  your Renders folder and opens it in any image editor you choose: a client preview in one click. Set it up once in
+  **Edit > Preferences > Render bridge**.
+- **Crisp Flatten** cuts ridges and steep walls clean, without teeth, shards or folded triangles along the cut, with a
+  big brush on a dense mesh and with Symmetry on.
+- **AI tools**: connecting to a live SculptForge window no longer shows as failed in clients such as Codex, so the
+  sculpting tools appear right after you approve.
+- **Move on a Micro level** next to a mask no longer leaves crumpled speckle or folded, leaf-like lumps around the
+  stroke.
+- **Bigger colour cells**: the main and second colour and the recent colours in the left column are larger (at least
+  20 px), the recent ones wrap instead of shrinking, and you can drag the column's edge to make it wider. Requested by
+  a member.
+- **Make sculptable** (Render > Gaussian Splats): smooth curves such as a forehead come out smooth, without contour
+  rings.
+- **Timelapse and video export** say what went wrong: ffmpeg missing (and how to get it), ffmpeg stopped (with its own
+  message), a folder that can't be written. No more empty black window on Windows, and ffmpeg is found in Homebrew's
+  and winget's folders.
+- **Dense meshes move smoothly**: on a mesh of millions of triangles (a high Voxel Remesh, say), the Gizmo's Move,
+  Rotate and Scale and the Move brush now follow the pen; before, a 7M-triangle mesh dragged at under one frame a
+  second.
+- **Big micro levels settle after strokes**: on a base of millions of triangles at micro level 4, the view held still
+  no longer stays at a few frames a second after you sculpt; the full detail fills in over a second or two and the
+  view is smooth again.
 
 ## Version 0.13.8
 

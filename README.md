@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.8:</strong> 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour (<a href="https://sculptforge.app/guide/micro-levels.md">how it works</a>)
+  <strong>New in 0.13.9:</strong> the Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes (<a href="https://sculptforge.app/guide/gizmo.md">how it works</a>)
 </p>
 
 <p align="center">
