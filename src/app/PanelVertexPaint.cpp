@@ -423,6 +423,10 @@ const BrushRecipe* App::strokeRecipe() const {
 
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
+    if (strokeColourSmooth_) { // Smooth's own Intensity (dabAt put it in p.strength); the shape stays where it is
+        paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
+        return;
+    }
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
     if (strokeSculpt_) p.invert = false; // Rgb while sculpting lays colour on Sub too (#186); only the Paint brush erases on Alt
     if (texturePainter_.active()) { // the brush material: colour plus the material channels it paints
@@ -435,7 +439,7 @@ void App::paintAt(const DabParams& dab) {
 
 void App::beginPaintStroke() {
     paintSnapshot_.reset();
-    if (strokePaint_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
+    if (strokePaint_ && !strokeColourSmooth_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
     const Mesh& m = doc_.mesh;
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
         if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {

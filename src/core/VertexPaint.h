@@ -43,6 +43,13 @@ inline glm::vec3 materialTintFor(const glm::vec3& linear) {
 size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams& p, const glm::vec3& color,
                 Symmetry sym);
 
+// One colour-smooth dab (Shift with the Paint brush): each vertex under the brush moves toward the average colour of
+// its neighbours by falloff x strength x pressure x vertexInfluence(). The shape is never touched. Works on what
+// painting writes (the vertex colours, the Base layer or the active paint layer, colour and coverage), from the
+// colours before the dab (so the result does not depend on vertex order), with symmetry, mask and hidden faces as
+// paintDab. Records the old colours for the stroke's undo step. Returns the number of vertices changed.
+size_t paintSmoothDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
+
 enum class PaintArea { All, Unmasked, Masked };
 
 // Blends `color` over the mesh with weight `amount` (0..1). Unmasked scales by

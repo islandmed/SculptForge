@@ -1309,6 +1309,7 @@ private:
     bool paintMode_ = false;  // Paint brush: colour only, no sculpting (Rgb on, Raise off)
     bool paintRgb_ = false;   // also paint the colour while sculpting (Rgb + Raise)
     bool strokePaint_ = false, strokeSculpt_ = true;
+    bool strokeColourSmooth_ = false; // Shift with the Paint brush: the stroke smooths the colour, not the shape
     void registerPaintUiCommands();
     std::string litsphereFolder() const; // <library>/Lit Spheres, empty without a library
     void loadLitSphereLibrary();         // custom Lit Spheres from the studio folders and lit sphereFolder() (start-up)
