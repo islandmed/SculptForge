@@ -1555,6 +1555,9 @@ constexpr Entry kTraditionalChinese[] = {
      "開啟或關閉連續：筆刷在模型上靜止時持續加入，每秒 30 個筆觸（不移動也能堆出凸起）。不適用於 Move、Tendril 與拖曳"
      "類筆畫。"},
     {"Swap the main and the secondary colour.", "交換主要色彩與次要色彩。"},
+    {"Left shelf width", "左側工具列寬度"},
+    {"Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
+     "拖曳可調整此欄的寬度（色彩區會隨之變大）。按兩下恢復預設寬度。"},
     {"Mask the whole visible Part.", "遮罩整個可見部件。"},
     {"Unmask everything (also: Ctrl+drag on the background, away from the model).",
      "取消所有遮罩（也可以：在遠離模型的背景上 Ctrl+拖曳）。"},

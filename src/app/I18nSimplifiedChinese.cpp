@@ -1555,6 +1555,9 @@ constexpr Entry kSimplifiedChinese[] = {
      "打开或关闭连续：笔刷在模型上静止时持续加入，每秒 30 个笔触（不移动也能堆出凸起）。不适用于 Move、Tendril 与拖动"
      "类笔触。"},
     {"Swap the main and the secondary colour.", "交换主要色彩与次要色彩。"},
+    {"Left shelf width", "左侧工具栏宽度"},
+    {"Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
+     "拖动可调整此栏的宽度（色彩区会随之变大）。双击恢复默认宽度。"},
     {"Mask the whole visible Part.", "遮罩整个可见部件。"},
     {"Unmask everything (also: Ctrl+drag on the background, away from the model).",
      "取消所有遮罩（也可以：在远离模型的背景上 Ctrl+拖动）。"},

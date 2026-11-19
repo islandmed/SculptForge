@@ -5,6 +5,7 @@
 #include "core/LegacyNames.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace sf {
 
@@ -84,6 +85,7 @@ Json toJson(const UiLayout& l) {
     j.set("rightTrayOpen", l.rightTrayOpen);
     j.set("leftTrayWidth", double(l.leftTrayWidth));
     j.set("rightTrayWidth", double(l.rightTrayWidth));
+    if (l.leftShelfWidth > 0.0f) j.set("leftShelfWidth", double(l.leftShelfWidth));
     j.set("leftTray", stringArray(l.leftTray));
     j.set("rightTray", stringArray(l.rightTray));
     j.set("openSubpalettes", stringArray(l.openSubpalettes));
@@ -155,6 +157,8 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     flag("rightTrayOpen", out.rightTrayOpen);
     number("leftTrayWidth", out.leftTrayWidth);
     number("rightTrayWidth", out.rightTrayWidth);
+    number("leftShelfWidth", out.leftShelfWidth);
+    if (!(out.leftShelfWidth >= 0.0f) || !std::isfinite(out.leftShelfWidth)) out.leftShelfWidth = 0.0f;
     readStrings(j["leftTray"], out.leftTray);
     readStrings(j["rightTray"], out.rightTray);
     readStrings(j["openSubpalettes"], out.openSubpalettes);

@@ -29,6 +29,9 @@ struct UiLayout {
     bool leftTrayOpen = false, rightTrayOpen = true;
     bool rightTrayPeek = false; // not saved: on a narrow window the right tray shows only after it was asked for (a tap)
     float leftTrayWidth = 300, rightTrayWidth = 300; // logical px
+    // The left shelf's width, logical px: 0 = the default (shell::kLeftShelfW); drag the shelf's inner edge to change it
+    // (the colour field and its swatches follow it; shell::leftShelfWidth clamps).
+    float leftShelfWidth = 0;
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
     std::vector<std::string> openSubpalettes;         // "tool.part", ...
     // My Panel (Palettes.cpp): what the member dragged in, top to bottom: "action:<action id>" or "section:<section id>".

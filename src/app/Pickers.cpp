@@ -54,8 +54,8 @@ constexpr ImU32 kMarkerLight = IM_COL32(255, 255, 255, 245);  // SV ring and hue
 constexpr ImU32 kMarkerDark = IM_COL32(0, 0, 0, 150);         // their outline, readable on white
 constexpr float kFieldGap = 4.0f;   // one gap between every part of the colour field (square, strip, swatches, Fill)
 constexpr float kHueStripW = 10.0f; // wide enough to read as a control next to the square
-constexpr float kSwatchH = 18.0f;
-constexpr float kRecentH = 12.0f; // the recent colours' rows: thin
+constexpr float kSwatchH = 30.0f;  // the main and second colour: the ones in use, clearly the biggest cells (Fenix: 18 px was too small)
+constexpr float kRecentMin = 20.0f; // a recent colour cell is never smaller than this (logical px); the row wraps instead
 
 const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
 
@@ -1640,7 +1640,10 @@ void swatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImVec4 colour, float rounding, f
 
 } // namespace
 
-void App::drawColorWidget(float width) {
+// `width`: the column's inside. `fit` (< 1 on a shelf too short for its content, Shell.cpp) shrinks the SV square and
+// the swatch heights, never the cells' widths: they wrap to `width` and keep kRecentMin (a narrow window at 150 % made
+// the cells one per row, full width, and clipped the column).
+void App::drawColorWidget(float width, float fit) {
     const float s = uiScale_;
     const float rounding = 3.0f * s;
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1660,8 +1663,10 @@ void App::drawColorWidget(float width) {
     if (val <= 1e-4f) sat = store->GetFloat(satKey, sat);
 
     const float stripW = kHueStripW * s, gap = kFieldGap * s;
-    const float squareW = width - stripW - gap, squareH = squareW;
+    const float squareW = std::floor((width - stripW - gap) * std::clamp(fit, 0.1f, 1.0f)), squareH = squareW;
+    const float fieldIndent = std::floor((width - (squareW + stripW + gap)) * 0.5f); // a shrunk field stays centred
     bool changed = false;
+    if (fieldIndent > 0.0f) ImGui::Indent(fieldIndent);
 
     // Saturation across, value down.
     const ImVec2 sq = ImGui::GetCursorScreenPos();
@@ -1723,14 +1728,16 @@ void App::drawColorWidget(float width) {
 
     ImGui::PopStyleVar();
     ImGui::PopID();
+    if (fieldIndent > 0.0f) ImGui::Unindent(fieldIndent);
     ImGui::EndGroup();
     ui::HelpText("Colour", "C", "The vertex paint colour (C over the model picks one).", "Left shelf");
 
     // Two swatches main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
     // the column, main on the left, the same gap as between the square and the strip.
-    const float swH = kSwatchH * s;
+    const float swH = std::max(kRecentMin, kSwatchH * std::clamp(fit, 0.0f, 1.0f)) * s; // (never under the cell minimum)
     const float mainW = std::floor((width - gap) * 0.5f), secondW = width - gap - mainW;
     const glm::vec3 second = linearToSrgb(secondaryColor_);
+    colourCellMin_ = std::min({mainW, secondW, swH}) / s;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, gap));
     const ImVec2 pa = ImGui::GetCursorScreenPos();
     bool swap = ImGui::InvisibleButton("##primary", ImVec2(mainW, swH));
@@ -1743,13 +1750,17 @@ void App::drawColorWidget(float width) {
            rounding, s, ImGui::IsItemHovered());
     ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour.", "Left shelf");
     if (swap) std::swap(doc_.paintColor, secondaryColor_);
-    // The recent colours (Oslen on Discord): the last ones painted with, newest first, in rows of four (a second row
-    // once there are more than four) across the column's width. Click one to paint with it.
+    // The recent colours (Oslen on Discord): the last ones painted with, newest first, square cells that wrap to the
+    // column's width (as many per row as fit at kRecentMin, stretched to fill it: a wider column gets more per row, never
+    // smaller cells). Click one to paint with it.
     if (!recentColors_.empty()) {
-        constexpr int kCols = 4;
-        const float rw = std::floor((width - gap * float(kCols - 1)) / float(kCols)), rh = kRecentH * s;
-        for (size_t i = 0; i < recentColors_.size(); ++i) {
-            if (i % kCols != 0) ImGui::SameLine();
+        const size_t cols = size_t(std::max(1, int(std::floor((width + gap) / (kRecentMin * s + gap)))));
+        const float rw = std::floor((width - gap * float(cols - 1)) / float(cols)), rh = std::max(kRecentMin * s, std::min(rw, 1.4f * kRecentMin * s));
+        // A shelf too short for its content (fit < 1) shows two rows of them, the newest ones; the rest return on a taller shelf.
+        const size_t shown = fit < 0.999f ? std::min(recentColors_.size(), cols * 2) : recentColors_.size();
+        colourCellMin_ = std::min(colourCellMin_, rw / s);
+        for (size_t i = 0; i < shown; ++i) {
+            if (i % cols != 0) ImGui::SameLine();
             const ImVec2 ra = ImGui::GetCursorScreenPos();
             const std::string id = "##recent" + std::to_string(i);
             const bool use = ImGui::InvisibleButton(id.c_str(), ImVec2(rw, rh));

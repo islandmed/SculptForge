@@ -312,6 +312,25 @@ TEST(panel_placements_json) {
 
 // Revert to Saved Layout and Reset Layout read whatever ui.json holds (#bug-reports: Revert crashed on a layout with its
 // shelf items dragged off): a corrupt or odd layout must load into something the shell can lay out, in every built-in
+// The left shelf's width: 88 (72 narrow) unless dragged, between that and 168, kept in the layout file.
+TEST(left_shelf_width_default_clamp_and_roundtrip) {
+    CHECK(leftShelfWidth(0.0f, 1600.0f) == 88.0f && leftShelfWidth(0.0f, 1000.0f) == 72.0f);
+    CHECK(leftShelfWidth(140.0f, 1600.0f) == 140.0f);
+    CHECK(leftShelfWidth(9999.0f, 1600.0f) == 168.0f && leftShelfWidth(10.0f, 1600.0f) == 88.0f);
+    CHECK(leftShelfWidth(168.0f, 1000.0f) <= 300.0f); // (a narrow window: at most 30 % of it)
+    UiLayout l = standardLayout();
+    l.leftShelfWidth = 132.0f;
+    const ShellGeometry g = computeShell(l, 1600.0f, 900.0f, 1.0f);
+    CHECK(g.leftShelf.w == 132.0f && g.canvas.x == g.leftShelf.x + 132.0f);
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.leftShelfWidth == 132.0f);
+    CHECK(!toJson(standardLayout()).has("leftShelfWidth")); // (the default is not stored)
+    Json bad;
+    CHECK(Json::parse(R"({"leftShelfWidth": -40})", bad, err) && fromJson(bad, back, err) && back.leftShelfWidth == 0.0f);
+}
+
 // layout, and the standard one is always a way back.
 TEST(layout_from_corrupt_or_odd_json_still_lays_out) {
     const char* const files[] = {
