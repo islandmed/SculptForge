@@ -3192,15 +3192,14 @@ constexpr Entry kTraditionalChinese[] = {
     {"Sculpt brushes also paint the colour.", "雕刻筆刷也會繪製色彩。"},
     {"Front faces only: brushes leave the far side of thin parts alone.", "僅限正面：筆刷不會影響薄部件的另一側。"},
     {"Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, the "
-     "next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the preferences and "
+     "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
-     "筆刷只影響與游標下的點相連、且在筆刷大小內的表面：另一條腿、旁邊的手指或隔著縫隙的嘴唇都保持不變（Blender 的 "
-     "Connected Only）。隨偏好設定與專案儲存。"},
+     "筆刷只影響與游標下的點相連、且在筆刷大小內的表面：另一條腿、旁邊的手指或隔著縫隙的嘴唇都保持不變。隨偏好設定與專案儲存。"},
     {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too to keep "
+     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
      "it to one piece.",
-     "筆刷衰減以螢幕測量：筆刷圓圈內的一切都會受影響，會穿過模型到背面，如同沿視線方向的圓柱（Blender 的 Projected "
-     "from View）。同時開啟「僅限相連」即可限制在單一區塊。"},
+     "筆刷衰減以螢幕測量：筆刷圓圈內的一切都會受影響，會穿過模型到背面，如同沿視線方向的圓柱。"
+     "同時開啟「僅限相連」即可限制在單一區塊。"},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+拖曳以筆刷繪製遮罩；Ctrl+Alt+拖曳擦除遮罩。在背景上 Ctrl+拖曳可清除遮罩。"},
     {"Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.",

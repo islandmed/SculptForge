@@ -484,6 +484,9 @@ void App::finishStrokeNow() {
     doc_.sculptor.timings = {};
     perf_.strokeSyncMs = 0.0;
     perf_.strokeFrames = 0;
+    if (const size_t bad = doc_.sculptor.nonFiniteDabs) // (gh#229: the dabs were dropped, the mesh is as it was)
+        SDL_Log("stroke: %zu dabs of %s dropped: the brush computed a non-finite offset (pressure %.3f)", bad,
+                brushLabel(strokeBrush_), double(strokePressure()));
     UndoRecord r = doc_.sculptor.endStroke();
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);

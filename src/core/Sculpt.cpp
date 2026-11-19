@@ -442,6 +442,7 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
         colored_.assign(words, 0);
     }
     ++strokeId_;
+    nonFiniteDabs = 0;
     draft_ = draftStrokes && !dyntopo.enabled;
     draftStrokes = false; // (asked for per stroke)
     draftLeaves_.clear();
@@ -873,6 +874,19 @@ void Sculptor::cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts) {
     }
 }
 
+namespace {
+template <class V> bool allFinite(const V& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
+// View falloff reaches through the model as a cylinder; the brushes that pull to a plane leave what lies deeper along the
+// view than the radius from the cursor (fading from 3/4 of it): a thin part (an ear, a horn) is still reached, the far
+// side of a head or a sphere stays (gh#229: Clay pulled it through to the front's plane in shards).
+float viewDepthFade(const glm::vec3& x, const glm::vec3& center, const glm::vec3& viewDir, float radius) {
+    const float l = glm::length(viewDir);
+    if (!(l > 1e-12f) || !(radius > 0.0f)) return 1.0f;
+    const float depth = std::abs(glm::dot(x - center, viewDir)) / l;
+    return std::clamp((1.0f - depth / radius) * 4.0f, 0.0f, 1.0f);
+}
+} // namespace
+
 void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence,
                            const float* given) {
     const size_t n = verts.size();
@@ -885,17 +899,29 @@ void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::spa
     influence_.resize(n);
     firstTouch_.resize(n);
     blockFirst_.assign((n + kBlock - 1) / kBlock + 1, 0);
+    // A non-finite offset (a NaN pressure, normal or tilt reaching a brush) drops its whole dab: one NaN vertex tears its
+    // triangles into long shards across the view, and its undo and normals with it (gh#229). The app logs it.
+    std::atomic<bool> bad{false};
     poolFor(n, [&](size_t b, size_t e) {
         uint32_t count = 0;
+        bool finite = true;
         for (size_t i = b; i < e; ++i) {
             float k = given ? given[i] : influence ? vertexInfluence(mesh, verts[i]) : 1.0f;
             if (cage) k = std::min(k, cageFree_[verts[i]]); // (hidden faces stay: 0)
             influence_[i] = k;
             firstTouch_[i] = k > 0.0f && markBit(touched_, verts[i]);
             count += firstTouch_[i];
+            finite = finite && allFinite(d[i]);
         }
         blockFirst_[b / kBlock + 1] = count;
+        if (!finite) bad.store(true, std::memory_order_relaxed);
     }, kBlock);
+    if (bad.load()) { // (the vertices first touched here go back to untouched: a later dab records their undo)
+        ++nonFiniteDabs;
+        for (size_t i = 0; i < n; ++i) // (rare: serial)
+            if (firstTouch_[i]) touched_[verts[i] >> 6] &= ~(uint64_t(1) << (verts[i] & 63));
+        return;
+    }
     for (size_t i = 1; i < blockFirst_.size(); ++i) blockFirst_[i] += blockFirst_[i - 1];
     std::vector<glm::vec3>& target = mesh.layerTarget(layer_);
     UndoChannel<glm::vec3>& rec = record_.positions;
@@ -1241,17 +1267,27 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
-    // Weighted area normal and centre of the brush region.
-    const AreaSums sums = areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
-        const uint32_t v = verts_[i * stride];
-        float w = brushFalloff(brushDistance(p, pos[v]), p.radius, p.focal);
-        acc.normal += glm::dvec3(nrm[v]) * double(w);
-        acc.center += glm::dvec3(pos[v]) * double(w);
-        acc.weight += w;
-    });
+    // Weighted area normal and centre of the brush region. View falloff reaches through the model as a cylinder, but the
+    // plane is the surface's under the cursor (the ball around it): across the cylinder it was the mean of the front
+    // and the back, inside the model, and Clay / Clay Block pulled the far side through to it in shards (gh#229).
+    const auto sumsWithin = [&](bool ball) {
+        return areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
+            const uint32_t v = verts_[i * stride];
+            float w = brushFalloff(ball ? glm::distance(pos[v], p.center) : brushDistance(p, pos[v]), p.radius, p.focal);
+            acc.normal += glm::dvec3(nrm[v]) * double(w);
+            acc.center += glm::dvec3(pos[v]) * double(w);
+            acc.weight += w;
+        });
+    };
+    AreaSums sums = sumsWithin(p.viewFalloff);
+    if (p.viewFalloff && sums.weight <= 0.0) sums = sumsWithin(false); // (no vertex near the cursor: big faces)
     glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
     const float wsum = float(sums.weight);
     if (wsum <= 0.0f) return;
+    if (!std::isfinite(sums.weight) || !allFinite(sums.normal) || !allFinite(sums.center)) { // (a NaN normal or position: gh#229)
+        ++nonFiniteDabs;
+        return;
+    }
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
     areaNormal = nlen > 1e-12f ? areaNormal / nlen : -p.viewDir;
@@ -1313,7 +1349,17 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
     // offset of the i-th vertex v if it were at x (x = pos[v] for the dab itself; the adaptive normals ask for
     // points next to it, which only the brushes that read nothing but the place, and v's own normal, are asked).
+    // The brushes that pull to their plane, under View falloff: only what lies within the radius of the plane and of the
+    // cursor along the view (viewDepthFade): the cylinder's far side stays where it is (gh#229).
+    const bool planeReach = p.viewFalloff && (type == BrushType::Clay || type == BrushType::ClayBlock ||
+                                              type == BrushType::Flatten || type == BrushType::Trim);
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
+        float reachFade = 1.0f;
+        if (planeReach) {
+            reachFade = std::clamp((1.0f - std::abs(glm::dot(x - areaCenter, areaNormal)) / r) * 4.0f, 0.0f, 1.0f) *
+                        viewDepthFade(x, p.center, p.viewDir, r);
+            if (reachFade <= 0.0f) return glm::vec3(0.0f);
+        }
         const glm::vec3 o = x - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
                            : brushFalloff(brushDistance(p, x), r, p.focal);
@@ -1416,7 +1462,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         default:
             break;
         }
-        return d;
+        return d * reachFade;
     };
     if (!adaptiveDab_ && !analyticEarly) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
@@ -1879,6 +1925,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     const bool copied = !m.identity();
     auto patternAt = [&](const glm::vec3& x) { return copied ? m.inversePoint(x) : x; };
     const float focalExp = std::exp2(2.0f * std::clamp(p.focal, -1.0f, 1.0f));
+    // (View falloff: the plane from the surface under the cursor, as dabSingle's; gh#229)
+    const bool ball = p.viewFalloff && r.plane != BrushRecipe::Plane::None;
     const AreaSums sums = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
         const uint32_t v = verts_[i];
         float t = std::clamp((1.0f - brushDistance(p, pos[v]) / rad) / edge, 0.0f, 1.0f);
@@ -1912,8 +1960,20 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         if (stencil.active() && w > 0.0f) w *= stencil.weight(pos[v]);
         weights_[i] = w;
     });
-    glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
-    const float wsum = float(sums.weight);
+    AreaSums near;
+    if (ball) // (the same profile over the distance in space; a cursor with no vertex near it: the cylinder's)
+        near = areaSums(verts_.size(), [&](size_t i, AreaSums& acc) {
+            const uint32_t v = verts_[i];
+            float t = std::clamp((1.0f - glm::distance(pos[v], p.center) / rad) / edge, 0.0f, 1.0f);
+            if (p.focal != 0.0f) t = std::pow(t, focalExp);
+            const float w = t * t * (3.0f - 2.0f * t);
+            acc.normal += glm::dvec3(nrm[v]) * double(w);
+            acc.center += glm::dvec3(pos[v]) * double(w);
+            acc.weight += w;
+        });
+    const AreaSums& plane = near.weight > 0.0 ? near : sums;
+    glm::vec3 areaNormal = glm::vec3(plane.normal), areaCenter = glm::vec3(plane.center);
+    const float wsum = float(plane.weight);
     if (wsum <= 0.0f) return;
     areaCenter /= wsum;
     float nlen = glm::length(areaNormal);
@@ -2036,6 +2096,9 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             h0 = h / std::max(1.0f - crispDone_[v], 1e-3f);
             facing = crispFacing_[v];
         }
+        // View falloff reaches through the model: a plane recipe leaves what lies a radius or more off its plane (the far
+        // side), fading from 3/4 of it, instead of pulling it through to the plane in shards (gh#229).
+        if (ball) f *= std::clamp((1.0f - std::abs(h0) / rad) * 4.0f, 0.0f, 1.0f) * viewDepthFade(x, p.center, p.viewDir, rad);
         if (r.crispEdge && r.plane != BrushRecipe::Plane::None && f > 0.0f) {
             // Crisp edge on a plane that follows the stroke: the surface turned away from the plane (the side of a box
             // past its edge, the far side of a thin part) fades out between 85 and 60 degrees off it when cut, so a
