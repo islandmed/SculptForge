@@ -66,6 +66,7 @@ void App::beginMaskStroke(float x, float y) {
     if (!doc_.sculptor.beginStroke(doc_.mesh, strokeInvert_ ? "Unmask" : "Mask", -1)) return;
     strokeMask_ = true;
     strokePaint_ = false; // mask strokes never paint or sculpt
+    strokeColourSmooth_ = false;
     strokeSculpt_ = true;
     paintSnapshot_.reset();
     strokeBrush_ = BrushType::Standard;

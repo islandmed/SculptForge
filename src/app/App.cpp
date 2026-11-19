@@ -2772,8 +2772,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift still smooths geometry while the Paint brush is active.
-    strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
+    // Shift with the Paint brush smooths the colour and leaves the shape alone; with a sculpt brush (Rgb on) it still
+    // smooths the shape. A Part painting into a texture has no colour smooth yet: Shift smooths its shape as before.
+    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_ && !paintsTexture(doc_.mesh);
+    strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
@@ -2896,8 +2898,8 @@ void App::strokeTo(float x, float y) {
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
-    if (alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
-                              (inputMods() & SDL_KMOD_SHIFT) != 0)) {
+    if (!strokeColourSmooth_ && alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
+                                                      (inputMods() & SDL_KMOD_SHIFT) != 0)) {
         strokeAltSmooth_ = true;
         status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
