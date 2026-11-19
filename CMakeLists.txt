@@ -1293,6 +1293,15 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
+    sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
+    sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
+    set_tests_properties(ui_async_stroke_undo_view ui_async_stroke_undo_view_1440 ui_async_stroke_undo_view_2880 PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=100")
+    set_tests_properties(ui_async_stroke_press_waits PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
+    set_tests_properties(ui_async_stroke_undo PROPERTIES
+                         ENVIRONMENT "SF_TRIANGLE_BUDGET=40000;SF_STILL_FRAME_MS=0.001;SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
     file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)

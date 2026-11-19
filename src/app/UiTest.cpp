@@ -259,6 +259,9 @@
 //                            alpha_pool_size, alpha_scale_jitter, alpha_position_jitter (the alpha pool and jitter, Alpha palette)
 //   (mesh values are the active Part's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
+//   interactive_strokes on|off   strokes as the window runs them: dabs queued and placed per frame, on the stroke thread for big
+//                            meshes (SF_BACKGROUND_DABS=1 forces it; set before the app starts, they are read once); off by default
+//                            (a UI test otherwise places a stroke's dabs at once). Values: stroke_async, stroke_draining, background_dabs
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
 //   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
@@ -457,6 +460,15 @@
 namespace sf {
 
 namespace {
+// mark_view / view_vs_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
+std::vector<uint8_t> gViewMark;
+bool renderLiveView(App& app, std::vector<uint8_t>& out, const Camera& camera, const RenderSettings& settings, Renderer& renderer) {
+    (void)app;
+    Camera cam = camera;
+    cam.aspect = 480.0f / 270.0f;
+    std::string error;
+    return renderer.renderToImage(cam, 480, 270, settings, out, error);
+}
 
 // copy: Bridge files under `dst` stored with the fixture header and name prefix get the format's own bytes back.
 void restoreBridgeFixtures(const std::filesystem::path& dst) {
@@ -1130,6 +1142,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
     if (name == "undo_steps") return double(app_.doc_.undo.undoCount());
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
+    if (name == "can_redo") return app_.doc_.undo.canRedo() ? 1.0 : 0.0;
     if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
     if (name == "splats") return double(app_.doc_.splats.size());
@@ -1666,6 +1679,19 @@ double Demo::query(const std::string& name, bool& known) const {
         for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
         return double(sum) / double(std::max<size_t>(1, now.size()));
     }
+    if (name == "view_vs_mark") { // the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255
+        std::vector<uint8_t> now;
+        if (gViewMark.empty() || !renderLiveView(app_, now, app_.camera_, app_.renderSettings_, app_.renderer_) || now.size() != gViewMark.size())
+            return -1.0;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(gViewMark[i])));
+        return double(sum) / double(std::max<size_t>(1, now.size()));
+    }
+    // Strokes on the stroke thread (interactive_strokes on; AsyncStroke.cpp): the stroke now running places its dabs there,
+    // and the last one is still being placed (draining) or the thread is busy.
+    if (name == "stroke_async") return app_.asyncStroke_ ? 1.0 : 0.0;
+    if (name == "stroke_draining") return app_.strokeDraining() || app_.solverBusy() ? 1.0 : 0.0;
+    if (name == "background_dabs") return app_.backgroundDabs() ? 1.0 : 0.0;
     if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
@@ -1923,7 +1949,7 @@ enum class StepVerb { None,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
-    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, Print, Remember,
+    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
@@ -2020,6 +2046,8 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"expect_guide", StepVerb::ExpectGuide},
         {"dump_shortcuts", StepVerb::DumpShortcuts},
         {"snapshot", StepVerb::Snapshot},
+        {"interactive_strokes", StepVerb::InteractiveStrokes},
+        {"mark_view", StepVerb::MarkView},
         {"print", StepVerb::Print},
         {"remember", StepVerb::Remember},
         {"pen_stroke", StepVerb::PenStroke},
@@ -4013,6 +4041,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
             baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
+        });
+        break;
+    }
+    case StepVerb::InteractiveStrokes: { // interactive_strokes on|off: strokes run as in the window (queued dabs; the stroke thread on big meshes)
+        if (!need(1)) return false;
+        const bool on = w[1] != "off";
+        run([this, on] { app_.interactiveStrokes_ = on; });
+        break;
+    }
+    case StepVerb::MarkView: { // mark_view: remember the view as the GPU holds it now, for view_vs_mark
+        run([this] {
+            if (!renderLiveView(app_, gViewMark, app_.camera_, app_.renderSettings_, app_.renderer_)) gViewMark.clear();
         });
         break;
     }
