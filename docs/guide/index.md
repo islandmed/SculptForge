@@ -39,7 +39,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 
 8. [Sculpting and brushes](sculpting.md)
 9. [Brush Lab and sharing brushes](brush-lab.md)
-    - [Brush packs: seventy-one built-in brushes](brush-packs.md)
+    - [Brush packs: eighty-seven built-in brushes](brush-packs.md)
 10. [Masking](masking.md)
 11. [Face Groups and visibility](face-groups.md)
 12. [Selection sets and morph targets](selection-sets.md)

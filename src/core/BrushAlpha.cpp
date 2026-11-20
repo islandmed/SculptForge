@@ -2,13 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushAlpha.h"
 
+#include "core/BakeImage.h"
 #include "core/Commands.h"
+#include "core/CreatureSkin.h"
 #include "core/Sculpt.h"
+#include "core/ThreadPool.h"
+
+#include "tinyexr.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 namespace sf {
 
@@ -472,6 +484,157 @@ const Generated kGenerated[] = {
      }},
 };
 
+// Creature Skin (core/CreatureSkin.h): rows in parallel, then stretched to 0..1 between the 0.05% and 99.95% levels
+// (each generator shapes its relief; this sets the range, so a few stray pixels can't flatten the rest).
+// `ownThreads`: rows on threads of its own instead of the shared pool (a prefetch in the background must not take
+// the pool from a stroke, which would then run on one thread).
+BrushAlpha makeCreature(const CreatureAlpha& c, int n, int ownThreads = 0) {
+    BrushAlpha a;
+    a.name = c.name;
+    a.width = a.height = n;
+    a.values.resize(size_t(n) * size_t(n));
+    auto rows = [&](size_t y0, size_t y1, size_t step) {
+        for (size_t y = y0; y < y1; y += step)
+            for (int x = 0; x < n; ++x)
+                a.values[y * size_t(n) + size_t(x)] = c.height((float(x) + 0.5f) / float(n), (float(y) + 0.5f) / float(n));
+    };
+    if (ownThreads > 0) {
+        std::vector<std::thread> workers;
+        for (int t = 0; t < ownThreads; ++t) workers.emplace_back([&rows, t, ownThreads, n] { rows(size_t(t), size_t(n), size_t(ownThreads)); });
+        for (std::thread& w : workers) w.join();
+    } else {
+        poolFor(size_t(n), [&](size_t y0, size_t y1) { rows(y0, y1, 1); }, 8);
+    }
+    const auto [mn, mx] = std::minmax_element(a.values.begin(), a.values.end());
+    const float lo0 = *mn, span0 = std::max(*mx - *mn, 1e-6f);
+    constexpr int kBins = 4096;
+    std::vector<size_t> hist(kBins, 0);
+    for (float v : a.values) ++hist[size_t(std::min(int((v - lo0) / span0 * float(kBins)), kBins - 1))];
+    const size_t cut = a.values.size() / 2000;
+    int b0 = 0, b1 = kBins - 1;
+    for (size_t sum = 0; b0 < kBins - 1 && (sum += hist[size_t(b0)]) <= cut;) ++b0;
+    for (size_t sum = 0; b1 > b0 && (sum += hist[size_t(b1)]) <= cut;) --b1;
+    const float lo = lo0 + span0 * float(b0) / float(kBins), hi = lo0 + span0 * float(b1 + 1) / float(kBins);
+    for (float& v : a.values) v = std::clamp((v - lo) / std::max(hi - lo, 1e-6f), 0.0f, 1.0f);
+    return a;
+}
+
+int creatureIndex(const std::string& key) {
+    size_t n = 0;
+    const CreatureAlpha* all = creatureAlphas(n);
+    for (size_t i = 0; i < n; ++i)
+        if (lookupKey(all[i].name) == key) return int(i);
+    return -1;
+}
+
+// The full-size one, made once (the first brush that needs it pays about a tenth of a second on the pool).
+std::atomic<bool> gDeferCreature{false};
+std::atomic<uint64_t> gCreatureReady{0}; // one bit per Creature Skin alpha made at full size
+
+struct CreatureStore {
+    size_t count = 0;
+    const CreatureAlpha* all = creatureAlphas(count);
+    std::unique_ptr<std::once_flag[]> once{new std::once_flag[count]};
+    std::unique_ptr<std::shared_ptr<const BrushAlpha>[]> made{new std::shared_ptr<const BrushAlpha>[count]};
+};
+CreatureStore& creatureStore() {
+    static CreatureStore store;
+    return store;
+}
+
+const BrushAlpha& creatureFull(int i, int ownThreads = 0) {
+    CreatureStore& s = creatureStore();
+    std::call_once(s.once[size_t(i)], [&] {
+        s.made[size_t(i)] = std::make_shared<const BrushAlpha>(makeCreature(s.all[i], kCreatureSize, ownThreads));
+        gCreatureReady.fetch_or(uint64_t(1) << i);
+    });
+    return *s.made[size_t(i)];
+}
+
+// Background prefetches, joined at exit before the store goes (made after it, so destroyed first).
+struct Prefetches {
+    std::mutex mutex;
+    std::vector<std::thread> threads;
+    uint64_t started = 0; // one bit per Creature Skin alpha
+    ~Prefetches() {
+        for (std::thread& t : threads)
+            if (t.joinable()) t.join();
+    }
+};
+
+
+// Grey (luminance x alpha) planes from a file, at full precision: 16-bit PNG and OpenEXR (half or float, any
+// compression tinyexr reads) without an 8-bit step; other formats through Image. False with `error` when unreadable.
+bool loadGrey(const std::string& path, int& w, int& h, std::vector<float>& grey, std::string& error) {
+    std::ifstream f(std::filesystem::path(std::u8string(path.begin(), path.end())), std::ios::binary);
+    if (!f) {
+        error = "Cannot open " + path;
+        return false;
+    }
+    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    auto lum = [](float r, float g, float b) { return 0.2126f * r + 0.7152f * g + 0.0722f * b; };
+    if (bytes.size() >= 4 && IsEXRFromMemory(bytes.data(), bytes.size()) == TINYEXR_SUCCESS) {
+        EXRVersion version;
+        EXRHeader header;
+        InitEXRHeader(&header);
+        bool hasAlpha = false, single = false;
+        if (ParseEXRVersionFromMemory(&version, bytes.data(), bytes.size()) == TINYEXR_SUCCESS &&
+            ParseEXRHeaderFromMemory(&header, &version, bytes.data(), bytes.size(), nullptr) == TINYEXR_SUCCESS) {
+            single = header.num_channels == 1;
+            for (int c = 0; c < header.num_channels; ++c) hasAlpha |= std::string(header.channels[c].name) == "A";
+            FreeEXRHeader(&header);
+        }
+        float* rgba = nullptr;
+        const char* err = nullptr;
+        if (LoadEXRFromMemory(&rgba, &w, &h, bytes.data(), bytes.size(), &err) != TINYEXR_SUCCESS) {
+            error = std::string("Can't read the EXR: ") + (err ? err : "unknown error");
+            if (err) FreeEXRErrorMessage(err);
+            return false;
+        }
+        if (w <= 0 || h <= 0 || size_t(w) * size_t(h) > size_t(16384) * 16384) {
+            std::free(rgba);
+            error = "The EXR is empty or too large";
+            return false;
+        }
+        grey.resize(size_t(w) * size_t(h));
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const float* p = &rgba[i * 4];
+            const float a = (hasAlpha && !single) ? std::clamp(p[3], 0.0f, 1.0f) : 1.0f; // (one channel fills all four)
+            grey[i] = (single ? p[0] : lum(p[0], p[1], p[2])) * a;
+            if (!std::isfinite(grey[i])) grey[i] = 0.0f;
+        }
+        std::free(rgba);
+        // A height map in its own units (negative, or above 1): its lowest to 0 and highest to 1.
+        const auto [mn, mx] = std::minmax_element(grey.begin(), grey.end());
+        if (*mn < 0.0f || *mx > 1.0f) {
+            const float lo = *mn, span = std::max(*mx - *mn, 1e-12f);
+            for (float& v : grey) v = (v - lo) / span;
+        }
+        return true;
+    }
+    if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
+        std::vector<uint16_t> px;
+        int channels = 0;
+        if (!decodePng16(bytes.data(), bytes.size(), w, h, channels, px, error, 4)) return false;
+        grey.resize(size_t(w) * size_t(h));
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const uint16_t* p = &px[i * 4];
+            grey[i] = lum(p[0], p[1], p[2]) / 65535.0f * (float(p[3]) / 65535.0f);
+        }
+        return true;
+    }
+    Image img;
+    if (!Image::decode(bytes.data(), bytes.size(), img, error)) return false;
+    w = img.width;
+    h = img.height;
+    grey.resize(size_t(w) * size_t(h));
+    for (size_t i = 0; i < grey.size(); ++i) {
+        const uint8_t* p = &img.rgba[i * 4];
+        grey[i] = lum(p[0], p[1], p[2]) / 255.0f * (float(p[3]) / 255.0f);
+    }
+    return true;
+}
+
 } // namespace
 
 float BrushAlpha::sample(float u, float v) const {
@@ -530,6 +693,9 @@ const std::vector<BrushAlpha>& BrushAlpha::builtins() {
         std::vector<BrushAlpha> v{round(), square(), noise()};
         v.front().name = "Round";
         for (const Generated& g : kGenerated) v.push_back(g.make());
+        size_t n = 0;
+        const CreatureAlpha* creature = creatureAlphas(n);
+        for (size_t i = 0; i < n; ++i) v.push_back(makeCreature(creature[i], kCreaturePreview)); // (tiles only)
         return v;
     }();
     return all;
@@ -542,7 +708,73 @@ std::string BrushAlpha::builtinHelp(const std::string& name) {
     if (key == "noise") return "A noisy stamp for rough, organic texture.";
     for (const Generated& g : kGenerated)
         if (lookupKey(g.name) == key) return g.help;
+    size_t n = 0;
+    const CreatureAlpha* creature = creatureAlphas(n);
+    if (const int i = creatureIndex(key); i >= 0) return creature[i].help;
     return {};
+}
+
+void BrushAlpha::prefetch(const std::string& name) {
+    const int i = creatureIndex(lookupKey(name));
+    if (i < 0) return;
+    creatureStore();
+    static Prefetches pre;
+    std::lock_guard lock(pre.mutex);
+    if (pre.started & (uint64_t(1) << i)) return;
+    pre.started |= uint64_t(1) << i;
+    const int threads = std::max(2, int(std::thread::hardware_concurrency()) / 2);
+    pre.threads.emplace_back([i, threads] { creatureFull(i, threads); });
+}
+
+void BrushAlpha::setDeferCreature(bool defer) { gDeferCreature = defer; }
+
+std::shared_ptr<const BrushAlpha> BrushAlpha::shared(const BrushAlpha& a) {
+    if (!a.path.empty() || a.width != kCreatureSize || a.tiled()) return nullptr;
+    const int i = creatureIndex(lookupKey(a.name));
+    if (i < 0 || !(gCreatureReady.load() & (uint64_t(1) << i))) return nullptr;
+    const std::shared_ptr<const BrushAlpha>& made = creatureStore().made[size_t(i)];
+    if (made->values.size() != a.values.size()) return nullptr;
+    for (size_t k = 0; k < 64; ++k) // (a copy of it, not an edited one: a few samples are enough)
+        if (made->values[k * a.values.size() / 64] != a.values[k * a.values.size() / 64]) return nullptr;
+    return made;
+}
+
+bool BrushAlpha::finishCreature(BrushAlpha& a, bool wait) {
+    if (!a.pending) return false;
+    const int i = creatureIndex(lookupKey(a.name));
+    if (i < 0 || (!wait && !(gCreatureReady.load() & (uint64_t(1) << i)))) return false;
+    const BrushAlpha& full = creatureFull(i);
+    a.width = full.width;
+    a.height = full.height;
+    a.values = full.values; // (Tile and the rest stay as they are)
+    a.pending = false;
+    return true;
+}
+
+std::string BrushAlpha::builtinGroup(const std::string& name) {
+    return creatureIndex(lookupKey(name)) >= 0 ? "Creature Skin" : std::string();
+}
+
+std::string BrushAlpha::builtinName(const std::string& name) {
+    const std::string key = lookupKey(name);
+    if (key == "none" || key.empty()) return "Round";
+    for (const BrushAlpha& a : builtins())
+        if (lookupKey(a.name) == key) return a.name;
+    return {};
+}
+
+bool BrushAlpha::builtinPreview(const std::string& name, BrushAlpha& out) {
+    const std::string key = lookupKey(name);
+    if (key == "none" || key.empty()) {
+        out = round();
+        return true;
+    }
+    for (const BrushAlpha& a : builtins())
+        if (lookupKey(a.name) == key) {
+            out = a;
+            return true;
+        }
+    return false;
 }
 
 std::string BrushAlpha::builtinNames() {
@@ -557,12 +789,17 @@ bool BrushAlpha::builtin(const std::string& name, BrushAlpha& out) {
         out = round();
         return true;
     }
-    for (const BrushAlpha& a : builtins())
-        if (lookupKey(a.name) == key) {
-            out = a;
-            return true;
+    if (const int i = creatureIndex(key); i >= 0) {
+        if (gDeferCreature && !(gCreatureReady.load() & (uint64_t(1) << i))) { // the tile now, the full one soon
+            prefetch(name);
+            const bool ok = builtinPreview(name, out);
+            out.pending = ok;
+            return ok;
         }
-    return false;
+        out = creatureFull(i);
+        return true;
+    }
+    return builtinPreview(name, out);
 }
 
 bool BrushAlpha::builtinAt(const std::string& name, int size, BrushAlpha& out) {
@@ -574,6 +811,11 @@ bool BrushAlpha::builtinAt(const std::string& name, int size, BrushAlpha& out) {
             gGenerateSize = kBuiltinSize;
             return true;
         }
+    if (const int i = creatureIndex(key); i >= 0) {
+        size_t n = 0;
+        out = makeCreature(creatureAlphas(n)[i], std::clamp(size, 8, 4096));
+        return true;
+    }
     return builtin(name, out); // (Round, Square, Noise: as made)
 }
 
@@ -594,27 +836,55 @@ BrushAlpha BrushAlpha::fromImage(const Image& image, std::string name, bool inve
     return a;
 }
 
+bool BrushAlpha::fromFile(const std::string& path, std::string name, bool invert, BrushAlpha& out, std::string& error,
+                          int maxSide) {
+    int w = 0, h = 0;
+    std::vector<float> grey;
+    if (!loadGrey(path, w, h, grey, error)) return false;
+    // Box-filtered down to maxSide, in floats (no 8-bit step).
+    const int side = std::max(w, h), cap = std::clamp(maxSide, 8, 8192);
+    const int k = side > cap ? (side + cap - 1) / cap : 1;
+    BrushAlpha a;
+    a.name = std::move(name);
+    a.width = std::max(1, w / k);
+    a.height = std::max(1, h / k);
+    a.values.resize(size_t(a.width) * size_t(a.height));
+    for (int y = 0; y < a.height; ++y)
+        for (int x = 0; x < a.width; ++x) {
+            float sum = 0.0f;
+            int cnt = 0;
+            for (int yy = y * k; yy < std::min(h, (y + 1) * k); ++yy)
+                for (int xx = x * k; xx < std::min(w, (x + 1) * k); ++xx, ++cnt) sum += grey[size_t(yy) * size_t(w) + size_t(xx)];
+            const float l = std::clamp(sum / float(std::max(cnt, 1)), 0.0f, 1.0f);
+            a.values[size_t(y) * size_t(a.width) + size_t(x)] = invert ? 1.0f - l : l;
+        }
+    a.path = path;
+    a.inverted = invert;
+    out = std::move(a);
+    return true;
+}
+
 void registerBrushCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add({"brush_set_alpha",
                   "Set the brush alpha (grayscale stamp shaping the falloff of every brush): a built-in "
                   "(round = none, square, noise, pores, cracks, scales, rivets, stitches, fabric weave, bark, rock "
-                  "strata, wrinkles, skin folds, hair strands, dot grid) or a grayscale image file.",
+                  "strata, wrinkles, skin folds, hair strands, dot grid, the Creature Skin set: elephant hide, snake scales, "
+                  "pores fine, nose pores open, skin crosshatch...) or a grayscale image file.",
                   {{"name", T::String, "Built-in alpha: round, square, noise, pores, cracks, scales, rivets, stitches, "
                                        "fabric_weave, bark, rock_strata, wrinkles, skin_folds, hair_strands or dot_grid.", false},
-                   {"path", T::String, "Image file (png, jpg, ...) used as the alpha; overrides name.", false},
+                   {"path", T::String, "Image file (png, jpg, exr, ...; 16-bit PNG and EXR keep their precision) used as the alpha; overrides name.", false},
                    {"invert", T::Bool, "Use the image's negative (white = no effect).", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const std::string path = argString(a, "path");
                       if (!path.empty()) {
-                          Image img;
                           std::string err;
-                          if (!Image::load(path, img, err)) return {false, err};
                           auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
-                          doc.brushAlpha = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()),
-                                                                 argBool(a, "invert", false));
-                          doc.brushAlpha.path = path;
-                          doc.brushAlpha.inverted = argBool(a, "invert", false);
+                          BrushAlpha loaded;
+                          if (!BrushAlpha::fromFile(path, std::string(stem.begin(), stem.end()), argBool(a, "invert", false),
+                                                    loaded, err))
+                              return {false, err};
+                          doc.brushAlpha = std::move(loaded);
                           return {true, "Alpha '" + doc.brushAlpha.name + "' (" + std::to_string(doc.brushAlpha.width) +
                                             "x" + std::to_string(doc.brushAlpha.height) + ")"};
                       }

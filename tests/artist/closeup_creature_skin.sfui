@@ -1,0 +1,364 @@
+# Creature Skin close-ups (gh#228; not a ctest case: artist-qa and the branch's before/after shots run it): the lion head
+# at micro level 3, turned so the middle of the view is on its cheek. For each pair, one stroke of the classic brush
+# through the middle (before), undo, the same stroke with the Creature Skin brush (after); a wide shot and a close-up.
+# Then each of the other pack brushes once on its own. Every stroke must move the micro level.
+run ui_look look=classic layout=classic
+run open path=$SCRIPT_DIR/../../assets/demo/lion-head.glb
+run micro_divide level=3
+wait_idle 300
+camera 28 -8
+key f
+wait_idle 30
+print triangles
+zoom 2.5
+wait_idle 30
+hover_window 0.97 0.5
+shot cs00-start
+
+# Skin Pores (before) / Pores Fine (after)
+run brush_use name="Skin Pores"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs01-pores-before
+zoom 3
+wait_idle 30
+shot cs01-pores-before-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Pores Fine"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs01-pores-after
+zoom 3
+wait_idle 30
+shot cs01-pores-after-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+
+# Deep Pores (before) / Nose Pores Open (after)
+run brush_use name="Deep Pores"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs02-nose-before
+zoom 3
+wait_idle 30
+shot cs02-nose-before-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Nose Pores Open"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs02-nose-after
+zoom 3
+wait_idle 30
+shot cs02-nose-after-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+
+# Reptile Scales (before) / Snake Scales (after)
+run brush_use name="Reptile Scales"
+brush_size 80
+snapshot
+drag_path 0.50 0.42 0.50 0.50 0.50 0.58 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs03-scales-before
+zoom 3
+wait_idle 30
+shot cs03-scales-before-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Snake Skin"
+brush_size 80
+snapshot
+drag_path 0.50 0.42 0.50 0.50 0.50 0.58 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs03-scales-after
+zoom 3
+wait_idle 30
+shot cs03-scales-after-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+
+# Leather Hide (before) / Elephant Hide (after)
+run brush_use name="Leather Hide"
+brush_size 80
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs04-hide-before
+zoom 3
+wait_idle 30
+shot cs04-hide-before-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Elephant Hide"
+brush_size 80
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs04-hide-after
+zoom 3
+wait_idle 30
+shot cs04-hide-after-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+
+# Crow's Feet (before) / Skin Fine Lines (after)
+run brush_use name="Crow's Feet"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs05-lines-before
+zoom 3
+wait_idle 30
+shot cs05-lines-before-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Skin Fine Lines"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs05-lines-after
+zoom 3
+wait_idle 30
+shot cs05-lines-after-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+
+# The rest of the pack, one stroke each in the same place (undone after its shots).
+run brush_use name="Dinosaur Hide"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs10-dinosaur-hide
+zoom 3
+wait_idle 30
+shot cs10-dinosaur-hide-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Hide Folds"
+brush_size 70
+snapshot
+drag_path 0.50 0.42 0.50 0.50 0.50 0.58 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs11-hide-folds
+zoom 3
+wait_idle 30
+shot cs11-hide-folds-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Overlap Scales"
+brush_size 70
+snapshot
+drag_path 0.50 0.42 0.50 0.50 0.50 0.58 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs12-overlap-scales
+zoom 3
+wait_idle 30
+shot cs12-overlap-scales-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Pebble Scales"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs13-pebble-scales
+zoom 3
+wait_idle 30
+shot cs13-pebble-scales-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Scute Plates"
+brush_size 70
+snapshot
+drag_path 0.50 0.42 0.50 0.50 0.50 0.58 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs14-scute-plates
+zoom 3
+wait_idle 30
+shot cs14-scute-plates-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Pores Clustered"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs15-pores-clustered
+zoom 3
+wait_idle 30
+shot cs15-pores-clustered-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Pores Stretched"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs16-pores-stretched
+zoom 3
+wait_idle 30
+shot cs16-pores-stretched-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Nose Pores Dense"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs17-nose-pores-dense
+zoom 3
+wait_idle 30
+shot cs17-nose-pores-dense-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Nose Pores Furrowed"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs18-nose-pores-furrowed
+zoom 3
+wait_idle 30
+shot cs18-nose-pores-furrowed-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Skin Crosshatch"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs19-skin-crosshatch
+zoom 3
+wait_idle 30
+shot cs19-skin-crosshatch-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30
+run brush_use name="Skin Micro Grain"
+brush_size 70
+snapshot
+drag_path 0.44 0.50 0.50 0.50 0.56 0.50 S=1.2
+wait_idle 60
+print longest_frame_ms
+expect_value micro_moved > 0
+hover_window 0.97 0.5
+shot cs20-skin-micro-grain
+zoom 3
+wait_idle 30
+shot cs20-skin-micro-grain-close
+zoom 0.3333333
+wait_idle 30
+key ctrl+z
+wait_idle 30

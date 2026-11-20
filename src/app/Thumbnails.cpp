@@ -367,16 +367,30 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
     const Stat& s = stat(path);
     if (!s.exists) return ImTextureID(0);
     const bool image = isImageFile(path), project = isProjectFile(path);
-    const std::string kind = project ? "project" : image ? "image" : "mesh";
+    const bool exr = !image && isAlphaImageFile(path); // (an EXR alpha: its grey, from BrushAlpha's reader)
+    const std::string kind = project ? "project" : image || exr ? "image" : "mesh";
     const std::string key = fileThumbnailKey(kind, path, s.size, s.mtime, kPixels);
     return request(
         key,
-        [path, image, project] {
+        [path, image, project, exr] {
             Result r;
             std::string err;
             if (image) {
                 Image full;
                 if (Image::load(path, full, err)) r.image = full.downscaled(kPixels);
+                return r;
+            }
+            if (exr) {
+                BrushAlpha a;
+                if (!BrushAlpha::fromFile(path, "", false, a, err, kPixels)) return r;
+                r.image.width = a.width;
+                r.image.height = a.height;
+                r.image.rgba.resize(a.values.size() * 4);
+                for (size_t i = 0; i < a.values.size(); ++i) {
+                    const uint8_t g = uint8_t(std::lround(a.values[i] * 255.0f));
+                    r.image.rgba[i * 4] = r.image.rgba[i * 4 + 1] = r.image.rgba[i * 4 + 2] = g;
+                    r.image.rgba[i * 4 + 3] = 255;
+                }
                 return r;
             }
             if (project && loadProjectThumbnail(path, r.image, err)) return r;
@@ -392,7 +406,7 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
 void ThumbnailCache::refresh(const std::string& path) {
     auto s = stats_.find(path);
     if (s == stats_.end()) return;
-    const std::string kind = isProjectFile(path) ? "project" : isImageFile(path) ? "image" : "mesh";
+    const std::string kind = isProjectFile(path) ? "project" : isAlphaImageFile(path) ? "image" : "mesh";
     const std::string key = fileThumbnailKey(kind, path, s->second.size, s->second.mtime, kPixels);
     if (!cacheDir_.empty()) {
         std::error_code ec;

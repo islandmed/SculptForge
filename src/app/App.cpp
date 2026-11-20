@@ -380,6 +380,7 @@ bool App::init(const AppOptions& options) {
             keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
         }
     });
+    BrushAlpha::setDeferCreature(true); // (Creature Skin alphas are made in the background: a pick never stalls a frame)
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
@@ -2875,6 +2876,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     fusedDabs_ = 64.0;
     if (drape_) finishDrape(true); // (PanelDrape.cpp: the stroke sculpts the kept result)
     if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
+    BrushAlpha::finishCreature(doc_.brushAlpha, true); // (picked a moment ago: the full alpha, never its tile)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2902,7 +2904,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     // the stroke's own copies of the recipe and the alpha, which the solver thread reads (DabSettings).
     asyncStroke_ = asyncStrokeAllowed();
     strokeRecipe_ = asyncStroke_ && recipe ? std::make_shared<const BrushRecipe>(*recipe) : nullptr;
-    strokeAlpha_ = asyncStroke_ && !doc_.brushAlpha.empty() ? std::make_shared<const BrushAlpha>(doc_.brushAlpha) : nullptr;
+    strokeAlpha_ = nullptr;
+    if (asyncStroke_ && !doc_.brushAlpha.empty()) // (a Creature Skin alpha is shared, not copied: 16 MB)
+        if (!(strokeAlpha_ = BrushAlpha::shared(doc_.brushAlpha))) strokeAlpha_ = std::make_shared<const BrushAlpha>(doc_.brushAlpha);
     pointerLatest_ = glm::vec2(x, y);
     pointerLatestAt_ = pointerEventSeconds();
     penPredictor_.reset(pointerLatest_, pointerLatestAt_);
@@ -3818,6 +3822,7 @@ void App::drawUi() {
     drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
+    BrushAlpha::finishCreature(doc_.brushAlpha, false); // a Creature Skin alpha made in the background since the pick
     pollStencilFile();
     pollReferenceFiles();
     syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke

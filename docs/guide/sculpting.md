@@ -538,10 +538,39 @@ levels](micro-levels.md) too, with every stroke type including Drag Stamp.
 All of them are made by SculptForge itself the first time they're needed (no image files are downloaded or
 shipped). They show in the alpha picker and in the Library's **Alpha** tab (`brush_set_alpha name=cracks`).
 
+### Creature Skin alphas
+
+Sixteen high-resolution alphas (2048 x 2048) for close-up creature and skin detail on [micro levels](micro-levels.md).
+Each repeats without a seam, so **Tile** makes the pattern finer without a visible join. They have their own section
+when the alpha picker is sorted by pack, and each has a ready brush in the **Creature Skin** [brush pack](brush-packs.md).
+
+| Alpha | What it does |
+|---|---|
+| **Elephant Hide** | Thick hide cut by a deep net of creases with finer ones between, for elephants and old skin. |
+| **Hide Folds** | Rings of heavy folds with short cross creases, for trunks, necks and leg joints. |
+| **Dinosaur Hide** | Pebbled hide with bigger feature scales and deep, wandering folds, for dinosaurs and beasts. |
+| **Snake Scales** | Overlapping keeled diamond scales in offset rows (Follow stroke, draw head to tail). |
+| **Overlap Scales** | Rounded overlapping scales with fine growth rings, for fish and dragons (Follow stroke). |
+| **Pebble Scales** | Small domed scales packed together with larger rosettes, for lizards and geckos. |
+| **Scute Plates** | Rows of square keeled plates with pitted tops, for crocodiles and armoured backs. |
+| **Pores Fine** | Dense, tiny pores over fine skin texture, for cheeks and close-ups. |
+| **Pores Clustered** | Pores of two sizes gathered in patches, for natural, uneven skin. |
+| **Pores Stretched** | Pores drawn out sideways with faint stretch lines, for foreheads, necks and tight skin. |
+| **Nose Pores Open** | Large, deep, steep-walled pores with small ones between, for the nose and chin. |
+| **Nose Pores Dense** | Close-packed round pores, for the tip and wings of the nose. |
+| **Nose Pores Furrowed** | Pores joined by fine furrows, for weathered noses and cheeks. |
+| **Skin Crosshatch** | Fine furrows crossing in a diamond net, for the backs of hands and aged skin. |
+| **Skin Fine Lines** | Fine, near-parallel wrinkle lines that break and merge, for eye corners and knuckles. |
+| **Skin Micro Grain** | A soft stipple of tiny bumps, the last pass of skin texture. |
+
+Each is made once, the first time a brush uses it (a fraction of a second), and kept until you quit.
+
 To use your own image:
 
 1. Click **Load image...** in the alpha picker or **Sculpt > Alpha**.
-2. Choose a PNG, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale.
+2. Choose a PNG, OpenEXR, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale. 16-bit PNGs and EXRs
+   (half or full float) keep their full precision, so smooth height maps don't step; an EXR whose values run outside
+   0 to 1 is stretched to its own lowest and highest values. Images are used at up to 2048 pixels a side.
 3. Turn on **Invert loaded image** *before* loading if your image is white where it should have no effect.
 
 Images you keep in the `Alphas` folder of your Library library (Documents/SculptForge/Alphas by default)

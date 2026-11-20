@@ -57,7 +57,7 @@ constexpr float kHueStripW = 10.0f; // wide enough to read as a control next to 
 constexpr float kSwatchH = 30.0f;  // the main and second colour: the ones in use, clearly the biggest cells (Fenix: 18 px was too small)
 constexpr float kRecentMin = 20.0f; // a recent colour cell is never smaller than this (logical px); the row wraps instead
 
-const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
+const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;exr;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
 
 std::string lower(std::string s) {
     for (auto& c : s)
@@ -765,6 +765,8 @@ void drawBrushGrid(App& app, GridMode mode) {
                              : b.kind == BrushItem::Kind::File   ? "Library file - pick to load it"
                              : b.kind == BrushItem::Kind::Guides ? "Tool > Geometry > Quad Remesh"
                                                                  : "Built-in brush";
+        if (b.kind == BrushItem::Kind::Recipe && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            BrushAlpha::prefetch(app.doc_.brushes[size_t(b.index)].alpha); // (a Creature Skin alpha, made by the click)
         quickInfo(tex, glyph, b.name, b.description, footer);
         ui::HelpText(b.name.c_str(), nullptr, b.description.c_str(), "Brush");
         if (ImGui::BeginPopupContextItem()) {
@@ -975,7 +977,8 @@ void drawAlphaGrid(App& app, GridMode mode) {
     std::vector<Entry> entries;
     for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
         const std::string& name = builtinAlpha(i).name;
-        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", "", "Built-in", i});
+        const std::string group = BrushAlpha::builtinGroup(name); // (the Creature Skin set sorts as its own pack)
+        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", group, group.empty() ? "Built-in" : group, i});
     }
     const bool custom = !current.empty() && !current.path.empty();
     if (custom)
@@ -984,7 +987,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
     if (!app.library_.user.empty()) {
         const std::string dir = app.library_.user + "/Alphas";
         if (const auto* list = app.libraryScanner_.get(dir, "alpha", [](const std::string& p) {
-                return isImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
+                return isAlphaImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
             }))
             for (const auto& e : *list)
                 if (e.kind == AssetKind::AlphaFile && !(custom && lower(e.name) == lower(current.name)))
@@ -1003,7 +1006,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
         kept.push_back(i);
         // Round is "no alpha": it stays first in every order (the pack order puts it with the built-ins).
         const Entry& e = entries[i];
-        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? std::string() : "\x01" + e.group,
+        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? e.pack : "\x01" + e.group,
                       recentRank(s.recentAlphas, lower(e.name))};
         if (e.builtin == 0) k.name = std::string(1, '\0');
         keys.push_back(std::move(k));
@@ -1049,6 +1052,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
             else if (e.kind != Entry::Kind::Current)
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
         }
+        if (e.kind == Entry::Kind::Builtin && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) BrushAlpha::prefetch(e.name);
         quickInfo(tex, glyph, e.name, e.help, e.path);
         ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
         if (ImGui::BeginPopupContextItem(("##alphapoolmenu" + id).c_str())) { // the alpha pool (core/AlphaOptions.h)

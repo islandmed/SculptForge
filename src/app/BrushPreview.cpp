@@ -169,13 +169,11 @@ bool makeAlphaLook(const BrushToolSettings& s, AlphaLook& out) {
     out.stroke = s.stroke;
     out.options = s.alphaOptions;
     if (s.alphaPath.empty()) {
-        if (!BrushAlpha::builtin(s.alphaName, out.alpha) || out.alpha.empty()) return false;
+        if (!BrushAlpha::builtinPreview(s.alphaName, out.alpha) || out.alpha.empty()) return false;
     } else {
-        Image img;
         std::string err;
-        if (!Image::load(s.alphaPath, img, err)) return false;
-        out.alpha = BrushAlpha::fromImage(img, s.alphaName, s.alphaInvert);
-        if (out.alpha.empty()) return false;
+        if (!BrushAlpha::fromFile(s.alphaPath, s.alphaName, s.alphaInvert, out.alpha, err, 512) || out.alpha.empty())
+            return false;
     }
     softenForPreview(out.alpha);
     return true;
@@ -229,7 +227,7 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type, co
         return sceneMesh(d);
     }
     if (recipe) {
-        if (!recipe->alpha.empty()) BrushAlpha::builtin(recipe->alpha, d.brushAlpha); // (as its first pick has)
+        if (!recipe->alpha.empty()) BrushAlpha::builtinPreview(recipe->alpha, d.brushAlpha); // (as its first pick has)
         // A textured brush (alpha or pattern) strokes wider, so its texture reads at thumbnail size.
         const bool textured = !recipe->alpha.empty() || recipe->pattern != BrushRecipe::Pattern::None;
         // A crisp flatten only cuts: its mark is the top of the ball under the plane, so it strokes wider too.

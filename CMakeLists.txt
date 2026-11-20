@@ -138,6 +138,7 @@ add_library(sculptforge_core STATIC
   src/core/CloseHoles.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
+  src/core/CreatureSkin.cpp
   src/core/Stencil.cpp
   src/core/Reference.cpp
   src/core/Stroke.cpp

@@ -101,6 +101,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     }
     const glm::vec3 view = stroke.view / viewLen;
     doc.syncBvh();
+    BrushAlpha::finishCreature(doc.brushAlpha, true); // (a Creature Skin alpha still being made: wait for it)
 
     const AABB box = mesh.bounds();
     const float diag = std::max(glm::length(box.extent()), 1e-4f);

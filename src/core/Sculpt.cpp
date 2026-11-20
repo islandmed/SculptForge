@@ -601,7 +601,7 @@ void Sculptor::inkHeader(bool maskBrush, const BrushAlpha* alpha, int pattern, f
         if (alpha) { // (a snapshot: the brush's alpha may change after the stroke)
             if (!inkAlpha_ || inkAlpha_->width != alpha->width || inkAlpha_->height != alpha->height || inkAlpha_->tileX != alpha->tileX ||
                 inkAlpha_->tileY != alpha->tileY || inkAlpha_->values != alpha->values)
-                inkAlpha_ = std::make_shared<const BrushAlpha>(*alpha);
+                if (!(inkAlpha_ = BrushAlpha::shared(*alpha))) inkAlpha_ = std::make_shared<const BrushAlpha>(*alpha);
             ink_.alpha = inkAlpha_;
         }
         return;

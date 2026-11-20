@@ -182,8 +182,8 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["penPressureSize"].isString()) pressureSize = penPressureFromId(j["penPressureSize"].asString());
     if (j["penPressureStrength"].isString()) pressureStrength = penPressureFromId(j["penPressureStrength"].asString());
     if (j["alpha"].isString()) {
-        BrushAlpha a;
-        alpha = BrushAlpha::builtin(j["alpha"].asString(), a) && !a.empty() ? a.name : std::string();
+        alpha = BrushAlpha::builtinName(j["alpha"].asString()); // (no stroke-size alpha made just to read a file)
+        if (alpha == "Round") alpha.clear();
     }
     for (const auto& p : recipeParams()) {
         const Json& v = j[p.key];
