@@ -362,3 +362,46 @@ TEST(alpha_file_exr_edges) {
     CHECK(c.values[size_t(c.width) - 1] > 0.99f); // the last column is its own box, kept
     std::filesystem::remove(png);
 }
+
+// The promise behind the loader edges, on the dense sphere: a negative, partly transparent EXR height map as a carving
+// alpha only carves (no vertex rises), the transparent part of the stamp moves nothing, and nothing goes NaN or flips.
+TEST(exr_alpha_carve_invariant) {
+    const int n = 128;
+    std::vector<float> rgba(size_t(n) * n * 4);
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            float* p = &rgba[(size_t(y) * n + size_t(x)) * 4];
+            const float v = -2.0f + 1.5f * std::sin(float(x) * 0.3f) * std::cos(float(y) * 0.3f); // -3.5 .. -0.5
+            p[0] = p[1] = p[2] = v;
+            p[3] = x < n / 2 ? 0.0f : 1.0f; // the left half of the stamp transparent
+        }
+    const std::string path = tempPath("sf_alpha_carve.exr");
+    const char* err = nullptr;
+    CHECK(SaveEXR(rgba.data(), n, n, 4, 0, path.c_str(), &err) == 0);
+    Document d = denseSphere();
+    std::string error;
+    CHECK(BrushAlpha::fromFile(path, "carve", false, d.brushAlpha, error));
+    std::filesystem::remove(path);
+    const std::vector<glm::vec3> before = d.mesh.positions, normals = d.mesh.normals;
+    BrushRecipe r; // a carving tip, as the pore brushes are
+    r.depth = -0.5f;
+    r.spacing = 0.3f;
+    PathStroke s;
+    s.points = {glm::vec3(0.0f, -0.1f, 1.2f), glm::vec3(0.0f, 0.1f, 1.2f)}; // straight up the view: the alpha upright
+    s.radius = 0.12f;
+    s.strength = 0.6f;
+    s.symmetry = Symmetry{false, false, false};
+    CHECK(strokePath(d, &r, BrushType::Standard, s, error) > 0);
+    const float edge = meanEdge(d.mesh);
+    const float rise = maxRise(before, d.mesh, normals), sink = maxSink(before, d.mesh, normals);
+    std::printf("  EXR carve: sink %.2g rise %.2g (edge %.2g)\n", sink, rise, edge);
+    CHECK(sink > 0.05f * edge);  // it carved
+    CHECK(rise < 0.02f * edge);  // and raised nothing
+    CHECK(nonFinite(d.mesh) == 0 && flippedFaces(before, d.mesh) == 0);
+    // The transparent half (screen left of the stroke, x < -0.02 here) stays where it was.
+    float leftMoved = 0.0f;
+    for (size_t v = 0; v < before.size(); ++v)
+        if (before[v].x < -0.02f && before[v].z > 0.8f) leftMoved = std::max(leftMoved, glm::distance(before[v], d.mesh.positions[v]));
+    std::printf("  transparent half moved at most %.2g\n", leftMoved);
+    CHECK(leftMoved < 0.02f * edge);
+}
