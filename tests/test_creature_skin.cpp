@@ -90,15 +90,19 @@ TEST(creature_skin_alphas_full_size_made_once) {
     CHECK(BrushAlpha::builtin(all[count - 1].name, fetched));
     CHECK(BrushAlpha::builtinAt(all[count - 1].name, kCreatureSize, direct));
     CHECK(fetched.values == direct.values);
+    // Every alpha's relief at 512 px (the range and pattern checks below hold at any size), four at full size: one of
+    // each kind, Elephant Hide the slowest to make (all sixteen at 2048 took 24 s on a loaded test machine).
     double slowest = 0.0;
     std::string slowestName;
     for (size_t i = 0; i < count; ++i) {
+        const std::string n = all[i].name;
+        const bool full = n == "Elephant Hide" || n == "Snake Scales" || n == "Pores Fine" || n == "Skin Micro Grain";
         const auto t0 = std::chrono::steady_clock::now();
         BrushAlpha a;
-        CHECK(BrushAlpha::builtin(all[i].name, a));
+        CHECK(full ? BrushAlpha::builtin(n, a) : BrushAlpha::builtinAt(n, 512, a));
         const double first = msSince(t0);
-        if (first > slowest) slowest = first, slowestName = all[i].name;
-        CHECK(a.width == 2048 && a.height == 2048 && a.name == all[i].name);
+        if (full && first > slowest) slowest = first, slowestName = n;
+        CHECK(a.width == (full ? 2048 : 512) && a.height == a.width && a.name == n);
         double sum = 0.0;
         float lo = 1.0f, hi = 0.0f;
         for (float v : a.values) {
@@ -110,7 +114,8 @@ TEST(creature_skin_alphas_full_size_made_once) {
         CHECK(lo >= 0.0f && hi <= 1.0f);
         CHECK(hi > 0.95f && lo < 0.05f);  // the whole range: a full-strength stamp
         CHECK(mean > 0.05 && mean < 0.85); // a pattern, not a flat plate
-        CHECK(levels(a.values) > 4096);    // smooth relief, finer than 16-bit images' 8-bit cousins
+        CHECK(levels(a.values) > (full ? 4096u : 1024u)); // smooth relief, far past an 8-bit image's 256 levels
+        if (!full) continue;
         // Kept: the second time is a copy, not a new one.
         const auto t1 = std::chrono::steady_clock::now();
         BrushAlpha again;
