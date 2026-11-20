@@ -27,7 +27,7 @@ inline constexpr const char* kVerifyUrl = "https://github.com/login/device"; // 
 inline constexpr const char* kReleasesUrl = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases?per_page=20";
 inline constexpr const char* kUserUrl = "https://api.github.com/user";
 inline constexpr const char* kInvitationsApiUrl = "https://api.github.com/user/repository_invitations?per_page=100";
-inline constexpr const char* kInvitationsPage = "https://github.com/sculptforge/sculptforge-insiders/invitations"; // opened by the app
+inline constexpr const char* kInvitationsPage = "https://github.com/orgs/sculptforge/invitation"; // opened by the app (the organization invite: members join the org, not the repo)
 inline constexpr const char* kRepoFullName = "sculptforge/sculptforge-insiders";
 inline constexpr const char* kAssetUrlPrefix = "https://api.github.com/repos/sculptforge/sculptforge-insiders/releases/assets/";
 inline constexpr const char* kKeychainAccount = "member-builds"; // (core/Keychain.h)

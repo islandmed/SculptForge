@@ -713,7 +713,7 @@ TEST(member_sign_in_outcomes) {
         const SignInOutcome o = runSignIn(g.io());
         CHECK(o.result == SignInResult::InvitePending && signInMessage(o).find("hameron") != std::string::npos &&
               signInMessage(o).find("isn't accepted yet") != std::string::npos);
-        CHECK(std::string(kInvitationsPage) == "https://github.com/sculptforge/sculptforge-insiders/invitations");
+        CHECK(std::string(kInvitationsPage) == "https://github.com/orgs/sculptforge/invitation");
     }
     { // the login is unknown (the user call failed): the message still reads
         FakeGitHub g;
