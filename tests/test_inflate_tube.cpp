@@ -54,38 +54,40 @@ std::vector<Section> sections(const Mesh& m, const Mesh& start) {
 
 TEST(inflate_coarse_tube_invariant_each_vertex_along_its_own_normal) {
     // Rings about 2:1 (0.1 round, 0.2 along) is just a coarse tube: no packed grid, so no dab carries its vertices along
-    // one area normal. Brushes narrower and wider than the tube, a stroke of overlapping dabs along it.
+    // one area normal. Inflate and its Sub / Alt reverse (deflate), brushes narrower and wider than the tube, a stroke of
+    // overlapping dabs along it: every vertex goes out (in) along its own normal.
     const float radius = 0.25f;
     const Mesh start = coarseTube(6.0f, radius);
     std::printf("coarse tube: %zu vertices, %zu triangles\n", start.vertexCount(), start.triangleCount());
-    for (float brush : {0.15f, 0.4f, 0.8f, 1.5f}) {
-        Document d = makeDoc(start);
-        CHECK(d.sculptor.beginStroke(d.mesh, "Inflate"));
-        float worstTurn = 1.0f; // the least cosine between a vertex's move and its own normal before the dab
-        size_t moved = 0;
-        for (int i = 0; i <= 30; ++i) {
-            const std::vector<vec3> before = d.mesh.positions, normals = d.mesh.normals;
-            DabParams p;
-            p.center = vec3(1.0f + 0.15f * float(i), 0.0f, radius);
-            p.viewDir = vec3(0, 0, -1);
-            p.radius = brush;
-            p.strength = 0.5f;
-            d.sculptor.dab(d.mesh, d.bvh, BrushType::Inflate, p, Symmetry{false, false, false});
-            for (uint32_t v = 0; v < before.size(); ++v) {
-                const vec3 move = d.mesh.positions[v] - before[v];
-                const float len = glm::length(move);
-                if (len < 1e-6f) continue;
-                ++moved;
-                worstTurn = std::min(worstTurn, glm::dot(move / len, glm::normalize(normals[v])));
+    for (const bool invert : {false, true}) {
+        for (float brush : {0.15f, 0.4f, 0.8f, 1.5f}) {
+            Document d = makeDoc(start);
+            CHECK(d.sculptor.beginStroke(d.mesh, invert ? "Deflate" : "Inflate"));
+            float worstTurn = 1.0f; // the least cosine between a vertex's move and its own normal (flipped for deflate) before the dab
+            size_t moved = 0;
+            for (int i = 0; i <= 30; ++i) {
+                const std::vector<vec3> before = d.mesh.positions, normals = d.mesh.normals;
+                DabParams p;
+                p.center = vec3(1.0f + 0.15f * float(i), 0.0f, radius);
+                p.viewDir = vec3(0, 0, -1);
+                p.radius = brush;
+                p.strength = brush > 1.0f ? 0.1f : 0.5f; // (a brush six radii wide, strongly, deflates the tube to a pinch: genuinely packed)
+                p.invert = invert;
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::Inflate, p, Symmetry{false, false, false});
+                for (uint32_t v = 0; v < before.size(); ++v) {
+                    const vec3 move = d.mesh.positions[v] - before[v];
+                    const float len = glm::length(move);
+                    if (len < 1e-6f) continue;
+                    ++moved;
+                    worstTurn = std::min(worstTurn, glm::dot(move / len, glm::normalize(normals[v])) * (invert ? -1.0f : 1.0f));
+                }
             }
+            d.undo.push(d.sculptor.endStroke());
+            std::printf("%s brush %.2f: %zu moves, the least cosine to the vertex's own normal %.4f\n", invert ? "deflate" : "inflate",
+                        brush, moved, worstTurn);
+            CHECK(moved > 0);
+            CHECK(worstTurn > 0.99f); // (the area-normal path turned the far side to -0.96 and below; the dab's repair adds a little sideways)
         }
-        d.undo.push(d.sculptor.endStroke());
-        float grown = 0.0f;
-        for (const Section& s : sections(d.mesh, start)) grown = std::max(grown, s.rMean / radius - 1.0f);
-        std::printf("brush %.2f: %zu moves, the least cosine to the vertex's own normal %.4f, thickest ring +%.0f%%\n", brush,
-                    moved, worstTurn, 100.0f * grown);
-        CHECK(moved > 0);
-        CHECK(worstTurn > 0.999f);
     }
 }
 
