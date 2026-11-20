@@ -210,6 +210,9 @@ straight stroke lays row on row; the pore and grain brushes turn each dab so no 
 | **Skin Micro Grain** | A soft stipple of tiny bumps, the last pass of skin texture. | Skin Micro Grain |
 
 For finer detail than a brush gives at your size, raise **Sculpt > Alpha > Tile**: the alphas repeat without a seam.
+Pressure sets the depth, as with the other skin brushes. At micro level 3 the scale, plate and fold brushes (the ones
+that follow the stroke) are faint below half pressure on flat areas: press harder there, or work at micro level 4,
+where every brush in the pack stays crisp.
 
 ## New alphas
 
