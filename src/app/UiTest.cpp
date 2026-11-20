@@ -115,6 +115,9 @@
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
 //                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
+//                            model_screen_x / model_screen_y (px of the scene's centre from the canvas's top-left),
+//                            last_stroke_x / last_stroke_y (window px of where the last stroke landed; -1: none),
+//                            last_stroke_off_centre_px (the same from the free area's middle; -1: none),
 //                            model_side_clear (px between the model's projected box and the 3D view's nearer side, < 0: cut off),
 //                            welcome_open (the first-run welcome shown), welcome_outside_px (how far its window sticks out of
 //                            the screen, 0: inside; a phone screen cut its X and Close off), welcome_overflow_px (how far its
@@ -1544,6 +1547,34 @@ double Demo::query(const std::string& name, bool& known) const {
             bottom = std::max(bottom, y);
         }
         return name == "model_top_clear" ? double(top - (c.y + area.y * c.h)) : double(c.y + area.w * c.h - bottom);
+    }
+    // Where the scene's bounding-box centre is on the screen, px from the canvas's top-left (the view turned about the
+    // pointer: how far it swings).
+    if (name == "model_screen_x" || name == "model_screen_y") {
+        const auto c = app_.canvasRect();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::vec4 h = app_.camera_.projection() * app_.camera_.view() * glm::vec4(b.center(), 1.0f);
+        if (h.w <= 0.0f) return -1e9;
+        return name == "model_screen_x" ? double((h.x / h.w * 0.5f + 0.5f) * c.w) : double((1.0f - h.y / h.w) * 0.5f * c.h);
+    }
+    // How far the last stroke's place is from the middle of the free canvas area (what Frame last stroke centres it on),
+    // px; -1 when there is no stroke to frame.
+    if (name == "last_stroke_x" || name == "last_stroke_y") { // window px; -1 when there is none
+        const auto p = app_.lastStrokePoint();
+        const ImVec2 s = p ? project(*p) : ImVec2(-1.0f, -1.0f);
+        return double(name == "last_stroke_x" ? s.x : s.y);
+    }
+    if (name == "last_stroke_off_centre_px") {
+        const auto p = app_.lastStrokePoint();
+        if (!p) return -1.0;
+        const auto c = app_.canvasRect();
+        const glm::vec4 area = app_.freeCanvasArea();
+        const glm::vec4 h = app_.camera_.projection() * app_.camera_.view() * glm::vec4(*p, 1.0f);
+        if (h.w <= 0.0f) return 1e9;
+        const glm::vec2 at(c.x + (h.x / h.w * 0.5f + 0.5f) * c.w, c.y + (1.0f - h.y / h.w) * 0.5f * c.h);
+        const glm::vec2 mid(c.x + (area.x + area.z) * 0.5f * c.w, c.y + (area.y + area.w) * 0.5f * c.h);
+        return double(glm::distance(at, mid));
     }
     // The model's projected bounding box against the 3D view's sides, px: >= 0 when it fits across (a phone held upright
     // showed the middle of a model wider than the view: "nothing visible").

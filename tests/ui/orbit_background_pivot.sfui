@@ -1,0 +1,71 @@
+# A small model panned off-centre, a rotation pressed just beside it (on the background): the view turns about the model
+# (or the last stroke), not about the empty middle of the view, so what you work on stays where it is on screen. Over the
+# model and with the preference off, nothing changes. Frame last stroke gets you back to the last stroke.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+input_style maya
+expect_value orbit_at_pointer == 1
+expect_value last_stroke_off_centre_px == -1
+# small, and off-centre: the view's middle (the target) is on empty background beside it
+zoom 0.3
+look 1.2 0.5 0
+remember model_screen_x x0
+remember model_screen_y y0
+shot before_drag
+# Alt+left (Maya's orbit), pressed on the background just right of the model: no stroke yet, so about the model
+hold alt
+drag_frames 0.43 0.55 0.58 0.55 6 frames-background
+hold none
+expect_value camera_yaw != 0
+shot after_drag
+expect_value model_screen_x < $x0+4
+expect_value model_screen_x > $x0-4
+expect_value model_screen_y < $y0+4
+expect_value model_screen_y > $y0-4
+
+# A stroke on the left of the model, then the same drag: about the stroke's place, which stays under its dab.
+key alt+h
+zoom 0.3
+look 1.2 0.5 0
+stroke 0.25 0.5 0.3 0.5
+expect_value last_stroke_off_centre_px > 0
+remember last_stroke_x sx0
+remember last_stroke_y sy0
+hold alt
+drag_frames 0.43 0.55 0.52 0.55 5 frames-stroke
+hold none
+expect_value last_stroke_x < $sx0+2
+expect_value last_stroke_x > $sx0-2
+expect_value last_stroke_y < $sy0+2
+expect_value last_stroke_y > $sy0-2
+
+# Frame last stroke: it goes to the middle of the free area, the view's angle stays.
+remember camera_yaw yaw1
+action view.frame_last_stroke
+expect_value last_stroke_off_centre_px < 3
+expect_value camera_yaw == $yaw1
+shot frame_last_stroke
+
+# The view's middle on the model: about the target as before (the model's centre is the target after Frame).
+key alt+h
+remember camera_pan pan0
+hold alt
+drag_frames 0.5 0.9 0.6 0.9 4 frames-middle-on-model
+hold none
+expect_value camera_yaw != 0
+expect_value camera_pan < $pan0+0.0001
+expect_value camera_pan > $pan0-0.0001
+
+# Off: the old behaviour exactly, the view turns about the empty middle and the model swings.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 0
+click "Preferences##palette.preferences"
+zoom 0.3
+look 1.2 0.5 0
+remember model_screen_x x1
+hold alt
+drag_frames 0.43 0.55 0.58 0.55 6 frames-off
+hold none
+expect_value model_screen_x > $x1+40
