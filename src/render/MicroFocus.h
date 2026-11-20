@@ -50,12 +50,15 @@ public:
     size_t pages() const { return pageCount_; }
     size_t pagesShaded() const { return shadedPages_; }
     size_t pendingPages() const { return pendingShade_.size(); }
+    // Base triangles whose coarse shading waits for a frame's budget (a stroke re-shades its tiles over several frames).
+    size_t pendingCoarse() const { return pendingCoarse_.size() - coarseHead_; }
 
     // Main-thread ms since the last takeSplit(), by part (the benchmark's focus_split_ms): coarse grids, records,
     // coarse shading, page heights, page shading, whole rebuilds (syncAll).
     enum Part { kCoarse, kRecords, kShadeCoarse, kPages, kShadePages, kSyncAll, kParts };
     void takeSplit(double* out) { for (int k = 0; k < kParts; ++k) out[k] += splitMs_[k], splitMs_[k] = 0; }
 
+    bool cameraMoving = false; // set before sync: the camera moved since the last frame (the coarse shading queue drains slowly)
     size_t poolBudgetBytes = size_t(384) << 20; // the pool's most (full grid + full shading: 6 bytes a point)
 
 private:
@@ -84,6 +87,13 @@ private:
     std::vector<int8_t> drawn_;          // per cluster: the level the last draw used (-1 = not drawn)
     uint32_t frame_ = 0;
     double shadeNsPerPoint_ = 0.0;
+    // The coarse shading of changed tiles, within a time budget each frame (#184: a Clay stroke at micro level 4 spent
+    // 20-380 ms of every frame re-shading the tiles under the brush, the same ones again each frame): queued once
+    // (coarseQueued_), taken oldest first from coarseHead_, the rest follows on the next frames.
+    std::vector<uint32_t> pendingCoarse_;
+    std::vector<uint8_t> coarseQueued_;
+    size_t coarseHead_ = 0;
+    double coarseNsPerTile_ = 0.0; // measured: a tile handed to shadeCoarse, its ring of neighbours included
     size_t bytes_ = 0;
     std::vector<int16_t> staging_;
     std::vector<uint32_t> shadeStaging_, written_, coarseShade_;

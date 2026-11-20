@@ -399,6 +399,7 @@ def main():
     sculptforge(["blender_receive", "blender_send"])
     bpy.ops.sculptforge.receive()
     check(not box.modifiers["Bevel"].show_viewport, "the applied modifier is turned off")
+    bridge.prefs().modifiers = "PRESERVE"  # (Apply sends the evaluated mesh without its shape keys: the shape key checks below send live)
 
     # Facial shapes: SculptForge's sculpt layers arrive as shape keys with their names (the 52 ARKit ones).
     sculptforge(["new_head", "face_shapes_generate", "face_weights json={\"jawOpen\":0.25}", "blender_send"])
@@ -415,6 +416,34 @@ def main():
     eyes = bpy.data.objects.get("Eyes")
     check(eyes is not None and eyes.data.shape_keys is not None and "eyeLookUpLeft" in eyes.data.shape_keys.key_blocks,
           "Eyes: eyeLook shape keys")
+
+    # And back the other way: Blender's shape keys (an edited jawOpen, a new key with a name that needs care) go to
+    # SculptForge as sculpt layers and come back as the same keys: names, order, values and offsets.
+    if len(keys) == 53:
+        edit = head.data.shape_keys.key_blocks["jawOpen"]
+        co = arr(edit.data, "co", 3)
+        co[:, 2] += 0.001 * np.sin(np.arange(len(co)))
+        edit.data.foreach_set("co", np.ascontiguousarray(co, dtype=np.float32).ravel())
+        extra = head.shape_key_add(name="Brow Up #2 \u00fc", from_mix=False)
+        co2 = arr(keys[0].data, "co", 3)
+        co2[::7, 1] += 0.01
+        extra.data.foreach_set("co", np.ascontiguousarray(co2, dtype=np.float32).ravel())
+        extra.value = 0.4
+        head.data.update()
+        want = [(k.name, k.value, arr(k.data, "co", 3).copy()) for k in head.data.shape_keys.key_blocks]
+        bpy.ops.object.select_all(action="DESELECT")
+        head.select_set(True)
+        bpy.context.view_layer.objects.active = head
+        check(bpy.ops.sculptforge.send() == {"FINISHED"}, "send the head with its shape keys")
+        sculptforge(["blender_receive", "blender_send"])
+        check(bpy.ops.sculptforge.receive() == {"FINISHED"}, "receive the head again: " + bridge.state.message)
+        check("shape key" in bridge.state.message, "the shape keys came back with the mesh: " + bridge.state.message)
+        got = [(k.name, k.value, arr(k.data, "co", 3).copy()) for k in head.data.shape_keys.key_blocks]
+        check([w[0] for w in want] == [g[0] for g in got], "shape keys round trip: the same names in the same order")
+        if len(want) == len(got):
+            check(all(abs(w[1] - g[1]) < 1e-6 for w, g in zip(want, got)), "shape keys round trip: the same values")
+            err = max(np.abs(w[2] - g[2]).max() for w, g in zip(want, got))
+            check(err < 1e-5, "shape keys round trip: points within 1e-5 (%.3g)" % err)
 
     test_splats()
     test_classic_keys()

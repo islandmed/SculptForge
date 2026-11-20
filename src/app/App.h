@@ -1313,6 +1313,7 @@ private:
     bool paintMode_ = false;  // Paint brush: colour only, no sculpting (Rgb on, Raise off)
     bool paintRgb_ = false;   // also paint the colour while sculpting (Rgb + Raise)
     bool strokePaint_ = false, strokeSculpt_ = true;
+    bool strokeColourSmooth_ = false; // Shift with the Paint brush: the stroke smooths the colour, not the shape
     void registerPaintUiCommands();
     std::string litsphereFolder() const; // <library>/Lit Spheres, empty without a library
     void loadLitSphereLibrary();         // custom Lit Spheres from the studio folders and lit sphereFolder() (start-up)
@@ -1660,6 +1661,7 @@ private:
         size_t triangles = 0;
         int resolution = 200;
         bool keepMasked = false, keepTexture = true;
+        bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
@@ -1684,10 +1686,14 @@ private:
     const VoxelRemeshEstimate& voxelEstimate(); // for the active Part at voxelResolution_
     bool voxelHighResOk_ = false; // confirmed for this trip above 512
     int voxelResolutionTyped_ = 200; // Ctrl+click on the slider: the number being typed
+    // More than is free but within RAM + the most swap: the same dialog says so and asks every time ("Proceed anyway",
+    // Cancel is the default; nothing is remembered). Proceed autosaves first, then runs with the usual progress + Cancel.
     struct VoxelHighResConfirm {
         bool open = false;
         RemeshTrigger trigger = RemeshTrigger::Button;
+        bool swap = false;
     } voxelHighResConfirm_;
+    bool voxelSwapOk_ = false; // Proceed anyway was pressed: the next startVoxelRemesh goes on (once)
     void pollQRemesh();
     struct QRemeshJob {
         std::future<bool> done;
@@ -3430,6 +3436,7 @@ private:
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
     bool pointerDragMoved_ = false; // the pointer itself (not the pen) has moved the view drag a mouse button began (#216)
+    Uint64 pointerDragNs_ = 0; // when it last did, clickClockNs (the pen's samples take the drag over once it has been still)
     bool firstDabPending_ = false;
     float lastStrokePressure_ = 1.0f; // pressure at the previous stroke sample (dabs in between interpolate)
     float penTiltX_ = 0.0f, penTiltY_ = 0.0f;

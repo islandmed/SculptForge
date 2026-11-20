@@ -9,9 +9,17 @@
 #include "core/BrushLibrary.h"
 #include "core/Json.h"
 #include "core/ManagedPolicy.h"
+#include "core/OpControl.h"
 
+#include <atomic>
 #include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <deque>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 #ifndef SCULPTFORGE_VERSION
 #define SCULPTFORGE_VERSION "unknown"
@@ -278,6 +286,23 @@ std::string handleMcpMessage(const CommandRegistry& registry, Document& doc, con
 
 Json mcpToolList(const CommandRegistry& registry) { return toolList(registry)["tools"]; }
 
+namespace {
+
+// One request waiting for, or running on, the worker.
+struct McpJob {
+    std::string line;
+    std::string idKey;    // the request id as JSON text ("" for a message that is not a request)
+    Json progressToken;   // params._meta.progressToken (null: the client doesn't want progress)
+    std::shared_ptr<OpControl> control = std::make_shared<OpControl>();
+};
+
+constexpr auto kProgressInterval = std::chrono::milliseconds(100); // (at most 10 progress notifications a second)
+
+} // namespace
+
+// The stdio loop. Requests run one at a time, in order, on a worker thread (the scene is one Document); this thread
+// keeps reading, so a ping is answered and notifications/cancelled reaches the request in flight while a long
+// operation runs. Replies and progress notifications go out whole, one line each, under one lock.
 int runMcpServer(const CommandRegistry& registry, std::istream& in, std::ostream& out) {
     if (std::string why; !policy::mcpAllowed(&why)) {
         std::cerr << "sculptforge: " << why << "\n";
@@ -286,12 +311,123 @@ int runMcpServer(const CommandRegistry& registry, std::istream& in, std::ostream
     Document doc;
     // stdout is the protocol: library messages go to stderr.
     for (const auto& message : loadBrushLibrary(doc)) std::cerr << "sculptforge: " << message << "\n";
+
+    std::mutex outMutex;
+    auto send = [&](const std::string& line) {
+        std::lock_guard lock(outMutex);
+        out << line << "\n" << std::flush;
+    };
+
+    std::mutex mutex; // guards queue, running, inputClosed
+    std::condition_variable wake;
+    std::deque<std::shared_ptr<McpJob>> queue;
+    std::shared_ptr<McpJob> running;
+    bool inputClosed = false;
+
+    std::thread worker([&] {
+        for (;;) {
+            std::shared_ptr<McpJob> job;
+            {
+                std::unique_lock lock(mutex);
+                wake.wait(lock, [&] { return !queue.empty() || inputClosed; });
+                if (queue.empty()) return; // (input closed and everything answered)
+                job = std::move(queue.front());
+                queue.pop_front();
+                running = job;
+            }
+            OpControl& control = *job->control;
+            if (!job->progressToken.isNull()) {
+                auto last = std::chrono::steady_clock::time_point();
+                double lastValue = -1.0;
+                control.onProgress = [&, token = job->progressToken, last, lastValue](float fraction, const std::string& message) mutable {
+                    if (control.cancel.load()) return; // (the client has stopped listening)
+                    const auto now = std::chrono::steady_clock::now();
+                    if (lastValue >= 0.0 && now - last < kProgressInterval) return;
+                    const double percent = std::round(double(fraction) * 1000.0) / 10.0;
+                    if (percent <= lastValue) return; // (progress only ever increases)
+                    last = now;
+                    lastValue = percent;
+                    Json params = Json::object();
+                    params.set("progressToken", token);
+                    params.set("progress", percent);
+                    params.set("total", 100.0);
+                    if (!message.empty()) params.set("message", message);
+                    Json note = Json::object();
+                    note.set("jsonrpc", "2.0");
+                    note.set("method", "notifications/progress");
+                    note.set("params", params);
+                    send(note.dump());
+                };
+            }
+            std::string response;
+            {
+                OpControlScope scope(&control);
+                response = handleMcpMessage(registry, doc, job->line);
+            }
+            // A request the client cancelled and the operation stopped for gets no reply (the client has dropped it). One
+            // that finished past its last cancel point is answered: its changes are in the scene.
+            if (!response.empty() && !control.honoured.load()) send(response);
+            {
+                std::lock_guard lock(mutex);
+                running.reset();
+            }
+        }
+    });
+
     std::string line;
     while (std::getline(in, line)) {
         if (line.find_first_not_of(" \t\r") == std::string::npos) continue;
-        const std::string response = handleMcpMessage(registry, doc, line);
-        if (!response.empty()) out << response << "\n" << std::flush;
+        Json msg;
+        std::string err;
+        const bool parsed = Json::parse(line, msg, err) && msg.isObject();
+        const std::string method = parsed ? msg["method"].asString() : std::string();
+        if (parsed && !msg.has("id")) {
+            if (method == "notifications/cancelled") {
+                const std::string target = msg["params"]["requestId"].dump();
+                std::lock_guard lock(mutex);
+                if (running && running->idKey == target) {
+                    running->control->cancel = true; // (the operation stops at its next cancel point)
+                } else {
+                    for (auto it = queue.begin(); it != queue.end(); ++it)
+                        if ((*it)->idKey == target) {
+                            queue.erase(it); // (never started: nothing to undo, nothing to answer)
+                            break;
+                        }
+                }
+            }
+            continue; // (notifications/initialized and the rest)
+        }
+        if (parsed && method == "ping") {
+            bool busy;
+            {
+                std::lock_guard lock(mutex);
+                busy = running || !queue.empty();
+            }
+            if (busy) { // (a long operation is running: answer now, the worker is not free)
+                Json result = Json::object();
+                send(reply(msg["id"], result).dump());
+                continue;
+            }
+        }
+        auto job = std::make_shared<McpJob>();
+        job->line = line;
+        if (parsed) {
+            job->idKey = msg["id"].dump();
+            const Json& token = msg["params"]["_meta"]["progressToken"];
+            if (method == "tools/call" && (token.isString() || token.isNumber())) job->progressToken = token;
+        }
+        {
+            std::lock_guard lock(mutex);
+            queue.push_back(std::move(job));
+        }
+        wake.notify_one();
     }
+    {
+        std::lock_guard lock(mutex);
+        inputClosed = true;
+    }
+    wake.notify_one();
+    worker.join();
     return 0;
 }
 

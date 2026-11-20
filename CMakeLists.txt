@@ -327,7 +327,9 @@ if(MSVC)
 else()
   # -ffp-contract=off: no fused multiply-adds, so a result doesn't depend on the optimisation level (distro
   # packages build at -O2; face_weights' fast path is tested to match a full evaluation exactly).
-  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
+  # -fno-fast-math: a packager's -ffast-math / -Ofast (CFLAGS come first, these win) would turn the brushes' NaN
+  # guards (std::isfinite, gh#229) into nothing.
+  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -fno-fast-math)
 endif()
 sculptforge_pch(sculptforge_core)
 set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/tinyexr_impl.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp
@@ -1486,6 +1488,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
     sculptforge_ui_test(paint_intensity_1440 paint_intensity --size 1440x900) # #164: the top bar's Intensity at 1440
+    sculptforge_ui_test(paint_shift_smooth_1440 paint_shift_smooth --size 1440x900) # Shift smooths the colour, never the shape
+    sculptforge_ui_test(paint_shift_smooth_2880 paint_shift_smooth --size 2880x1800)
     sculptforge_ui_test(rgb_sub_1440 rgb_sub --size 1440x900)  # #186: Rgb lays colour on Sub strokes
     sculptforge_ui_test(rgb_sub_2880 rgb_sub --size 2880x1800)
     sculptforge_ui_test(tablet_view_speed_1024 tablet_view_speed --size 1024x768)
@@ -1521,6 +1525,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
     sculptforge_ui_test(popup_click_outside_1440 popup_click_outside --size 1440x900) # #210: context menus and combo lists close on a press outside
     sculptforge_ui_test(popup_click_outside_2880 popup_click_outside --size 2880x1800)
+    # #182: the high-resolution and may-use-swap remesh dialogs at the review sizes (tests/ui/voxel_highres.sfui).
+    sculptforge_ui_test(voxel_highres_1440 voxel_highres --size 1440x900)
+    sculptforge_ui_test(voxel_highres_2880 voxel_highres --size 2880x1800)
     sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px
     sculptforge_ui_test(unlit_view_2880 unlit_view --size 2880x3200)
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)

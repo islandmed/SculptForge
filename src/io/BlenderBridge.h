@@ -95,6 +95,10 @@ struct BridgeShape {
 };
 bool writeBridgeShapes(const std::string& path, const Mesh& mesh, std::string& error);
 bool readBridgeShapes(const std::string& path, uint32_t& vertexCount, std::vector<BridgeShape>& out, std::string& error);
+// Sculpt layers on `mesh` from shape keys: the mesh's positions are the Basis (the base shape), each shape a layer
+// of its offsets (Blender's axes; `linear` is the object's matrix as SculptForge uses it, applied to the offsets),
+// named and weighted like the key. Replaces the mesh's layers.
+void setLayersFromShapes(Mesh& mesh, const std::vector<BridgeShape>& shapes, const glm::dmat3& linear);
 
 // Loads what Blender sent (<root>/to_sculptforge): every object's Bridge, moved by its matrix into place, named
 // after its Blender object. `manifest` receives the manifest (for its revision). A Gaussian splat object goes to

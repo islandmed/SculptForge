@@ -1474,6 +1474,13 @@ size_t Renderer::microPendingShading() const {
     return total;
 }
 
+size_t Renderer::microPendingCoarse() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingCoarse();
+    return total;
+}
+
 size_t Renderer::microTilePages() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
@@ -2634,6 +2641,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     if (mesh.micro && microMatches(mesh)) { // a micro level draws its own way (render/MicroRenderer.h)
         if (!s.micro) s.micro = std::make_shared<MicroRenderer>();
         s.micro->viewMoving = proxyUsed_; // (the last draw's: the view moving)
+        s.micro->cameraMoving = cameraMoved_;
         s.micro->drawAbove = currentTierConfig().budgets.microDrawAbove; // close-ups past the stored level (SF_TIER_MICRO_DRAW_ABOVE)
         s.outOfMemory = !s.micro->sync(mesh);
         s.drawnTriangles = s.outOfMemory ? 0 : 1; // (draw() skips empty slots)
@@ -3612,6 +3620,8 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     frameViewport_ = inset ? glm::vec4(float(viewport.x), float(viewport.y), float(viewport.w), float(viewport.h))
                            : glm::vec4(0.0f, 0.0f, float(targetWidth), float(targetHeight));
     frameCull_ = CullView::from(view, proj);
+    cameraMoved_ = frameCull_.eye != prevEye_ || frameCull_.forward != prevForward_;
+    prevEye_ = frameCull_.eye, prevForward_ = frameCull_.forward;
     lastDrawn_ = 0;
     lastCoarseClusters_ = 0;
     previewOnly_ = stillWanted_ = false;

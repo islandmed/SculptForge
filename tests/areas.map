@@ -104,6 +104,7 @@ ui_navigation               render
 ui_orbit_lock               render
 ui_timelapse_flicker        render
 ui_timelapse_failure        io
+ui_timelapse_micro          render
 ui_remove_flat_background   render
 ui_frame_free_area*         render
 ui_hover_pop                render
@@ -214,6 +215,7 @@ test_support                ui
 test_library                ui
 test_connect_ai             ai
 test_mcp_structured         ai
+test_mcp_progress           ai
 test_ai_*                   ai
 test_comfyui                ai
 test_hyper3d                ai
@@ -242,6 +244,7 @@ test_packs                  io
 test_unicode_paths          io
 test_plugins                io
 test_part_io                io
+test_layers_roundtrip       io
 test_map_export             io
 test_bake                   io
 test_camera                 render

@@ -307,6 +307,7 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
     // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
     size_t microTilePages() const;
     size_t microTilePageBytes() const;
@@ -550,6 +551,8 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    glm::vec3 prevEye_{0.0f}, prevForward_{0.0f, 0.0f, -1.0f};
+    bool cameraMoved_ = false; // this frame's camera differs from the last frame's (a micro level's shading catch-up waits)
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too

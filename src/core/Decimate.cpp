@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Decimate.h"
 
+#include "core/OpControl.h"
+
 #include <algorithm>
 #include <cmath>
 #include <queue>
@@ -150,9 +152,14 @@ Mesh decimate(const Mesh& src, size_t targetTriangles, bool keepMasked, size_t m
     };
 
     size_t liveFaces = nt;
+    size_t pops = 0;
     while (liveFaces > targetTriangles && !heap.empty()) {
         const Candidate c = heap.top();
         heap.pop();
+        if ((++pops & 0x3FF) == 0) { // (cancel point and progress for an MCP call, core/OpControl.h)
+            if (opCancelled()) return src;
+            opProgress(float(nt - liveFaces) / float(std::max<size_t>(nt - targetTriangles, 1)), "Decimating");
+        }
         const uint32_t u = c.from, v = c.to;
         if (!vAlive[u] || !vAlive[v] || version[u] != c.fromVersion || version[v] != c.toVersion) continue;
         if (uvSeam[u] || locked[u]) continue;
@@ -291,7 +298,9 @@ std::vector<Mesh> generateLods(const Mesh& src, int levels, float ratio) {
     lods.push_back(src);
     for (int i = 1; i < levels; ++i) {
         size_t target = static_cast<size_t>(std::llround(double(lods.back().triangleCount()) * ratio));
+        OpProgressWindow window(float(i - 1) / float(levels - 1), 1.0f / float(levels - 1));
         lods.push_back(decimate(lods.back(), target));
+        if (opCancelled()) break; // (the caller checks too: the chain is then incomplete)
     }
     return lods;
 }

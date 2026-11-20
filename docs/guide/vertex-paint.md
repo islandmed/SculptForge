@@ -36,7 +36,9 @@ paint layers with blend modes, and the Lit Sphere materials that change how the 
 While the Paint brush is active:
 
 - <kbd>Alt</kbd> paints back towards white.
-- <kbd>Shift</kbd> still smooths the shape.
+- Hold <kbd>Shift</kbd> to smooth the colour: each stroke blends the colours under the brush toward their neighbours'
+  (noise, hard edges and speckles melt away). It uses Smooth's own Intensity, and respects the mask, symmetry and the
+  active paint layer. The shape is never touched.
 - The surface isn't changed.
 
 Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sculpting.
@@ -44,7 +46,8 @@ Press <kbd>P</kbd> again, or click **Sculpt** on the top shelf, to go back to sc
 ## Paint while sculpting
 
 Turn on **Rgb** on the top shelf (or **RGB while sculpting** in the **Paint** menu). Every sculpt brush then also
-paints the current colour along its stroke, Add and Sub (<kbd>Alt</kbd>) alike. The Smooth brush and <kbd>Shift</kbd>-smoothing never paint.
+paints the current colour along its stroke, Add and Sub (<kbd>Alt</kbd>) alike. The Smooth brush and <kbd>Shift</kbd>-smoothing
+never paint; with a sculpt brush <kbd>Shift</kbd> smooths the shape, and with the Paint brush it smooths the colour.
 
 ## Choose a colour
 

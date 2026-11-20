@@ -497,4 +497,75 @@ bool renderCloseup(const Document& doc, const Json& args, Json& content, std::st
     return true;
 }
 
+namespace {
+
+Json schemaProp(const char* type, const char* description) {
+    Json p = Json::object();
+    p.set("type", type);
+    p.set("description", description);
+    return p;
+}
+
+Json liveTool(const char* name, const char* description, std::vector<std::pair<const char*, Json>> props) {
+    Json properties = Json::object();
+    for (auto& [k, v] : props) properties.set(k, std::move(v));
+    Json schema = Json::object();
+    schema.set("type", "object");
+    schema.set("properties", std::move(properties));
+    schema.set("required", Json::array());
+    Json t = Json::object();
+    t.set("name", name);
+    t.set("description", description);
+    t.set("inputSchema", std::move(schema));
+    return t;
+}
+
+} // namespace
+
+Json mcpLiveTools() {
+    Json tools = Json::array();
+    const auto view = [] {
+        return std::vector<std::pair<const char*, Json>>{
+            {"preset", schemaProp("string", "front, back, left, right, top, bottom or three_quarter (front-right, a little from above).")},
+            {"yaw", schemaProp("number", "Degrees around the vertical axis: 0 = front, 90 = the model's right side, 180 = back.")},
+            {"elevation", schemaProp("number", "Degrees above the model (-89..89): 0 = level, 30 = looking down a little.")},
+            {"frame", schemaProp("string", "Frame the view on: all (every visible Part), active (the active Part) or a Part's name.")},
+            {"zoom", schemaProp("number", "Closer (2 = twice as close) or further (0.5) after framing.")},
+            {"ortho", schemaProp("boolean", "Orthographic (true) or perspective (false).")}};
+    };
+    Json image = viewportImageTool(); // (one schema with the headless server: cli/McpTools.h)
+    image.set("description", "See the model: the viewport exactly as the user sees it (without the interface), as a PNG. "
+                             "The view options turn the user's camera too (they stay; with none, the view as it is). "
+                             "Look after every step and correct what you see.");
+    tools.push(std::move(image));
+    tools.push(liveTool("view_set", "Turn and frame the camera the user sees (and viewport_image renders).", view()));
+    tools.push(liveTool("view_turntable",
+                        "The model from several sides in one image (a grid, labelled by yaw), to check form and "
+                        "proportions all around. The user's camera is put back afterwards.",
+                        {{"views", schemaProp("number", "4, 6 or 8 views around (default 4: front, right, back, left).")},
+                         {"elevation", schemaProp("number", "Degrees above the model (default 10).")},
+                         {"size", schemaProp("number", "Each view's side in pixels (192-512, default 320).")}}));
+    tools.push(viewCloseupTool()); // (one schema with the headless server: cli/McpTools.h)
+    tools.push(liveTool(
+        "stroke_screen",
+        "Brush stroke drawn on the screen, as a user drags across the viewport: points in viewport coordinates "
+        "(0,0 = top left, 1,1 = bottom right), projected onto the model (points off the model are skipped). Use "
+        "viewport_image to see where things are. One undo step.",
+        {{"points", schemaProp("string", "\"u,v u,v ...\" in 0..1 viewport coordinates (at least one on the model).")},
+         {"brush", schemaProp("string", "Brush name (Standard, Clay, Clay Block, Crease, Inflate, Smooth, Pinch...) or a "
+                                        "detail preset (Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail "
+                                        "Scales, Detail Scar). Default: the active brush.")},
+         {"radius", schemaProp("number", "Brush radius as a fraction of the viewport's height (default 0.04; a detail "
+                                         "preset's own size on the model).")},
+         {"strength", schemaProp("number", "0-1 (default 0.5; a detail preset's own).")},
+         {"invert", schemaProp("boolean", "Carve instead of build (like holding Alt).")},
+         {"symmetry", schemaProp("string", "Mirror across these world planes, e.g. \"x\" (default none).")}}));
+    return tools;
+}
+
+bool mcpIsLiveTool(const std::string& name) {
+    return name == "viewport_image" || name == "view_set" || name == "view_turntable" || name == "view_closeup" ||
+           name == "stroke_screen";
+}
+
 } // namespace sf

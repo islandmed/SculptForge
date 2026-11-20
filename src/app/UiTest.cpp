@@ -196,6 +196,8 @@
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
+//                            paint_rough (how uneven the vertex paint is: the mean distance, sRGB 0-255, between a vertex's colour
+//                            and its neighbours' average; Shift with the Paint brush lowers it),
 //                            brush_color_r / brush_color_g / brush_color_b (the brush's colour, sRGB 0-255: what C picks)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
 //                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
@@ -343,7 +345,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|kde|kde_pointer|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
+//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -742,6 +744,18 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const glm::vec3& c : m.colors) sum += double(linearToSrgb(c)[k]);
         return 255.0 * sum / double(m.colors.size());
     }
+    if (name == "paint_rough") {
+        if (!m.hasColors()) return 0.0;
+        double sum = 0.0;
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+            const auto ring = m.neighbors(v);
+            if (ring.empty()) continue;
+            glm::vec3 avg(0.0f);
+            for (uint32_t u : ring) avg += linearToSrgb(m.colors[u]);
+            sum += double(glm::distance(linearToSrgb(m.colors[v]), avg / float(ring.size())));
+        }
+        return 255.0 * sum / double(m.vertexCount());
+    }
     if (name == "brush_color_r" || name == "brush_color_g" || name == "brush_color_b")
         return std::round(255.0f * linearToSrgb(app_.doc_.paintColor)[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2]);
     if (name == "uvs") return m.hasUvs() ? 1.0 : 0.0;
@@ -785,7 +799,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "guide_strength") return double(app_.curvesStrength_);
     if (name == "sdiv_slider") return double(app_.sdivSlider_);
     if (name == "voxel_triangle_estimate") return double(app_.voxelEstimate().triangles);
-    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open ? 1.0 : 0.0;
+    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open && !app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "voxel_swap_confirm") return app_.voxelHighResConfirm_.open && app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "autosave_written") return app_.autosaveWritten_ ? 1.0 : 0.0;
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
@@ -1784,6 +1800,32 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return worst;
     }
+    if (name == "timelapse_micro_change" || name == "timelapse_micro_stale") {
+        // Strokes on a Micro level in the timelapse (member bug, 0.13.9: "recorded nothing inside the micro"). The frame
+        // after step 1 (the script's Micro level, no stroke yet) and at the last step, as renderTimelapseFrame draws
+        // them (static camera, 320x180):
+        // _change = mean per-pixel difference (0-255) between the two (the strokes must show);
+        // _stale = the last step's frame against the same frame with the whole level sent up again (0 = nothing missed).
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t || t->cursor() == 0) return -1.0;
+        const size_t last = t->cursor();
+        Camera cam = app_.camera_;
+        cam.frame(app_.sceneBounds());
+        cam.pitch = app_.camera_.pitch;
+        cam.distance *= 0.72f;
+        cam.aspect = 320.0f / 180.0f;
+        std::vector<uint8_t> first, end, whole;
+        std::string err;
+        if (!t->seek(app_.doc_, 1, &err) || !app_.renderTimelapseFrame(cam, 320, 180, first, err)) return -2.0;
+        if (!t->seek(app_.doc_, last, &err) || !app_.renderTimelapseFrame(cam, 320, 180, end, err)) return -3.0;
+        app_.displayedMesh().topologyDirty = true; // (a full upload)
+        if (!app_.renderTimelapseFrame(cam, 320, 180, whole, err) || whole.size() != end.size() || first.size() != end.size())
+            return -4.0;
+        const std::vector<uint8_t>& other = name == "timelapse_micro_change" ? first : whole;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < end.size(); ++i) sum += uint64_t(std::abs(int(end[i]) - int(other[i])));
+        return double(sum) / double(std::max<size_t>(1, end.size()));
+    }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
     if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
         app_.benchmarkDrawMs(0);
@@ -1823,6 +1865,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
+    if (name == "pen_x") return penAt_.x; // where the pen last was (window px): the brush ring is there (#216)
+    if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
@@ -4326,7 +4370,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
-            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : 0;
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : 0;
+            kdeStall_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4804,7 +4849,9 @@ void Demo::penMove(float x, float y) {
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
-    if (huionStream_ || kdeStream_ != 0) mouseMotion(x, y, kDriverMouse); // ... and the driver moves it too
+    // ... and the driver moves it too (kde_stalled: its pointer sends one move after a button, then no more: #216)
+    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0)))
+        mouseMotion(x, y, kDriverMouse);
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4923,6 +4970,7 @@ void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     static const int kKdeMouse[] = {0, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
     if (kdeStream_ != 0 && button >= 1 && button <= 2) {
         if (kdeStream_ == 1) app_.handleEvent(e);
+        kdeStall_ = down ? 1 : 0;
         mouseButton(down, kKdeMouse[button], kDriverMouse);
         return;
     }

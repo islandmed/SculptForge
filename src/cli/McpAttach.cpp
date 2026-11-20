@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cli/McpAttach.h"
 
+#include "cli/McpServer.h"
 #include "cli/McpTools.h"
+#include "core/Commands.h"
+#include "core/ManagedPolicy.h"
 #include "core/Json.h"
 #include "link/AiLink.h"
 #include "link/AiLinkSession.h"
@@ -43,6 +46,21 @@ Json tool(const std::string& name, const std::string& description, Json properti
     return t;
 }
 
+} // namespace
+
+Json mcpAppToolList(const CommandRegistry& registry) {
+    Json tools = Json::array();
+    const Json commands = mcpToolList(registry), live = mcpLiveTools(); // (named: items() must not outlive its Json)
+    for (const Json& t : commands.items()) // (leaves out what a studio's policy doesn't allow; the window tools below
+                                           // replace its viewport_image and view_closeup)
+        if (!link::AiLinkPolicy::hidden(t["name"].asString()) && !mcpIsLiveTool(t["name"].asString())) tools.push(t);
+    for (const Json& t : live.items())
+        if (policy::mcpToolAllowed(t["name"].asString(), {})) tools.push(t);
+    return tools;
+}
+
+namespace {
+
 Json connectTool() {
     Json code = Json::object();
     code.set("type", "string");
@@ -63,7 +81,8 @@ Json disconnectTool() {
 
 class Attach {
 public:
-    Attach(std::ostream& out, std::string endpoint) : out_(out), endpoint_(std::move(endpoint)) {}
+    Attach(std::ostream& out, std::string endpoint, const CommandRegistry* registry)
+        : out_(out), endpoint_(std::move(endpoint)), registry_(registry) {}
 
     void message(const std::string& line) {
         Json msg;
@@ -172,9 +191,12 @@ private:
     }
 
     void toolsList(const Json& id, const Json& msg) {
-        if (!paired_) {
+        if (!paired_) { // the whole set already: clients that never ask again must not be left with live_connect alone
             Json tools = Json::array();
             tools.push(connectTool());
+            const Json offered = registry_ ? mcpAppToolList(*registry_) : mcpLiveTools();
+            for (const Json& t : offered.items()) tools.push(t);
+            tools.push(disconnectTool());
             Json r = Json::object();
             r.set("tools", tools);
             return send(result(id, std::move(r)));
@@ -202,7 +224,7 @@ private:
             return send(AiLinkSession::resultReply(id, true, "Disconnected from SculptForge"));
         }
         if (!paired_)
-            return send(AiLinkSession::resultReply(id, false, "Not connected to SculptForge: call live_connect first."));
+            return send(AiLinkSession::resultReply(id, false, "Not connected to SculptForge yet: call live_connect (SculptForge must be open)"));
         Json reply;
         if (forward(id, msg, reply)) send(reply.dump());
     }
@@ -273,12 +295,12 @@ private:
     }
 
     static std::string connectedText() {
-        return "Connected to SculptForge. Its tools are now listed (call tools/list again if you don't see them): start "
-               "with scene_overview and viewport_image.";
+        return "Connected to SculptForge. Its tools work now: start with scene_overview and viewport_image.";
     }
 
     std::ostream& out_;
     std::string endpoint_, client_;
+    const CommandRegistry* registry_;
     link::AiLinkConn conn_;
     bool paired_ = false;
     bool listChangedPending_ = false;
@@ -286,8 +308,8 @@ private:
 
 } // namespace
 
-int runMcpAttach(std::istream& in, std::ostream& out, const std::string& endpoint) {
-    Attach attach(out, endpoint);
+int runMcpAttach(std::istream& in, std::ostream& out, const std::string& endpoint, const CommandRegistry* registry) {
+    Attach attach(out, endpoint, registry);
     std::string line;
     while (std::getline(in, line)) {
         if (line.find_first_not_of(" \t\r") == std::string::npos) continue;

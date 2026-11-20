@@ -55,10 +55,13 @@ public:
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
     size_t pendingShading() const { return pendingCount_ + staleCount_; }
+    // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
+    size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
     bool viewMoving = false;
+    bool cameraMoving = false; // the camera moved since the last frame (set by the Renderer before sync)
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
     // Levels a cluster may draw ABOVE the stored one (TierBudgets::microDrawAbove; 0 = the stored level caps the draw,

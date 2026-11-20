@@ -1081,7 +1081,8 @@ bool App::wantsFrames(double now) const {
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
            renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
-           renderer_.microTilePagesWantFrame(); // Adaptive Detail tiles: pages for what came into view, on the next frame
+           renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
+           renderer_.microPendingCoarse() > 0; // a micro level's coarse shading still waits for a frame's budget (after a stroke)
 }
 
 uint64_t App::frameKey() const {
@@ -2390,8 +2391,15 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dx = x - mouseX_;
         dy = y - mouseY_;
     }
-    if (!fromPen && pointerDrag) pointerDragMoved_ = true;
-    if (fromPen && pointerDrag && pointerDragMoved_) return;
+    // (Only while the pointer keeps moving it: a compositor whose pointer sent one move after the click and then went quiet
+    // while the cursor went on left the drag, and the ring that follows it, where the click began, #216. The pen's samples
+    // carry it from the pointer's last place, as soon as the pointer has been still for kPointerDragNs.)
+    constexpr Uint64 kPointerDragNs = 60000000ull;
+    if (!fromPen && pointerDrag) {
+        pointerDragMoved_ = true;
+        pointerDragNs_ = clickClockNs();
+    }
+    if (fromPen && pointerDrag && pointerDragMoved_ && clickClockNs() - pointerDragNs_ < kPointerDragNs) return;
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
@@ -2839,8 +2847,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift still smooths geometry while the Paint brush is active.
-    strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
+    // Shift with the Paint brush smooths the colour and leaves the shape alone; with a sculpt brush (Rgb on) it still
+    // smooths the shape. A Part painting into a texture has no colour smooth yet: Shift smooths its shape as before.
+    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_ && !paintsTexture(doc_.mesh);
+    strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
@@ -2966,8 +2976,8 @@ void App::strokeTo(float x, float y) {
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
-    if (alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
-                              (inputMods() & SDL_KMOD_SHIFT) != 0)) {
+    if (!strokeColourSmooth_ && alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
+                                                      (inputMods() & SDL_KMOD_SHIFT) != 0)) {
         strokeAltSmooth_ = true;
         status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }

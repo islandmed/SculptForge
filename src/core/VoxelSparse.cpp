@@ -131,7 +131,11 @@ void morph(const Bricks& g, std::vector<uint8_t>& flags, Src src, Uniform unifor
 } // namespace
 
 Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float band, bool checkClosed, std::string* error,
-                        const std::function<bool(float)>& step) {
+                        const std::function<bool(float)>& step, bool allowSwap) {
+    auto fits = [&](size_t need) { // (free memory, or past it with the person's go-ahead and room on swap)
+        const MemoryTier tier = classifyMemory(need);
+        return tier == MemoryTier::Fits || (allowSwap && tier == MemoryTier::NeedsSwap);
+    };
     auto fail = [&](const std::string& why) {
         if (error) *error = why;
         return Mesh();
@@ -160,7 +164,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     const float reach = band + 4.0f;
     {
         const size_t need = bricks * 6;
-        if (const MemoryCheck c = checkMemory(need); !c.enough)
+        if (const MemoryCheck c = checkMemory(need); !fits(need))
             return fail("Voxel Remesh at " + std::to_string(resolution) + " needs ~" + formatGigabytes(c.needBytes + memoryMargin(c.needBytes)) +
                         " free, " + formatGigabytes(c.availableBytes) + " available. Lower the Resolution or close other apps");
     }
@@ -203,7 +207,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     {
         // Flags, morph scratch, distance and nearest triangle per stored sample, the surface it makes.
         const size_t need = stored * 11 + size_t(double(stored) * 0.6);
-        if (const MemoryCheck c = checkMemory(need); !c.enough)
+        if (const MemoryCheck c = checkMemory(need); !fits(need))
             return fail("Voxel Remesh at " + std::to_string(resolution) + " needs ~" + formatGigabytes(c.needBytes + memoryMargin(c.needBytes)) +
                         " free, " + formatGigabytes(c.availableBytes) + " available. Lower the Resolution or close other apps");
     }

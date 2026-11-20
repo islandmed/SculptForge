@@ -311,6 +311,8 @@ public:
     // endStroke). Brushes whose offset depends on more than the vertex's place (Smooth, Layer, Morph) and the
     // remesher always take the exact path, and so do regions below the threshold (small brushes are unchanged).
     bool adaptiveDabs = false;
+    // This stroke's dabs dropped because a brush computed a non-finite offset (displaceAll; gh#229); the app logs it.
+    size_t nonFiniteDabs = 0;
     // The same adaptive path (sampled plane, normals from the brush's own derivative, exact ones behind the brush and
     // at the end) without fused batches: on by default (perf plan item 2: the normals were half of a big brush's
     // time). Fused batches stay with adaptiveDabs (Fast Big Brushes, Experimental).

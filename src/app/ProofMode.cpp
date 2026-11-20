@@ -274,6 +274,7 @@ struct PhaseSpec {
     float closeUp = 0.0f;
     int gizmo = 0;           // 1 / 2: a Gizmo Move / Rotate drag of the whole Part (the centre handle), no stroke
     bool wholeView = false;  // the brush as big as the framed model (half the view's height)
+    bool sweep = false;      // a serpentine over the whole front of the model instead of the figure eight: fresh surface all the way
 };
 
 // SF_BENCH_DENSE=1 with --benchmark-file (bench.sh dense): a dense plain mesh's interactive actions, each on the mesh
@@ -392,9 +393,11 @@ struct PhaseResult {
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
     std::vector<double> focusSplit[7]; // a streamed level's main-thread work each frame: promote, then MicroFocus::Part
+    std::vector<double> pendingPromote, pendingShade; // (SF_BENCH_TRACE) tiles still waiting to be promoted / coarse-shaded each frame
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
     double strokeSyncMs = 0;      // its uploads to the GPU (main thread, over strokeFrames frames)
     int strokeFrames = 0;
+    double catchUpSeconds = 0;    // a rest phase: the shading the strokes before it left waiting, until it was done (MicroFocus)
 };
 
 struct SizeResult {
@@ -452,6 +455,7 @@ struct ProofState {
     // The samples the newest dab / preview head were last matched to: the stroke only moves forward, so the
     // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
     size_t dabFrom = 0, previewFrom = 0;
+    bool sweep = false; // PhaseSpec::sweep
     bool pressed = false;
     bool releasing = false; // let go: the phase ends with the stroke (predictive strokes finish after the release)
     double releaseAt = 0;
@@ -471,6 +475,10 @@ struct ProofState {
 namespace {
 
 glm::vec2 strokePoint(const ProofState& p, double u) {
+    if (p.sweep) { // zigzags across the framed model while the height swings once up and down: fresh surface all the way
+        const double phi = 2.0 * 3.14159265358979 * u;
+        return {p.cx + 1.2f * p.R * float(std::sin(11.0 * phi)), p.cy + 0.9f * p.R * float(std::sin(phi))};
+    }
     // A figure eight across the front of the model, three times round.
     const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
     return {p.cx + p.R * 1.25f * float(std::sin(phi)), p.cy + p.R * 0.75f * float(std::sin(2.0 * phi))};
@@ -572,6 +580,25 @@ void App::startProofMode() {
     if (const char* still = std::getenv("SF_BENCH_STILL_SECONDS"); still && std::atof(still) > 0)
         for (PhaseSpec& ph : p->phases)
             if (std::string(ph.name) == "still") ph.seconds = std::atof(still);
+    // SF_BENCH_LONG=120:25: one continuous Clay stroke of that radius (px) and length (s), named "clay long", before the
+    // other phases (#184: a hang that only shows once a stroke has been going for seconds).
+    if (const char* lg = std::getenv("SF_BENCH_LONG"); lg && *lg) {
+        const float r = float(std::atof(lg));
+        const char* colon = std::strchr(lg, ':');
+        p->phases.insert(p->phases.begin(), PhaseSpec{"clay long", r > 0 ? r : 60.0f, colon ? std::max(1.0, std::atof(colon + 1)) : 25.0, BrushType::Clay, 0.35f});
+        p->phases.front().sweep = std::getenv("SF_BENCH_LONG_EIGHT") == nullptr; // (SF_BENCH_LONG_EIGHT=1: the figure eight)
+        // ... then a second stroke at once (60 px, 6 s, the figure eight): started while the first one's shading catches up.
+        p->phases.insert(p->phases.begin() + 1, PhaseSpec{"clay second", 60.0f, 6.0, BrushType::Clay, 0.35f});
+    }
+    // SF_BENCH_SETTLED=1: a "still settled" phase after "still" (the rest view once the shading the strokes left is done).
+    if (const char* st = std::getenv("SF_BENCH_SETTLED"); st && *st == '1')
+        for (auto it = p->phases.begin(); it != p->phases.end(); ++it)
+            if (std::string(it->name) == "still") {
+                PhaseSpec settled = *it;
+                settled.name = "still settled";
+                p->phases.insert(it + 1, settled);
+                break;
+            }
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -842,6 +869,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.cx = c.x + c.w * 0.5f;
             p.cy = c.y + c.h * 0.5f;
             p.R = 0.26f * std::min(c.w, c.h) * spec.pathScale;
+            p.sweep = spec.sweep;
             const glm::vec2 q = strokePoint(p, 0.0);
             p.samples.push_back({now, q, 0.0});
             p.lastSample = now;
@@ -1060,6 +1088,14 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             nextPhase();
             break;
         }
+        // "still settled" (SF_BENCH_SETTLED=1, after "still", which is measured as always, catch-up inside it): first the coarse shading
+        // the strokes left waiting (a micro level's catch-up, 30 s at most), timed on its own ("catch_up_s"), then the view at rest.
+        if (std::string(spec.name) == "still settled" && ph.frameMs.empty() && ph.catchUpSeconds < 30.0 && doc_.mesh.micro &&
+            doc_.mesh.micro->focus && renderer_.microPendingCoarse() > 0) {
+            ph.catchUpSeconds += frameMs / 1000.0;
+            p.stageStart = now;
+            break;
+        }
         if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
@@ -1067,6 +1103,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 double f[MicroFocus::kParts] = {};
                 renderer_.takeFocusSplit(f);
                 ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
+                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->stats().lastPending));
+                ph.pendingShade.push_back(double(renderer_.microPendingCoarse()));
                 for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
             }
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
@@ -1265,6 +1303,26 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 j.set("worst_stall_ms", std::round(worstStallMs(ph.frameMs, ph.releaseMs) * 10) / 10);
                 j.set("seconds", std::round(ph.seconds * 100) / 100);
                 j.set("frames", double(ph.frameMs.size()));
+                if (ph.catchUpSeconds > 0) j.set("catch_up_s", std::round(ph.catchUpSeconds * 100) / 100);
+                if (const char* tr = std::getenv("SF_BENCH_TRACE"); tr && *tr == '1') { // every frame: total, main-thread parts, Focus Detail's promote
+                    Json t = Json::object();
+                    auto col = [&](const char* n, const std::vector<double>& v) {
+                        Json a = Json::array();
+                        for (double x : v) a.push(std::round(x * 10) / 10);
+                        t.set(n, a);
+                    };
+                    col("frame", ph.frameMs);
+                    const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
+                    for (int k = 0; k < 6; ++k) col(names[k], ph.split[k]);
+                    if (!ph.focusSplit[0].empty()) {
+                        const char* fnames[7] = {"promote", "coarse", "records", "shade_coarse", "pages", "shade_pages", "sync_all"};
+                        for (int k = 0; k < 7; ++k) col(fnames[k], ph.focusSplit[k]);
+                    }
+                    col("drawn", ph.drawn);
+                    col("pending_promote", ph.pendingPromote);
+                    col("pending_shade", ph.pendingShade);
+                    j.set("trace", t);
+                }
                 j.set("fps", ph.seconds > 0 ? std::round(double(ph.frameMs.size()) / ph.seconds * 10) / 10 : 0.0);
                 j.set("frame_ms", percentilesJson(percentiles(ph.frameMs)));
                 { // where the frames went (main thread; the solver thread's dabs run beside them, waits are in "sculpt")

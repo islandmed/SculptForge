@@ -1074,7 +1074,7 @@ TEST(usd_roundtrip_mesh_layers_splats) {
         CHECK(loadUsd(path, back, sback, err));
         if (!err.empty()) std::printf("  %s\n", err.c_str());
         CHECK(back.vertexCount() == m.vertexCount() && back.triangleCount() == m.triangleCount());
-        CHECK(back.layers.size() == 2 && back.layers[0].name == "Smile_2" && std::abs(back.layers[0].weight - 0.75f) < 1e-6f);
+        CHECK(back.layers.size() == 2 && back.layers[0].name == "Smile 2" && std::abs(back.layers[0].weight - 0.75f) < 1e-6f);
         bool same = true;
         for (size_t v = 0; v < m.vertexCount(); ++v) {
             same = same && glm::distance(back.base[v], m.base[v]) < 1e-6f;

@@ -3601,16 +3601,16 @@ constexpr Entry kSpanish[] = {
     {"Front faces only: brushes leave the far side of thin parts alone.",
      "Solo caras frontales: los pinceles no tocan el otro lado de las partes finas."},
     {"Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, the "
-     "next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the preferences and "
+     "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "Los pinceles solo llegan a la superficie unida al punto bajo el cursor, dentro del tamaño del pincel: la otra "
-     "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian (Connected Only de Blender). Se "
+     "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian. Se "
      "guarda con las preferencias y el proyecto."},
     {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too to keep "
+     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
      "it to one piece.",
      "La atenuación del pincel se mide en pantalla: se alcanza todo lo que está dentro del círculo del pincel, a "
-     "través del modelo y por detrás, como un cilindro en la dirección de la vista (Projected from View de Blender). "
+     "través del modelo y por detrás, como un cilindro en la dirección de la vista. "
      "Activa también Solo conectado para limitarlo a una pieza."},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+arrastrar pinta la máscara con el pincel; Ctrl+Alt+arrastrar la borra. Ctrl+arrastrar en el fondo la "
@@ -5716,18 +5716,30 @@ constexpr Entry kSpanish[] = {
     {"Asks first", "Pregunta antes"},
     {"Revoke", "Revocar"},
     // Voxel Remesh up to 4096 (PanelRetopo.cpp)
-    {"Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of millions of triangles and take minutes; it asks once first, and won't start if it can't fit in the free memory. Ctrl+click to type a value.",
-     "Vóxeles a lo ancho del modelo, de 32 a 4096: más alto conserva más detalle y crea más triángulos (unas 4 veces más cada vez que se duplica). La línea de debajo estima el resultado. Por encima de 512 un remallado puede crear decenas de millones de triángulos y tardar minutos; pregunta una vez antes y no empieza si no cabe en la memoria libre. Ctrl+clic para escribir un valor."},
     {"Estimate",
      "Estimación"},
-    {"About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the remesh needs; in red when that is more than is free now.",
-     "Cuántos triángulos crea aproximadamente el Remallado vóxel con esta Resolución, a partir del área de la superficie de la Pieza (el detalle más fino que un vóxel cuenta, así que un escaneo denso sale por debajo). Por encima de 512 también la memoria que necesita; en rojo cuando es más de la que hay libre ahora."},
     {"About %s triangles",
      "Unos %s triángulos"},
     {"About %s triangles, ~%s of memory",
      "Unos %s triángulos, ~%s de memoria"},
     {"About %s triangles, needs ~%s, %s free",
      "Unos %s triángulos, necesita ~%s, %s libres"},
+    {"About %s triangles, needs ~%s, %s free (may use swap)",
+     "Unos %s triángulos, necesita ~%s, %s libres (puede usar intercambio)"},
+    {"Proceed anyway",
+     "Continuar de todos modos"},
+    {"Remesh may use swap",
+     "El remallado puede usar intercambio"},
+    {"This needs about %s; %s is free. It may use swap and be slow.",
+     "Esto necesita unos %s; %s están libres. Puede usar intercambio y ser lento."},
+    {"Voxel Remesh at resolution %d makes about %s triangles.",
+     "El Remallado vóxel a resolución %d crea unos %s triángulos."},
+    {"Your work is saved to the recovery copy first. Cancel in Tool > Remesh stops it and the Part stays as it is. This asks every time. A lower Resolution is lighter.",
+     "Tu trabajo se guarda primero en la copia de recuperación. Cancelar en Herramienta > Remallado lo detiene y la Pieza queda como está. Pregunta cada vez. Una Resolución más baja es más ligera."},
+    {"About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the remesh needs; in orange when that is more than is free now but could run on swap (slow), in red when the computer can't hold it at all.",
+     "Más o menos cuántos triángulos crea el Remallado vóxel con esta Resolución, a partir del área de superficie de la Pieza (cuenta el detalle fino menor que un vóxel, así que un escaneo denso sale más bajo). Por encima de 512 también la memoria que necesita el remallado; en naranja cuando es más de lo que hay libre ahora pero podría ejecutarse con intercambio (lento), en rojo cuando el equipo no puede con ello en absoluto."},
+    {"Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of millions of triangles and take minutes; it asks once first. If it needs more than the free memory it asks every time (swap makes it slow), and it won't start if the computer can't hold it at all. Ctrl+click to type a value.",
+     "Vóxeles a lo ancho del modelo, de 32 a 4096: más alto conserva más detalle y crea más triángulos (unas 4 veces por cada duplicación). La línea de abajo estima el resultado. Por encima de 512 un remallado puede crear decenas de millones de triángulos y tardar minutos; pregunta una vez antes. Si necesita más que la memoria libre, pregunta cada vez (el intercambio lo hace lento), y no empieza si el equipo no puede con ello en absoluto. Ctrl+clic para escribir un valor."},
     {"High resolution remesh",
      "Remallado de alta resolución"},
     {"Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free).",

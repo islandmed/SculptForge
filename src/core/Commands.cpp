@@ -11,6 +11,7 @@
 #include "core/BrushAlpha.h"
 #include "core/BrushLibrary.h"
 #include "core/Decimate.h"
+#include "core/OpControl.h"
 #include "core/KeepMasked.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
@@ -284,7 +285,7 @@ CommandRegistry::CommandRegistry() {
     add({"remesh",
          "Voxel remesh (like Voxel Remesh): rebuild the sculpt as an even, watertight surface, merging overlapping "
          "parts and fixing broken scans or generated models. Sculpt layers are baked in. A painted texture is "
-         "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false.",
+         "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false. Reports progress and can be cancelled (the scene stays as it was).",
          {{"resolution", T::Number, "Voxels across the longest side (32-4096). Default 200; higher keeps more detail. "
                                   "Above 512 it can make tens of millions of triangles; it stops with a message when "
                                   "it would not fit in the free memory.", false},
@@ -298,14 +299,21 @@ CommandRegistry::CommandRegistry() {
              const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
-             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err);
+             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
+                                  [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
+                                      opProgress(0.9f * f, "Remeshing");
+                                      return !opCancelled();
+                                  });
              if (m.triangleCount() == 0) return {false, err};
+             if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;
              if (keeping) {
                  Mesh stitched;
                  if (!stitchKeptTriangles(doc.mesh, keep, m, stitched, err, &keepNote)) return {false, "Remesh (Keep masked): " + err};
                  m = std::move(stitched);
              }
+             opProgress(0.95f, "Carrying the texture");
+             if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
              doc.replaceMeshUndoable(std::move(m), "Remesh", true);
              return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
@@ -403,7 +411,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"subdivide",
          "Smoothly subdivide the mesh (Loop subdivision). Each level multiplies the triangle count by 4. Unlike "
-         "Divide (subdiv_divide), it keeps no lower levels to step back to.",
+         "Divide (subdiv_divide), it keeps no lower levels to step back to. Can be cancelled between levels.",
          {{"levels", T::Number, "Number of subdivision levels to apply (1-4). Default 1.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              int levels = std::clamp(int(argNumber(a, "levels", 1)), 1, 4);
@@ -411,8 +419,12 @@ CommandRegistry::CommandRegistry() {
              for (int i = 0; i < levels; ++i) projected *= 4;
              if (projected > kMaxSubdivideTriangles)
                  return {false, "Subdividing would exceed " + std::to_string(kMaxSubdivideTriangles) + " triangles"};
-             Mesh m = loopSubdivide(doc.mesh);
-             for (int i = 1; i < levels; ++i) m = loopSubdivide(m);
+             Mesh m = loopSubdivide(doc.mesh); // (a cancel point after each level: one level itself can't stop)
+             for (int i = 1; i <= levels; ++i) {
+                 opProgress(float(i) / float(levels), "Subdivided level " + std::to_string(i) + " of " + std::to_string(levels));
+                 if (opCancelled()) return {false, "Subdivide cancelled; the scene is unchanged"};
+                 if (i < levels) m = loopSubdivide(m);
+             }
              doc.replaceMeshUndoable(std::move(m), "Subdivide");
              return {true, "Subdivided to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
@@ -465,7 +477,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"decimate",
-         "Reduce triangle count while preserving shape (quadric edge collapse). Sculpt layers are kept.",
+         "Reduce triangle count while preserving shape (quadric edge collapse). Sculpt layers are kept. Reports progress and can be cancelled (the scene stays as it was).",
          {{"ratio", T::Number, "Fraction of triangles to keep (0.01-1). Default 0.5.", false},
           {"triangles", T::Number, "Exact target triangle count (overrides ratio).", false},
           {"keep_masked", T::Bool, "Keep masked: masked vertices aren't moved or removed, so masked areas keep their "
@@ -475,7 +487,9 @@ CommandRegistry::CommandRegistry() {
                                  ? size_t(std::max(4.0, argNumber(a, "triangles", 4)))
                                  : size_t(double(doc.mesh.triangleCount()) *
                                           std::clamp(argNumber(a, "ratio", 0.5), 0.01, 1.0));
-             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate", true);
+             Mesh m = decimate(doc.mesh, target, argBool(a, "keep_masked", false));
+             if (opCancelled()) return {false, "Decimate cancelled; the scene is unchanged"};
+             doc.replaceMeshUndoable(std::move(m), "Decimate", true);
              return {true, "Decimated to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
 
@@ -577,7 +591,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"export_lods",
          "Generate a LOD chain of every visible Part and export each level as <name>_LOD<n>.glb next to `path`. "
-         "Blend shapes are kept on every LOD.",
+         "Blend shapes are kept on every LOD. Reports progress and can be cancelled before it writes the files or between them.",
          {{"path", T::String, "Base output path, e.g. /assets/rock.glb.", true},
           {"levels", T::Number, "Number of LODs including LOD0 (1-8). Default 4.", false},
           {"ratio", T::Number, "Triangle ratio between consecutive LODs (0.1-0.9). Default 0.5.", false}},
@@ -590,8 +604,11 @@ CommandRegistry::CommandRegistry() {
              if (objects.empty()) return {false, "Nothing visible to export"};
              // Every visible Part is decimated on its own; LOD n of each goes into <name>_LOD<n>.glb.
              std::vector<std::vector<Mesh>> lods;
-             for (const auto& o : objects) {
+             for (size_t k = 0; k < objects.size(); ++k) {
+                 const auto& o = objects[k];
+                 OpProgressWindow window(0.8f * float(k) / float(objects.size()), 0.8f / float(objects.size()));
                  lods.push_back(generateLods(*o.mesh, levels, ratio));
+                 if (opCancelled()) return {false, "Export LODs cancelled; nothing was written"};
                  // Decimation keeps the UVs, so every level can carry the Part's texture.
                  for (auto& l : lods.back()) l.texture = o.mesh->texture;
              }
@@ -600,6 +617,9 @@ CommandRegistry::CommandRegistry() {
              std::ostringstream msg;
              msg << "Exported";
              for (size_t i = 0; i < lods[0].size(); ++i) {
+                 // A cancel point before each file: the ones already written stay (they are complete files).
+                 opProgress(0.8f + 0.2f * float(i) / float(lods[0].size()), "Writing LOD" + std::to_string(i));
+                 if (opCancelled()) return {false, "Export LODs cancelled after " + std::to_string(i) + " of " + std::to_string(lods[0].size()) + " files"};
                  std::string fileName = stem + "_LOD" + std::to_string(i) + ".glb";
                  auto out = (base.parent_path() / std::u8string(fileName.begin(), fileName.end())).u8string();
                  std::string outPath(out.begin(), out.end());
