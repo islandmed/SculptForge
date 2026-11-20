@@ -1,0 +1,29 @@
+# Strokes on a Micro level show in the timelapse (member, 0.13.9: the export "recorded nothing inside the micro"). A Micro
+# level, then strokes on it: the timelapse's frames seek through the history, and the frame at the last step must show
+# the strokes (timelapse_micro_change: the largest difference to the frame before them, 0-255) and be what the whole
+# level sent up again draws (timelapse_micro_stale: 0 = no stroke's tiles missed on the GPU). Plain Micro, then Focus Detail.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+run micro_divide level=4
+key b
+key s
+key t
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+expect_value timeline_steps == 4
+wait_idle 60
+expect_value timelapse_micro_change > 0.3
+expect_value timelapse_micro_stale < 0.05
+# Focus Detail (a streamed level).
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=3
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+stroke 0.4 0.3 0.6 0.7
+expect_value timeline_steps == 4
+wait_idle 60
+expect_value timelapse_micro_change > 0.3
+expect_value timelapse_micro_stale < 0.05
