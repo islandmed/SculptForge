@@ -4,6 +4,7 @@
 // Inflate on a coarse quad tube (member report, #member-bug-reports): the brush wider than the tube must thicken it
 // evenly, each vertex along its own normal, never carry a whole section sideways as one lump.
 #include "TestHarness.h"
+#include "GeomInvariants.h"
 
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
@@ -51,7 +52,7 @@ std::vector<Section> sections(const Mesh& m, const Mesh& start) {
 }
 } // namespace
 
-TEST(inflate_coarse_tube_moves_each_vertex_along_its_own_normal) {
+TEST(inflate_coarse_tube_invariant_each_vertex_along_its_own_normal) {
     // Rings about 2:1 (0.1 round, 0.2 along) is just a coarse tube: no packed grid, so no dab carries its vertices along
     // one area normal. Brushes narrower and wider than the tube, a stroke of overlapping dabs along it.
     const float radius = 0.25f;
@@ -86,4 +87,32 @@ TEST(inflate_coarse_tube_moves_each_vertex_along_its_own_normal) {
         CHECK(moved > 0);
         CHECK(worstTurn > 0.999f);
     }
+}
+
+TEST(inflate_dense_sphere_invariant_build_only_clean_edge) {
+    // The promise on a dense curved mesh (the detector change must not touch it): Inflate only builds (no vertex sinks along
+    // its own normal) and leaves no spike at the falloff edge.
+    Document d = geom::denseSphere();
+    const std::vector<vec3> before = d.mesh.positions, normals = d.mesh.normals;
+    const float edge = geom::meanEdge(geom::denseSphereFixture().mesh), radius = 0.25f;
+    std::vector<vec3> centers;
+    CHECK(d.sculptor.beginStroke(d.mesh, "Inflate"));
+    for (int i = 0; i < 12; ++i) {
+        DabParams p;
+        p.center = glm::normalize(vec3(-0.2f + 0.04f * float(i), 0.1f, 1.0f)) * 1.0f;
+        p.viewDir = -glm::normalize(p.center);
+        p.radius = radius;
+        p.strength = 0.5f;
+        centers.push_back(p.center);
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Inflate, p, Symmetry{false, false, false});
+    }
+    d.undo.push(d.sculptor.endStroke());
+    const float sink = geom::maxSink(before, d.mesh, normals), moved = geom::maxMove(before, d.mesh);
+    const geom::EdgeReport e = geom::edgeOutliers(d.mesh, before, centers, radius, edge);
+    std::printf("  inflate on the dense sphere: moved %.4f (edge %.4f), sink %.2g, edge umbrella %.3f (%d spikes of %d)\n", moved,
+                edge, sink, e.worst, e.spikes, e.ring);
+    CHECK(moved > 0.05f * edge);
+    CHECK(sink < 1e-3f * edge);
+    CHECK(e.spikes == 0);
+    CHECK(geom::nonFinite(d.mesh) == 0);
 }
