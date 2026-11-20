@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.9:</strong> the Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes (<a href="https://sculptforge.app/guide/gizmo.md">how it works</a>)
+  <strong>New in 0.13.10:</strong> sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive (<a href="https://sculptforge.app/guide/layers.md">how it works</a>)
 </p>
 
 <p align="center">

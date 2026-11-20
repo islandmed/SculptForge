@@ -208,13 +208,13 @@ Drop a <code>.ply</code>, <code>.splat</code>, <code>.glb</code> or OpenUSD spla
 <strong>Linked duplicates</strong> (objects sharing one mesh) all show the last one received.
 </li>
 <li>
-<strong>Shape keys</strong>: the Basis and the keys named like SculptForge&#x27;s layers are updated; other keys keep their shapes.
+<strong>Shape keys</strong>: the Basis and the keys named like SculptForge&#x27;s layers are updated; other keys keep their shapes (a key you add in Blender goes to SculptForge as a layer the next time you send).
 </li>
 <li>
 <strong>Subdivision levels</strong> don&#x27;t go to Blender: it receives the level you&#x27;re on (like Bridge files).
 </li>
 <li>
-<strong>Sculpt layers</strong> arrive as <strong>shape keys</strong> (Basis plus one key per layer, with its name and weight), so the 52 <a href="facial-shapes.html">facial shapes</a> keep their ARKit names. Shape keys don&#x27;t come back from Blender, and textures stay in SculptForge.
+<strong>Sculpt layers and shape keys</strong> go both ways. A layer arrives in Blender as a <strong>shape key</strong> (Basis plus one key per layer, with its name and weight), so the 52 <a href="facial-shapes.html">facial shapes</a> keep their ARKit names. A shape key sent from Blender arrives in SculptForge as a <a href="layers.html">sculpt layer</a> with its name and value, in the same order; each key counts from the Basis (not from the key it is &quot;relative to&quot;), and a key limited by a vertex group or a slider range is sent as it is. With <strong>Apply modifiers</strong> on, the keys are baked into the sent mesh and don&#x27;t travel. Textures stay in SculptForge.
 </li>
 <li>
 <strong>Nothing arrives in SculptForge?</strong> Check <span class="path"><span>File</span><i>&#8250;</i><span>Blender</span><i>&#8250;</i><span>Receive automatically</span></span>, or choose <strong>Receive from Blender</strong>. <strong>Nothing arrives in Blender?</strong> Click <strong>Receive from SculptForge</strong>; automatic receiving starts after the first send from that Blender session.

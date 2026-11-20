@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.10
 
 ```features
-date: unreleased
+date: 2026-11-20
 tagline: Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive.
 highlight: Sculpt layers travel to Blender and back as shape keys, with names and order kept
 highlight: Hold Shift with the Paint brush to blend colours smoothly
@@ -25,6 +25,33 @@ title: Creature Skin brushes
 line: Sixteen brushes for scales, hide, folds and pores, each with its own full-precision alpha.
 action: guide:brush-packs.md
 ```
+
+- **Creature Skin brushes**: sixteen high-resolution brushes for hide wrinkles, snake and lizard scales, croc plates,
+  skin and nose pores and fine skin, tuned to read at micro level 3 or 4 (**Sculpt > Brush**, pack Creature Skin).
+  Requested by @RodTDai.
+- **Alphas from 16-bit PNG and OpenEXR** keep their full precision: smooth height maps no longer step.
+- **Layers round trip**: shape keys sent from Blender arrive as sculpt layers (names, values, order kept), and layers
+  go back as shape keys; glTF, FBX and USD files exported from SculptForge open with the same layers.
+- **AI agents see progress and can cancel**: long steps (remesh, subdivide, decimate, LOD export, 3D generation)
+  report how far they are, and an agent can stop one; the scene stays as it was.
+- **Smooth colour**: with the Paint brush, hold **Shift** to blend the vertex colours under the brush into their
+  neighbours. The shape stays put. Requested by fxrtst and others in the community.
+- **Member builds**: "Open the invitations page" now opens the organization invitation, so members can accept it.
+- **AI tools**: AI clients that never refresh their tool list (ChatGPT) now see every SculptForge tool as soon as they
+  connect, not only `live_connect`.
+- "**Orbit beside a small model**: pressing on the background next to a small, off-centre model no longer swings it
+  off the screen. With **Orbit around the pointer** on, the view turns about where you last sculpted, or about the
+  model."
+- **Paint after Smooth**: the Paint brush colours again when Smooth was the brush before it; strokes no longer blend
+  instead of painting.
+- **Timelapse and history on a Micro level**: strokes on a Micro level are saved with the project's history and show
+  in its timelapse.
+- **Clay at Micro level 4**: a long Clay stroke on a dense Micro level keeps up with the pointer much better; the
+  lighting under the last stretch of the brush may look slightly stale for a few seconds after the stroke while it
+  catches up.
+- **Voxel Remesh no longer refuses when memory is tight**: if a remesh needs more than the free memory but the
+  computer can hold it, it says so and lets you **Proceed anyway** (it may use swap and be slow). One that can't fit
+  at all says which Resolution would.
 
 ## Version 0.13.9
 

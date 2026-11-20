@@ -6,6 +6,96 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.10] - 2026-11-20
+
+### Added
+- **Creature Skin** brush pack and alphas (gh#228): Elephant Hide, Hide Folds, Dinosaur Hide, Snake Scales, Overlap
+  Scales, Pebble Scales, Scute Plates, Pores Fine, Pores Clustered, Pores Stretched, Nose Pores Open, Nose Pores
+  Dense, Nose Pores Furrowed, Skin Crosshatch, Skin Fine Lines and Skin Micro Grain. Each alpha is 2048 x 2048, made
+  in code by SculptForge the first time a brush uses it (no image files), and repeats without a seam (Alpha > Tile).
+  The brushes are tuned for micro levels: scales and plates step whole rows per dab, pores and grain turn each dab.
+  Requested by @RodTDai.
+- Alpha images: **OpenEXR** (half or float, any compression) and **16-bit PNG** load at full precision, with no 8-bit
+  step, up to 2048 pixels a side (was 512); an EXR outside 0 to 1 is stretched to its own range. The Alphas folder and
+  alpha pools take .exr too.
+- **Sculpt layers survive a round trip.** Blender shape keys sent with the add-on arrive as sculpt layers (name, value
+  and order kept, offsets placed by the object's transform) and return as shape keys; glTF morph targets, FBX blend
+  shapes and USD blend shapes already opened as layers, and a SculptForge export now opens with the same layers, in
+  the same order, with the same weights and offsets within 1e-5 (tested for each format, the 52 ARKit names included).
+- **MCP progress and cancel** (stdio server): a call with `_meta.progressToken` gets `notifications/progress` (at most
+  10 a second) from remesh, subdivide, decimate, export_lods, image_to_3d and text_to_3d, and from each command of a
+  batch; `notifications/cancelled` stops the request in flight at its next cancel point, leaving the scene as before
+  (no undo step; a cancelled batch rolls back whole), and the server keeps reading while a call runs, so `ping` is
+  answered meanwhile. micro_divide and subdiv_divide have no cancel point and say so in their descriptions.
+- **Smooth colour** (Paint brush, hold Shift): blends the vertex colours under the brush toward the average of their
+  neighbours, with Smooth's own Intensity. Mask, symmetry, falloff, the active paint layer and one undo step per
+  stroke work as for painting. The shape is never touched. With a sculpt brush (Rgb on), Shift still smooths the
+  shape; a Part that paints into a texture keeps the shape smooth for now. Requested by fxrtst and others in the
+  community.
+- Alpha images from OpenEXR: a height map below zero with transparent pixels keeps them at no effect (the range is
+  taken over the pixels that show); a file larger than 16384 pixels a side is refused from its header, before its
+  pixels are read; a downscaled image keeps its last column and row.
+- "**Frame last stroke** (no key by default: bind one in Preferences > Hotkeys): moves in on where you last sculpted
+  and keeps the view's angle."
+
+### Changed
+- "Predictive strokes hand the last stroke's position to the main thread with the finished batch (Frame last stroke
+  and the orbit about the last stroke); no visible change."
+- Release tooling: the update feed's "N changes in this release were members' requests" number is now written
+  automatically from the release's `member_request` notes (no manual step).
+- **High-resolution Voxel Remesh with little free memory** (#182, thanks @TheLycanFenrir): a remesh that needs more
+  than the free memory used to refuse. Now (at any Resolution, one memory estimate and one dialog), when it fits in
+  RAM plus the most swap the system can grow to (90% of that), a dialog says "This needs about X GB; Y GB is free. It
+  may use swap and be slow." with Proceed anyway or Cancel (Cancel is the default; nothing is remembered, it asks
+  every time). Proceed saves the recovery copy first, then remeshes with the usual progress and Cancel. The dialog
+  shows the limit it used. The swap figure is the maximum, not today's size: Linux the swap size; Windows the page
+  file maximum you set (system managed: the volume's free space, at most 3x RAM, so a page file that grows 52 -> 84 GB
+  counts as 84); macOS the startup volume's free space less 10 GB. One that is past RAM plus swap is still refused,
+  now with the numbers and the highest Resolution that fits. Running out of memory midway is caught: the Part stays as
+  it was and a message says so.
+
+### Fixed
+- **Layer names and vertex order in USD and glTF.** A USD export renamed layers with spaces or other characters
+  ("Smile 2" came back as "Smile_2"), and a glTF export with UV seams opened with its vertices renumbered; both now
+  come back as they were.
+- With **View falloff** on (the Brush palette), Clay, Clay Block, Flatten, Trim and the Brush Lab's plane brushes tore
+  long shards into a model: one stroke on a new Sphere left two bands of spikes. The brush reaches through the model
+  as a cylinder, and these brushes took their plane from all of it, the front and the far side together, then pulled
+  the far side through to that plane. The plane now comes from the surface under the cursor, and they leave what lies
+  a brush radius or more behind it, so a stroke over a thin part (an ear, a horn) still sculpts both of its faces and
+  the far side of a head or a sphere stays put. A brush that ever computes an invalid value (not a number) now skips
+  that dab and says so in the log, instead of moving the mesh (Fixes #229, reported by @Velisariy).
+- **Cloth brush**: with X symmetry both sides now move the same (Fixes #200)
+- **Member builds**: the "Open the invitations page" button opened a repository invitations page that shows "page not
+  found" for a member who is invited to the SculptForge organization on GitHub. It now opens the organization
+  invitation page, where the invitation is accepted.
+- **Live mode** (`sculptforge-cli --mcp --attach`): `tools/list` offers the full tool set from the first call, before
+  the connection is approved, because some clients (ChatGPT Work mode) keep the first list and ignore the list-changed
+  notice. A tool called before `live_connect` is approved answers "Not connected to SculptForge yet: call live_connect
+  (SculptForge must be open)"; after Approve the same tool works with no refresh. Reported by @maxyui77.
+- "**Orbit around the pointer**: a rotation started on the background while the middle of the view was on empty space
+  (a small model panned aside) turned about that empty middle and swung the model away. It now turns about the last
+  stroke if that is in view, else the middle of the model as it shows. Over the model, and with the preference off,
+  nothing changes."
+- **Brush ring frozen during a pen side-button drag** (#216, thanks @Calavera00): on a compositor that turns the pen's
+  side buttons into right / middle clicks (KDE on Wayland), the ring stayed where the button was pressed, and the view
+  did not turn, while the cursor went on, until the button was let go. A drag that a mouse button began now goes by
+  the pointer only while the pointer keeps moving; if it goes quiet the pen carries the drag on, so the ring and the
+  view follow the pen.
+- **Paint brush smoothing instead of colouring**: with Smooth picked (S, or its shelf tile) and then Paint (top shelf
+  Paint on, Sculpt off, or P), strokes blended the colour (or smoothed the shape) and never laid any, until another
+  brush was picked. Paint now colours whatever brush came before it; holding Shift still blends the colour.
+- **Timelapse of a Micro level** (member report): a project saved with its history lost the strokes made on a Micro
+  level (the saved history kept the steps without their detail, or was refused whole when it held only such steps), so
+  the timelapse of the reopened project missed them or could not be made. They are saved with it now (history file
+  version 2; older files still open). A step that moves the base mesh and writes Micro detail together is also seeked
+  exactly (the fast path skipped the detail). Adding or removing a Micro level still cuts the saved history there, as
+  a topology change does.
+- **Long Clay strokes on a Micro level 4 mesh lag and stall** (#184, thanks @HG4Science): the shading of the tiles
+  under the brush was recomputed in full every frame, the same tiles again and again. It now runs within a per-frame
+  time budget, each changed tile queued once, and finishes within a few seconds after the stroke (up to about 8 s on a
+  2.5M base at Micro level 4; the same result as before, checked against a full re-shade).
+
 ## [0.13.9] - 2026-11-19
 
 ### Added
