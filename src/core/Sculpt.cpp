@@ -208,10 +208,11 @@ std::function<float(const glm::vec3&)> stencilTexture(const DabParams& p, const 
 // Smooth's keep-volume steps (Sculptor::taubinShrink): Taubin's own values, pass band 1/lambda + 1/mu = 0.1.
 constexpr float kTaubinLambda = 0.6307f, kTaubinMu = -0.6732f;
 // Smooth's reach (Sculptor::smoothStepsFor): a plain Laplacian step relaxes a vertex toward its neighbours' average, a scale of one
-// edge, so on a dense mesh a dab of a given size barely changed the surface (1.3M triangles: 2% of what 20k removed). A dab
-// repeats the step (r / (kSmoothRefEdges x edge))^2 times, what it did on a mesh whose edges are 1/6 of the brush radius, at any
-// density, as far as kSmoothMaxWork (vertex steps per dab: 6-9 ms on 10 cores, 1.3M triangles) and kSmoothMaxSteps allow.
-constexpr float kSmoothRefEdges = 6.0f;
+// edge, so with many edges under the brush a dab did almost nothing (1.3M triangles: 2% of what 82k took off). Up to about 100k
+// triangles under a brush of this size (edges 1/16 of the radius and coarser) a dab is the one step it always was; on a denser
+// mesh it repeats the step (r / (16 x edge))^2 times, so a stroke takes off what it takes off at 100k, at any density. At most
+// kSmoothMaxWork vertex steps per dab (a few ms on 10 cores), kSmoothMaxSteps steps.
+constexpr float kSmoothRefEdges = 16.0f;
 constexpr int kSmoothMaxSteps = 256;
 constexpr size_t kSmoothMaxWork = 2500000;
 

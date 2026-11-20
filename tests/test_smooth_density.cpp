@@ -109,7 +109,7 @@ TEST(smooth_density_report) { // SF_SMOOTH_REPORT=1: the numbers, by density, st
 }
 
 // The same brush (size in the world, Intensity, pressure) takes about the same share of a bump pattern off at 82k, 330k and
-// 1.3M triangles (before: 48%, 9% and 2% of it after 8 dabs: a pen's Shift-smooth on a dense limb barely changed it).
+// 1.3M triangles (before: 30%, 9% and 2% of it after 8 dabs: a pen's Shift-smooth on a dense limb barely changed it).
 TEST(smooth_effect_does_not_fall_with_density) {
     double share[3];
     int k = 0;
@@ -117,11 +117,42 @@ TEST(smooth_effect_does_not_fall_with_density) {
         const Mesh m = bumpy(level);
         share[k] = removed(m, 0.5f, 1.0f, 8);
         std::printf("  Smooth, 8 dabs at Intensity 0.5 on %zu triangles: %.1f%% of the bump gone\n", m.triangleCount(), 100.0 * share[k]);
-        CHECK(share[k] > 0.3);
+        CHECK(share[k] > 0.25);
         ++k;
     }
     const double lo = std::min({share[0], share[1], share[2]}), hi = std::max({share[0], share[1], share[2]});
     CHECK(hi < 1.25 * lo);
+}
+
+// Up to about 100k triangles under the brush a Smooth dab is what it always was: one step toward the neighbours' average,
+// weighted by Intensity x pressure x falloff (82k triangles, brush radius 0.3: 16 edges to the radius).
+TEST(smooth_on_a_light_mesh_is_one_step) {
+    Mesh m = bumpy(6);
+    const Mesh start = m;
+    Document d = makeDoc(std::move(m));
+    DabParams p;
+    p.center = glm::normalize(glm::vec3(0.2f, 0.1f, 1.0f));
+    p.viewDir = -p.center;
+    p.radius = 0.3f;
+    p.strength = 0.5f;
+    p.pressure = 0.8f;
+    d.sculptor.beginStroke(d.mesh, "Smooth");
+    d.sculptor.dab(d.mesh, d.bvh, BrushType::Smooth, p, kNone);
+    d.undo.push(d.sculptor.endStroke());
+    double worst = 0.0, moved = 0.0;
+    for (uint32_t v = 0; v < start.vertexCount(); ++v) {
+        glm::vec3 avg(0.0f);
+        const auto ring = start.polygonNeighbors(v);
+        for (uint32_t u : ring) avg += start.positions[u];
+        avg /= float(ring.size());
+        const float w = std::min(1.0f, p.strength * p.pressure * brushFalloff(brushDistance(p, start.positions[v]), p.radius, p.focal));
+        const glm::vec3 expected = start.positions[v] + (avg - start.positions[v]) * w;
+        worst = std::max(worst, double(glm::distance(expected, d.mesh.positions[v])));
+        moved = std::max(moved, double(glm::distance(start.positions[v], d.mesh.positions[v])));
+    }
+    std::printf("  one Smooth dab on %zu triangles: moved up to %.5f, differs from one step by %.2g\n", start.triangleCount(), moved, worst);
+    CHECK(moved > 1e-4);
+    CHECK(worst < 1e-6);
 }
 
 // Pressure scales the strength once (a dab's effect is about proportional to it, not to its square).
@@ -130,7 +161,7 @@ TEST(smooth_pressure_is_applied_once) {
     const double full = removed(m, 0.5f, 1.0f, 1), half = removed(m, 0.5f, 0.5f, 1), fifth = removed(m, 0.5f, 0.2f, 1);
     std::printf("  one Smooth dab on %zu triangles removes %.2f%% at pressure 1, %.2f%% at 0.5, %.2f%% at 0.2\n", m.triangleCount(),
                 100.0 * full, 100.0 * half, 100.0 * fifth);
-    CHECK(full > 0.04);
+    CHECK(full > 0.03);
     CHECK(half > 0.4 * full && half < 0.65 * full);
     CHECK(fifth > 0.12 * full && fifth < 0.3 * full);
 }
