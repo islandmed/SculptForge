@@ -20,6 +20,10 @@
 #include <cstdlib>
 #include <filesystem>
 
+// tinyexr's writer (third_party/tinyexr, linked into core): RGBA and compressed files, which core's saveExr doesn't write.
+extern "C" int SaveEXR(const float* data, int width, int height, int components, int save_as_fp16, const char* filename,
+                       const char** err);
+
 using namespace sf;
 using namespace sf::geom;
 
@@ -86,15 +90,19 @@ TEST(creature_skin_alphas_full_size_made_once) {
     CHECK(BrushAlpha::builtin(all[count - 1].name, fetched));
     CHECK(BrushAlpha::builtinAt(all[count - 1].name, kCreatureSize, direct));
     CHECK(fetched.values == direct.values);
+    // Every alpha's relief at 512 px (the range and pattern checks below hold at any size), four at full size: one of
+    // each kind, Elephant Hide the slowest to make (all sixteen at 2048 took 24 s on a loaded test machine).
     double slowest = 0.0;
     std::string slowestName;
     for (size_t i = 0; i < count; ++i) {
+        const std::string n = all[i].name;
+        const bool full = n == "Elephant Hide" || n == "Snake Scales" || n == "Pores Fine" || n == "Skin Micro Grain";
         const auto t0 = std::chrono::steady_clock::now();
         BrushAlpha a;
-        CHECK(BrushAlpha::builtin(all[i].name, a));
+        CHECK(full ? BrushAlpha::builtin(n, a) : BrushAlpha::builtinAt(n, 512, a));
         const double first = msSince(t0);
-        if (first > slowest) slowest = first, slowestName = all[i].name;
-        CHECK(a.width == 2048 && a.height == 2048 && a.name == all[i].name);
+        if (full && first > slowest) slowest = first, slowestName = n;
+        CHECK(a.width == (full ? 2048 : 512) && a.height == a.width && a.name == n);
         double sum = 0.0;
         float lo = 1.0f, hi = 0.0f;
         for (float v : a.values) {
@@ -106,7 +114,8 @@ TEST(creature_skin_alphas_full_size_made_once) {
         CHECK(lo >= 0.0f && hi <= 1.0f);
         CHECK(hi > 0.95f && lo < 0.05f);  // the whole range: a full-strength stamp
         CHECK(mean > 0.05 && mean < 0.85); // a pattern, not a flat plate
-        CHECK(levels(a.values) > 4096);    // smooth relief, finer than 16-bit images' 8-bit cousins
+        CHECK(levels(a.values) > (full ? 4096u : 1024u)); // smooth relief, far past an 8-bit image's 256 levels
+        if (!full) continue;
         // Kept: the second time is a copy, not a new one.
         const auto t1 = std::chrono::steady_clock::now();
         BrushAlpha again;
@@ -308,4 +317,91 @@ TEST(creature_skin_pack_micro_level_invariants) {
         ++checked;
     }
     CHECK(checked == 16);
+}
+
+// Loader edges (review of #228): an RGBA EXR height map below zero with transparent pixels stretches over the pixels
+// that show and leaves the transparent ones at no effect; a size past 16384 is refused from the header, before the
+// pixels are read; a box-filtered size rounds up, so the last column and row aren't dropped.
+TEST(alpha_file_exr_edges) {
+    const int w = 64, h = 4;
+    std::vector<float> rgba(size_t(w) * h * 4);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            float* p = &rgba[(size_t(y) * w + size_t(x)) * 4];
+            const float v = -3.0f + 2.0f * float(x) / float(w - 1); // -3 .. -1
+            p[0] = p[1] = p[2] = v;
+            p[3] = x < 8 ? 0.0f : 1.0f; // the first eight columns transparent
+        }
+    const std::string path = tempPath("sf_alpha_rgba_neg.exr");
+    const char* err = nullptr;
+    CHECK(SaveEXR(rgba.data(), w, h, 4, 1, path.c_str(), &err) == 0); // (half floats, tinyexr's default compression)
+    BrushAlpha a;
+    std::string error;
+    CHECK(BrushAlpha::fromFile(path, "neg", false, a, error));
+    CHECK(a.width == w);
+    CHECK(a.values[0] == 0.0f && a.values[7] == 0.0f);     // transparent: no effect, not stretched to white
+    CHECK(a.values[8] < 0.01f && a.values[size_t(w) - 1] > 0.99f); // the visible range is 0..1
+    std::filesystem::remove(path);
+
+    std::vector<float> wide(size_t(16400) * 3, 0.5f);
+    const std::string big = tempPath("sf_alpha_wide.exr");
+    CHECK(SaveEXR(wide.data(), 16400, 1, 3, 1, big.c_str(), &err) == 0);
+    BrushAlpha b;
+    CHECK(!BrushAlpha::fromFile(big, "wide", false, b, error) && error.find("16384") != std::string::npos);
+    std::filesystem::remove(big);
+
+    const int odd = 3001;
+    std::vector<uint16_t> ramp(size_t(odd) * 2);
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < odd; ++x) ramp[size_t(y) * odd + size_t(x)] = x == odd - 1 ? 65535 : 0;
+    const std::string png = tempPath("sf_alpha_odd16.png");
+    CHECK(savePng16(png, odd, 2, 1, ramp, error));
+    BrushAlpha c;
+    CHECK(BrushAlpha::fromFile(png, "odd", false, c, error, 1000));
+    CHECK(c.width == 751);                        // ceil(3001 / 4)
+    CHECK(c.values[size_t(c.width) - 1] > 0.99f); // the last column is its own box, kept
+    std::filesystem::remove(png);
+}
+
+// The promise behind the loader edges, on the dense sphere: a negative, partly transparent EXR height map as a carving
+// alpha only carves (no vertex rises), the transparent part of the stamp moves nothing, and nothing goes NaN or flips.
+TEST(exr_alpha_carve_invariant) {
+    const int n = 128;
+    std::vector<float> rgba(size_t(n) * n * 4);
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            float* p = &rgba[(size_t(y) * n + size_t(x)) * 4];
+            const float v = -2.0f + 1.5f * std::sin(float(x) * 0.3f) * std::cos(float(y) * 0.3f); // -3.5 .. -0.5
+            p[0] = p[1] = p[2] = v;
+            p[3] = x < n / 2 ? 0.0f : 1.0f; // the left half of the stamp transparent
+        }
+    const std::string path = tempPath("sf_alpha_carve.exr");
+    const char* err = nullptr;
+    CHECK(SaveEXR(rgba.data(), n, n, 4, 0, path.c_str(), &err) == 0);
+    Document d = denseSphere();
+    std::string error;
+    CHECK(BrushAlpha::fromFile(path, "carve", false, d.brushAlpha, error));
+    std::filesystem::remove(path);
+    const std::vector<glm::vec3> before = d.mesh.positions, normals = d.mesh.normals;
+    BrushRecipe r; // a carving tip, as the pore brushes are
+    r.depth = -0.5f;
+    r.spacing = 0.3f;
+    PathStroke s;
+    s.points = {glm::vec3(0.0f, -0.1f, 1.2f), glm::vec3(0.0f, 0.1f, 1.2f)}; // straight up the view: the alpha upright
+    s.radius = 0.12f;
+    s.strength = 0.6f;
+    s.symmetry = Symmetry{false, false, false};
+    CHECK(strokePath(d, &r, BrushType::Standard, s, error) > 0);
+    const float edge = meanEdge(d.mesh);
+    const float rise = maxRise(before, d.mesh, normals), sink = maxSink(before, d.mesh, normals);
+    std::printf("  EXR carve: sink %.2g rise %.2g (edge %.2g)\n", sink, rise, edge);
+    CHECK(sink > 0.05f * edge);  // it carved
+    CHECK(rise < 0.02f * edge);  // and raised nothing
+    CHECK(nonFinite(d.mesh) == 0 && flippedFaces(before, d.mesh) == 0);
+    // The transparent half (screen left of the stroke, x < -0.02 here) stays where it was.
+    float leftMoved = 0.0f;
+    for (size_t v = 0; v < before.size(); ++v)
+        if (before[v].x < -0.02f && before[v].z > 0.8f) leftMoved = std::max(leftMoved, glm::distance(before[v], d.mesh.positions[v]));
+    std::printf("  transparent half moved at most %.2g\n", leftMoved);
+    CHECK(leftMoved < 0.02f * edge);
 }

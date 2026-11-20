@@ -41,10 +41,7 @@ TEST(brush_packs_seven_packs_of_ten) { // (Hard Surface has an eleventh: Crisp F
         CHECK(!builtinBrushPackHelp(r.origin.pack).empty());
         CHECK(!r.description.empty() && r.description.size() <= 110); // one line
         CHECK(r.description.back() == '.');
-        if (!r.alpha.empty()) {
-            BrushAlpha a;
-            CHECK(BrushAlpha::builtin(r.alpha, a) && a.name == r.alpha);
-        }
+        if (!r.alpha.empty()) CHECK(BrushAlpha::builtinName(r.alpha) == r.alpha); // (makes nothing: no 2048 px alphas)
     }
     for (const std::string& p : builtinBrushPacks())
         CHECK(perPack[p] == (p == "Hard Surface" ? 11 : p == "Creature Skin" ? 16 : 10));

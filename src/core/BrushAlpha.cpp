@@ -546,8 +546,8 @@ const BrushAlpha& creatureFull(int i, int ownThreads = 0) {
     CreatureStore& s = creatureStore();
     std::call_once(s.once[size_t(i)], [&] {
         s.made[size_t(i)] = std::make_shared<const BrushAlpha>(makeCreature(s.all[i], kCreatureSize, ownThreads));
-        gCreatureReady.fetch_or(uint64_t(1) << i);
     });
+    gCreatureReady.fetch_or(uint64_t(1) << i); // (after call_once returns: a frame that sees the bit never waits on it)
     return *s.made[size_t(i)];
 }
 
@@ -578,11 +578,24 @@ bool loadGrey(const std::string& path, int& w, int& h, std::vector<float>& grey,
         EXRHeader header;
         InitEXRHeader(&header);
         bool hasAlpha = false, single = false;
-        if (ParseEXRVersionFromMemory(&version, bytes.data(), bytes.size()) == TINYEXR_SUCCESS &&
-            ParseEXRHeaderFromMemory(&header, &version, bytes.data(), bytes.size(), nullptr) == TINYEXR_SUCCESS) {
+        // The header first: its size is checked before LoadEXRFromMemory allocates anything for the pixels.
+        const bool parsed = ParseEXRVersionFromMemory(&version, bytes.data(), bytes.size()) == TINYEXR_SUCCESS &&
+                            ParseEXRHeaderFromMemory(&header, &version, bytes.data(), bytes.size(), nullptr) == TINYEXR_SUCCESS;
+        int64_t hw = 0, hh = 0;
+        if (parsed) {
             single = header.num_channels == 1;
             for (int c = 0; c < header.num_channels; ++c) hasAlpha |= std::string(header.channels[c].name) == "A";
-            FreeEXRHeader(&header);
+            hw = int64_t(header.data_window.max_x) - header.data_window.min_x + 1;
+            hh = int64_t(header.data_window.max_y) - header.data_window.min_y + 1;
+        }
+        FreeEXRHeader(&header); // (safe after InitEXRHeader, parsed or not)
+        if (!parsed) {
+            error = "Can't read the EXR header";
+            return false;
+        }
+        if (hw <= 0 || hh <= 0 || hw > 16384 || hh > 16384) {
+            error = "The EXR is empty or too large (" + std::to_string(hw) + " x " + std::to_string(hh) + "; up to 16384 a side)";
+            return false;
         }
         float* rgba = nullptr;
         const char* err = nullptr;
@@ -597,18 +610,25 @@ bool loadGrey(const std::string& path, int& w, int& h, std::vector<float>& grey,
             return false;
         }
         grey.resize(size_t(w) * size_t(h));
+        std::vector<float> alpha(grey.size(), 1.0f);
         for (size_t i = 0; i < grey.size(); ++i) {
             const float* p = &rgba[i * 4];
-            const float a = (hasAlpha && !single) ? std::clamp(p[3], 0.0f, 1.0f) : 1.0f; // (one channel fills all four)
-            grey[i] = (single ? p[0] : lum(p[0], p[1], p[2])) * a;
-            if (!std::isfinite(grey[i])) grey[i] = 0.0f;
+            if (hasAlpha && !single) alpha[i] = std::isfinite(p[3]) ? std::clamp(p[3], 0.0f, 1.0f) : 0.0f; // (one channel fills all four)
+            grey[i] = single ? p[0] : lum(p[0], p[1], p[2]);
+            if (!std::isfinite(grey[i])) grey[i] = 0.0f, alpha[i] = 0.0f;
         }
         std::free(rgba);
-        // A height map in its own units (negative, or above 1): its lowest to 0 and highest to 1.
-        const auto [mn, mx] = std::minmax_element(grey.begin(), grey.end());
-        if (*mn < 0.0f || *mx > 1.0f) {
-            const float lo = *mn, span = std::max(*mx - *mn, 1e-12f);
-            for (float& v : grey) v = (v - lo) / span;
+        // A height map in its own units (negative, or above 1): its lowest to 0 and highest to 1, over the pixels that
+        // show; then alpha, so transparent pixels are no effect whatever the range (not the lowest value stretched).
+        float lo = 0.0f, hi = 0.0f;
+        bool any = false;
+        for (size_t i = 0; i < grey.size(); ++i)
+            if (alpha[i] > 0.0f) lo = any ? std::min(lo, grey[i]) : grey[i], hi = any ? std::max(hi, grey[i]) : grey[i], any = true;
+        const bool stretch = any && (lo < 0.0f || hi > 1.0f);
+        const float span = std::max(hi - lo, 1e-12f);
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const float v = stretch ? (grey[i] - lo) / span : grey[i];
+            grey[i] = std::clamp(v, 0.0f, 1.0f) * alpha[i];
         }
         return true;
     }
@@ -846,8 +866,8 @@ bool BrushAlpha::fromFile(const std::string& path, std::string name, bool invert
     const int k = side > cap ? (side + cap - 1) / cap : 1;
     BrushAlpha a;
     a.name = std::move(name);
-    a.width = std::max(1, w / k);
-    a.height = std::max(1, h / k);
+    a.width = std::max(1, (w + k - 1) / k); // (rounded up: the last, partial box keeps the right and bottom edge)
+    a.height = std::max(1, (h + k - 1) / k);
     a.values.resize(size_t(a.width) * size_t(a.height));
     for (int y = 0; y < a.height; ++y)
         for (int x = 0; x < a.width; ++x) {
