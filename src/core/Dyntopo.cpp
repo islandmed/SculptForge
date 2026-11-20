@@ -1416,7 +1416,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     phase(stats.collapseMs);
     flipPass();
     phase(stats.flipMs);
-    relaxPass();
+    if (!refineOnly) relaxPass(); // (a refinement keeps the split points on their facets: relaxing frays a sharp fold's lip)
     const bool changed = !changedV_.empty() || !changedT_.empty();
     compact();
     stats.maxOps = std::max(stats.maxOps, ops_);

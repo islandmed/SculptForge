@@ -713,10 +713,25 @@ void Sculptor::smoothSplits(Mesh& mesh, BVH& bvh, uint32_t first) {
     for (int round = 0; round < 3; ++round) {
         poolFor(verts.size(), [&](size_t b, size_t e) {
             for (size_t i = b; i < e; ++i) {
+                // Not on or next to a sharp fold (a pulled flange's lip): the average there frays the edge into teeth.
+                glm::vec3 mean(0.0f);
+                const auto tris = mesh.vertexTriangles(verts[i]);
+                for (uint32_t t : tris) {
+                    const glm::uvec3 tri = mesh.triangles[t];
+                    mean += glm::cross(mesh.positions[tri.y] - mesh.positions[tri.x], mesh.positions[tri.z] - mesh.positions[tri.x]);
+                }
+                const float meanLen = glm::length(mean);
+                bool fold = !(meanLen > 1e-20f);
+                for (uint32_t t : tris) {
+                    if (fold) break;
+                    const glm::uvec3 tri = mesh.triangles[t];
+                    const glm::vec3 n = glm::cross(mesh.positions[tri.y] - mesh.positions[tri.x], mesh.positions[tri.z] - mesh.positions[tri.x]);
+                    fold = glm::dot(n, mean) < 0.6f * glm::length(n) * meanLen;
+                }
                 glm::vec3 sum(0.0f);
                 size_t n = 0;
                 for (uint32_t w : mesh.neighbors(verts[i])) sum += mesh.positions[w], ++n;
-                delta[i] = n ? (sum / float(n) - mesh.positions[verts[i]]) * 0.5f : glm::vec3(0.0f);
+                delta[i] = n && !fold ? (sum / float(n) - mesh.positions[verts[i]]) * 0.5f : glm::vec3(0.0f);
             }
         });
         displaceAll(mesh, verts, delta);
