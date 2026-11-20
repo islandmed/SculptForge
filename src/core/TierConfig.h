@@ -65,6 +65,11 @@ size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t min
 // frame through the orbit on the floor tier); still frames get all of the points, as nothing waits for them.
 size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints);
 
+// How many of `pending` tiles waiting for coarse shading to hand to one frame: all of them when `ms` is 0 (off), 64 while the
+// cost per tile (`nsPerTile`, measured, ring of neighbours included) is not known yet, else what fits in `ms`, at least 16
+// (a queue always moves). So a stroke's frame carries a bounded share however many tiles it has changed (#184).
+size_t coarseShadeBatch(size_t pending, double ms, double nsPerTile);
+
 // 144 for displays of 143 Hz and up, 120 from 119 Hz, else 60 (also when unknown: 0).
 int targetHzForDisplay(int displayHz);
 // The knobs for `profile` on this power source and display (displayHz 0 = unknown), the hardware tier stepped down

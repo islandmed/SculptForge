@@ -710,6 +710,13 @@ TEST(hw_stroke_shade_budget) {
     CHECK(strokeShadeBudget(1u << 20, 10.0, 20.0, 300) == 500000);         // 10 ms at 20 ns a point
     CHECK(strokeShadeBudget(1u << 20, 10.0, 2.0, 300) == (1u << 20));      // fast enough: the points still cap it
     CHECK(strokeShadeBudget(0, 10.0, 20.0, 300) == 500000);                // no points limit
+    // The coarse shading a stroke's frame carries is bounded however many tiles it changed (#184: Clay at micro level 4).
+    CHECK(coarseShadeBatch(1000000, 10.0, 100000.0) == 100);               // 10 ms at 0.1 ms a tile
+    CHECK(coarseShadeBatch(10000000, 10.0, 100000.0) == 100);              // ten times the tiles: the same frame
+    CHECK(coarseShadeBatch(50, 10.0, 100000.0) == 50);                     // less waiting than fits: all of it
+    CHECK(coarseShadeBatch(1000000, 10.0, 1e9) == 16);                     // a queue always moves
+    CHECK(coarseShadeBatch(1000000, 10.0, 0.0) == 64);                     // cost not measured yet
+    CHECK(coarseShadeBatch(1000000, 0.0, 100000.0) == 1000000);            // off
     CHECK(strokeShadeBudget(1u << 20, 10.0, 1e9, 300) == 300);             // at least one patch and its ring
 }
 
