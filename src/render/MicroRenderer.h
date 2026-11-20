@@ -54,7 +54,9 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
-    size_t pendingShading() const { return pendingCount_ + staleCount_ + (focus_ ? focus_->pendingCoarse() : 0); }
+    size_t pendingShading() const { return pendingCount_ + staleCount_; }
+    // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
+    size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
