@@ -8,4 +8,4 @@ testers:
 Follow-up to the 0.13.9 Focus Detail work. Cause (v0.13.9, b2.5m-m4, floor tier, 25 s Clay sweep): per frame, 40-130 ms of
 main-thread coarse shading of the tiles under the brush (plus their two rings of neighbours), re-done every frame for the same
 tiles, on top of Focus Detail's scoring. Reporter's freeze (73 px brush, one 2-3 s stall, one 277 ms dab batch): overload of
-the main thread by this work. Test: hw_stroke_shade_budget (coarseShadeBatch bound). Rows in REPORT.md.
+the main thread by this work. Test: hw_stroke_shade_budget (coarseShadeBatch bound).
