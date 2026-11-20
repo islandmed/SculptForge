@@ -850,7 +850,7 @@
      "title": "Render bridge",
      "line": "Send a quick render, or the scene with its materials and vertex paint, to an external renderer or image editor in one click.",
      "where": "Render panel and File menu",
-     "votes": 0,
+     "votes": 1,
      "status": "shipped",
      "shipped": "0.13.9"
     }
@@ -874,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-19T23:04:52Z"
+ "updated": "2026-11-20T14:08:09Z"
 }
