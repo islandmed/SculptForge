@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
         } else if (a == "--mcp") {
             // --attach: drive the open app (live mode, cli/McpAttach.h) instead of a scene of our own.
             for (int j = i + 1; j < argc; ++j)
-                if (std::string(argv[j]) == "--attach") return sf::runMcpAttach(std::cin, std::cout);
+                if (std::string(argv[j]) == "--attach") return sf::runMcpAttach(std::cin, std::cout, {}, &registry);
             return sf::runMcpServer(registry, std::cin, std::cout);
         } else if (a == "--schema") {
             std::puts(registry.toolSchemaJson().c_str());
