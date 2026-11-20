@@ -8,6 +8,7 @@
 #include "core/Benchmark.h"
 #include "core/Commands.h"
 #include "core/Masking.h"
+#include "core/Micro.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Timeline.h"
@@ -270,6 +271,106 @@ TEST(timeline_history_sidecar_round_trip) {
         CHECK(!Timeline::load(f, part, &err));
     }
     std::filesystem::remove_all(dir);
+}
+
+// Member bug (0.13.9): a timelapse made from a reopened project "recorded nothing inside the micro": the saved history
+// kept a Micro stroke's step without its tiles (or refused the whole history as damaged). They are saved with it now:
+// after loading, the strokes on the Micro level seek and replay exactly.
+TEST(timeline_history_sidecar_keeps_micro_strokes) {
+    Document d = makeDoc(makeBenchSphere(3000));
+    std::string err;
+    CHECK(microDivide(d.mesh, 3, err));
+    d.bvh.build(d.mesh);
+    auto t = Timeline::attach(d);
+    const std::vector<int16_t> start = d.mesh.micro->disp.toVector();
+    std::vector<std::vector<int16_t>> states{start};
+    Symmetry sym;
+    sym.x = false;
+    for (int i = 0; i < 3; ++i) {
+        CHECK(d.sculptor.beginStroke(d.mesh, "Standard"));
+        for (int k = 0; k < 5; ++k) {
+            DabParams p;
+            p.center = glm::normalize(glm::vec3(0.1f * float(i) + 0.03f * float(k), 0.05f, 1.0f));
+            p.viewDir = -p.center;
+            p.radius = 0.12f;
+            p.strength = 0.8f;
+            d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, sym);
+        }
+        d.undo.push(d.sculptor.endStroke());
+        t->sync(d);
+        states.push_back(d.mesh.micro->disp.toVector());
+        CHECK(states.back() != states[states.size() - 2]); // (the stroke changed the micro level)
+    }
+    const std::string dir = tempPath("sf_timeline_micro_test");
+    std::filesystem::create_directories(dir);
+    const std::string project = dir + "/history.sfp";
+    CHECK(saveProject(project, d, err));
+    CHECK(saveHistorySidecar(d, project, &err));
+
+    Document e;
+    CHECK(loadProject(project, e, err));
+    CHECK(e.mesh.micro != nullptr);
+    CHECK(loadHistorySidecar(e, project, &err) == 1);
+    Timeline* u = Timeline::of(e.undo);
+    CHECK(u != nullptr);
+    if (!u || !e.mesh.micro) return;
+    CHECK(u->path().size() == 4);
+    CHECK(e.mesh.micro->disp.toVector() == states[3]);
+    CHECK(u->seek(e, 0));
+    CHECK(e.mesh.micro->disp.toVector() == states[0]);
+    CHECK(u->seek(e, 1));
+    CHECK(e.mesh.micro->disp.toVector() == states[1]);
+    CHECK(u->seek(e, 3));
+    CHECK(e.mesh.micro->disp.toVector() == states[3]);
+    std::filesystem::remove_all(dir);
+}
+
+// A step that moves the base and writes Micro tiles (a big dab's base kernel, Move on the cage) is one record with
+// both: seeking must swap the tiles too (the positions-only fast path left them where they were).
+TEST(timeline_seek_swaps_micro_tiles_of_steps_that_move_the_base) {
+    Document d = makeDoc(makeBenchSphere(3000));
+    std::string err;
+    CHECK(microDivide(d.mesh, 3, err));
+    d.bvh.build(d.mesh);
+    auto t = Timeline::attach(d);
+    const std::vector<int16_t> start = d.mesh.micro->disp.toVector();
+    const std::vector<glm::vec3> basePositions = d.mesh.positions;
+    Symmetry sym;
+    sym.x = false;
+    for (int i = 0; i < 2; ++i) {
+        CHECK(d.sculptor.beginStroke(d.mesh, "Standard"));
+        for (int k = 0; k < 5; ++k) {
+            DabParams p;
+            p.center = glm::normalize(glm::vec3(0.1f * float(i) + 0.03f * float(k), 0.05f, 1.0f));
+            p.viewDir = -p.center;
+            p.radius = 0.12f;
+            p.strength = 0.8f;
+            d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, sym);
+        }
+        UndoRecord r = d.sculptor.endStroke();
+        CHECK(r.micro != nullptr);
+        if (r.micro && i == 1) { // the second one also moved a base vertex
+            r.positions.indices = {7};
+            r.positions.values = {d.mesh.positions[7]};
+            d.mesh.positions[7] += glm::vec3(0.0f, 0.02f, 0.0f);
+            d.mesh.markDirty(7);
+            d.bvh.refit(d.mesh, r.positions.indices);
+        }
+        d.undo.push(std::move(r));
+        t->sync(d);
+    }
+    const std::vector<int16_t> end = d.mesh.micro->disp.toVector();
+    const std::vector<glm::vec3> endPositions = d.mesh.positions;
+    CHECK(end != start);
+    CHECK(t->seek(d, 0));
+    CHECK(d.mesh.micro->disp.toVector() == start);
+    CHECK(maxDiff(d.mesh.positions, basePositions) < 1e-6f);
+    CHECK(t->seek(d, 2));
+    CHECK(d.mesh.micro->disp.toVector() == end);
+    CHECK(maxDiff(d.mesh.positions, endPositions) < 1e-6f);
+    CHECK(t->seek(d, 1));
+    CHECK(t->seek(d, 2));
+    CHECK(d.mesh.micro->disp.toVector() == end);
 }
 
 TEST(timeline_follows_the_undo_budget_and_clear) {

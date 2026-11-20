@@ -86,8 +86,8 @@ about the last 100 strokes of the size above, a 33 million one about 70; small d
 Turn on **Save with project** (the save icon on the strip) and saving a project also writes its history beside it, as
 `name.sfhist` next to `name.sfproj`. Opening the project brings the timeline back, branches and re-tuned strengths
 included, as long as the project hasn't been changed elsewhere since. Sculpt strokes, masks, vertex paint, visibility
-and face groups are saved; a topology change (dynamic topology, remesh, Add Level, sculpt layers) cuts the saved
-history there, keeping what came after it.
+and face groups are saved, and so are strokes on a Micro level; a topology change (dynamic topology, remesh, Add Level,
+adding or removing a Micro level, sculpt layers) cuts the saved history there, keeping what came after it.
 
 ## Timelapse video
 

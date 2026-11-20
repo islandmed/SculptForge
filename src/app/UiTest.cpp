@@ -1753,6 +1753,32 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return worst;
     }
+    if (name == "timelapse_micro_change" || name == "timelapse_micro_stale") {
+        // Strokes on a Micro level in the timelapse (member bug, 0.13.9: "recorded nothing inside the micro"). The frame
+        // after step 1 (the script's Micro level, no stroke yet) and at the last step, as renderTimelapseFrame draws
+        // them (static camera, 320x180):
+        // _change = mean per-pixel difference (0-255) between the two (the strokes must show);
+        // _stale = the last step's frame against the same frame with the whole level sent up again (0 = nothing missed).
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t || t->cursor() == 0) return -1.0;
+        const size_t last = t->cursor();
+        Camera cam = app_.camera_;
+        cam.frame(app_.sceneBounds());
+        cam.pitch = app_.camera_.pitch;
+        cam.distance *= 0.72f;
+        cam.aspect = 320.0f / 180.0f;
+        std::vector<uint8_t> first, end, whole;
+        std::string err;
+        if (!t->seek(app_.doc_, 1, &err) || !app_.renderTimelapseFrame(cam, 320, 180, first, err)) return -2.0;
+        if (!t->seek(app_.doc_, last, &err) || !app_.renderTimelapseFrame(cam, 320, 180, end, err)) return -3.0;
+        app_.displayedMesh().topologyDirty = true; // (a full upload)
+        if (!app_.renderTimelapseFrame(cam, 320, 180, whole, err) || whole.size() != end.size() || first.size() != end.size())
+            return -4.0;
+        const std::vector<uint8_t>& other = name == "timelapse_micro_change" ? first : whole;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < end.size(); ++i) sum += uint64_t(std::abs(int(end[i]) - int(other[i])));
+        return double(sum) / double(std::max<size_t>(1, end.size()));
+    }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
     if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
         app_.benchmarkDrawMs(0);

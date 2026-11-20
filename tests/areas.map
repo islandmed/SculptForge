@@ -104,6 +104,7 @@ ui_navigation               render
 ui_orbit_lock               render
 ui_timelapse_flicker        render
 ui_timelapse_failure        io
+ui_timelapse_micro          render
 ui_remove_flat_background   render
 ui_frame_free_area*         render
 ui_hover_pop                render
