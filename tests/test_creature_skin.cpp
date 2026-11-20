@@ -20,6 +20,10 @@
 #include <cstdlib>
 #include <filesystem>
 
+// tinyexr's writer (third_party/tinyexr, linked into core): RGBA and compressed files, which core's saveExr doesn't write.
+extern "C" int SaveEXR(const float* data, int width, int height, int components, int save_as_fp16, const char* filename,
+                       const char** err);
+
 using namespace sf;
 using namespace sf::geom;
 
@@ -308,4 +312,48 @@ TEST(creature_skin_pack_micro_level_invariants) {
         ++checked;
     }
     CHECK(checked == 16);
+}
+
+// Loader edges (review of #228): an RGBA EXR height map below zero with transparent pixels stretches over the pixels
+// that show and leaves the transparent ones at no effect; a size past 16384 is refused from the header, before the
+// pixels are read; a box-filtered size rounds up, so the last column and row aren't dropped.
+TEST(alpha_file_exr_edges) {
+    const int w = 64, h = 4;
+    std::vector<float> rgba(size_t(w) * h * 4);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            float* p = &rgba[(size_t(y) * w + size_t(x)) * 4];
+            const float v = -3.0f + 2.0f * float(x) / float(w - 1); // -3 .. -1
+            p[0] = p[1] = p[2] = v;
+            p[3] = x < 8 ? 0.0f : 1.0f; // the first eight columns transparent
+        }
+    const std::string path = tempPath("sf_alpha_rgba_neg.exr");
+    const char* err = nullptr;
+    CHECK(SaveEXR(rgba.data(), w, h, 4, 1, path.c_str(), &err) == 0); // (half floats, tinyexr's default compression)
+    BrushAlpha a;
+    std::string error;
+    CHECK(BrushAlpha::fromFile(path, "neg", false, a, error));
+    CHECK(a.width == w);
+    CHECK(a.values[0] == 0.0f && a.values[7] == 0.0f);     // transparent: no effect, not stretched to white
+    CHECK(a.values[8] < 0.01f && a.values[size_t(w) - 1] > 0.99f); // the visible range is 0..1
+    std::filesystem::remove(path);
+
+    std::vector<float> wide(size_t(16400) * 3, 0.5f);
+    const std::string big = tempPath("sf_alpha_wide.exr");
+    CHECK(SaveEXR(wide.data(), 16400, 1, 3, 1, big.c_str(), &err) == 0);
+    BrushAlpha b;
+    CHECK(!BrushAlpha::fromFile(big, "wide", false, b, error) && error.find("16384") != std::string::npos);
+    std::filesystem::remove(big);
+
+    const int odd = 3001;
+    std::vector<uint16_t> ramp(size_t(odd) * 2);
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < odd; ++x) ramp[size_t(y) * odd + size_t(x)] = x == odd - 1 ? 65535 : 0;
+    const std::string png = tempPath("sf_alpha_odd16.png");
+    CHECK(savePng16(png, odd, 2, 1, ramp, error));
+    BrushAlpha c;
+    CHECK(BrushAlpha::fromFile(png, "odd", false, c, error, 1000));
+    CHECK(c.width == 751);                        // ceil(3001 / 4)
+    CHECK(c.values[size_t(c.width) - 1] > 0.99f); // the last column is its own box, kept
+    std::filesystem::remove(png);
 }
