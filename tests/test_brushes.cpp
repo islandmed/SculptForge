@@ -638,10 +638,11 @@ TEST(spray_and_spacing_are_deterministic) {
 TEST(alpha_generated_builtins) {
     // #43: twelve patterns made in code (no image files), after Round, Square and Noise, six for the brush packs and six for wood.
     const auto& all = BrushAlpha::builtins();
-    CHECK(all.size() == 30); // ...and three procedural wood grains
+    CHECK(all.size() == 46); // ...and three procedural wood grains, then the sixteen Creature Skin tiles (test_creature_skin)
     CHECK(all[0].empty() && all[0].name == "Round" && all[1].name == "Square" && all[2].name == "Noise");
     for (size_t i = 3; i < all.size(); ++i) {
         const BrushAlpha& a = all[i];
+        if (!BrushAlpha::builtinGroup(a.name).empty()) continue; // (seamless tiles, made full size by name)
         CHECK(a.width == 128 && a.height == 128 && a.values.size() == 128u * 128u);
         float lo = 1.0f, hi = 0.0f, border = 0.0f;
         double sum = 0.0;

@@ -103,7 +103,8 @@ private:
 // Drag Stamp, takes one. Immutable once made, so a stroke keeps the pool it began with while the artist edits the next.
 class AlphaPool {
 public:
-    static constexpr size_t kMax = 32; // 512 px floats each: about 1 MB apiece
+    static constexpr size_t kMax = 32; // kSide px floats each: about 1 MB apiece
+    static constexpr int kSide = 512;
     size_t size() const { return items_.size(); }
     bool empty() const { return items_.empty(); }
     const std::shared_ptr<const BrushAlpha>& at(size_t i) const { return items_[i]; }
@@ -112,7 +113,7 @@ public:
     bool contains(const std::string& key) const; // by image path, or the built-in's name
     // A copy with `a` added (its path, else its name, is the key; adding one already in is a no-op).
     std::shared_ptr<const AlphaPool> with(BrushAlpha a) const;
-    // The image files of `dir` (png, jpg, ...; not its sub-folders) A-Z, up to kMax, loaded as alphas. Files that do not
+    // The image files of `dir` (png, jpg, exr, ...; not its sub-folders) A-Z, up to kMax, loaded as alphas. Files that do not
     // load are skipped; `error` says why when none loaded. Null when the folder gives nothing.
     static std::shared_ptr<const AlphaPool> fromFolder(const std::string& dir, std::string& error);
 

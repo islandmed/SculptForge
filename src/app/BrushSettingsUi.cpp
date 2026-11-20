@@ -112,12 +112,9 @@ void App::applyBrushSettings(const BrushToolSettings& in) {
         if (BrushAlpha::builtin(s.alphaName, a)) doc_.brushAlpha = std::move(a);
         return;
     }
-    Image img;
+    BrushAlpha a;
     std::string err;
-    if (!Image::load(s.alphaPath, img, err)) return;
-    BrushAlpha a = BrushAlpha::fromImage(img, s.alphaName, s.alphaInvert);
-    a.path = s.alphaPath;
-    a.inverted = s.alphaInvert;
+    if (!BrushAlpha::fromFile(s.alphaPath, s.alphaName, s.alphaInvert, a, err)) return;
     doc_.brushAlpha = std::move(a);
 }
 
@@ -300,16 +297,18 @@ void App::registerAlphaPoolCommand() {
                            if (!pool) return {false, err};
                            alphaPool_ = std::move(pool);
                        } else if (const std::string path = argString(a, "path"); !path.empty()) {
-                           Image img;
                            std::string err;
-                           if (!Image::load(path, img, err)) return {false, err};
                            const auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
-                           BrushAlpha alpha = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()));
-                           alpha.path = path;
+                           BrushAlpha alpha;
+                           if (!BrushAlpha::fromFile(path, std::string(stem.begin(), stem.end()), false, alpha, err,
+                                                     AlphaPool::kSide))
+                               return {false, err};
                            alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
                        } else if (const std::string name = argString(a, "name"); !name.empty()) {
-                           BrushAlpha alpha;
-                           if (!BrushAlpha::builtin(name, alpha)) return {false, "Unknown alpha: " + name};
+                           BrushAlpha alpha; // (a Creature Skin one at the pool's size, not its 2048 px)
+                           const bool creature = !BrushAlpha::builtinGroup(name).empty();
+                           if (!(creature ? BrushAlpha::builtinAt(name, AlphaPool::kSide, alpha) : BrushAlpha::builtin(name, alpha)))
+                               return {false, "Unknown alpha: " + name};
                            alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
                        } else {
                            return {false, "Give a folder, a path or a built-in name (or clear)"};

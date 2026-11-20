@@ -59,6 +59,8 @@ const char* libraryTabFolder(LibraryTab tab);
 bool isMeshFile(const std::string& path);
 bool isSplatFile(const std::string& path); // .ply/.splat: the Splats tab (.ply also opens as a mesh)
 bool isImageFile(const std::string& path);
+// An image an alpha can be made from: isImageFile, or OpenEXR (BrushAlpha::fromFile).
+bool isAlphaImageFile(const std::string& path);
 bool isBrushFile(const std::string& path);
 bool isProjectFile(const std::string& path);
 // Kind of a file for a tab (Recent and QuickSave mix kinds); Folder for files the tab doesn't show.

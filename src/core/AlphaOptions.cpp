@@ -108,7 +108,7 @@ std::shared_ptr<const AlphaPool> AlphaPool::fromFolder(const std::string& dir, s
         const std::u8string ext = it->path().extension().u8string();
         std::string e(ext.begin(), ext.end());
         std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-        if (e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".bmp" || e == ".tga")
+        if (e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".bmp" || e == ".tga" || e == ".exr")
             files.push_back(std::string(name.begin(), name.end()));
     }
     if (ec) {
@@ -121,17 +121,14 @@ std::shared_ptr<const AlphaPool> AlphaPool::fromFolder(const std::string& dir, s
         if (pool->items_.size() >= kMax) break;
         const auto full = (fs::path(std::u8string(dir.begin(), dir.end())) / fs::path(std::u8string(f.begin(), f.end()))).u8string();
         const std::string path(full.begin(), full.end());
-        Image img;
         std::string err;
-        if (!Image::load(path, img, err)) continue;
         auto stem = fs::path(std::u8string(f.begin(), f.end())).stem().u8string();
-        BrushAlpha a = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()));
-        if (a.empty()) continue;
-        a.path = path;
+        BrushAlpha a;
+        if (!BrushAlpha::fromFile(path, std::string(stem.begin(), stem.end()), false, a, err, kSide) || a.empty()) continue;
         pool->items_.push_back(std::make_shared<const BrushAlpha>(std::move(a)));
     }
     if (pool->empty()) {
-        error = "No images in " + dir + " (png, jpg, bmp or tga)";
+        error = "No images in " + dir + " (png, jpg, bmp, tga or exr)";
         return nullptr;
     }
     return pool;

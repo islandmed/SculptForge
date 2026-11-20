@@ -24,11 +24,11 @@
 
 using namespace sf;
 
-TEST(brush_packs_seven_packs_of_ten) { // (Hard Surface has an eleventh: Crisp Flatten)
+TEST(brush_packs_seven_packs_of_ten) { // (Hard Surface has an eleventh: Crisp Flatten; Creature Skin has sixteen)
     const std::vector<BrushRecipe> all = builtinBrushRecipes();
     const std::vector<BrushRecipe> packs = builtinPackRecipes();
-    CHECK(builtinBrushPacks().size() == 7);
-    CHECK(packs.size() == 71);
+    CHECK(builtinBrushPacks().size() == 8);
+    CHECK(packs.size() == 87);
     CHECK(all.size() == 7 + packs.size()); // the classic seven first
     std::map<std::string, int> perPack;
     std::set<std::string> names;
@@ -46,7 +46,8 @@ TEST(brush_packs_seven_packs_of_ten) { // (Hard Surface has an eleventh: Crisp F
             CHECK(BrushAlpha::builtin(r.alpha, a) && a.name == r.alpha);
         }
     }
-    for (const std::string& p : builtinBrushPacks()) CHECK(perPack[p] == (p == "Hard Surface" ? 11 : 10));
+    for (const std::string& p : builtinBrushPacks())
+        CHECK(perPack[p] == (p == "Hard Surface" ? 11 : p == "Creature Skin" ? 16 : 10));
 }
 
 TEST(brush_recipe_alpha_keys_round_trip) {
@@ -81,7 +82,7 @@ TEST(brush_recipe_alpha_keys_round_trip) {
 
 TEST(brush_alphas_builtin_set) {
     const auto& all = BrushAlpha::builtins();
-    CHECK(all.size() == 30); // Round, Square, Noise, the twelve patterns, the six for the packs and the six wood ones and the three procedural wood grains
+    CHECK(all.size() == 46); // Round, Square, Noise, the twelve patterns, the six for the packs and the six wood ones and the three procedural wood grains, the sixteen Creature Skin tiles
     std::set<std::string> names;
     for (const BrushAlpha& a : all) CHECK(names.insert(a.name).second);
     for (const char* name : {"Cobblestone", "Leather Grain", "Hex Plates", "Knit", "Bolt", "Chips", "Weathered Grain", "Splinters",
