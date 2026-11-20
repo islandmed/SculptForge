@@ -72,7 +72,7 @@ camera.
 
 | To | Do this |
 |---|---|
-| Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view. Started over the model, the view turns about the point under the pointer (**Edit > Preferences > Input > Orbit around the pointer**; on for new installs) |
+| Rotate | Left-drag on the background, or right-drag anywhere on the canvas; add <kbd>Shift</kbd> to snap to an axis view. Started over the model, the view turns about the point under the pointer; beside a small model that is off-centre, about your last stroke or the model (**Edit > Preferences > Input > Orbit around the pointer**; on for new installs) |
 | Roll (turn about the view axis) | <kbd>Shift</kbd>+click the background, let go of <kbd>Shift</kbd>, then drag (Maya style: hold <kbd>Alt</kbd>, add <kbd>Ctrl</kbd>, left-drag sideways) |
 | Pan | <kbd>Alt</kbd>+left-drag on the background, <kbd>Alt</kbd>+right-drag, or middle-drag |
 | Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
@@ -278,9 +278,15 @@ swinging around the middle of the scene. It is on for new installs; if you used 
 stays as it was until you turn it on. The view doesn't jump when the drag starts, and the camera's target moves to
 that point's depth, so zooming toward the middle afterwards zooms at the depth you were working at.
 
-A rotation that starts over the background turns about the target as before; so does a drag on the axis gizmo's disc.
+A rotation that starts over the background turns about the target (the middle of the view) as long as that is on the
+model. When it is on empty space, say a small model panned off to one side and you press just beside it, the view turns
+about the place you last sculpted if that is on screen, otherwise about the middle of the model as it shows, so the model
+stays where it is instead of swinging away. A drag on the axis gizmo's disc always turns about the target.
 Turntable, the orbit locks and <kbd>Shift</kbd> snapping work as usual. Turn it off to always orbit the target (which
 **Frame** sets to the scene centre).
+
+**Frame last stroke** (no key by default: bind one in **Edit > Preferences > Hotkeys**) moves in on the place you last
+sculpted and keeps the view's angle, for getting back to your work after **Frame** has shown the whole model.
 
 ## Not yet
 

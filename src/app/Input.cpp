@@ -355,6 +355,8 @@ void App::registerViewActions() {
         add(id, label, key, text, [this, id = std::string(id)] { keyNavStep(id); });
     add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected; "
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
+    add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
+        "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
     add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
         "the whole model in view (Maya keys: Alt+H).", [this] { resetView(); });
     // Saved views (from a review: "custom cam views, like Blender"): named cameras, kept with the project.
@@ -600,6 +602,22 @@ void App::frameActivePart() {
     else frameView(sceneBounds());
 }
 
+// Close in on the last stroke's place (the view's angle stays): a box round it a tenth the size of its Part.
+void App::frameLastStroke() {
+    const auto p = lastStrokePoint();
+    if (!p) {
+        status_ = "No stroke to frame yet";
+        return;
+    }
+    const AABB part = doc_.partBounds(lastStrokePart_);
+    const float r = std::max(glm::length(part.extent()) * 0.05f, 1e-4f);
+    AABB box;
+    box.expand(*p - glm::vec3(r));
+    box.expand(*p + glm::vec3(r));
+    frameView(box);
+    status_ = "Framed the last stroke";
+}
+
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
     // What the sculpting code reads: Alt inverts, Ctrl masks, Shift smooths (the classic meanings). Blender inverts
     // with Ctrl and masks with the Mask brush, or (5.1+, #77) with Alt held: Alt+drag masks, Ctrl+Alt+drag unmasks.
@@ -819,8 +837,9 @@ void App::drawInputSection() {
     ui::Checkbox("Orbit around the pointer##input.orbit_at_pointer", &uiPrefs_.orbitAtPointer);
     ui::HelpText("Orbit around the pointer", nullptr,
                  "A rotation that starts over the model turns the view about the point under the pointer, and later "
-                 "zooms work at that depth. Started over the background, it turns about the middle of the view as "
-                 "before. In every key style.",
+                 "zooms work at that depth. Started over the background, it turns about the middle of the view while that is "
+                 "on the model; when it is on empty space, it turns about where you last sculpted (if that is in view) "
+                 "or the middle of the model, so the model stays put. In every key style.",
                  "Preferences > Input");
     {
         ImGui::TextDisabled("%s", tr("Mouse orbit speed"));

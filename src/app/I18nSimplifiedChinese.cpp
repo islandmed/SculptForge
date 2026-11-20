@@ -1690,8 +1690,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "在触摸屏或触控板上双指扭转时，视图与手指反向滚转。关闭：视图随手指滚转。旋转锁定（转盘、X 或 Z 轴）会忽略扭转。"},
     {"Wheel zooms toward the pointer", "滚轮朝指针缩放"},
     {"Orbit around the pointer", "以指针为中心环绕"},
-    {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view as before. In every key style.",
-     "从模型上开始的旋转会以指针下的点为中心旋转视图，之后的缩放也在该深度进行。从背景开始时，照旧以视图中心旋转。适用于所有按键风格。"},
+    {"A rotation that starts over the model turns the view about the point under the pointer, and later zooms work at that depth. Started over the background, it turns about the middle of the view while that is on the model; when it is on empty space, it turns about where you last sculpted (if that is in view) or the middle of the model, so the model stays put. In every key style.",
+     "在模型上方开始的旋转会围绕指针下方的点旋转视图，随后的缩放将在该深度下进行。在背景上方开始时，只要视图中心位于模型上，就会围绕视图中心旋转；当位于空白处时，会围绕上次雕刻处（如果在视图内）或模型中心旋转，从而保持模型位置不变。适用于所有按键风格。"},
+    {"Frame last stroke", "将最后一笔居中显示"},
+    {"Move in on where you last sculpted (no key by default: bind one in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.",
+     "移至最后雕刻的位置（默认无快捷键：在 偏好设置 > 快捷键 中绑定一个）。视图保持其角度；居中显示适合整个模型。"},
     {"Mouse orbit speed", "鼠标环绕速度"},
     {"How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x is the usual turn; lower it if the view spins too fast. The pen has its own View speed in Preferences > Tablet.", "鼠标或触控板的旋转拖动每移动一个像素，视图转动的幅度，适用于所有按键风格。1x 为通常的转速；视图转得过快时可调低。画笔有自己的视图速度（偏好设置 > 数位板）。"},
     {"The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead of the "

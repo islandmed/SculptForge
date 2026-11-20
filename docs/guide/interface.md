@@ -733,7 +733,8 @@ rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see [Navigat
 Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen.
 
 **Rotation** chooses free rotation or a turntable. **Orbit around the pointer** (on for new installs) turns the view
-about the point of the model under the pointer when a rotation starts over it (see
+about the point of the model under the pointer when a rotation starts over it, and about the model, not the view's
+middle, when it starts beside a small model that is off-centre (see
 [Navigation](navigation.md#orbit-around-the-pointer)). See [Quick tour for experienced sculptors](quick-tour.md).
 
 ### The background

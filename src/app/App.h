@@ -228,6 +228,10 @@ private:
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
     void orbitBy(float x, float y, float dx, float dy, bool mouse = false);
     std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
+    std::optional<glm::vec3> backgroundOrbitPivot();         // ... started over the background: the visible model, not the view's middle
+    std::optional<glm::vec3> lastStrokePoint() const;        // where a stroke last landed, in the scene, while it is still on a Part
+    void noteStrokePoint(const glm::vec3& local);            // (the active Part's space)
+    void frameLastStroke();                                  // the view.frame_last_stroke action
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
@@ -3341,6 +3345,10 @@ private:
     float rollStartX_ = 0.0f, rollStartY_ = 0.0f;
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
     glm::vec3 lastDabCentre_{0.0f}; // ... and its centre on the active Part's mesh (UI tests: dab_scene_error_px)
+    glm::vec3 lastStrokeLocal_{0.0f}; // where the last stroke landed, on that Part's mesh, and the Part (-1: none yet)
+    int lastStrokePart_ = -1;
+    glm::vec3 asyncDabCentre_{0.0f}; // the solver's last dab, kept for lastStrokeLocal_ at the commit (AsyncStroke.cpp)
+    bool asyncDabSeen_ = false;
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
     // ---- end classic feel ----

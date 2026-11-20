@@ -2582,8 +2582,65 @@ std::optional<glm::vec3> App::orbitPivotAt(float x, float y) {
     if (!uiPrefs_.orbitAtPointer || forceTurntable_ || solverBusy() || previewLod_ >= 0) return std::nullopt;
     doc_.syncBvh();
     RayHit hit;
-    if (pickPart(x, y, &hit) < 0) return std::nullopt;
+    if (pickPart(x, y, &hit) < 0) return backgroundOrbitPivot();
     return hit.position;
+}
+
+// A rotation that starts over the background: when the view's middle is on the model, turning about it keeps the model
+// near (as before); when it is on empty space (a small model panned aside), that swings the model off the screen. Then
+// turn about where the last stroke landed if that is in view, else about the middle of the scene's box, or of what shows of it when that is off screen.
+std::optional<glm::vec3> App::backgroundOrbitPivot() {
+    const CanvasRect c = canvasRect();
+    if (c.w <= 0.0f || c.h <= 0.0f) return std::nullopt;
+    const float cx = c.x + c.w * 0.5f * (1.0f + camera_.shift.x), cy = c.y + c.h * 0.5f * (1.0f - camera_.shift.y);
+    RayHit middle;
+    if (pickPart(cx, cy, &middle) >= 0) return std::nullopt;
+    const glm::mat4 vp = camera_.projection() * camera_.view();
+    auto onScreen = [&](const glm::vec3& p, glm::vec2& out) {
+        const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+        if (!(h.w > 0.0f)) return false;
+        out = glm::vec2(c.x + (h.x / h.w * 0.5f + 0.5f) * c.w, c.y + (1.0f - h.y / h.w) * 0.5f * c.h);
+        return std::isfinite(out.x) && std::isfinite(out.y);
+    };
+    glm::vec2 s;
+    if (const auto last = lastStrokePoint(); last && onScreen(*last, s) && c.contains(s.x, s.y)) return last;
+    const AABB b = sceneBounds();
+    if (!b.valid()) return std::nullopt;
+    if (onScreen(b.center(), s) && c.contains(s.x, s.y)) return b.center();
+    glm::vec2 lo(1e30f), hi(-1e30f);
+    for (int k = 0; k < 8; ++k) {
+        if (!onScreen(glm::vec3((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z), s))
+            return std::nullopt; // (reaches behind the eye: no sure middle)
+        lo = glm::min(lo, s);
+        hi = glm::max(hi, s);
+    }
+    lo = glm::max(lo, glm::vec2(c.x, c.y)); // what shows of it
+    hi = glm::min(hi, glm::vec2(c.x + c.w, c.y + c.h));
+    if (lo.x >= hi.x || lo.y >= hi.y) return std::nullopt;
+    // The point on the ray through that middle at the depth of the box's centre.
+    glm::vec3 o, d;
+    canvasRay((lo.x + hi.x) * 0.5f, (lo.y + hi.y) * 0.5f, o, d);
+    const float along = glm::dot(d, camera_.forward());
+    if (!(along > 1e-6f)) return std::nullopt;
+    return o + d * (glm::dot(b.center() - o, camera_.forward()) / along);
+}
+
+void App::noteStrokePoint(const glm::vec3& local) {
+    if (!std::isfinite(local.x + local.y + local.z)) return;
+    lastStrokeLocal_ = local;
+    lastStrokePart_ = doc_.activePart;
+}
+
+// The last stroke's place in the scene; none before the first stroke, or once its Part is gone or the spot is off it.
+std::optional<glm::vec3> App::lastStrokePoint() const {
+    const int i = lastStrokePart_;
+    if (i < 0 || i >= doc_.partCount()) return std::nullopt;
+    const AABB local = doc_.partMesh(i).bounds();
+    if (!local.valid()) return std::nullopt;
+    const glm::vec3 pad = local.extent() * 0.01f + glm::vec3(1e-4f);
+    if (glm::any(glm::lessThan(lastStrokeLocal_, local.min - pad)) || glm::any(glm::greaterThan(lastStrokeLocal_, local.max + pad)))
+        return std::nullopt;
+    return glm::vec3(doc_.parts[size_t(i)].transform * glm::vec4(lastStrokeLocal_, 1.0f));
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
@@ -2643,6 +2700,7 @@ void App::onMouseUp() {
         }
     }
     if (drag_ == Drag::Stroke && !maskClickPending_) steadyCatchUp(); // Steady Stroke: on to the pointer (Precision.cpp)
+    if (drag_ == Drag::Stroke && haveLastDab_ && !asyncStroke_) noteStrokePoint(lastDabCentre_);
     if (drag_ == Drag::SizeScrub) status_ = drawSizeStatus();
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
@@ -2825,6 +2883,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     drag_ = Drag::Stroke;
+    asyncDabSeen_ = false;
+    noteStrokePoint(hit.position); // (the first dab: where it began; the last dab replaces it as the stroke ends)
     playingLayer_ = -1;
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) doc_.sculptor.holdTopology(); // (they re-stamp)
     // (Only when there are LODs: clearing forgets which mesh was shown, so the next frame sent the whole mesh
@@ -3181,6 +3241,9 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     if (!dabView_) { // (the solver's: when its batch is committed)
         lastDabScreen_ = glm::vec2(x, y);
         lastDabCentre_ = hit.position;
+    } else {
+        asyncDabCentre_ = hit.position; // (the solver thread's: the main thread reads it as the batch is committed)
+        asyncDabSeen_ = true;
     }
     if (st.mask) {
         p.strength = st.maskStrength;
