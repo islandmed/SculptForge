@@ -65,7 +65,11 @@ click "Preferences##palette.preferences"
 zoom 0.3
 look 1.2 0.5 0
 remember model_screen_x x1
+remember camera_pan pan1
 hold alt
 drag_frames 0.43 0.55 0.58 0.55 6 frames-off
 hold none
-expect_value model_screen_x > $x1+40
+expect_value camera_yaw != 0
+expect_value camera_pan < $pan1+0.0001
+expect_value camera_pan > $pan1-0.0001
+expect_value model_screen_x != $x1
