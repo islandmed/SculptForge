@@ -277,7 +277,7 @@ struct PhaseSpec {
 };
 
 // SF_BENCH_DENSE=1 with --benchmark-file (bench.sh dense): a dense plain mesh's interactive actions, each on the mesh
-// the phases before it left: Move at three sizes, Standard at 240 px, a Gizmo drag and turn, the orbit.
+// the phases before it left: Move at three sizes, Standard at 240 px, Smooth at 60 and 240 px, a Gizmo drag and turn, the orbit.
 std::vector<PhaseSpec> densePhases(double seconds) {
     PhaseSpec whole{"move whole", 1.0f, seconds, BrushType::Move, 0.25f, 0.4f};
     whole.wholeView = true;
@@ -289,6 +289,8 @@ std::vector<PhaseSpec> densePhases(double seconds) {
             {"move 240 px", 240.0f, seconds, BrushType::Move, 0.25f, 0.4f},
             whole,
             {"standard 240 px", 240.0f, seconds, BrushType::Standard, 0.35f},
+            {"smooth 60 px", 60.0f, seconds, BrushType::Smooth, 0.5f}, // (Smooth repeats its step on a dense mesh: its lag)
+            {"smooth 240 px", 240.0f, seconds, BrushType::Smooth, 0.5f},
             gm,
             gr,
             {"still", -1.0f, 0.6}};
