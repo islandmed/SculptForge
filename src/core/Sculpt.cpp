@@ -208,11 +208,12 @@ std::function<float(const glm::vec3&)> stencilTexture(const DabParams& p, const 
 // Smooth's keep-volume steps (Sculptor::taubinShrink): Taubin's own values, pass band 1/lambda + 1/mu = 0.1.
 constexpr float kTaubinLambda = 0.6307f, kTaubinMu = -0.6732f;
 // Smooth's reach (Sculptor::smoothStepsFor): a plain Laplacian step relaxes a vertex toward its neighbours' average, a scale of one
-// edge, so with many edges under the brush a dab did almost nothing (1.3M triangles: 2% of what 82k took off). Up to about 100k
-// triangles under a brush of this size (edges 1/16 of the radius and coarser) a dab is the one step it always was; on a denser
-// mesh it repeats the step (r / (16 x edge))^2 times, so a stroke takes off what it takes off at 100k, at any density. At most
-// kSmoothMaxWork vertex steps per dab (a few ms on 10 cores), kSmoothMaxSteps steps.
-constexpr float kSmoothRefEdges = 16.0f;
+// edge, whatever the brush's size, so the denser the mesh the less a dab does (1.3M triangles: 2% of what 82k took off). Up to about
+// 100k triangles (kSmoothRefTris: 120k still takes one step) a dab is the one step it always was; on a denser mesh it repeats the
+// step in proportion to the triangles (N = triangles / kSmoothRefTris, found from the triangles under the brush against the whole
+// surface's area), so a stroke takes off what it takes off on a mesh of the same shape with 80k triangles. At most kSmoothMaxWork
+// vertex steps per dab (a few ms on 10 cores) and kSmoothMaxSteps steps.
+constexpr double kSmoothRefTris = 80000.0;
 constexpr int kSmoothMaxSteps = 256;
 constexpr size_t kSmoothMaxWork = 2500000;
 
@@ -1284,7 +1285,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const glm::vec3 strokeDir = strokeLen > 1e-12f ? p.strokeDelta / strokeLen : glm::vec3(0.0f);
     if (type == BrushType::Layer) prepareLayer(mesh, r * 0.08f * std::clamp(p.strength, 0.0f, 1.0f));
     const bool keepVolume = type == BrushType::Smooth && p.keepVolume && !p.groupBorders;
-    const int smoothSteps = type == BrushType::Smooth && !p.groupBorders ? smoothStepsFor(mesh, r) : 1;
+    const int smoothSteps = type == BrushType::Smooth && !p.groupBorders ? smoothStepsFor(mesh) : 1;
     if (keepVolume && smoothSteps <= 1) taubinShrink(mesh);
     const std::vector<glm::vec3>* morph = type == BrushType::Morph ? morphTarget(mesh) : nullptr;
     if (type == BrushType::Morph && !morph) return;
@@ -1695,18 +1696,35 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
     });
 }
 
-// How many times a Smooth dab repeats its step so that its effect does not depend on the mesh's density (kSmoothRefEdges).
-int Sculptor::smoothStepsFor(const Mesh& mesh, float radius) const {
+// How many times a Smooth dab repeats its step so that its effect does not depend on the mesh's density (kSmoothRefTris).
+int Sculptor::smoothStepsFor(const Mesh& mesh) {
     static const bool off = [] { // SF_SMOOTH_DENSITY=0: one step per dab, as before (A/B clips and benches)
         const char* e = std::getenv("SF_SMOOTH_DENSITY");
         return e && e[0] == '0';
     }();
-    if (off) return 1;
-    const float edge = typicalEdge(mesh, verts_);
-    if (!(edge > 0.0f) || !(radius > 0.0f)) return 1;
-    const float edges = radius / (kSmoothRefEdges * edge); // brush radius in units of the reference density's edge
+    if (off || dynTopo_.active() || mesh.triangleCount() <= size_t(1.5 * kSmoothRefTris)) return 1; // (dynamic topology changes the triangles)
+    // The mean area of the triangles around a sample of the brush's points, against the whole surface's area (once a stroke).
+    const size_t stride = std::max<size_t>(1, verts_.size() / 64);
+    double sum = 0.0;
+    size_t count = 0;
+    for (size_t i = 0; i < verts_.size(); i += stride)
+        for (uint32_t t : mesh.vertexTriangles(verts_[i])) {
+            const glm::uvec3 f = mesh.triangles[t];
+            sum += 0.5 * double(glm::length(glm::cross(mesh.positions[f.y] - mesh.positions[f.x], mesh.positions[f.z] - mesh.positions[f.x])));
+            ++count;
+        }
+    if (smoothAreaStroke_ != strokeId_ || smoothAreaMesh_ != &mesh || smoothAreaTris_ != mesh.triangleCount()) {
+        smoothArea_ = areaSums(mesh.triangleCount(), [&](size_t t, AreaSums& acc) {
+                          const glm::uvec3 f = mesh.triangles[t];
+                          acc.weight += 0.5 * double(glm::length(glm::cross(mesh.positions[f.y] - mesh.positions[f.x], mesh.positions[f.z] - mesh.positions[f.x])));
+                      }).weight;
+        smoothAreaStroke_ = strokeId_, smoothAreaMesh_ = &mesh, smoothAreaTris_ = mesh.triangleCount();
+    }
+    if (count == 0 || !(sum > 0.0) || !(smoothArea_ > 0.0)) return 1;
+    const double local = sum / double(count); // (a triangle's area here)
+    const double steps = smoothArea_ / (kSmoothRefTris * local);
     const int cap = int(std::clamp<size_t>(kSmoothMaxWork / std::max<size_t>(verts_.size(), 1), 1, kSmoothMaxSteps));
-    return std::clamp(int(std::lround(edges * edges)), 1, cap);
+    return std::clamp(int(std::lround(steps)), 1, cap);
 }
 
 // `steps` of Smooth's relax step over verts_, from smoothW_ (each one's weight: Intensity x pressure x falloff, 0 where it
