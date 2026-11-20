@@ -7,7 +7,7 @@ name: Release
 #            (packages.yml) ran on a maintainer's push to `staging` or `main` for this commit, or for one with the same
 #            build-input key (tools/release/build_key.py: every file that goes into the packages identical), the release
 #            promotes that run's packages unchanged: built and tested once. tools/release/staged_run.py picks it (push
-#            event, branch, actor, success, at most 7 days old, artifacts present, the key recomputed from git) and
+#            event, branch, actor, success (or only its Python wheels jobs failed or were cancelled), at most 7 days old, artifacts present, the key recomputed from git) and
 #            refuses the release if no such run qualifies; CI must have passed on main for the commit. With none at all:
 #   build    the Packages workflow runs here, from the tag (compiler cache restored from main, never saved): the
 #            --rebuild path.

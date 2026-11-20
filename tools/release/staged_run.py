@@ -12,7 +12,10 @@ repository
     the same, computed here from git, never taken from the run): never a pull_request, never a workflow_dispatch,
     never a fork,
   - was pushed and (re)run by a maintainer (actor and triggering_actor in --actors),
-  - finished with success, at most --max-days ago (default 7; artifacts are kept 14),
+  - finished with success, at most --max-days ago (default 7; artifacts are kept 14). A run that finished failed or
+    cancelled still counts when only its Python wheels jobs ("Python wheels ...", "Record wheel checksums", pypi) did
+    not succeed and every other job did: release.yml publishes the app without the wheels (a hung wheels job
+    cancelled 0.13.10's staging run, and every app package was built),
   - still has every package artifact and the recorded checksums (staged-sums), none expired: a run that reused
     another one (packages.yml job reuse) has none, so the run that built them is the one picked.
 A run for exactly SHA wins over one for another commit with the same key, then the newest. Exits 3 when no Packages
@@ -52,13 +55,35 @@ def candidates(runs, repo, before=None):
             and (before is None or r["id"] < before)]
 
 
-def problem(r, actors, now, max_days):
-    """Why run r can't be promoted, judged from the run alone; None when it may (artifacts aside)."""
+def is_wheels_job(name):
+    """The optional Python package jobs of packages.yml (and release.yml's pypi), also as "caller / job" in a reusable workflow."""
+    return re.match(r"(python wheels\b|record wheel checksums$|pypi$)", (name or "").rsplit(" / ", 1)[-1].strip(), re.I) is not None
+
+
+def only_wheels_failed(jobs):
+    """None when every job that is not a wheels job succeeded (at least one such job), else the reason."""
+    if not jobs:
+        return "no jobs"
+    bad = sorted(j.get("name") or "?" for j in jobs if not is_wheels_job(j.get("name")) and j.get("conclusion") != "success")
+    if bad:
+        return f"{', '.join(bad)} did not succeed"
+    if all(is_wheels_job(j.get("name")) for j in jobs):
+        return "no job but the wheels ran"
+    return None
+
+
+def problem(r, actors, now, max_days, jobs=None):
+    """Why run r can't be promoted, judged from the run alone (jobs(run id) -> [job], asked only for a run that ended
+    without success); None when it may (artifacts aside)."""
     rid = r["id"]
     if r.get("status") != "completed":
         return f"run {rid} is {r.get('status')}"
     if r.get("conclusion") != "success":
-        return f"run {rid} {r.get('conclusion')}"
+        if jobs is None or r.get("conclusion") not in ("failure", "cancelled", "timed_out"):
+            return f"run {rid} {r.get('conclusion')}"
+        why = only_wheels_failed(jobs(rid))
+        if why:
+            return f"run {rid} {r.get('conclusion')}: {why}"
     who = {(r.get("actor") or {}).get("login"), (r.get("triggering_actor") or {}).get("login")}
     if not who <= actors:
         return f"run {rid} was pushed or rerun by {', '.join(sorted(map(str, who - actors)))}, not a maintainer"
@@ -68,13 +93,13 @@ def problem(r, actors, now, max_days):
     return None
 
 
-def choose(runs, artifacts, sha, repo, actors, now, max_days, keys, before=None):
+def choose(runs, artifacts, sha, repo, actors, now, max_days, keys, before=None, jobs=None):
     """(run, 0, "") | (None, 3, why) | (None, 1, why) | (None, 2, why: in progress).
-    artifacts(run id) -> [artifact]; keys(shas) -> {sha: build-input key or None (commit unknown)}."""
+    artifacts(run id) -> [artifact]; jobs(run id) -> [job] (name, conclusion); keys(shas) -> {sha: build-input key or None (commit unknown)}."""
     cs = candidates(runs, repo, before)
     exact = [r for r in cs if r.get("head_sha") == sha]
     # Another commit's run counts only when it could be promoted (or is still running) and its key is SHA's.
-    others = [r for r in cs if r.get("head_sha") != sha and (problem(r, actors, now, max_days) is None or r.get("status") != "completed")]
+    others = [r for r in cs if r.get("head_sha") != sha and (problem(r, actors, now, max_days, jobs) is None or r.get("status") != "completed")]
     if others:
         k = keys({sha} | {r["head_sha"] for r in others})
         want = k.get(sha)
@@ -85,7 +110,7 @@ def choose(runs, artifacts, sha, repo, actors, now, max_days, keys, before=None)
     newest = lambda rs: sorted(rs, key=lambda r: r["created_at"], reverse=True)
     for r in newest(exact) + newest(others):
         rid = r["id"]
-        p = problem(r, actors, now, max_days)
+        p = problem(r, actors, now, max_days, jobs)
         if p:
             why.append(p)
             continue
@@ -131,7 +156,13 @@ def live(sha, repo):
         if rid not in cache:
             cache[rid] = gh(f"repos/{repo}/actions/runs/{rid}/artifacts?per_page=100")["artifacts"]
         return cache[rid]
-    return list(runs.values()), artifacts
+    jcache = {}
+
+    def jobs(rid):
+        if rid not in jcache:
+            jcache[rid] = gh(f"repos/{repo}/actions/runs/{rid}/jobs?per_page=100")["jobs"]
+        return jcache[rid]
+    return list(runs.values()), artifacts, jobs
 
 
 def self_test():
@@ -145,6 +176,12 @@ def self_test():
         r.update(k)
         return r
     full = {n: [{"name": a} for a in ARTIFACTS] for n in (1, 2, 3)}
+    def job(name, conclusion="success"):
+        return {"name": name, "conclusion": conclusion}
+    app = [job(n) for n in ("Reuse an earlier build of the same inputs", "Linux x86_64 (.deb, AppImage, .tar.gz)", "macOS (universal .dmg)",
+                            "Windows x64 (installer, .zip)", "Record checksums")]
+    wheels_ok = [job(f"Python wheels {n}") for n in ("Linux x86_64", "Windows x64")] + [job("Record wheel checksums")]
+    wheels_cut = [job("Python wheels Linux x86_64"), job("Python wheels macOS universal2", "cancelled"), job("Record wheel checksums", "skipped")]
     same = {sha: "k1", other: "k1"}
     differ = {sha: "k1", other: "k2"}
     cases = { # name: (runs, artifacts, keys, want code, want run id)
@@ -183,7 +220,43 @@ def self_test():
                                                run(head_sha=other)], {1: full[1], 2: []}, same, 0, 1),
         "the 0.11.14 case (main built the staged commit)": ([run(id=2, head_branch="main")], {2: full[2]}, differ, 0, 2),
     }
+    # name: (runs, jobs of run 1, want code, want run id): the runs that ended without success (the 0.13.10 staging run)
+    jcases = {
+        "wheels cancelled": ([run(conclusion="cancelled")], app + wheels_cut, 0, 1),
+        "wheels failed": ([run(conclusion="failure")], app + wheels_cut, 0, 1),
+        "wheels timed out, main": ([run(conclusion="failure", head_branch="main")], app + wheels_cut, 0, 1),
+        "macos app job failed": ([run(conclusion="failure")], app[:2] + [job("macOS (universal .dmg)", "failure")] + app[3:] + wheels_cut, 1, None),
+        "macos app job cancelled": ([run(conclusion="cancelled")], app[:2] + [job("macOS (universal .dmg)", "cancelled")] + app[3:] + wheels_cut, 1, None),
+        "app job skipped": ([run(conclusion="failure")], app[:2] + [job("macOS (universal .dmg)", "skipped")] + app[3:] + wheels_cut, 1, None),
+        "app and wheels failed": ([run(conclusion="failure")], app + [job("Windows x64 (installer, .zip)", "failure")] + wheels_cut, 1, None),
+        "only wheels ran": ([run(conclusion="cancelled")], wheels_cut, 1, None),
+        "no jobs": ([run(conclusion="cancelled")], [], 1, None),
+        "wheels still running": ([run(status="in_progress", conclusion=None)], app + wheels_cut, 2, None),
+        "skipped run": ([run(conclusion="skipped")], app + wheels_cut, 1, None),
+        "success needs no jobs": ([run()], None, 0, 1),
+        "wheels cancelled, stranger": ([run(conclusion="cancelled", actor={"login": "mallory"})], app + wheels_cut, 1, None),
+        "wheels cancelled, other commit, same key": ([run(head_sha=other, conclusion="cancelled")], app + wheels_cut, 0, 1),
+        "wheels cancelled, other commit, other key": ([run(head_sha=other, conclusion="cancelled")], app + wheels_cut, 3, None),
+        "wheels cancelled, no artifacts": ([run(conclusion="cancelled")], app + wheels_cut, 1, None),
+    }
     bad = []
+    for name, (runs, js, want, want_id) in jcases.items():
+        arts = {} if "no artifacts" in name else full
+        keys = differ if "other key" in name else same
+        got = choose(runs, lambda rid: arts.get(rid, []), sha, repo, {"islandmed"}, now, 7, lambda s: {x: keys.get(x) for x in s},
+                     jobs=None if js is None else lambda rid: js)
+        if got[1] != want or (got[0] or {}).get("id") != want_id:
+            bad.append(f"{name}: want {want} {want_id}, got {got[1]} {(got[0] or {}).get('id')} {got[2]}")
+    # the same cut run without a jobs source (a caller that can't ask) is still refused
+    got = choose([run(conclusion="cancelled")], lambda r: full[1], sha, repo, {"islandmed"}, now, 7, lambda s: {})
+    if got[1] != 1:
+        bad.append(f"no jobs source: want 1, got {got}")
+    for name in ("Python wheels macOS universal2", "Build / Python wheels Linux x86_64", "Record wheel checksums", "pypi", "Publish to PyPI / pypi"):
+        if not is_wheels_job(name):
+            bad.append(f"is_wheels_job({name!r}) is false")
+    for name in ("macOS (universal .dmg)", "Record checksums", "Windows x64 (installer, .zip)", "Wheels of the app", "", None):
+        if is_wheels_job(name):
+            bad.append(f"is_wheels_job({name!r}) is true")
     for name, (runs, arts, keys, want, want_id) in cases.items():
         got = choose(runs, lambda rid: arts.get(rid, []), sha, repo, {"islandmed"}, now, 7, lambda s: {x: keys.get(x) for x in s})
         if got[1] != want or (got[0] or {}).get("id") != want_id:
@@ -217,8 +290,8 @@ def main():
     actors = set(a.actors.split(","))
     end = time.time() + 60 * a.wait_minutes
     while True:
-        runs, arts = live(a.sha, a.repo)
-        r, code, why = choose(runs, arts, a.sha, a.repo, actors, datetime.now(timezone.utc), a.max_days, git_keys, a.before_run)
+        runs, arts, jobs = live(a.sha, a.repo)
+        r, code, why = choose(runs, arts, a.sha, a.repo, actors, datetime.now(timezone.utc), a.max_days, git_keys, a.before_run, jobs)
         if code == 2 and a.wait and time.time() < end:
             print(f"   waiting for the Packages run in progress ({why}) ...", file=sys.stderr)
             time.sleep(60)

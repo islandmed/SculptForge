@@ -326,7 +326,7 @@ bumped() {
 }
 # staged_run SHA [--wait]: the id of the Packages run that this release may promote (tools/release/staged_run.py:
 # a push to staging or main by islandmed for SHA or a commit with the same build-input key (tools/release/build_key.py),
-# successful, at most SF_STAGED_MAX_DAYS (7) days old, artifacts present). Its exit status: 0 found, 3 there is no
+# successful (or only its Python wheels jobs did not succeed), at most SF_STAGED_MAX_DAYS (7) days old, artifacts present). Its exit status: 0 found, 3 there is no
 # such run, 1 none may be promoted (why in $work/staged.err).
 staged_run() {
     python3 tools/release/staged_run.py --repo "$REPO" --sha "$1" --actors "$AUTHOR_NAME" --max-days "${SF_STAGED_MAX_DAYS:-7}" \

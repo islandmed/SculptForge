@@ -90,7 +90,8 @@ What makes a run promotable (tools/release/staged_run.py, used by release.sh ste
   checks it again and logs both): never a pull_request, a workflow_dispatch or a fork's run. The exact commit wins,
   then the newest;
 - pushed and (re)run by islandmed (`actor` and `triggering_actor`);
-- concluded `success`, at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
+- concluded `success` (or ended failed or cancelled with every job that is not a Python wheels job green: "Python wheels ...",
+  "Record wheel checksums", pypi; the wheels are optional, a hung one must not hold the app), at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
   `staged-sums` still there;
 - CI passed on main for the commit (or for its parent, when the bump only added paperwork).
 
