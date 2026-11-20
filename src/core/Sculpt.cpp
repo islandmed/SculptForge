@@ -453,6 +453,8 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     strokeDiagonal_ = 0.0f;
     lastRemesh_ = false;
     topologyHeld_ = false;
+    grabCaptured_ = false; // (a grab of a stroke that never ended)
+    grabMesh_ = nullptr, grabBvh_ = nullptr;
     microMesh_ = nullptr;
     microBase_ = -1;
     inkKeep_ = keepEditable, inkOk_ = true, inkHead_ = false;
@@ -666,6 +668,66 @@ void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym,
     lastMirrors_ = ms;
     followRemesh(mesh);
     timings.remeshMs += lapMs(clock);
+}
+
+// Move with dynamic topology on: the stretch's triangles are split at the stroke's end, over the region the grab moved
+// (its bounding sphere at the final positions), a few passes since one is bounded in operations. Splits only: a
+// Part already finer than the detail keeps every triangle it had.
+void Sculptor::refineGrab() {
+    if (!dyntopo.enabled || topologyHeld_ || !active_ || !grabCaptured_ || !grabMesh_ || !grabBvh_ || grabMirrors_.empty()) return;
+    Mesh& mesh = *grabMesh_;
+    if (!dyntopoBlocker(mesh).empty() || (micro_.active() && microMesh_ == &mesh) || (dynTopo_.active() && dynTopo_.strokeMesh() != &mesh)) return;
+    auto clock = std::chrono::steady_clock::now();
+    glm::vec3 lo(1e30f), hi(-1e30f);
+    for (size_t i = 0; i < grabMirrors_[0].first; ++i) { // (the first copy: the mirrors' remeshes follow it)
+        const uint32_t v = grabVerts_[i];
+        if (v >= mesh.vertexCount()) continue;
+        lo = glm::min(lo, mesh.positions[v]);
+        hi = glm::max(hi, mesh.positions[v]);
+    }
+    if (lo.x > hi.x) return;
+    const glm::vec3 center = (lo + hi) * 0.5f;
+    const float radius = glm::length(hi - lo) * 0.5f + 0.1f * grabRadius_;
+    if (dyntopo.constantDetail && strokeDiagonal_ <= 0.0f) strokeDiagonal_ = glm::length(mesh.bounds().extent());
+    const float edge = dyntopoEdgeLength(dyntopo, grabRadius_, strokeDiagonal_);
+    const std::vector<SymCopy> ms = copies(grabSym_);
+    const uint32_t firstNew = uint32_t(mesh.vertexCount()); // (a split appends; nothing is removed or renumbered without collapses)
+    dynTopo_.refineOnly = true;
+    for (int pass = 0; pass < 8; ++pass) {
+        if (!dynTopo_.remesh(mesh, *grabBvh_, center, radius, edge, ms)) break;
+        followRemesh(mesh);
+    }
+    dynTopo_.refineOnly = false;
+    smoothSplits(mesh, *grabBvh_, firstNew);
+    timings.remeshMs += lapMs(clock);
+}
+
+// The vertices a refinement added sit on the long facets they split, so a fold that shaded smooth reads as a line. They
+// move part of the way to their neighbours' average (the old vertices, the tip among them, stay), a few rounds.
+void Sculptor::smoothSplits(Mesh& mesh, BVH& bvh, uint32_t first) {
+    const uint32_t end = uint32_t(mesh.vertexCount());
+    if (first >= end) return;
+    std::vector<uint32_t> verts(end - first);
+    for (uint32_t i = 0; i < verts.size(); ++i) verts[i] = first + i;
+    std::vector<glm::vec3> delta(verts.size());
+    for (int round = 0; round < 3; ++round) {
+        poolFor(verts.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                glm::vec3 sum(0.0f);
+                size_t n = 0;
+                for (uint32_t w : mesh.neighbors(verts[i])) sum += mesh.positions[w], ++n;
+                delta[i] = n ? (sum / float(n) - mesh.positions[verts[i]]) * 0.5f : glm::vec3(0.0f);
+            }
+        });
+        displaceAll(mesh, verts, delta);
+    }
+    std::vector<uint32_t> around = verts;
+    for (uint32_t v : verts) {
+        mesh.markDirty(v);
+        for (uint32_t t : mesh.vertexTriangles(v)) bvh.touchTriangle(t);
+    }
+    mesh.updateNormals(around);
+    bvh.refitChanged(mesh);
 }
 
 // After the brush: when it squashed a triangle flat (pinching or flattening a fold), the dab is remeshed
@@ -1018,6 +1080,9 @@ UndoRecord Sculptor::endStroke() {
     dropLazy();
     lazyMesh_ = nullptr;
     lazyBvh_ = nullptr;
+    refineGrab();
+    grabMesh_ = nullptr;
+    grabBvh_ = nullptr;
     if (dynTopo_.active()) {
         Mesh& mesh = *dynTopo_.strokeMesh();
         std::unique_ptr<TopologyUndo> topo = dynTopo_.finish(mesh, *dynTopo_.strokeBvh());
@@ -2209,6 +2274,7 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     grabCaptured_ = false;
     grabTotal_ = glm::vec3(0.0f);
     if (!active_) return;
+    grabMesh_ = &mesh, grabBvh_ = &bvh, grabRadius_ = p.radius, grabSym_ = sym;
     if (mesh.micro) inkMesh_ = &mesh;
     // A micro level (core/Micro.h): Move deforms the base cage below it (dual scale: the detail is relative to the
     // base, so it rides along in its local frame), unless asked to move the micro surface along its normals.

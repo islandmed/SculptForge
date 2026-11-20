@@ -488,7 +488,8 @@ void App::finishStrokeNow() {
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
-        status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
+        status_ = doc_.mesh.texture ? "Dynamic topology removed the UVs of the remeshed Part, so its texture no longer shows (Undo brings them back)"
+                                    : "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
     if (const size_t fixed = doc_.sculptor.lastFixedStrokes())
         status_ = fixed == 1 ? "1 editable stroke under this one is now fixed in place"
                              : std::to_string(fixed) + " editable strokes under this one are now fixed in place";

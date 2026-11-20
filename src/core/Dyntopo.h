@@ -114,6 +114,9 @@ public:
     // The most triangles one dab looks at (see limitRegion): about 40 ms of a dab on a dense Part; a brush covering
     // more is remeshed over the nearest ones. (A member so a test can set it low on a small mesh.)
     size_t maxRegionTriangles = 100000;
+    // Splits only (no collapses): a pass that adds the detail a stretch needs and never coarsens what is already
+    // finer (the end of a Move stroke, Sculptor::refineGrab).
+    bool refineOnly = false;
     // Candidates a pass looks at per operation it may do: most fail where face groups, borders or masks are
     // everywhere (a collapse needs a free end or a feature edge), and a pass that only stopped at its operations
     // scanned every edge of the brush's disc, seconds a dab on a dense Part.

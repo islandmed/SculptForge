@@ -1412,7 +1412,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     phase(stats.splitMs);
     queryRegion();
     phase(stats.gatherMs);
-    collapsePass();
+    if (!refineOnly) collapsePass();
     phase(stats.collapseMs);
     flipPass();
     phase(stats.flipMs);

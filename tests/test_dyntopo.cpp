@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -809,4 +810,118 @@ TEST(dyntopo_failing_candidates_are_bounded_per_dab) {
     CHECK(dt.stats.collapses == 0); // (nothing can collapse: every edge is a feature)
     CHECK(invalid(d.mesh, true).empty());
     d.undo.push(d.sculptor.endStroke());
+}
+
+// ---------------------------------------------------------------------------
+// Stretching (a member's report: Dynamic on, a Move or Draw stretch left the stretched area coarse).
+// ---------------------------------------------------------------------------
+namespace {
+
+// The longest edge (as a multiple of the detail's edge length) of the triangles within `near` of `at`.
+float longestEdgeNear(const Mesh& m, const glm::vec3& at, float near) {
+    float longest = 0.0f;
+    for (const glm::uvec3& t : m.triangles)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec3 a = m.positions[t[c]], b = m.positions[t[(c + 1) % 3]];
+            if (glm::distance((a + b) * 0.5f, at) < near) longest = std::max(longest, glm::distance(a, b));
+        }
+    return longest;
+}
+
+enum class Setup { Plain, Uvs, Levels, Dense };
+
+Document stretchDoc(Setup setup) {
+    Document d = sphereDoc(setup == Setup::Dense ? 3 : 2);
+    Mesh& m = d.mesh;
+    if (setup == Setup::Uvs) {
+        m.uvs.assign(m.triangleCount() * 3, glm::vec2(0.5f));
+        m.texture = makeTexture(16, 16);
+        m.ensureColors();
+        m.paintToTexture = true;
+    }
+    if (setup == Setup::Levels) {
+        CommandRegistry reg;
+        reg.execute(d, "subdiv_divide", {});
+    }
+    return d;
+}
+
+} // namespace
+
+namespace {
+
+// A Move grab of `steps` x `step` from the sphere's pole at (0, 0, 1), brush `radius`, strength 1.
+void moveStretch(Document& d, const Symmetry& sym, float radius = 0.5f, int steps = 10, glm::vec3 step = glm::vec3(0, 0, 0.1f)) {
+    RayHit hit;
+    CHECK(d.bvh.raycast(d.mesh, glm::vec3(0, 0, 3), glm::vec3(0, 0, -1), hit));
+    DabParams p;
+    p.center = hit.position;
+    p.viewDir = glm::vec3(0, 0, -1);
+    p.radius = radius;
+    p.strength = 1.0f;
+    CHECK(d.sculptor.beginStroke(d.mesh, "Move"));
+    d.sculptor.beginGrab(d.mesh, d.bvh, p, sym);
+    for (int i = 0; i < steps; ++i) d.sculptor.grab(d.mesh, d.bvh, step);
+    d.undo.push(d.sculptor.endStroke());
+}
+
+float tipHeight(const Mesh& m) {
+    float tip = -1e9f;
+    for (const glm::vec3& v : m.positions) tip = std::max(tip, v.z);
+    return tip;
+}
+
+} // namespace
+
+TEST(dyntopo_move_stretch_is_refined_at_the_stroke_end) {
+    for (Setup setup : {Setup::Plain, Setup::Uvs, Setup::Dense}) {
+        Document d = stretchDoc(setup);
+        d.sculptor.dyntopo.detail = 0.6f;
+        Document flat = stretchDoc(setup); // the same stretch without Dynamic: the shape to keep
+        flat.sculptor.dyntopo.enabled = false;
+        moveStretch(flat, Symmetry{});
+        const Mesh before = d.mesh;
+        moveStretch(d, Symmetry{});
+        CHECK(d.mesh.triangleCount() > before.triangleCount() * 3 / 2);
+        CHECK(invalid(d.mesh, true).empty());
+        CHECK(bvhMatches(d.mesh, d.bvh));
+        CHECK(!d.mesh.dynamicAdjacency());
+        // The stretch's edges are the detail's length (a split edge may stay up to 4/3 of it) and the form is the Move's.
+        const float edge = dyntopoEdgeLength(d.sculptor.dyntopo, 0.5f, 2.0f);
+        CHECK(longestEdgeNear(d.mesh, glm::vec3(0, 0, tipHeight(d.mesh) - 0.2f), 0.4f) <= edge * 4.0f / 3.0f * 1.25f);
+        CHECK(std::abs(tipHeight(d.mesh) - tipHeight(flat.mesh)) < 0.03f);
+        // One undo step: the coarse mesh comes back exactly (the UVs too), and redo makes the same stretch.
+        const Mesh after = d.mesh;
+        CHECK(d.undo.undo(d.mesh, d.bvh));
+        CHECK(d.mesh.triangles == before.triangles && d.mesh.positions == before.positions && d.mesh.uvs == before.uvs);
+        CHECK(d.undo.redo(d.mesh, d.bvh));
+        CHECK(d.mesh.triangles == after.triangles && d.mesh.positions == after.positions);
+    }
+}
+
+TEST(dyntopo_move_stretch_never_coarsens_and_skips_levels) {
+    // Finer than the detail asks for (a big brush, high Detail 0): the stretch keeps every triangle it had.
+    Document d = stretchDoc(Setup::Dense);
+    d.sculptor.dyntopo.detail = 0.0f;
+    const size_t before = d.mesh.triangleCount();
+    moveStretch(d, Symmetry{}, 0.8f, 1, glm::vec3(0, 0, 0.02f));
+    CHECK(d.mesh.triangleCount() >= before);
+    CHECK(invalid(d.mesh, true).empty());
+    // Subdivision levels can't be remeshed: the Move stays as it was.
+    Document levels = stretchDoc(Setup::Levels);
+    levels.sculptor.dyntopo.detail = 0.6f;
+    const size_t tris = levels.mesh.triangleCount();
+    moveStretch(levels, Symmetry{});
+    CHECK(levels.mesh.triangleCount() == tris);
+}
+
+TEST(dyntopo_move_stretch_with_symmetry_makes_mirrored_topology) {
+    Document d = stretchDoc(Setup::Dense);
+    d.sculptor.dyntopo.detail = 0.6f;
+    const size_t before = d.mesh.triangleCount();
+    moveStretch(d, Symmetry{true, false, false});
+    CHECK(d.mesh.triangleCount() > before);
+    CHECK(invalid(d.mesh, true).empty());
+    const std::vector<uint32_t> map = mirrorMap(d.mesh, dyntopoEdgeLength(d.sculptor.dyntopo, 0.5f, 2.0f) * 0.3f);
+    CHECK(map.size() == d.mesh.vertexCount() && mirroredTopology(d.mesh, map));
 }

@@ -478,6 +478,10 @@ private:
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
     void repairDab(Mesh& mesh, BVH& bvh);
+    // Dynamic topology and Move: the grab moves a fixed set of vertices, so a stretched surface kept the triangles it
+    // had. At the stroke's end the region it moved is split towards the detail's edge length (never coarsened).
+    void refineGrab();
+    void smoothSplits(Mesh& mesh, BVH& bvh, uint32_t first);
     void followRemesh(Mesh& mesh);
     void mergeTopologyUndo(TopologyUndo& topo, const Mesh& mesh);
     DynamicTopology dynTopo_;
@@ -588,6 +592,10 @@ private:
     std::vector<uint8_t> grabFirst_;
     glm::vec3 grabTotal_{0.0f};
     bool grabCaptured_ = false;
+    Mesh* grabMesh_ = nullptr; // the mesh, BVH, brush radius and symmetry of the grab (refineGrab)
+    BVH* grabBvh_ = nullptr;
+    float grabRadius_ = 0.0f;
+    Symmetry grabSym_{};
     void captureGrab(Mesh& mesh);
 
     // Layer brush: per-stroke height already applied to each vertex.

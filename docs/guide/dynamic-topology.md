@@ -23,9 +23,9 @@ remeshing first.
 | **Detail** | Top shelf (while Dynamic is on), **Sculpt > Draw & Tablet** | How small the triangles get: 0 coarse, 100 fine (default 50) |
 | **Constant detail** | **Sculpt > Draw & Tablet** | Off: the size follows the brush. On: one size for the whole mesh |
 
-Then sculpt as usual. Every brush works with it except **Move** (it drags the surface without remeshing), the
-mask and paint brushes, and the stamping strokes **Drag Stamp** and **Slide Stamp** (so VDM stamps don't remesh either). **Smooth** remeshes towards larger triangles, so smoothing
-also simplifies.
+Then sculpt as usual. Every brush works with it except the mask and paint brushes and the stamping strokes **Drag Stamp** and **Slide Stamp** (so VDM stamps don't remesh either). **Smooth** remeshes towards larger triangles, so smoothing
+also simplifies. **Move** drags the surface as it always did and adds the triangles the stretch needs when you let go
+(it only adds: triangles that are finer than the Detail asks for stay).
 
 > **Tip:** Turn on **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>) to see the triangles appear under the brush.
 
