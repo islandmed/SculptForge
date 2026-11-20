@@ -207,6 +207,13 @@ std::function<float(const glm::vec3&)> stencilTexture(const DabParams& p, const 
 
 // Smooth's keep-volume steps (Sculptor::taubinShrink): Taubin's own values, pass band 1/lambda + 1/mu = 0.1.
 constexpr float kTaubinLambda = 0.6307f, kTaubinMu = -0.6732f;
+// Smooth's reach (Sculptor::smoothStepsFor): a plain Laplacian step relaxes a vertex toward its neighbours' average, a scale of one
+// edge, so on a dense mesh a dab of a given size barely changed the surface (1.3M triangles: 2% of what 20k removed). A dab
+// repeats the step (r / (kSmoothRefEdges x edge))^2 times, what it did on a mesh whose edges are 1/6 of the brush radius, at any
+// density, as far as kSmoothMaxWork (vertex steps per dab: 6-9 ms on 10 cores, 1.3M triangles) and kSmoothMaxSteps allow.
+constexpr float kSmoothRefEdges = 6.0f;
+constexpr int kSmoothMaxSteps = 256;
+constexpr size_t kSmoothMaxWork = 2500000;
 
 // --- Procedural 3D patterns (deterministic, so texture sticks to the surface) ---
 
@@ -1276,7 +1283,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const glm::vec3 strokeDir = strokeLen > 1e-12f ? p.strokeDelta / strokeLen : glm::vec3(0.0f);
     if (type == BrushType::Layer) prepareLayer(mesh, r * 0.08f * std::clamp(p.strength, 0.0f, 1.0f));
     const bool keepVolume = type == BrushType::Smooth && p.keepVolume && !p.groupBorders;
-    if (keepVolume) taubinShrink(mesh);
+    const int smoothSteps = type == BrushType::Smooth && !p.groupBorders ? smoothStepsFor(mesh, r) : 1;
+    if (keepVolume && smoothSteps <= 1) taubinShrink(mesh);
     const std::vector<glm::vec3>* morph = type == BrushType::Morph ? morphTarget(mesh) : nullptr;
     if (type == BrushType::Morph && !morph) return;
 
@@ -1313,11 +1321,22 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
     // offset of the i-th vertex v if it were at x (x = pos[v] for the dab itself; the adaptive normals ask for
     // points next to it, which only the brushes that read nothing but the place, and v's own normal, are asked).
-    const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
+    const auto falloffAt = [&](const glm::vec3& x) {
         const glm::vec3 o = x - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
                            : brushFalloff(brushDistance(p, x), r, p.focal);
         if (useStencil && f > 0.0f) f *= stencil.weight(x);
+        return f;
+    };
+    if (smoothSteps > 1) { // Smooth on a mesh denser than the brush's size asks: its steps, all at once (kSmoothRefEdges)
+        smoothW_.resize(verts_.size());
+        for (size_t i = 0; i < verts_.size(); ++i)
+            smoothW_[i] = vertexInfluence(mesh, verts_[i]) > 0.0f ? std::min(1.0f, s * falloffAt(pos[verts_[i]])) : 0.0f; // (a masked point stays)
+        smoothSteps_(mesh, smoothSteps, keepVolume);
+    }
+    const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
+        const glm::vec3 o = x - p.center;
+        const float f = falloffAt(x);
         glm::vec3 d(0.0f);
 
         switch (type) {
@@ -1334,6 +1353,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 if (groupBorderNeighbours(mesh, v, nb) != 2) break;
                 const glm::vec3 mid = 0.5f * (pos[nb[0]] + pos[nb[1]]);
                 d = projectOnPlane(mid - x, nrm[v]) * std::min(1.0f, s * f);
+                break;
+            }
+            if (smoothSteps > 1 && type == BrushType::Smooth) { // (the steps, summed up: where they left it)
+                d = smoothed_[i] - x;
                 break;
             }
             auto ring = mesh.polygonNeighbors(v);
@@ -1669,6 +1692,73 @@ void Sculptor::taubinShrink(const Mesh& mesh) {
             shrunk_[i] += kTaubinLambda * (avg - pos[v]);
         }
     });
+}
+
+// How many times a Smooth dab repeats its step so that its effect does not depend on the mesh's density (kSmoothRefEdges).
+int Sculptor::smoothStepsFor(const Mesh& mesh, float radius) const {
+    static const bool off = [] { // SF_SMOOTH_DENSITY=0: one step per dab, as before (A/B clips and benches)
+        const char* e = std::getenv("SF_SMOOTH_DENSITY");
+        return e && e[0] == '0';
+    }();
+    if (off) return 1;
+    const float edge = typicalEdge(mesh, verts_);
+    if (!(edge > 0.0f) || !(radius > 0.0f)) return 1;
+    const float edges = radius / (kSmoothRefEdges * edge); // brush radius in units of the reference density's edge
+    const int cap = int(std::clamp<size_t>(kSmoothMaxWork / std::max<size_t>(verts_.size(), 1), 1, kSmoothMaxSteps));
+    return std::clamp(int(std::lround(edges * edges)), 1, cap);
+}
+
+// `steps` of Smooth's relax step over verts_, from smoothW_ (each one's weight: Intensity x pressure x falloff, 0 where it
+// stays), into smoothed_ (where each ends up). Jacobi: every step reads the points as the step before left them; points outside
+// the brush's region stay where they are. keepVolume: each step a Taubin pair (taubinShrink's lambda then mu) instead.
+void Sculptor::smoothSteps_(const Mesh& mesh, int steps, bool keepVolume) {
+    const auto& pos = mesh.positions;
+    const size_t n = verts_.size();
+    constexpr uint32_t kOutside = 0x80000000u;
+    constexpr size_t kBlock = 512; // (a step is short: many blocks, so that every core has one)
+    if (smoothIndex_.size() != mesh.vertexCount()) smoothIndex_.assign(mesh.vertexCount(), UINT32_MAX);
+    for (size_t i = 0; i < n; ++i) smoothIndex_[verts_[i]] = uint32_t(i);
+    // The neighbours once (a region index, or kOutside | the vertex), not per step.
+    smoothStart_.resize(n + 1);
+    smoothRing_.clear();
+    for (size_t i = 0; i < n; ++i) {
+        smoothStart_[i] = uint32_t(smoothRing_.size());
+        for (uint32_t u : mesh.polygonNeighbors(verts_[i])) smoothRing_.push_back(smoothIndex_[u] != UINT32_MAX ? smoothIndex_[u] : kOutside | u);
+    }
+    smoothStart_[n] = uint32_t(smoothRing_.size());
+    for (size_t i = 0; i < n; ++i) smoothIndex_[verts_[i]] = UINT32_MAX; // (all that was set, for the next dab)
+    smoothed_.resize(n);
+    smoothNext_.resize(n);
+    smoothShrunk_.resize(keepVolume ? n : 0);
+    for (size_t i = 0; i < n; ++i) smoothed_[i] = pos[verts_[i]];
+    const auto average = [&](size_t i, const std::vector<glm::vec3>& inside) {
+        glm::vec3 avg(0.0f);
+        const uint32_t b = smoothStart_[i], e = smoothStart_[i + 1];
+        for (uint32_t k = b; k < e; ++k) avg += smoothRing_[k] & kOutside ? pos[smoothRing_[k] & ~kOutside] : inside[smoothRing_[k]];
+        return e > b ? avg / float(e - b) : glm::vec3(0.0f);
+    };
+    for (int step = 0; step < steps; ++step) {
+        if (keepVolume)
+            poolFor(n, [&](size_t b, size_t e) {
+                for (size_t i = b; i < e; ++i) smoothShrunk_[i] = smoothed_[i] + kTaubinLambda * (average(i, smoothed_) - smoothed_[i]);
+            }, kBlock);
+        poolFor(n, [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const float w = smoothW_[i];
+                if (w <= 0.0f || smoothStart_[i + 1] == smoothStart_[i]) {
+                    smoothNext_[i] = smoothed_[i];
+                    continue;
+                }
+                if (keepVolume) {
+                    const glm::vec3 q = smoothShrunk_[i];
+                    smoothNext_[i] = smoothed_[i] + (q + kTaubinMu * (average(i, smoothShrunk_) - q) - smoothed_[i]) * w;
+                } else {
+                    smoothNext_[i] = smoothed_[i] + (average(i, smoothed_) - smoothed_[i]) * w;
+                }
+            }
+        }, kBlock);
+        smoothed_.swap(smoothNext_);
+    }
 }
 
 // The BVH after a mirror's dab moved (some of) the vertices its query returned, verts_ (the kernel ran since

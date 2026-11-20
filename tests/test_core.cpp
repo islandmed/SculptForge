@@ -180,7 +180,7 @@ TEST(smooth_keep_volume_keeps_volume) {
         p.strength = 1.0f;
         p.keepVolume = keepVolume;
         d.sculptor.beginStroke(d.mesh, "Smooth");
-        for (int i = 0; i < 20; ++i) {
+        for (int i = 0; i < 2; ++i) { // (a dab of this size repeats Smooth's step up to 256 times: Sculptor::smoothStepsFor)
             p.center = glm::vec3(0, 0, i % 2 ? -1.0f : 1.0f);
             p.viewDir = -p.center;
             d.sculptor.dab(d.mesh, d.bvh, BrushType::Smooth, p, Symmetry{false, false, false});
@@ -198,6 +198,7 @@ TEST(smooth_keep_volume_keeps_volume) {
     CHECK(keptChange < plainLoss * 0.25);  // the Taubin step keeps (nearly) all of it
     // It still smooths: the bumps of a noisy sphere mostly go.
     const Mesh noisy = smoothed(true, true, v0, s0);
+    std::printf("  noisy sphere: roughness %.3f -> %.3f, volume change %.2f%%\n", s0, spread(noisy), 100.0 * (volume(noisy) - v0) / v0);
     CHECK(spread(noisy) < s0 * 0.7);
     CHECK(std::abs(volume(noisy) - v0) / v0 < 0.02);
 }

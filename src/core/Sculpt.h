@@ -570,6 +570,12 @@ private:
     std::vector<glm::vec3> scratch_;
     // Smooth with keepVolume: each brush vertex's shrunk position, and (vertex, index) sorted to look it up.
     void taubinShrink(const Mesh& mesh);
+    // Smooth repeats its step on a dense mesh (Sculptor::smoothStepsFor): the steps' result per brush point, and what they read.
+    int smoothStepsFor(const Mesh& mesh, float radius) const;
+    void smoothSteps_(const Mesh& mesh, int steps, bool keepVolume);
+    std::vector<glm::vec3> smoothed_, smoothNext_, smoothShrunk_;
+    std::vector<float> smoothW_;
+    std::vector<uint32_t> smoothIndex_, smoothStart_, smoothRing_;
     std::vector<glm::vec3> shrunk_;
     std::vector<std::pair<uint32_t, uint32_t>> shrunkIndex_;
     std::vector<float> weights_, influence_;
