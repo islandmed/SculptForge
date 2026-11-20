@@ -550,6 +550,8 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    glm::vec3 prevEye_{0.0f}, prevForward_{0.0f, 0.0f, -1.0f};
+    bool cameraMoved_ = false; // this frame's camera differs from the last frame's (a micro level's shading catch-up waits)
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too

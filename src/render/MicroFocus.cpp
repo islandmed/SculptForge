@@ -305,6 +305,9 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     Lap lap{splitMs_};
     for (uint32_t s = 0; s < slots_; ++s) freePage(s);
     pendingShade_.clear();
+    pendingCoarse_.clear(); // (shadeCoarse(all) below shades every tile)
+    coarseHead_ = 0;
+    coarseQueued_.assign(r.baseTriangles_, 0);
     buildCoarse(mesh, mm, {});
     std::vector<uint32_t> none;
     writeRecords(mm, r, none, true);
@@ -356,7 +359,26 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
     if (!reshade.empty()) {
         std::sort(reshade.begin(), reshade.end());
         reshade.erase(std::unique(reshade.begin(), reshade.end()), reshade.end());
-        shadeCoarse(mesh, r, reshade, false);
+        if (coarseQueued_.size() != r.baseTriangles_) coarseQueued_.assign(r.baseTriangles_, 0);
+        for (uint32_t t : reshade)
+            if (!coarseQueued_[t]) coarseQueued_[t] = 1, pendingCoarse_.push_back(t);
+    }
+    if (pendingCoarse() > 0) {
+        // While a stroke runs: strokeShadeMs of it, then the rest on the next frames (a tile under the brush is queued once
+        // however many frames change it). While the view or the camera moves a fifth of that (an orbit after a stroke isn't slowed by the
+        // catch-up), at rest four times, until the queue is empty.
+        const TierConfig& tc = currentTierConfig();
+        const size_t take = coarseShadeBatch(pendingCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.2 : 4.0), coarseNsPerTile_);
+        std::vector<uint32_t> batch(pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_ + take));
+        for (uint32_t t : batch) coarseQueued_[t] = 0;
+        coarseHead_ += take;
+        if (coarseHead_ == pendingCoarse_.size()) pendingCoarse_.clear(), coarseHead_ = 0;
+        else if (coarseHead_ > (size_t(1) << 16) && coarseHead_ * 2 > pendingCoarse_.size())
+            pendingCoarse_.erase(pendingCoarse_.begin(), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_)), coarseHead_ = 0;
+        const auto started = std::chrono::steady_clock::now();
+        shadeCoarse(mesh, r, batch, false);
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(batch.size());
+        coarseNsPerTile_ = coarseNsPerTile_ > 0.0 ? coarseNsPerTile_ * 0.7 + ns * 0.3 : ns;
     }
     lap(kShadeCoarse);
     // Pages for the full tiles the last draw drew finer than the coarse level, finest first.
