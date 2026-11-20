@@ -393,6 +393,7 @@ struct PhaseResult {
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
     std::vector<double> focusSplit[7]; // a streamed level's main-thread work each frame: promote, then MicroFocus::Part
+    std::vector<double> pendingPromote, pendingShade; // (SF_BENCH_TRACE) tiles still waiting to be promoted / coarse-shaded each frame
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
     double strokeSyncMs = 0;      // its uploads to the GPU (main thread, over strokeFrames frames)
     int strokeFrames = 0;
@@ -586,7 +587,18 @@ void App::startProofMode() {
         const char* colon = std::strchr(lg, ':');
         p->phases.insert(p->phases.begin(), PhaseSpec{"clay long", r > 0 ? r : 60.0f, colon ? std::max(1.0, std::atof(colon + 1)) : 25.0, BrushType::Clay, 0.35f});
         p->phases.front().sweep = std::getenv("SF_BENCH_LONG_EIGHT") == nullptr; // (SF_BENCH_LONG_EIGHT=1: the figure eight)
+        // ... then a second stroke at once (60 px, 6 s, the figure eight): started while the first one's shading catches up.
+        p->phases.insert(p->phases.begin() + 1, PhaseSpec{"clay second", 60.0f, 6.0, BrushType::Clay, 0.35f});
     }
+    // SF_BENCH_SETTLED=1: a "still settled" phase after "still" (the rest view once the shading the strokes left is done).
+    if (const char* st = std::getenv("SF_BENCH_SETTLED"); st && *st == '1')
+        for (auto it = p->phases.begin(); it != p->phases.end(); ++it)
+            if (std::string(it->name) == "still") {
+                PhaseSpec settled = *it;
+                settled.name = "still settled";
+                p->phases.insert(it + 1, settled);
+                break;
+            }
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -1076,10 +1088,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             nextPhase();
             break;
         }
-        // The view at rest after strokes: first the shading they left waiting (a micro level's catch-up, 30 s at most),
-        // timed on its own ("catch_up_s"), so the rest row is the settled view and the catch-up is not hidden.
-        if (spec.radiusPx < 0 && ph.frameMs.empty() && ph.catchUpSeconds < 30.0 && doc_.mesh.micro && doc_.mesh.micro->focus &&
-            renderer_.microPendingShading() > 0) {
+        // "still settled" (SF_BENCH_SETTLED=1, after "still", which is measured as always, catch-up inside it): first the coarse shading
+        // the strokes left waiting (a micro level's catch-up, 30 s at most), timed on its own ("catch_up_s"), then the view at rest.
+        if (std::string(spec.name) == "still settled" && ph.frameMs.empty() && ph.catchUpSeconds < 30.0 && doc_.mesh.micro &&
+            doc_.mesh.micro->focus && renderer_.microPendingCoarse() > 0) {
             ph.catchUpSeconds += frameMs / 1000.0;
             p.stageStart = now;
             break;
@@ -1091,6 +1103,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 double f[MicroFocus::kParts] = {};
                 renderer_.takeFocusSplit(f);
                 ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
+                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->stats().lastPending));
+                ph.pendingShade.push_back(double(renderer_.microPendingCoarse()));
                 for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
             }
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
@@ -1305,6 +1319,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         for (int k = 0; k < 7; ++k) col(fnames[k], ph.focusSplit[k]);
                     }
                     col("drawn", ph.drawn);
+                    col("pending_promote", ph.pendingPromote);
+                    col("pending_shade", ph.pendingShade);
                     j.set("trace", t);
                 }
                 j.set("fps", ph.seconds > 0 ? std::round(double(ph.frameMs.size()) / ph.seconds * 10) / 10 : 0.0);

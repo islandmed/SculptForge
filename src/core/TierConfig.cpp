@@ -25,7 +25,7 @@ size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t min
 
 size_t coarseShadeBatch(size_t pending, double ms, double nsPerTile) {
     if (!(ms > 0.0)) return pending;
-    return std::min(pending, nsPerTile > 0.0 ? std::max<size_t>(16, size_t(ms * 1e6 / nsPerTile)) : size_t(64));
+    return std::min(pending, nsPerTile > 0.0 ? std::max<size_t>(8, size_t(ms * 1e6 / nsPerTile)) : size_t(64));
 }
 
 size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints) {
