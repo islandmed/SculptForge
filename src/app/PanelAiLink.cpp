@@ -17,6 +17,7 @@
 #include "app/I18n.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
+#include "cli/McpAttach.h"
 #include "cli/McpServer.h"
 #include "cli/McpTools.h"
 #include "core/AuditLog.h"
@@ -56,73 +57,6 @@ float dialogButtonWidth(const char* const (&labels)[2], float scale) {
     for (const char* l : labels)
         w = std::max(w, ImGui::CalcTextSize(l, nullptr, true).x + 2.0f * ImGui::GetStyle().FramePadding.x);
     return w;
-}
-
-Json schemaProp(const char* type, const char* description) {
-    Json p = Json::object();
-    p.set("type", type);
-    p.set("description", description);
-    return p;
-}
-
-Json liveTool(const char* name, const char* description, std::vector<std::pair<const char*, Json>> props) {
-    Json properties = Json::object();
-    for (auto& [k, v] : props) properties.set(k, std::move(v));
-    Json schema = Json::object();
-    schema.set("type", "object");
-    schema.set("properties", std::move(properties));
-    schema.set("required", Json::array());
-    Json t = Json::object();
-    t.set("name", name);
-    t.set("description", description);
-    t.set("inputSchema", std::move(schema));
-    return t;
-}
-
-Json liveTools() {
-    Json tools = Json::array();
-    const auto view = [] {
-        return std::vector<std::pair<const char*, Json>>{
-            {"preset", schemaProp("string", "front, back, left, right, top, bottom or three_quarter (front-right, a little from above).")},
-            {"yaw", schemaProp("number", "Degrees around the vertical axis: 0 = front, 90 = the model's right side, 180 = back.")},
-            {"elevation", schemaProp("number", "Degrees above the model (-89..89): 0 = level, 30 = looking down a little.")},
-            {"frame", schemaProp("string", "Frame the view on: all (every visible Part), active (the active Part) or a Part's name.")},
-            {"zoom", schemaProp("number", "Closer (2 = twice as close) or further (0.5) after framing.")},
-            {"ortho", schemaProp("boolean", "Orthographic (true) or perspective (false).")}};
-    };
-    Json image = viewportImageTool(); // (one schema with the headless server: cli/McpTools.h)
-    image.set("description", "See the model: the viewport exactly as the user sees it (without the interface), as a PNG. "
-                             "The view options turn the user's camera too (they stay; with none, the view as it is). "
-                             "Look after every step and correct what you see.");
-    tools.push(std::move(image));
-    tools.push(liveTool("view_set", "Turn and frame the camera the user sees (and viewport_image renders).", view()));
-    tools.push(liveTool("view_turntable",
-                        "The model from several sides in one image (a grid, labelled by yaw), to check form and "
-                        "proportions all around. The user's camera is put back afterwards.",
-                        {{"views", schemaProp("number", "4, 6 or 8 views around (default 4: front, right, back, left).")},
-                         {"elevation", schemaProp("number", "Degrees above the model (default 10).")},
-                         {"size", schemaProp("number", "Each view's side in pixels (192-512, default 320).")}}));
-    tools.push(viewCloseupTool()); // (one schema with the headless server: cli/McpTools.h)
-    tools.push(liveTool(
-        "stroke_screen",
-        "Brush stroke drawn on the screen, as a user drags across the viewport: points in viewport coordinates "
-        "(0,0 = top left, 1,1 = bottom right), projected onto the model (points off the model are skipped). Use "
-        "viewport_image to see where things are. One undo step.",
-        {{"points", schemaProp("string", "\"u,v u,v ...\" in 0..1 viewport coordinates (at least one on the model).")},
-         {"brush", schemaProp("string", "Brush name (Standard, Clay, Clay Block, Crease, Inflate, Smooth, Pinch...) or a "
-                                        "detail preset (Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail "
-                                        "Scales, Detail Scar). Default: the active brush.")},
-         {"radius", schemaProp("number", "Brush radius as a fraction of the viewport's height (default 0.04; a detail "
-                                         "preset's own size on the model).")},
-         {"strength", schemaProp("number", "0-1 (default 0.5; a detail preset's own).")},
-         {"invert", schemaProp("boolean", "Carve instead of build (like holding Alt).")},
-         {"symmetry", schemaProp("string", "Mirror across these world planes, e.g. \"x\" (default none).")}}));
-    return tools;
-}
-
-bool isLiveTool(const std::string& name) {
-    return name == "viewport_image" || name == "view_set" || name == "view_turntable" || name == "view_closeup" ||
-           name == "stroke_screen";
 }
 
 // A studio's policy (core/ManagedPolicy.h) may allow only some kinds of tool: the rest are neither listed nor run.
@@ -431,13 +365,7 @@ void App::pollAiLink() {
             s.approvalSince = seconds();
             break;
         case K::ListTools: {
-            Json tools = Json::array();
-            const Json commands = mcpToolList(commands_), live = liveTools();
-            for (const Json& t : commands.items()) // (mcpToolList leaves out what the policy doesn't allow; the live
-                                                    // tools below replace its viewport_image and view_closeup)
-                if (!link::AiLinkPolicy::hidden(t["name"].asString()) && !isLiveTool(t["name"].asString())) tools.push(t);
-            for (const Json& t : live.items())
-                if (policyAllowsTool(nullptr, t["name"].asString())) tools.push(t);
+            Json tools = mcpAppToolList(commands_); // (cli/McpAttach.h: the same list `--attach` shows before pairing)
             s.send(link::AiLinkSession::listReply(step.call.id, std::move(tools)));
             break;
         }
@@ -445,18 +373,18 @@ void App::pollAiLink() {
         case K::Confirm: {
             const std::string& name = step.call.name;
             const Command* cmd = commands_.find(name);
-            if (!cmd && !isLiveTool(name)) {
+            if (!cmd && !mcpIsLiveTool(name)) {
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, "Unknown tool: " + name));
                 break;
             }
-            if (std::string why; !policyAllowsTool(isLiveTool(name) ? nullptr : cmd, name, &why) ||
+            if (std::string why; !policyAllowsTool(mcpIsLiveTool(name) ? nullptr : cmd, name, &why) ||
                                  (audit::required() && !audit::writable(&why))) {
                 auditLive(s.session->client(), name, step.call.args, false, why);
                 s.send(link::AiLinkSession::resultReply(step.call.id, false, why));
                 break;
             }
             s.session->policy.projectDir = macroProjectDir();
-            link::AiDecision d = s.session->policy.classify(isLiveTool(name) ? nullptr : cmd, name, step.call.args);
+            link::AiDecision d = s.session->policy.classify(mcpIsLiveTool(name) ? nullptr : cmd, name, step.call.args);
             // A new scene clears the history: unsaved work couldn't be undone back.
             if (d.verdict == link::AiVerdict::Allow && doc_.dirty() && replacesScene(name))
                 d = link::confirmBecause("Replaces the scene: your unsaved changes would be lost");
@@ -486,7 +414,7 @@ void App::aiLinkExecute(const link::AiLinkCall& call) {
     const auto elapsedMs = [&] {
         return int64_t(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
-    if (isLiveTool(call.name)) {
+    if (mcpIsLiveTool(call.name)) {
         bool ok = true;
         Json content = aiLiveTool(call.name, call.args, ok);
         auditLive(s.session->client(), call.name, call.args, ok, ok ? "" : "failed", elapsedMs()); // (never the image)

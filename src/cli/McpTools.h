@@ -27,6 +27,11 @@ Json mcpPromptList();
 // prompts/get: fills `result` ({description, messages}) or `error` (unknown recipe, a required argument missing).
 bool mcpPromptGet(const std::string& name, const Json& args, Json& result, std::string& error);
 
+// Live mode's window tools (viewport_image, view_set, view_turntable, view_closeup, stroke_screen), for tools/list: the app
+// serves them once paired, and `--attach` lists the same ones before.
+Json mcpLiveTools();
+bool mcpIsLiveTool(const std::string& name);
+
 // The viewport_image tool definition ({name, description, inputSchema}), for tools/list.
 Json viewportImageTool();
 // Headless viewport_image: draws doc's visible Parts (args: size, yaw, elevation, frame "all" | "active" | a Part's
