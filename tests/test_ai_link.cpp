@@ -18,6 +18,7 @@
 #include <fstream>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <thread>
 #ifndef _WIN32
@@ -319,6 +320,7 @@ TEST(ai_link_attach_end_to_end) {
     });
     std::stringstream in, out;
     in << R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"Tester"}}})" << "\n"
+       << R"({"jsonrpc":"2.0","id":9,"method":"tools/list"})" << "\n"      // before pairing: the whole set
        << call(2, "mesh_info") << "\n"                                   // not connected yet
        << call(3, "live_connect", R"({"code":"000000"})") << "\n"         // wrong code
        << call(4, "live_connect", R"({"code":"314159"})") << "\n"         // right code
@@ -326,7 +328,8 @@ TEST(ai_link_attach_end_to_end) {
        << call(8, "live_connect") << "\n"                                // already connected
        << call(6, "live_disconnect") << "\n"
        << call(7, "mesh_info") << "\n";
-    runMcpAttach(in, out, endpoint);
+    CommandRegistry registry;
+    runMcpAttach(in, out, endpoint, &registry);
     app.join();
     const std::string o = out.str();
     { // Each live_connect reply's isError matches what it says, and list_changed comes after the reply that caused it.
@@ -340,6 +343,18 @@ TEST(ai_link_attach_end_to_end) {
             if (j["method"].asString() == "notifications/tools/list_changed" && listChangedAt < 0) listChangedAt = n;
             else if (j.has("id")) replies[int(j["id"].asNumber())] = j;
         }
+        { // Clients that never refresh their tool list: the first tools/list, before any pairing, already has everything.
+            std::set<std::string> names;
+            for (const Json& t : replies[9]["result"]["tools"].items()) names.insert(t["name"].asString());
+            for (const char* want : {"live_connect", "live_disconnect", "mesh_info", "blockout", "viewport_image", "view_set",
+                                     "view_turntable", "view_closeup", "stroke_screen"})
+                CHECK(names.count(want) == 1);
+            CHECK(names.count("pack_install") == 0); // what the app never offers an AI tool stays out
+            CHECK(names.size() > 20);
+        }
+        CHECK(replies[2]["result"]["isError"].asBool(false)); // a tool before pairing: the plain line, not a silent pairing
+        CHECK(replies[2]["result"]["content"][0]["text"].asString() ==
+              "Not connected to SculptForge yet: call live_connect (SculptForge must be open)");
         CHECK(replies[3]["result"]["isError"].asBool(false)); // wrong code: refused
         CHECK(!replies[4]["result"]["isError"].asBool(true)); // right code: connected
         CHECK(replies[4]["result"]["content"][0]["text"].asString().find("Connected to SculptForge") == 0);
@@ -352,12 +367,12 @@ TEST(ai_link_attach_end_to_end) {
             if (l.find("\"id\":4") != std::string::npos) connectReplyAt = n;
         CHECK(connectReplyAt >= 0 && listChangedAt > connectReplyAt);
     }
-    CHECK(o.find("Not connected to SculptForge: call live_connect first") != std::string::npos);
+    CHECK(o.find("Not connected to SculptForge yet: call live_connect") != std::string::npos);
     CHECK(o.find("wrong code") != std::string::npos);
     CHECK(o.find("Connected to SculptForge") != std::string::npos);
     CHECK(o.find("ran mesh_info") != std::string::npos);
     CHECK(o.find("notifications/tools/list_changed") != std::string::npos);
-    CHECK(o.rfind("Not connected to SculptForge") > o.find("ran mesh_info")); // after Disconnect, refused again
+    CHECK(o.rfind("Not connected to SculptForge yet") > o.find("ran mesh_info")); // after Disconnect, refused again
     CHECK(o.find("Already connected to SculptForge") != std::string::npos);
     listener.close();
     std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
