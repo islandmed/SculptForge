@@ -2883,7 +2883,6 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     drag_ = Drag::Stroke;
-    asyncDabSeen_ = false;
     noteStrokePoint(hit.position); // (the first dab: where it began; the last dab replaces it as the stroke ends)
     playingLayer_ = -1;
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) doc_.sculptor.holdTopology(); // (they re-stamp)
@@ -3242,8 +3241,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         lastDabScreen_ = glm::vec2(x, y);
         lastDabCentre_ = hit.position;
     } else {
-        asyncDabCentre_ = hit.position; // (the solver thread's: the main thread reads it as the batch is committed)
-        asyncDabSeen_ = true;
+        dabView_->lastHit = hit.position; // (the solver thread's: the main thread reads it as the batch is committed)
+        dabView_->lastHitSeen = true;
     }
     if (st.mask) {
         p.strength = st.maskStrength;
