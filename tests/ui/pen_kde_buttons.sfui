@@ -156,3 +156,43 @@ expect_value camera_pan != $t2
 key f
 camera 0 0
 pen_stream ink
+
+# The brush ring is the cursor over the view: during a side-button drag it stays on the pen every step, and after the
+# button is let go it is at the pen (#216: a compositor whose pointer sent one move after the click, then nothing, left the
+# ring where the click began while the cursor went on, until the release).
+pen_stream kde_stalled
+key f
+camera 0 0
+pen_move 0.4 0.4
+pen_button 1 down
+pen_move 0.415 0.40 0.1
+pen_move 0.430 0.41 0.1
+remember pen_x px
+remember pen_y py
+expect_value cursor_x < $px+1
+expect_value cursor_x > $px-1
+expect_value cursor_y < $py+1
+expect_value cursor_y > $py-1
+pen_move 0.500 0.45 0.3
+remember pen_x px
+remember pen_y py
+expect_value cursor_x < $px+1
+expect_value cursor_x > $px-1
+expect_value cursor_y < $py+1
+expect_value cursor_y > $py-1
+pen_move 0.600 0.30 0.3
+remember pen_x px
+remember pen_y py
+expect_value cursor_x < $px+1
+expect_value cursor_x > $px-1
+expect_value cursor_y < $py+1
+expect_value cursor_y > $py-1
+expect_value view_dragging == 1
+pen_button 1 up
+expect_value cursor_x < $px+1
+expect_value cursor_x > $px-1
+expect_value cursor_y < $py+1
+expect_value cursor_y > $py-1
+key f
+camera 0 0
+pen_stream ink

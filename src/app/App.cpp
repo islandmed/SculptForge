@@ -2391,8 +2391,15 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dx = x - mouseX_;
         dy = y - mouseY_;
     }
-    if (!fromPen && pointerDrag) pointerDragMoved_ = true;
-    if (fromPen && pointerDrag && pointerDragMoved_) return;
+    // (Only while the pointer keeps moving it: a compositor whose pointer sent one move after the click and then went quiet
+    // while the cursor went on left the drag, and the ring that follows it, where the click began, #216. The pen's samples
+    // carry it from the pointer's last place, as soon as the pointer has been still for kPointerDragNs.)
+    constexpr Uint64 kPointerDragNs = 60000000ull;
+    if (!fromPen && pointerDrag) {
+        pointerDragMoved_ = true;
+        pointerDragNs_ = clickClockNs();
+    }
+    if (fromPen && pointerDrag && pointerDragMoved_ && clickClockNs() - pointerDragNs_ < kPointerDragNs) return;
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
