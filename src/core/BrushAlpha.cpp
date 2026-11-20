@@ -740,13 +740,14 @@ std::shared_ptr<const BrushAlpha> BrushAlpha::shared(const BrushAlpha& a) {
 }
 
 bool BrushAlpha::finishCreature(BrushAlpha& a, bool wait) {
-    if (!a.path.empty() || a.width == kCreatureSize) return false;
+    if (!a.pending) return false;
     const int i = creatureIndex(lookupKey(a.name));
     if (i < 0 || (!wait && !(gCreatureReady.load() & (uint64_t(1) << i)))) return false;
     const BrushAlpha& full = creatureFull(i);
     a.width = full.width;
     a.height = full.height;
     a.values = full.values; // (Tile and the rest stay as they are)
+    a.pending = false;
     return true;
 }
 
@@ -791,7 +792,9 @@ bool BrushAlpha::builtin(const std::string& name, BrushAlpha& out) {
     if (const int i = creatureIndex(key); i >= 0) {
         if (gDeferCreature && !(gCreatureReady.load() & (uint64_t(1) << i))) { // the tile now, the full one soon
             prefetch(name);
-            return builtinPreview(name, out);
+            const bool ok = builtinPreview(name, out);
+            out.pending = ok;
+            return ok;
         }
         out = creatureFull(i);
         return true;

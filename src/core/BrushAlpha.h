@@ -31,6 +31,9 @@ struct BrushAlpha {
     bool inverted = false;
     // Tile (#76, core/AlphaOptions.h): the alpha repeated tileX x tileY times inside the stamp (1 x 1: once).
     int tileX = 1, tileY = 1;
+    // A Creature Skin pick whose full alpha is still being made (BrushAlpha::setDeferCreature): this is its tile until
+    // finishCreature swaps it. A tile asked for as one (builtinPreview, the previews) is never pending.
+    bool pending = false;
     bool tiled() const { return tileX > 1 || tileY > 1; }
 
     bool empty() const { return values.empty(); }

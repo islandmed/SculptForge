@@ -127,7 +127,8 @@ TEST(creature_skin_deferred_pick_never_strokes_the_tile) {
     BrushAlpha::setDeferCreature(true);
     BrushAlpha a;
     CHECK(BrushAlpha::builtin("Pebble Scales", a));
-    CHECK(a.width == kCreaturePreview || a.width == kCreatureSize);
+    CHECK(a.width == kCreaturePreview ? a.pending : (a.width == kCreatureSize && !a.pending));
+    a.pending = true; // (made already by an earlier test: act as if it weren't)
     a.tileX = 3;
     BrushAlpha::finishCreature(a, true);
     CHECK(a.width == kCreatureSize && a.tileX == 3 && a.name == "Pebble Scales");
@@ -141,9 +142,12 @@ TEST(creature_skin_deferred_pick_never_strokes_the_tile) {
     CHECK(!BrushAlpha::shared(a));
     BrushAlpha classic;
     CHECK(BrushAlpha::builtin("Pores", classic) && !BrushAlpha::finishCreature(classic, true));
-    // Through a path stroke: the document's tile becomes the full alpha first.
+    // Through a path stroke: a pending tile becomes the full alpha first; a tile asked for as one (the brush previews)
+    // stays a tile, so previews never make the 16 MB alphas.
     Document d = docFrom(denseSphereFixture());
     CHECK(BrushAlpha::builtinPreview("Pebble Scales", d.brushAlpha) && d.brushAlpha.width == kCreaturePreview);
+    CHECK(!d.brushAlpha.pending && !BrushAlpha::finishCreature(d.brushAlpha, true));
+    d.brushAlpha.pending = true; // (as a deferred pick leaves it)
     PathStroke s;
     s.points = {glm::vec3(-0.1f, 0.0f, 1.2f), glm::vec3(0.1f, 0.0f, 1.2f)};
     s.radius = 0.05f;
