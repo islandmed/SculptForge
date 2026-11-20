@@ -1,0 +1,37 @@
+# A member's Paint strokes smoothed the shape and never coloured it (macOS 0.13.9): Smooth picked (S, or its shelf tile),
+# then the Paint brush, left Smooth as the brush under it. A plain stroke in Paint mode colours and leaves the shape
+# alone whatever brush came before; only a held Shift smooths (the colour, paint_shift_smooth.sfui) while painting.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+run set_color color=ff0000
+mouse_move 0.5 0.5
+
+action brush.smooth
+action draw.paint
+expect_value paint_mode == 1
+remember paint_mean_g white_g
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value paint_mean_g < $white_g
+expect_value moved_sum <= 0.000001
+key ctrl+z
+
+# Shift smooths the colour: over bare white it lays none and the shape stays put.
+snapshot
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value paint_mean_g >= $white_g
+expect_value moved_sum <= 0.000001
+key ctrl+z
+
+# A Shift whose key-up was lost to another window must not outlive the focus loss.
+hold shift
+window_focus 0
+hold none
+window_focus 1
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value paint_mean_g < $white_g
+expect_value moved_sum <= 0.000001

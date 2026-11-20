@@ -2165,7 +2165,9 @@ BrushType App::activeBrush() const {
     if (erasing() && eraserAction() == PenAction::Smooth) return BrushType::Smooth;
     // Shift+click / Ctrl+click on a shelf brush rebinds Shift / Ctrl (ModifierBrush.cpp).
     if (const ModifierSlot slot = heldSlot(); slot != ModifierSlot::None) return BrushType(uiPrefs_.modifierBrushes.brush(slot));
-    return (inputMods() & SDL_KMOD_SHIFT) ? BrushType::Smooth : brush_;
+    // The Paint brush colours whatever brush was picked before it: Smooth picked, then Paint, painted nothing (a member's
+    // strokes smoothed the shape for good). Only a held Shift smooths while painting.
+    return (inputMods() & SDL_KMOD_SHIFT) ? BrushType::Smooth : paintMode_ && brush_ == BrushType::Smooth ? BrushType::Standard : brush_;
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
