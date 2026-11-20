@@ -478,6 +478,10 @@ private:
         DabSettings settings;
         std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
         std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
+        // The batch's last dab on the Part's mesh: written by the solver thread (dabAt), read by the main thread once
+        // the batch is done (the hand-over orders them), for lastStrokeLocal_.
+        mutable glm::vec3 lastHit{0.0f};
+        mutable bool lastHitSeen = false;
     };
     std::unique_ptr<StrokeSolver> solver_;
     const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
@@ -3347,8 +3351,6 @@ private:
     glm::vec3 lastDabCentre_{0.0f}; // ... and its centre on the active Part's mesh (UI tests: dab_scene_error_px)
     glm::vec3 lastStrokeLocal_{0.0f}; // where the last stroke landed, on that Part's mesh, and the Part (-1: none yet)
     int lastStrokePart_ = -1;
-    glm::vec3 asyncDabCentre_{0.0f}; // the solver's last dab, kept for lastStrokeLocal_ at the commit (AsyncStroke.cpp)
-    bool asyncDabSeen_ = false;
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
     // ---- end classic feel ----
