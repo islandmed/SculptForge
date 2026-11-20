@@ -342,7 +342,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|kde|kde_pointer|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
+//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -1808,6 +1808,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
+    if (name == "pen_x") return penAt_.x; // where the pen last was (window px): the brush ring is there (#216)
+    if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
@@ -4311,7 +4313,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
-            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : 0;
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : 0;
+            kdeStall_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4789,7 +4792,9 @@ void Demo::penMove(float x, float y) {
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
-    if (huionStream_ || kdeStream_ != 0) mouseMotion(x, y, kDriverMouse); // ... and the driver moves it too
+    // ... and the driver moves it too (kde_stalled: its pointer sends one move after a button, then no more: #216)
+    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0)))
+        mouseMotion(x, y, kDriverMouse);
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
@@ -4908,6 +4913,7 @@ void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     static const int kKdeMouse[] = {0, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
     if (kdeStream_ != 0 && button >= 1 && button <= 2) {
         if (kdeStream_ == 1) app_.handleEvent(e);
+        kdeStall_ = down ? 1 : 0;
         mouseButton(down, kKdeMouse[button], kDriverMouse);
         return;
     }
