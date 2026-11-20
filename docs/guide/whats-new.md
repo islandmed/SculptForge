@@ -5,6 +5,27 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.10
+
+```features
+date: unreleased
+tagline: Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive.
+highlight: Sculpt layers travel to Blender and back as shape keys, with names and order kept
+highlight: Hold Shift with the Paint brush to blend colours smoothly
+highlight: Long Clay strokes on dense Micro levels keep up with your pen
+highlight: Voxel Remesh lets you proceed when memory is tight, and timelapses keep your Micro level strokes
+highlight: 16 new Creature Skin brushes for scales, hide and pores, made by request
+title: Layers to Blender and back
+line: Shape keys sent from Blender arrive as sculpt layers with their names, values and order, and go back as shape keys; glTF, FBX and USD exports keep the same layers.
+action: guide:layers.md
+title: Smooth colour with Shift
+line: With the Paint brush, hold Shift to blend the vertex colours under the brush into their neighbours; the shape stays put.
+action: guide:vertex-paint.md
+title: Creature Skin brushes
+line: Sixteen brushes for scales, hide, folds and pores, each with its own full-precision alpha.
+action: guide:brush-packs.md
+```
+
 ## Version 0.13.9
 
 ```features

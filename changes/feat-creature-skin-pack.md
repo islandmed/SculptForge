@@ -3,7 +3,6 @@ whats_new: **Creature Skin brushes**: sixteen high-resolution brushes for hide w
   plates, skin and nose pores and fine skin, tuned to read at micro level 3 or 4 (**Sculpt > Brush**, pack Creature
   Skin). Requested by @RodTDai.
 whats_new: **Alphas from 16-bit PNG and OpenEXR** keep their full precision: smooth height maps no longer step.
-highlight: Creature Skin: 16 high-resolution skin, hide and scale brushes
 added: **Creature Skin** brush pack and alphas (gh#228): Elephant Hide, Hide Folds, Dinosaur Hide, Snake Scales,
   Overlap Scales, Pebble Scales, Scute Plates, Pores Fine, Pores Clustered, Pores Stretched, Nose Pores Open, Nose
   Pores Dense, Nose Pores Furrowed, Skin Crosshatch, Skin Fine Lines and Skin Micro Grain. Each alpha is 2048 x 2048,
