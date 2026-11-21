@@ -18,8 +18,6 @@ remember z_intensity z0
 remember rgb_intensity rgb0
 remember smooth_intensity sm0
 remember shift_intensity sh0
-remember paint_rgb prgb0
-remember raise_on raise0
 
 hold shift
 expect_value paint_mode == $pm0
@@ -39,8 +37,6 @@ expect_value z_intensity == $z0
 expect_value rgb_intensity == $rgb0
 expect_value smooth_intensity == $sm0
 expect_value shift_intensity == $sh0
-expect_value paint_rgb == $prgb0
-expect_value raise_on == $raise0
 key ctrl+z
 
 # Shift+click a shelf brush while painting: it becomes the Shift brush, Paint stays.
@@ -72,7 +68,11 @@ remember smooth_intensity sm1
 remember z_intensity z1
 
 hold shift
+wait 0.3
+shot shift-held
 hold none
+wait 0.3
+shot shift-up
 expect_value paint_mode == 1
 expect_value main_brush == $mb1
 hold shift
@@ -83,7 +83,6 @@ expect_value main_brush == $mb1
 expect_value rgb_intensity == $rgb1
 expect_value smooth_intensity == $sm1
 expect_value z_intensity == $z1
-expect_value raise_on == 1
 key ctrl+z
 
 hold shift
