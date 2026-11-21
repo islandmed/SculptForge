@@ -17,6 +17,7 @@
 
 #include "core/Precision.h"
 
+#include "core/BenchLag.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
 
@@ -384,8 +385,14 @@ struct PhaseResult {
     int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
-    size_t dabs = 0, samples = 0;
+    float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
+    double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
+    bool pathUpright = false;
+    size_t dabs = 0, dabsOffModel = 0, samples = 0; // dabsOffModel: dabs that found no surface (a path's stretch off the model)
     std::vector<double> frameMs, lagMs, lagPx;
+    // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
+    // it are quick and their lag small; where they fall decided whether a heavy stroke's lag_ms p50 read 24 or 370 ms (#184)
+    std::vector<double> lagOnModelMs, lagOnModelPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
@@ -446,6 +453,7 @@ struct ProofState {
     };
     std::vector<Sample> samples;
     std::vector<glm::vec2> dabs;
+    std::vector<uint8_t> dabHits; // (App::strokeHitProbe_) 1: that dab reached the surface
     size_t sent = 1; // samples handed to onMouseMove (the first went to onMouseDown)
     // SF_BENCH_DENSE: Move and the Gizmo follow the pointer on the main thread (no dabs to match): their lag is the
     // age of the oldest sample handed over last frame when this frame shows it (its index; -1: none handed).
@@ -456,6 +464,8 @@ struct ProofState {
     // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
     size_t dabFrom = 0, previewFrom = 0;
     bool sweep = false; // PhaseSpec::sweep
+    bool upright = false; // the path turned a quarter (a tall model: Lucy)
+    double laps = 1.0;    // times round the path in the phase: a path fitted smaller goes round more, at the same pointer speed
     bool pressed = false;
     bool releasing = false; // let go: the phase ends with the stroke (predictive strokes finish after the release)
     double releaseAt = 0;
@@ -475,13 +485,16 @@ struct ProofState {
 namespace {
 
 glm::vec2 strokePoint(const ProofState& p, double u) {
+    u *= p.laps;
+    glm::vec2 d;
     if (p.sweep) { // zigzags across the framed model while the height swings once up and down: fresh surface all the way
         const double phi = 2.0 * 3.14159265358979 * u;
-        return {p.cx + 1.2f * p.R * float(std::sin(11.0 * phi)), p.cy + 0.9f * p.R * float(std::sin(phi))};
+        d = {1.2f * p.R * float(std::sin(11.0 * phi)), 0.9f * p.R * float(std::sin(phi))};
+    } else { // A figure eight across the front of the model, three times round.
+        const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
+        d = {p.R * 1.25f * float(std::sin(phi)), p.R * 0.75f * float(std::sin(2.0 * phi))};
     }
-    // A figure eight across the front of the model, three times round.
-    const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
-    return {p.cx + p.R * 1.25f * float(std::sin(phi)), p.cy + p.R * 0.75f * float(std::sin(2.0 * phi))};
+    return p.upright ? glm::vec2(p.cx + d.y, p.cy + d.x) : glm::vec2(p.cx + d.x, p.cy + d.y);
 }
 
 std::string isoDate() {
@@ -785,6 +798,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (p.pressed) onMouseUp();
         p.pressed = false;
         strokeProbe_ = nullptr;
+        strokeHitProbe_ = nullptr;
         p.stage = Stage::Finish;
     }
 
@@ -815,6 +829,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         proofGpuMs_.clear(); // (frames from before the phase)
         p.samples.clear();
         p.dabs.clear();
+        p.dabHits.clear();
         p.sent = 1;
         p.dabFrom = p.previewFrom = 0;
         // SF_BENCH_REFERENCES=a.png;b.png: reference images in the view for every phase (View > Reference images): the
@@ -870,9 +885,45 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.cy = c.y + c.h * 0.5f;
             p.R = 0.26f * std::min(c.w, c.h) * spec.pathScale;
             p.sweep = spec.sweep;
+            // The path stays on the model: a dab off it costs nothing, and the quick frames after it made the lag
+            // read 24 ms or 370 ms by where they fell (#184; the 1B scene had 88% of its small dabs off the model).
+            // Smaller until at most 2% of the path misses, lying or upright (a tall model), whichever stays larger, and
+            // round it more often: the pointer keeps its speed (lag depends on it). A miss is the dab's own (dabAt: no
+            // surface within the brush circle), so a phase whose dabs all land keeps the full path and stays comparable
+            // with earlier results (in practice only the small brushes are fitted).
+            {
+                RayHit h;
+                const float full = p.R;
+                p.laps = 1.0;
+                auto fit = [&](bool upright) {
+                    p.upright = upright;
+                    p.R = full;
+                    auto misses = [&] {
+                        int miss = 0;
+                        for (int k = 0; k < 120; ++k) {
+                            const glm::vec2 q = strokePoint(p, double(k) / 120.0);
+                            if (!pickNearCursor(q.x, q.y, radiusPx_, [&](float x, float y, RayHit& c) { return pick(x, y, c); }, h)) ++miss;
+                        }
+                        return miss;
+                    };
+                    for (int k = 0; k < 12 && misses() > 2; ++k) p.R *= 0.85f;
+                    return p.R;
+                };
+                const float lying = fit(false);
+                if (lying < full && fit(true) < lying) {
+                    p.upright = false;
+                    p.R = lying;
+                }
+                p.laps = double(full / p.R);
+                r.phases.back().pathRadiusPx = p.R;
+                r.phases.back().pathLaps = p.laps;
+                r.phases.back().pathUpright = p.upright;
+            }
+            const double start = nowSeconds(); // (the fit's picks are not the phase's)
+            p.stageStart = p.lastFrame = start;
             const glm::vec2 q = strokePoint(p, 0.0);
-            p.samples.push_back({now, q, 0.0});
-            p.lastSample = now;
+            p.samples.push_back({start, q, 0.0});
+            p.lastSample = start;
             // SF_BENCH_STENCIL=Cobblestone (a built-in alpha's name) or =photo.png: the strokes go through that Stencil
             // (#155), tiled so every dab reads it; SF_BENCH_STENCIL_SIZE=0.1 its height as a fraction of the view's (default
             // 0.8; small: vertices many image pixels apart, every read a disc). bench.sh stencil.
@@ -899,10 +950,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 benchStampFootprint_ = std::getenv("SF_BENCH_STAMP") != nullptr; // every dab as a stamp's (dabAt)
             }
             strokeProbe_ = &p.dabs;
+            strokeHitProbe_ = &p.dabHits;
             onMouseDown(q.x, q.y, SDL_BUTTON_LEFT);
             p.pressed = drag_ == Drag::Stroke;
             if (!p.pressed) {
                 strokeProbe_ = nullptr;
+                strokeHitProbe_ = nullptr;
                 p.error = "No stroke began on the " + r.label + " mesh (nothing under the pointer)";
             }
         } else if (spec.gizmo) { // the centre handle: Move drags in the view plane, Rotate turns about the view axis
@@ -1072,7 +1125,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
             ph.strokeFrames = perf_.lastStrokeFrames;
             strokeProbe_ = nullptr;
+            strokeHitProbe_ = nullptr;
             ph.dabs = p.dabs.size();
+            ph.dabsOffModel = size_t(std::count(p.dabHits.begin(), p.dabHits.end(), uint8_t(0)));
             // SF_BENCH_DUMP=<prefix>: the positions after each stroke (<prefix>-<phase>.bin, raw floats), to compare
             // what two settings' strokes made (a result check beside the timings).
             // SF_BENCH_DUMP_PHASES="clay large,smooth": only those.
@@ -1141,15 +1196,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // How far the stroke on screen (the newest dab in this frame) trails the pointer (the newest sample).
             if (!p.dabs.empty()) {
                 const glm::vec2 d = p.dabs.back();
-                size_t best = p.samples.size() - 1;
-                float bestDist = 1e30f;
-                for (size_t i = p.samples.size(); i-- > p.dabFrom && p.samples.size() - i < 2000;) {
-                    const float dist = glm::length(p.samples[i].p - d);
-                    if (dist < bestDist) bestDist = dist, best = i;
-                }
+                // Its sample: on the dab's own lap of the path (core/BenchLag.h), not a later one over the same spot.
+                const size_t best = dabSampleIndex(p.samples.size(), p.dabFrom, d.x, d.y, [&](size_t i) { return p.samples[i].p; });
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
+                if (p.dabHits.size() == p.dabs.size() && p.dabHits.back())
+                    ph.lagOnModelMs.push_back(ph.lagMs.back()), ph.lagOnModelPx.push_back(ph.lagPx.back());
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
                 size_t nearest = p.samples.size() - 1;
@@ -1263,6 +1316,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (const char* sim = std::getenv("SF_HW_SIMULATE"); sim && *sim) settings.set("hw_simulate", std::string(sim)); // a simulated tier says so (not in the hardware fields)
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
+        settings.set("lag_on_model", "lag over the frames whose newest dab reached the surface (dabs_off_model: those that found none)");
         root.set("settings", settings);
         Json runs = Json::array(), skipped = Json::array();
         for (const SizeResult& r : p.results) {
@@ -1363,7 +1417,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("spacing_floor_ms", std::round(floorMs * 10) / 10);
                         j.set("lag_adjusted_ms", percentilesJson(percentiles(adjusted)));
                     }
+                    if (!ph.lagOnModelMs.empty()) j.set("lag_on_model_ms", percentilesJson(percentiles(ph.lagOnModelMs)));
+                    if (!ph.lagOnModelPx.empty()) j.set("lag_on_model_px", percentilesJson(percentiles(ph.lagOnModelPx)));
                     j.set("dabs", double(ph.dabs));
+                    j.set("dabs_off_model", double(ph.dabsOffModel));
+                    j.set("path_radius_px", std::round(double(ph.pathRadiusPx)));
+                    j.set("path_laps", std::round(ph.pathLaps * 100) / 100);
+                    if (ph.pathUpright) j.set("path_upright", true);
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);

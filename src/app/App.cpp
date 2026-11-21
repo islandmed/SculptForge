@@ -3179,6 +3179,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         strokeProbe_->emplace_back(x, y);
         if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
+    std::vector<uint8_t>* hitProbe = dabView_ ? dabView_->hitProbe : strokeProbe_ ? strokeHitProbe_ : nullptr;
+    if (hitProbe) hitProbe->push_back(1); // (0 below when the dab finds no surface)
     const Camera cam = dabView_ ? dabView_->camera : partCamera(); // (a moved linked copy: its own space)
     const glm::vec2 pathPoint(x, y); // (before any scatter: the rake follows the stroke itself)
     const BrushRecipe* recipe = st.recipe;
@@ -3206,7 +3208,10 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     RayHit hit;
     // Off the surface but the brush still over it (sliding over a silhouette, #84): the nearest surface within it.
     auto cast = [&](float cx, float cy, RayHit& h) { return dabView_ ? pickWith(*dabView_, cx, cy, h) : pick(cx, cy, h); };
-    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) return;
+    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) {
+        if (hitProbe) hitProbe->back() = 0;
+        return;
+    }
     if (pressure < 0.0f) pressure = strokePressure();
     pressure = st.pressureCurve.apply(pressure); // the brush's own curve, after the tablet's
 

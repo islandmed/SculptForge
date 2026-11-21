@@ -107,6 +107,9 @@ def validate(doc):
             if isinstance(ph, dict) and "brush_radius_px" in ph and ph.get("brush") != "Move":
                 pct(ph, "lag_ms", pw)
                 pct(ph, "lag_px", pw)
+                if "lag_on_model_ms" in ph:
+                    pct(ph, "lag_on_model_ms", pw)
+                    pct(ph, "lag_on_model_px", pw)
     return errs
 
 
@@ -182,8 +185,11 @@ def summary(doc):
             s = f"  {run['label']:>6} {ph['name']:<20} {ph['fps']:6.1f} fps  frame p50 {f['p50']:5.1f}  p95 {f['p95']:5.1f}  p99 {f['p99']:5.1f} ms"
             if "worst_stall_ms" in ph:
                 s += f"  stall {ph['worst_stall_ms']:.0f} ms"
-            if "lag_ms" in ph:
-                s += f"  trails {ph['lag_ms']['p50']:.0f} ms / {ph['lag_px']['p50']:.0f} px (p95 {ph['lag_ms']['p95']:.0f} ms)"
+            if "lag_on_model_ms" in ph:
+                s += (f"  trails {ph['lag_on_model_ms']['p50']:.0f} ms / {ph['lag_on_model_px']['p50']:.0f} px on the model"
+                      f" (p95 {ph['lag_on_model_ms']['p95']:.0f} ms; {ph.get('dabs_off_model', 0):.0f} of {ph.get('dabs', 0):.0f} dabs off it)")
+            elif "lag_ms" in ph:
+                s += f"  trails {ph['lag_ms']['p50']:.0f} ms / {ph['lag_px']['p50']:.0f} px (p95 {ph['lag_ms']['p95']:.0f} ms; not listed: no off-model count)"
             lines.append(s)
     return "\n".join(lines)
 
@@ -223,8 +229,13 @@ def compact(doc, name, video, machine=None):
                     p[k] = ph[k]
             if "brush_radius_px" in ph:
                 p["brush_radius_px"] = ph["brush_radius_px"]
-            if "lag_ms" in ph:
-                p.update(lag_ms=ph["lag_ms"], lag_px=ph["lag_px"])
+            # Lag only as measured on the model (gh#184: a dab off it costs nothing, and the quick frames after it pulled
+            # lag_ms / lag_px down by chance). Builds without dabs_off_model (before 0.13.11) list no lag at all.
+            if "dabs_off_model" in ph and "lag_on_model_ms" in ph and "lag_on_model_px" in ph:
+                p.update(lag_on_model_ms=ph["lag_on_model_ms"], lag_on_model_px=ph["lag_on_model_px"],
+                         dabs_off_model=ph["dabs_off_model"])
+                if "dabs" in ph:
+                    p["dabs"] = ph["dabs"]
             r["phases"].append(p)
         entry["runs"].append(r)
     return entry
@@ -351,7 +362,13 @@ def cmd_selftest(_args):
     bad["runs"][0]["phases"][0]["lag_ms"]["p95"] = 99  # above p99
     del bad["hardware"]["gpu"]
     assert len(validate(bad)) == 2, validate(bad)
-    assert compact(good, "me", None)["runs"][0]["phases"][0]["lag_px"] == pct
+    p0 = compact(good, "me", None)["runs"][0]["phases"][0]
+    assert "lag_px" not in p0 and "lag_ms" not in p0 and "lag_on_model_px" not in p0, p0  # (no off-model count: no lag)
+    om = json.loads(json.dumps(good))
+    om["runs"][0]["phases"][0].update(lag_on_model_ms=pct, lag_on_model_px=pct, dabs_off_model=1, dabs=40)
+    assert validate(om) == [], validate(om)
+    p0 = compact(om, "me", None)["runs"][0]["phases"][0]
+    assert p0["lag_on_model_px"] == pct and p0["dabs_off_model"] == 1 and "lag_px" not in p0, p0
     std = json.loads(json.dumps(good))
     std["settings"].update(scene="standard-15m", stroke_set="standard/1")
     std["runs"][0].update(label="15M", peak_ram_mb=4000, gpu_buffers_mb=900, worst_stall_ms=45.5)
