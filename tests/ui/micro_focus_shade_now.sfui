@@ -3,10 +3,11 @@
 # whole on the next frame: the view right after each must match the same mesh sent up whole (view_stale, mean
 # pixel difference 0-255). A Clay stroke's own catch-up may lag a few frames; it must be whole once idle. (The tiles still
 # waiting are printed, not checked: on slow frames Focus Detail's streaming queues a few of its own, within the budget.)
+# (Focus Detail is POSIX only: on Windows this runs the plain micro path, which micro_shade_now.sfui covers on every platform.)
 # cold: SF_FOCUS_DETAIL is set here, and a warm server doesn't keep it between scripts.
 run ui_look look=classic layout=classic
 env SF_FOCUS_DETAIL 1
-run new_sphere subdivisions=7
+run new_sphere subdivisions=6
 run micro_divide level=4
 env SF_FOCUS_DETAIL 0
 wait_idle 120
