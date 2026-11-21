@@ -9,6 +9,7 @@
 ^website/
 ^\.github/workflows/(pages|download-stats)\.yml$
 ^packaging/arch/
+^packaging/winget/
 ^tools/publish/
 ^scripts/release\.sh$
 ^docs/releasing\.md$

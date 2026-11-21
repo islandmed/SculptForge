@@ -25,7 +25,7 @@
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
 #
-# Steps: bump check ci tag release site aur brew scoop omarchy replies social status (--stage: bump stage)
+# Steps: bump check ci tag release site aur brew scoop winget omarchy replies social status (--stage: bump stage)
 # bump sets every version file and rebuilds the guide (--stage: committed in the batch; --rebuild: pushed to main;
 # promoting: only checks main already has it); check then verifies everything the later steps need, so a release
 # either stops in seconds before the tag or runs through to the end.
@@ -55,7 +55,7 @@ AUR_REPO=ssh://aur@aur.archlinux.org/sculptforge.git
 # (ScoopInstaller/Extras, once it accepts the manifest, updates itself from checkver/autoupdate).
 SCOOP_BUCKET=islandmed/scoop-sculptforge
 OMARCHY_PR=1800
-STEPS=(bump check ci tag release site aur brew scoop omarchy replies social status)
+STEPS=(bump check ci tag release site aur brew scoop winget omarchy replies social status)
 
 red() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 say() { printf '\033[1m== %s\033[0m\n' "$*"; }
@@ -1279,6 +1279,129 @@ scoop_push() {
     ok "Scoop bucket at $V"
 }
 
+# winget begin
+# Step winget: the three manifests of packaging/winget at X.Y.Z (tools/release/winget_manifest.py), then to microsoft/winget-pkgs
+# through our fork (a sparse blobless clone under $WINGET_DIR, a normal git push so the global push guard runs; never the
+# contents API). While $WINGET_PR is open, its branch gets one commit that replaces the version directory and the PR is
+# retitled; once it merged, every release is a PR of its own (branch sculptforge-X.Y.Z from upstream master). It never fails
+# the release: an error prints "winget: why" + the manual command, and step status lists it. SF_WINGET_DRY=1 renders into
+# $WINGET_DIR/dry/X.Y.Z, diffs against packaging/winget and changes nothing anywhere.
+WINGET_PR=464465
+WINGET_PKGS=microsoft/winget-pkgs
+WINGET_DIR=${SF_WINGET_DIR:-$HOME/Work/.sf/winget}
+WINGET_PATH=manifests/s/SculptForge/SculptForge
+WINGET_FORK_URL=${WINGET_FORK_URL:-https://github.com/$AUTHOR_NAME/winget-pkgs.git}
+WINGET_UPSTREAM_URL=${WINGET_UPSTREAM_URL:-https://github.com/$WINGET_PKGS.git}
+WINGET_WHY=
+step_winget() {
+    local rc=0 state_file="$WINGET_DIR/status-$V.txt"
+    mkdir -p "$WINGET_DIR"
+    winget_run || rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "winget: $WINGET_WHY"
+        echo "   by hand: $(resume winget | sed 's/ --from winget/ --only winget/')"
+        [ -n "${SF_WINGET_DRY:-}" ] || echo "winget: NOT updated for $V: $WINGET_WHY" > "$state_file"
+    fi
+    return 0
+}
+winget_run() {
+    local sha date out="$work/winget" dry=${SF_WINGET_DRY:-}
+    sha=$(gh release download "$T" -R "$REPO" -p SHA256SUMS.txt -D "$work" --clobber >/dev/null 2>&1 &&
+        awk -v f="SculptForge-$V-windows-x86_64.exe" '$2 == f || $2 == "*"f { print $1 }' "$work/SHA256SUMS.txt") || sha=
+    [[ "$sha" =~ ^[0-9a-fA-F]{64}$ ]] || { WINGET_WHY="SculptForge-$V-windows-x86_64.exe has no checksum in the SHA256SUMS.txt of $T"; return 1; }
+    date=$(gh release view "$T" -R "$REPO" --json publishedAt -q .publishedAt 2>/dev/null | cut -c1-10) || date=
+    [[ "$date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { WINGET_WHY="can't read the publish date of release $T"; return 1; }
+    [ -z "$dry" ] || out="$WINGET_DIR/dry/$V"
+    rm -rf "$out"
+    python3 -I tools/release/winget_manifest.py render "$V" --sha "$sha" --date "$date" --out "$out" ||
+        { WINGET_WHY="tools/release/winget_manifest.py couldn't render packaging/winget"; return 1; }
+    if [ -n "$dry" ]; then
+        echo "   winget dry run: manifests for $V in $out (diff against packaging/winget):"
+        diff -ru packaging/winget "$out" || true
+        winget_pr_state && echo "   winget dry run: $WINGET_STATE_TEXT (nothing pushed)"
+        return 0
+    fi
+    # the repository's copy first (check_marks.py scans it; the next release renders from it), like Scoop's
+    if diff -rq packaging/winget "$out" >/dev/null; then
+        ok "packaging/winget already at $V"
+    else
+        [ "$(git rev-parse --abbrev-ref HEAD)" = main ] && [ -z "$(git status --porcelain --untracked-files=no)" ] ||
+            { WINGET_WHY="this checkout is not a clean main (packaging/winget stays at its old version)"; return 1; }
+        cp "$out"/*.yaml packaging/winget/ && git add packaging/winget && commit -m "winget manifests at $V" &&
+            gitp push -q origin HEAD:main || { WINGET_WHY="committing or pushing packaging/winget to main failed"; return 1; }
+        ok "packaging/winget at $V ($sha)"
+    fi
+    winget_pr_state || return 1
+    case $WINGET_STATE in
+        OPEN) winget_replace "$out" || return 1 ;;
+        MERGED) winget_new_pr "$out" || return 1 ;;
+        *) WINGET_WHY="microsoft/winget-pkgs#$WINGET_PR is $WINGET_STATE (closed without merging?): the owner decides"; return 1 ;;
+    esac
+    echo "winget: $WINGET_STATE_TEXT" > "$WINGET_DIR/status-$V.txt"
+    ok "$WINGET_STATE_TEXT"
+}
+# winget_pr_state: WINGET_STATE (OPEN, MERGED, CLOSED), WINGET_BRANCH and WINGET_TITLE of the first PR, one gh call.
+winget_pr_state() {
+    local line
+    line=$(gh pr view "$WINGET_PR" -R "$WINGET_PKGS" --json state,headRefName,title -q '[.state, .headRefName, .title] | @tsv' 2>/dev/null) || line=
+    IFS=$'\t' read -r WINGET_STATE WINGET_BRANCH WINGET_TITLE <<<"$line" || true
+    [ -n "$WINGET_STATE" ] || { WINGET_WHY="can't read microsoft/winget-pkgs#$WINGET_PR"; return 1; }
+    WINGET_STATE_TEXT="winget-pkgs#$WINGET_PR: $WINGET_STATE"
+}
+# winget_clone: the sparse blobless clone of the fork in $WINGET_DIR/fork (only manifests/s/SculptForge is checked out).
+winget_clone() {
+    local d="$WINGET_DIR/fork"
+    if [ ! -d "$d/.git" ]; then
+        rm -rf "$d"
+        gitp clone -q --filter=blob:none --no-checkout "$WINGET_FORK_URL" "$d" 2>/dev/null &&
+            git -C "$d" sparse-checkout set manifests/s/SculptForge || { WINGET_WHY="can't clone $WINGET_FORK_URL"; return 1; }
+    fi
+}
+# winget_replace DIR: the open PR's branch gets one commit "Replace A with X.Y.Z"; the PR is retitled for X.Y.Z.
+winget_replace() {
+    local d="$WINGET_DIR/fork" want="New package: SculptForge.SculptForge version $V" old
+    winget_clone || return 1
+    gitp -C "$d" fetch -q --depth 1 origin "$WINGET_BRANCH" && git -C "$d" checkout -q -f -B "$WINGET_BRANCH" FETCH_HEAD ||
+        { WINGET_WHY="can't fetch $WINGET_BRANCH from the fork"; return 1; }
+    old=$(cd "$d/$WINGET_PATH" 2>/dev/null && ls | paste -sd, -) || old=
+    if [ "$old" = "$V" ] && diff -rq "$1" "$d/$WINGET_PATH/$V" >/dev/null; then
+        ok "fork branch $WINGET_BRANCH already carries $V"
+    else
+        (cd "$d" && git rm -rq --ignore-unmatch "$WINGET_PATH" && mkdir -p "$WINGET_PATH/$V" && cp "$1"/*.yaml "$WINGET_PATH/$V/" &&
+            git add "$WINGET_PATH" && commit -m "Replace ${old:-the old version} with $V" && gitp push -q origin "HEAD:refs/heads/$WINGET_BRANCH") ||
+            { WINGET_WHY="committing or pushing $WINGET_BRANCH to the fork failed (the global push guard refuses? read its message)"; return 1; }
+    fi
+    if [ "$WINGET_TITLE" != "$want" ]; then
+        gh pr edit "$WINGET_PR" -R "$WINGET_PKGS" --title "$want" >/dev/null 2>&1 ||
+            { WINGET_WHY="pushed $V but couldn't retitle #$WINGET_PR"; return 1; }
+    fi
+    WINGET_STATE_TEXT="winget-pkgs#$WINGET_PR: OPEN, at $V (waits on the moderators)"
+}
+# winget_new_pr DIR: the first PR merged: this release is a PR of its own (skipped when winget-pkgs has X.Y.Z or a PR for it).
+winget_new_pr() {
+    local d="$WINGET_DIR/fork" b="sculptforge-$V" title="SculptForge.SculptForge version $V" n url
+    if gh api "repos/$WINGET_PKGS/contents/$WINGET_PATH/$V" >/dev/null 2>&1; then
+        WINGET_STATE_TEXT="winget-pkgs has $V"; return 0
+    fi
+    n=$(gh pr list -R "$WINGET_PKGS" --author "$AUTHOR_NAME" --state all --search "$title in:title" --json number,title \
+        -q ".[] | select(.title == \"$title\") | .number" 2>/dev/null | head -1) || n=
+    if [ -n "$n" ]; then WINGET_STATE_TEXT="winget-pkgs#$n is the PR for $V"; return 0; fi
+    winget_clone || return 1
+    git -C "$d" remote get-url upstream >/dev/null 2>&1 || git -C "$d" remote add upstream "$WINGET_UPSTREAM_URL"
+    gitp -C "$d" fetch -q --depth 1 --filter=blob:none upstream master && git -C "$d" checkout -q -f -B "$b" FETCH_HEAD ||
+        { WINGET_WHY="can't fetch master of $WINGET_PKGS"; return 1; }
+    if ! git -C "$d" ls-remote --exit-code origin "refs/heads/$b" >/dev/null 2>&1; then
+        (cd "$d" && mkdir -p "$WINGET_PATH/$V" && cp "$1"/*.yaml "$WINGET_PATH/$V/" && git add "$WINGET_PATH" &&
+            commit -m "New version: $title" && gitp push -q origin "HEAD:refs/heads/$b") ||
+            { WINGET_WHY="committing or pushing $b to the fork failed"; return 1; }
+    fi
+    url=$(gh pr create -R "$WINGET_PKGS" --head "$AUTHOR_NAME:$b" --base master --title "$title" \
+        --body "Adds SculptForge.SculptForge $V (nullsoft installer, x64, machine scope). The installer checksum is the one in the release's SHA256SUMS.txt." 2>/dev/null) ||
+        { WINGET_WHY="pushed $b to the fork but couldn't open the PR"; return 1; }
+    WINGET_STATE_TEXT="winget-pkgs PR opened for $V: $url"
+}
+# winget end
+
 step_omarchy() {
     release_ready
     local state branch owner path=pkgbuilds/omasculpt/PKGBUILD sum pr
@@ -1364,9 +1487,13 @@ step_status() {
         echo "   Stable:   when testers are happy: HIGHLIGHTS=f scripts/release.sh $BASE --yes (clears the prerelease)"
         return
     fi
-    local winget
-    winget=$(gh pr view 464465 -R microsoft/winget-pkgs --json state -q .state 2>/dev/null || echo unknown)
-    echo "   winget-pkgs#464465: $winget (update it once it merges; waits on the CLA)"
+    # step winget wrote its outcome (the PR's state, or why it didn't update); without it, the PR's live state
+    if [ -f "$WINGET_DIR/status-$V.txt" ]; then
+        echo "   $(cat "$WINGET_DIR/status-$V.txt")"
+    else
+        winget_pr_state >/dev/null 2>&1 || WINGET_STATE_TEXT="winget-pkgs#$WINGET_PR: unknown"
+        echo "   winget: step didn't run for $V ($WINGET_STATE_TEXT); run: $(resume winget | sed 's/ --from winget/ --only winget/')"
+    fi
     echo "   Release:  https://github.com/$REPO/releases/tag/$T"
     release_signing_note
     echo "   Replies:  sfmonitor posts release-replies-$V.md (after reading it). Then update the handoff note."
