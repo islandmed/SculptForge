@@ -25,7 +25,7 @@ expect_text $4 a month, billed yearly
 expect_no_text / month
 expect_text Quote
 expect_text One quote for the whole studio: any number of artists, each with everything in Member
-expect_text Betas and early builds of the next version
+expect_text Early builds, like SculptForge for Android today
 expect_text Member Requests: one a month, built first, credited to you
 expect_no_text 10 artists
 expect_text Isolated: a private release channel, no outside connections
