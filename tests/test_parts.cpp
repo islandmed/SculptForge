@@ -504,3 +504,27 @@ TEST(part_pick_colour_any_visible_part) {
     p = pickPartColor(doc, rayAt, cubeC.x, cubeC.y, base);
     CHECK(p.part == 1 && p.colour == base);
 }
+
+// A Part inside another (an eyeball in its socket): the point is inside a Part only when its closed surface wraps it
+// (Frame Part says so when the camera ends up there). Negative controls: outside, inside an open mesh, hidden Part.
+TEST(part_enclosing_finds_the_head_around_a_point) {
+    Document doc;
+    doc.setMesh(makeIcosphere(4, 3.5f), "Head");
+    Mesh eye = makeIcosphere(3, 0.6f);
+    for (auto& p : eye.positions) p += glm::vec3(0.0f, 0.0f, 2.6f);
+    eye.recomputeAllNormals();
+    doc.addPart(std::move(eye), "Eye");
+    doc.selectPart(1);
+    doc.syncBvh();
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 1) == 0);   // the camera behind the eye: inside the head
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 0) == -1);  // (the head itself is not "another" Part)
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 6.0f), 1) == -1);  // in front of the face, outside both
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 2.6f)) == 1);      // inside the eye, and the head: the innermost
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 2.6f), 1) == 0);
+    doc.parts[0].visible = false;
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 1) == -1);  // Solo / hide: nothing around it any more
+    doc.parts[0].visible = true;
+    doc.addPart(makePlane(8, 20.0f), "Floor");                         // an open sheet wraps nothing
+    doc.syncBvh();
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 6.0f), 1) == -1);
+}

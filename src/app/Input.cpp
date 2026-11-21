@@ -600,6 +600,31 @@ void App::frameActivePart() {
     const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
     if (b.valid()) frameView(b);
     else frameView(sceneBounds());
+    noteViewInsideAnotherPart();
+}
+
+// A Part inside another (an eye in its socket): Frame puts the camera a few eye-widths away, which is inside the
+// head, and the view fills with the head's inner wall (its back faces, lit from outside: a dark slab). The brush still
+// works on the active Part there; the Part around it only needs to go out of the way.
+void App::noteViewInsideAnotherPart() {
+    if (doc_.partCount() < 2) return;
+    const int around = partEnclosing(doc_, camera_.position(), doc_.activePart);
+    if (around < 0) return;
+    status_ = "Inside " + doc_.parts[size_t(around)].name + ": Solo " + doc_.activePartInfo().name + " to see it";
+}
+
+// A press that started no stroke because the pointer is over another Part, not the one being sculpted (brushes work
+// on the active Part only; the press orbits instead). Said once per press, so "the pen can't sculpt" has an answer.
+void App::notePressOnAnotherPart(float x, float y) {
+    if (doc_.partCount() < 2 || !doc_.activePartInfo().visible) return;
+    const int other = pickPart(x, y);
+    if (other < 0 || other == doc_.activePart) return;
+    const uint64_t key = uint64_t(doc_.activePartInfo().id) << 32 | doc_.parts[size_t(other)].id;
+    const Uint64 now = clickClockNs();
+    if (key == pressHintKey_ && pressHintNs_ != 0 && now - pressHintNs_ < 30000000000ull) return;
+    pressHintKey_ = key;
+    pressHintNs_ = now;
+    status_ = doc_.parts[size_t(other)].name + " is in front: Alt+Q selects it";
 }
 
 // Close in on the last stroke's place (the view's angle stays): a box round it a tenth the size of its Part.
