@@ -320,6 +320,9 @@
 //                            at: the event carries that position (window fractions) instead of the pen's, as a
 //                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
 //   pen_move X Y [S]         the same to a point of the window (fractions): a fixed path, whatever the view does
+//   view_trace on|off|check RATIO   on: note the camera's yaw and pitch at every pen_move sample; check: fail unless the view's step
+//                            per sample is smooth (no sample's step below 1/RATIO or above RATIO times the median, no step
+//                            against its neighbours' direction), ends excluded; off stops (the samples stay for check)
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -347,7 +350,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
+//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|kde_sparse|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -2075,7 +2078,7 @@ enum class StepVerb { None,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
-    SpacemouseEcho, PenRest, Shot,
+    SpacemouseEcho, PenRest, ViewTrace, Shot,
 };
 static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
     static const std::unordered_map<std::string_view, StepVerb> verbs = {
@@ -2203,7 +2206,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_sample", StepVerb::PenSample},
         {"pen_lift", StepVerb::PenLift},
         {"spacemouse_echo", StepVerb::SpacemouseEcho},
-        {"pen_rest", StepVerb::PenRest},
+        {"pen_rest", StepVerb::PenRest}, {"view_trace", StepVerb::ViewTrace},
         {"shot", StepVerb::Shot},
     };
     return verbs;
@@ -4406,8 +4409,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
-            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : 0;
-            kdeStall_ = 0;
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : mode == "kde_sparse" ? 4 : 0;
+            kdeStall_ = kdeTick_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4728,6 +4731,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::ViewTrace: {
+        if (!need(1)) return false;
+        const std::string mode = w[1];
+        const float ratio = num(2, 3.0f);
+        run([this, mode, ratio, line] {
+            if (mode == "on") {
+                viewTrace_ = true;
+                viewTraceData_.clear();
+            } else if (mode == "off") {
+                viewTrace_ = false;
+            } else {
+                checkViewTrace(line, ratio);
+            }
+        });
+        break;
+    }
     case StepVerb::PenRest: {
         if (!need(1)) return false;
         run([this, on = w[1] != "off"] {
@@ -4874,6 +4893,45 @@ void Demo::penProximity(bool in) {
     app_.handleEvent(e);
 }
 
+// view_trace check (steps in degrees of yaw, pitch and 1/100 units of the target): a steady pen drag turns the view by about the same each sample. A skip is a sample whose step is far
+// below its neighbours' (the view waited, then caught up) or above them, or one against their direction (#216).
+static float traceDot(const Demo::TraceSample& a, const Demo::TraceSample& b) {
+    float d = 0.0f;
+    for (size_t k = 0; k < a.size(); ++k) d += a[k] * b[k];
+    return d;
+}
+static float traceLength(const Demo::TraceSample& a) { return std::sqrt(traceDot(a, a)); }
+
+void Demo::checkViewTrace(int line, float ratio) {
+    const auto& d = viewTraceData_;
+    if (d.size() < 8) return fail(line, "view_trace: only " + std::to_string(d.size()) + " samples");
+    std::vector<Demo::TraceSample> step;
+    for (size_t i = 1; i < d.size(); ++i) {
+        Demo::TraceSample t;
+        for (size_t k = 0; k < t.size(); ++k) t[k] = d[i][k] - d[i - 1][k];
+        for (size_t k = 0; k < 2; ++k) t[k] = t[k] - 360.0f * std::round(t[k] / 360.0f); // (the angles wrap)
+        step.push_back(t);
+    }
+    step.erase(step.begin(), step.begin() + 3); // (the press and the first samples settle)
+    step.pop_back();
+    std::vector<float> len;
+    for (const auto& s : step) len.push_back(traceLength(s));
+    std::vector<float> sorted = len;
+    std::sort(sorted.begin(), sorted.end());
+    const float med = sorted[sorted.size() / 2];
+    if (med < 0.01f) return fail(line, "view_trace: the view moved in fewer than half the samples (median step " + std::to_string(med) + "): it waits, then catches up");
+    for (size_t i = 0; i < step.size(); ++i) {
+        const bool against = i > 0 && traceDot(step[i], step[i - 1]) < 0.0f;
+        if (len[i] < med / ratio || len[i] > med * ratio || against)
+            return fail(line, "view_trace: sample " + std::to_string(i) + " moved the view " + std::to_string(len[i]) + (against ? " against the one before" : "") +
+                                  " (median " + std::to_string(med) + "; steps " + [&] {
+                                      std::string all;
+                                      for (size_t k = 0; k < len.size() && k < 16; ++k) all += (k ? " " : "") + std::to_string(int(len[k] * 10.0f) / 10.0f).substr(0, 5);
+                                      return all;
+                                  }() + ")");
+    }
+}
+
 void Demo::penMove(float x, float y) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_MOTION;
@@ -4886,8 +4944,12 @@ void Demo::penMove(float x, float y) {
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
     // ... and the driver moves it too (kde_stalled: its pointer sends one move after a button, then no more: #216)
-    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0)))
+    // (kde_sparse: its pointer reports every third pen sample only, as a compositor that sends the pointer once a frame does)
+    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0) &&
+                        (kdeStream_ != 4 || ++kdeTick_ % 3 == 0)))
         mouseMotion(x, y, kDriverMouse);
+    if (viewTrace_) app_.flushPenMotion(); // (the frame's end does it before the view is drawn: what the frame shows)
+    if (viewTrace_) viewTraceData_.push_back({glm::degrees(app_.camera_.yaw), glm::degrees(app_.camera_.pitch), app_.camera_.target.x * 100.0f, app_.camera_.target.y * 100.0f, app_.camera_.target.z * 100.0f}); // (view_trace)
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);

@@ -35,6 +35,7 @@ class App;
 
 class Demo {
 public:
+    using TraceSample = std::array<float, 5>; // view_trace: yaw, pitch (degrees), target x y z (x100)
     explicit Demo(App& app) : app_(app) {}
 
     static std::vector<std::string> names();
@@ -258,8 +259,12 @@ private:
     bool huionStream_ = false;
     bool mouseSteps_ = true; // (mouse_steps off: motion events without xrel / yrel)
     bool lateRight_ = false, driverRightHeld_ = false; // (right_late)
+    bool viewTrace_ = false;             // view_trace on: penMove notes the camera
+    std::vector<TraceSample> viewTraceData_;
+    void checkViewTrace(int line, float ratio);
+    int kdeTick_ = 0;   // pen_stream kde_sparse: pen samples since the pointer last reported
     int kdeStall_ = 0;  // pen_stream kde_stalled: pointer moves still to be sent after a button went down
-    int kdeStream_ = 0; // 1: tablet-protocol button and pointer click (pen_stream kde); 2: the pointer click only (kde_pointer); 3: kde_stalled   // pen_stream kde: the compositor maps the barrel buttons to a right / middle click and moves its own pointer with the pen (#216)
+    int kdeStream_ = 0; // 1: tablet-protocol button and pointer click (pen_stream kde); 2: the pointer click only (kde_pointer); 3: kde_stalled; 4: kde_sparse   // pen_stream kde: the compositor maps the barrel buttons to a right / middle click and moves its own pointer with the pen (#216)
     int driverRight_ = 0; // pen_stream right_after / right_first: the driver clicks the right mouse button for a pen button, after / before the pen's event
     // pen_rest on: the pen lies still in range and, as a real one does, sends a hair of tilt and sub-pixel motion
     // every frame (phoenix 11-05) until pen_rest off.
