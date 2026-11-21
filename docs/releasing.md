@@ -246,9 +246,10 @@ The home page's What's New area (between the `whats-new` markers in website/inde
 | aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball, and `.SRCINFO`; then, once `~/Work/.sf/aur-publish` exists (packaging/arch/SUBMIT.md), pushes both to the AUR | already at X.Y.Z with that checksum (and the AUR at X.Y.Z) |
 | brew | Homebrew cask through tools/publish/setup-channels.sh, after checking the .dmg's checksum here | the cask is at X.Y.Z |
 | scoop | packaging/scoop/sculptforge.json: version, url, checksum of the portable .zip (checked against SHA256SUMS.txt), pushed to main; then a copy to the islandmed/scoop-sculptforge bucket once that repository exists (ScoopInstaller/Extras updates itself from checkver once it accepts the manifest) | the manifest and the bucket are at X.Y.Z |
+| winget | packaging/winget (installer, locale, version manifests) rendered for X.Y.Z by `tools/release/winget_manifest.py` (installer URL, checksum from SHA256SUMS.txt, release date), pushed to main; then to microsoft/winget-pkgs through the islandmed fork (sparse blobless clone in `~/Work/.sf/winget`, normal push): while the first PR (#464465) is open, one "Replace A with X.Y.Z" commit on its branch and a new title; once merged, a branch sculptforge-X.Y.Z off upstream master and a PR of its own (skipped when winget-pkgs or a PR has it). `SF_WINGET_DRY=1` renders into `~/Work/.sf/winget/dry/X.Y.Z` and diffs, changing nothing | never fails the release: prints `winget: why` + the manual command, and status lists it |
 | omarchy | bumps the PKGBUILD on our branch of omacom/omarchy-pkgs#1800 (author islandmed noreply) | the PR is at X.Y.Z |
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |
-| status | winget PR state, links, reminders | never |
+| status | winget PR state (from step winget), links, reminders | never |
 
 The highlights and What's New's words are writing: the script never invents them. It checks they exist before
 tagging.

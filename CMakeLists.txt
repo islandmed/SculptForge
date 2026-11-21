@@ -1155,6 +1155,9 @@ if(SCULPTFORGE_BUILD_TESTS)
                --out ${CMAKE_CURRENT_BINARY_DIR}/mcpb-test/SculptForge-test.mcpb)
     endif()
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
+    # step winget: the manifests render with the release's version, installer checksum and date (tools/release/winget_manifest.py),
+    # and reach main + the winget-pkgs PR (open: replace commit and title; merged: a PR per release) without ever failing the release.
+    add_test(NAME release_winget_manifest COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/winget_manifest.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
@@ -1185,6 +1188,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       # A members' beta through the whole release step (floor, sums, install check, APKs): tests/release_beta_path_test.sh.
       add_test(NAME release_beta_path COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_path_test.sh)
       set_tests_properties(release_beta_path PROPERTIES TIMEOUT 60)
+      add_test(NAME release_winget COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_winget_test.sh)
+      set_tests_properties(release_winget PROPERTIES TIMEOUT 120)
     endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
