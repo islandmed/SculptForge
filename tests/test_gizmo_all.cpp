@@ -10,7 +10,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace sf;
 using namespace sf::gizmo_all;
@@ -77,8 +79,8 @@ TEST(gizmo_all_ball_hides_when_its_axis_points_at_the_viewer) {
     CHECK(front.axis[0].ball && front.axis[1].ball);
     // Along the hidden axis, a point near the centre is the centre, not a scale ball sitting on top of it.
     CHECK(pick(front, front.centre + glm::vec2(2.0f, 2.0f)) == MoveView);
-    // A point on the X ring (seen edge-on, a vertical line) below the centre: that ring.
-    CHECK(pick(front, front.centre + glm::vec2(0.0f, 0.85f * front.unit)) == RotateX);
+    // The X ring is seen edge-on here (a vertical bar): it is faded and picks nothing, wherever along the bar.
+    for (float t : {0.3f, 0.6f, 0.85f, 1.0f}) CHECK(pick(front, front.centre + glm::vec2(0.0f, t * front.unit)) != RotateX);
     // Above the centre the Y arrow lies over the same line and wins (its ball too).
     CHECK(pick(front, front.centre + glm::vec2(0.0f, -0.3f * front.unit)) == MoveY);
     CHECK(pick(front, front.centre + glm::vec2(0.0f, -kBall * front.unit)) == ScaleY);
@@ -133,9 +135,9 @@ TEST(gizmo_all_every_handle_reachable_from_any_view_and_ui_scale) {
                             }
                         CHECK(plane || covered);
                     }
-                    bool ring = false;
+                    bool ring = false; // (a ring seen edge-on is faded and picks nothing: the clarity tests below)
                     for (size_t k = 0; k < a.ring.size() && !ring; ++k) ring = pick(s, a.ring[k]) == Handle(RotateX + i);
-                    CHECK(ring);
+                    CHECK(ring || a.ringPick == Screen::Axis::RingFaded);
                     // The arrow head and the ball stay well inside the rings, with a gap.
                     if (a.arrow) CHECK(glm::length(a.tip - s.centre) < s.unit * 0.84f);
                     if (a.ball) CHECK(glm::length(a.ballAt - s.centre) < s.unit * 0.5f);
@@ -151,4 +153,160 @@ TEST(gizmo_all_turned_axes) {
     CHECK(pick(s, s.centre) == MoveView);
     for (int i = 0; i < 3; ++i)
         if (s.axis[i].ball) CHECK(pick(s, s.axis[i].ballAt) == Handle(ScaleX + i));
+}
+
+// ---- Pick clarity (Idea by Fenix on Discord): edge-on rings and arrows at the viewer step back ------------------------
+
+namespace {
+
+// The views the sweep covers: front, side and top, then 30 more spread over the sphere.
+std::vector<View> clarityViews(float scale) {
+    std::vector<View> out{view(0.0f, 0.0f, scale), view(90.0f, 0.0f, scale), view(0.0f, 90.0f, scale)};
+    for (int k = 0; k < 30; ++k) {
+        const float yaw = std::fmod(37.0f * float(k) + 11.0f, 360.0f) - 180.0f; // 37 is coprime with 360: no repeats
+        const float pitch = -80.0f + 160.0f * float((k * 7) % 30) / 29.0f;
+        out.push_back(view(yaw, pitch, scale));
+    }
+    return out;
+}
+
+// Whether p is close enough to a handle other than `self` that its pick could fairly go there (that handle is drawn
+// there too): arrows, balls, plane squares, the centre, the tabs, the view ring and the other rings' pickable parts.
+bool nearOther(const Screen& s, glm::vec2 p, Handle self) {
+    const float tol = kPickPx * s.scale + 2.0f;
+    auto is = [&](Handle h) { return h == self; };
+    if (!is(MoveView) && glm::length(p - s.centre) < kCentrePx * s.scale + tol) return true;
+    for (int i = 0; i < 3; ++i) {
+        const Screen::Axis& a = s.axis[i];
+        if (a.arrow && !is(Handle(MoveX + i)) && segmentDistance(p, a.from, a.tip) < tol) return true;
+        if (a.ball && !is(Handle(ScaleX + i)) && glm::length(p - a.ballAt) < (kBallPx + 3.0f) * s.scale + 2.0f) return true;
+        if (a.plane && !is(Handle(PlaneYZ + i)) && insideQuad(p, a.quad)) return true;
+        if (!is(Handle(RotateX + i)) && a.ringPick != Screen::Axis::RingFaded)
+            for (size_t k = 1; k < a.ring.size(); ++k)
+                if (ringPointPicks(s, a, a.ring[k]) && segmentDistance(p, a.ring[k - 1], a.ring[k]) < tol + kPickPx * s.scale * 0.6f)
+                    return true;
+    }
+    for (int k = 0; k < 4; ++k)
+        if (!is(ScaleUniform) && glm::length(p - tabPoint(s, k)) < tol + 10.0f * s.scale) return true;
+    return !is(RotateView) && std::abs(glm::length(p - s.centre) - kViewRing * s.unit) < tol;
+}
+
+} // namespace
+
+TEST(gizmo_all_pick_clarity_edge_on_rings_and_arrows_at_the_viewer_step_back) {
+    int faded = 0, rims = 0, fadedArrows = 0;
+    for (float scale : {1.0f, 2.0f})
+        for (const View& v : clarityViews(scale)) {
+            const Screen s = v.screen();
+            for (int i = 0; i < 3; ++i) {
+                const Screen::Axis& a = s.axis[i];
+                const float sinEdge = std::abs(a.depth);
+                const float edgeDeg = glm::degrees(std::asin(std::min(sinEdge, 1.0f)));
+                CHECK((a.ringPick == Screen::Axis::RingFaded) == (edgeDeg < kRingFadeDeg));
+                CHECK((a.ringPick == Screen::Axis::RingRim) == (edgeDeg >= kRingFadeDeg && edgeDeg < kRingRimDeg));
+                // Rings: faded ones pick nothing; rim ones pick only beyond the heads.
+                for (size_t k = 0; k < a.ring.size(); ++k) {
+                    const bool ringHit = pick(s, a.ring[k]) == Handle(RotateX + i);
+                    if (a.ringPick == Screen::Axis::RingFaded) CHECK(!ringHit);
+                    // (the rim's edge picks within the pick distance of itself, as any handle does)
+                    if (a.ringPick == Screen::Axis::RingRim && glm::length(a.ring[k] - s.centre) < kRimMin * s.unit - kPickPx * s.scale)
+                        CHECK(!ringHit);
+                    // No point of a visible ring picks anything else where nothing else is near.
+                    if (a.ringPick != Screen::Axis::RingFaded && ringPointPicks(s, a, a.ring[k]) && !nearOther(s, a.ring[k], Handle(RotateX + i)))
+                        CHECK(ringHit);
+                }
+                if (a.ringPick == Screen::Axis::RingFaded) ++faded;
+                if (a.ringPick == Screen::Axis::RingRim) ++rims;
+                // Arrows at the viewer: faded, with their ball, and picked nowhere along their line.
+                if (std::abs(a.depth) > std::cos(glm::radians(kArrowFadeDeg))) {
+                    CHECK(!a.arrow && !a.ball);
+                    ++fadedArrows;
+                    for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+                        const Handle h = pick(s, lerp(a.from, a.tip, t));
+                        CHECK(h != Handle(MoveX + i) && h != Handle(ScaleX + i));
+                    }
+                    CHECK(pick(s, a.ballAt) != Handle(ScaleX + i));
+                } else {
+                    CHECK(!a.arrowFaded);
+                }
+                // Visible arrows, balls and squares: no point on one that nothing else is near picks another handle.
+                if (a.arrow)
+                    for (float t : {0.1f, 0.3f, 0.5f, 0.7f, 0.9f}) {
+                        const glm::vec2 p = lerp(a.from, a.tip, t);
+                        if (!nearOther(s, p, Handle(MoveX + i))) CHECK(pick(s, p) == Handle(MoveX + i));
+                    }
+                if (a.ball && !nearOther(s, a.ballAt, Handle(ScaleX + i))) CHECK(pick(s, a.ballAt) == Handle(ScaleX + i));
+                if (a.plane)
+                    for (float u : {0.3f, 0.7f}) {
+                        const glm::vec2 q = lerp(lerp(a.quad[0], a.quad[1], u), lerp(a.quad[3], a.quad[2], u), 0.5f);
+                        if (!nearOther(s, q, Handle(PlaneYZ + i))) CHECK(pick(s, q) == Handle(PlaneYZ + i));
+                    }
+                // Every visible handle is still reachable: a ring (faded rings aside) has a point that picks it.
+                if (a.ringPick != Screen::Axis::RingFaded) {
+                    bool reach = false;
+                    for (size_t k = 0; k < a.ring.size() && !reach; ++k) reach = pick(s, a.ring[k]) == Handle(RotateX + i);
+                    CHECK(reach);
+                }
+                if (a.arrow) {
+                    bool reach = false;
+                    for (float t : {0.5f, 0.3f, 0.7f, 0.9f, 0.1f}) reach = reach || pick(s, lerp(a.from, a.tip, t)) == Handle(MoveX + i);
+                    // (unless an arrow in front lies over it, as in the existing reachability test)
+                    CHECK(reach || [&] {
+                        const Handle h = pick(s, lerp(a.from, a.tip, 0.5f));
+                        return (h >= MoveX && h <= MoveZ && s.axis[h - MoveX].depth > a.depth) || (h >= ScaleX && h <= ScaleZ);
+                    }());
+                }
+            }
+        }
+    CHECK(faded > 0 && rims > 0 && fadedArrows > 0); // the sweep does reach each case
+}
+
+TEST(gizmo_all_pick_clarity_front_side_top_rings_are_bars_only_at_the_rim) {
+    // The axis-aligned views are where people start: two rings are edge-on bars, each faded, and the arrows keep the
+    // middle; the view ring turns about the viewer; the third axis points at the viewer and its arrow fades.
+    for (const View& v : {view(0.0f, 0.0f), view(90.0f, 0.0f), view(0.0f, 90.0f)}) {
+        const Screen s = v.screen();
+        int edgeOn = 0, atViewer = 0;
+        for (int i = 0; i < 3; ++i) {
+            if (s.axis[i].ringPick == Screen::Axis::RingFaded) ++edgeOn;
+            if (s.axis[i].arrowFaded) ++atViewer;
+        }
+        CHECK(edgeOn == 2 && atViewer == 1);
+        // Pressing along the bars picks the arrows and balls there, never a faded ring.
+        for (int i = 0; i < 3; ++i)
+            if (s.axis[i].ringPick == Screen::Axis::RingFaded)
+                for (float t : {-0.95f, -0.6f, -0.3f, 0.3f, 0.6f, 0.95f}) {
+                    const glm::vec2 d = glm::normalize(s.axis[(i + 1) % 3].arrow ? s.axis[(i + 1) % 3].tip - s.centre : s.axis[(i + 2) % 3].tip - s.centre);
+                    CHECK(pick(s, s.centre + d * (t * s.unit)) != Handle(RotateX + i));
+                }
+    }
+}
+
+TEST(gizmo_all_pick_clarity_thresholds_in_degrees) {
+    // Turn the front view about the vertical by `yaw`: the X ring is `yaw` degrees from edge-on, the Z arrow `yaw`
+    // degrees off the view direction (the numbers of the design: 15 and 35 for rings, 12 for arrows).
+    auto at = [](float yaw) { return view(yaw, 0.0f).screen(); };
+    CHECK(at(10.0f).axis[0].ringPick == Screen::Axis::RingFaded);
+    CHECK(at(14.0f).axis[0].ringPick == Screen::Axis::RingFaded);
+    CHECK(at(16.0f).axis[0].ringPick == Screen::Axis::RingRim);
+    CHECK(at(34.0f).axis[0].ringPick == Screen::Axis::RingRim);
+    CHECK(at(36.0f).axis[0].ringPick == Screen::Axis::RingFull);
+    CHECK(at(10.0f).axis[2].arrowFaded && !at(10.0f).axis[2].arrow && !at(10.0f).axis[2].ball);
+    CHECK(at(11.0f).axis[2].arrowFaded);
+    CHECK(!at(13.0f).axis[2].arrowFaded);
+    // The Z arrow at 13 degrees is short on screen (about 10 px): it may still be too short to show, never picked then.
+    // A rim ring picks beyond the arrow heads only: at 25 degrees the X ring's ends do, its middle (under the arrows) does not.
+    const Screen s = at(25.0f);
+    const Screen::Axis& x = s.axis[0];
+    CHECK(x.ringPick == Screen::Axis::RingRim);
+    float far = 0.0f, near = 1e9f;
+    for (const glm::vec2& p : x.ring) {
+        const bool hit = pick(s, p) == RotateX;
+        const float r = glm::length(p - s.centre) / s.unit;
+        if (hit) near = std::min(near, r);
+        if (r > 0.97f) far = std::max(far, hit ? 1.0f : 0.0f);
+        if (r < 0.7f) CHECK(!hit);
+    }
+    CHECK(far == 1.0f);
+    CHECK(near > 0.75f);
 }
