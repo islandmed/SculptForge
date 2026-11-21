@@ -81,7 +81,10 @@ def problem(r, actors, now, max_days, jobs=None):
     if r.get("conclusion") != "success":
         if jobs is None or r.get("conclusion") not in ("failure", "cancelled", "timed_out"):
             return f"run {rid} {r.get('conclusion')}"
-        why = only_wheels_failed(jobs(rid))
+        try:
+            why = only_wheels_failed(jobs(rid))
+        except (subprocess.CalledProcessError, OSError, ValueError, KeyError) as e: # an API error refuses this run, never crashes
+            why = f"its jobs could not be read ({type(e).__name__})"
         if why:
             return f"run {rid} {r.get('conclusion')}: {why}"
     who = {(r.get("actor") or {}).get("login"), (r.get("triggering_actor") or {}).get("login")}
@@ -99,7 +102,9 @@ def choose(runs, artifacts, sha, repo, actors, now, max_days, keys, before=None,
     cs = candidates(runs, repo, before)
     exact = [r for r in cs if r.get("head_sha") == sha]
     # Another commit's run counts only when it could be promoted (or is still running) and its key is SHA's.
-    others = [r for r in cs if r.get("head_sha") != sha and (problem(r, actors, now, max_days, jobs) is None or r.get("status") != "completed")]
+    # (Jobs are asked only below, of runs whose key matches: this pass takes a cut-short run on trust.)
+    trust = lambda rid: [{"name": "-", "conclusion": "success"}]
+    others = [r for r in cs if r.get("head_sha") != sha and (problem(r, actors, now, max_days, trust if jobs else None) is None or r.get("status") != "completed")]
     if others:
         k = keys({sha} | {r["head_sha"] for r in others})
         want = k.get(sha)
@@ -247,6 +252,22 @@ def self_test():
                      jobs=None if js is None else lambda rid: js)
         if got[1] != want or (got[0] or {}).get("id") != want_id:
             bad.append(f"{name}: want {want} {want_id}, got {got[1]} {(got[0] or {}).get('id')} {got[2]}")
+    # jobs are asked only of runs that match: an old cut run of another commit is never looked at (11-20: its API call failed)
+    asked = []
+    choose([run(id=7, head_sha=other, conclusion="cancelled"), run()], lambda r: full[1], sha, repo, {"islandmed"}, now, 7,
+           lambda s: {sha: "k1", other: "k2"}, jobs=lambda rid: asked.append(rid) or app)
+    if asked:
+        bad.append(f"jobs asked of a run with another key: {asked}")
+    # an API error on one run's jobs refuses that run (the next one is tried), never a crash
+    def boom(rid):
+        raise subprocess.CalledProcessError(1, "gh")
+    got = choose([run(conclusion="cancelled")], lambda r: full[1], sha, repo, {"islandmed"}, now, 7, lambda s: {}, jobs=boom)
+    if got[1] != 1:
+        bad.append(f"jobs error: want 1, got {got}")
+    got = choose([run(id=2, conclusion="cancelled", created_at="2026-11-05T11:00:00Z"), run(id=3, created_at="2026-11-04T10:00:00Z")],
+                 lambda r: full[1], sha, repo, {"islandmed"}, now, 7, lambda s: {}, jobs=boom)
+    if got[1] != 0 or got[0]["id"] != 3:
+        bad.append(f"jobs error, older ok run: want 0 3, got {got[1]}")
     # the same cut run without a jobs source (a caller that can't ask) is still refused
     got = choose([run(conclusion="cancelled")], lambda r: full[1], sha, repo, {"islandmed"}, now, 7, lambda s: {})
     if got[1] != 1:
