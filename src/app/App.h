@@ -2905,6 +2905,7 @@ private:
         // the transform into the vertices, as the per-frame path would have. Parallel to sessions.
         std::vector<uint8_t> gpu;
         glm::mat4 gpuModel{1.0f}; // the drag's world matrix (MeshTransform::matrix)
+        float gridSize = 0.0f;    // the size of what moves, for Shift snapping (read once per drag)
         // In the app's loop the pointer's samples only note where it is; the drag follows the newest once a frame
         // (every apply starts from the originals, so the skipped ones changed nothing).
         bool pending = false;

@@ -562,6 +562,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     gizmo_.angle = gizmo_.lastAngle = 0.0f;
     gizmo_.tangent = false;
     gizmo_.current = MeshTransform{};
+    gizmo_.gridSize = 0.0f;
     gizmo_.readout.clear();
     if (gizmo_.pivotOnly && isScale(h)) {
         status_ = "Alt+drag moves the pivot (Move) or turns the axes (Rotate); scaling it does nothing";
@@ -621,7 +622,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             }
             if (std::find(meshes.begin(), meshes.end(), s.data.get()) != meshes.end()) continue;
             meshes.push_back(s.data.get());
-            doc_.partBvh(i);
+            // (its BVH is taken at the release, where finish() refits it: a stale one is no cost at the press)
             // The active Part's mesh records into its active sculpt layer, as strokes do.
             const int layer = s.data == doc_.activePartInfo().data ? doc_.activeLayer : -1;
             TransformSession session;
@@ -641,11 +642,11 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             return true;
         }
         playingLayer_ = -1;
-        // A whole Part moved, turned or scaled evenly is drawn moved by one matrix while dragging (gizmo_.gpu).
+        // A whole Part moved, turned or scaled is drawn moved by one matrix while dragging (gizmo_.gpu).
         gizmo_.gpu.assign(gizmo_.sessions.size(), 0);
         const char* gpuEnv = std::getenv("SF_GIZMO_GPU"); // =0: every drag moves the vertices each frame (tests compare)
-        const bool similarity = !(h >= H::ScaleX && h <= H::ScaleZ) && !(gpuEnv && *gpuEnv == '0');
-        for (size_t k = 0; k < gizmo_.sessions.size() && similarity; ++k) {
+        const bool byMatrix = !(gpuEnv && *gpuEnv == '0'); // (an axis scale too: the renderer corrects the normals, Renderer::normalFixFor)
+        for (size_t k = 0; k < gizmo_.sessions.size() && byMatrix; ++k) {
             const int st = gizmo_.parts[k];
             const auto& data = doc_.parts[size_t(st)].data;
             const bool shared = std::count_if(doc_.parts.begin(), doc_.parts.end(), [&](const Part& o) { return o.data == data; }) > 1;
@@ -667,11 +668,16 @@ void App::gizmoDragTo(float x, float y) {
     const glm::mat3& f = gizmo_.startFrame;
     const glm::vec3 c = gizmo_.startPivot;
     const int axis = axisOf(h);
-    float size = 0.0f;
-    for (int i : gizmo_.parts.empty() && gizmo_.wholeParts.empty() ? gizmoTargets() : gizmo_.parts)
-        size = std::max(size, glm::length(doc_.partBounds(i).extent()));
-    for (int i : gizmo_.wholeParts) size = std::max(size, glm::length(doc_.partBounds(i).extent()));
-    const float grid = gridStep(size);
+    // The snap grid follows the size of what moves at the press: Mesh::bounds walks every vertex, so it is read once
+    // per drag, and only when Shift asks for the grid (a 5M triangle Part made every drag frame ~5 ms slower).
+    if (snap && gizmo_.gridSize <= 0.0f) {
+        float size = 0.0f;
+        for (int i : gizmo_.parts.empty() && gizmo_.wholeParts.empty() ? gizmoTargets() : gizmo_.parts)
+            size = std::max(size, glm::length(doc_.partBounds(i).extent()));
+        for (int i : gizmo_.wholeParts) size = std::max(size, glm::length(doc_.partBounds(i).extent()));
+        gizmo_.gridSize = size;
+    }
+    const float grid = snap ? gridStep(gizmo_.gridSize) : 1.0f;
     MeshTransform t;
     t.pivot = c;
     t.frame = f;
