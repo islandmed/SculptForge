@@ -32,8 +32,6 @@ action: guide:sculpting.md
 - **View falloff**: Standard, Inflate, Crease, Pinch and Sharp Crease no longer change the far side of the model;
   Move and the grab brushes still reach through.
 - **Pen side buttons** (KDE on Wayland): orbit and pan follow the pen steadily again (#216).
-- **Undo on dense Micro levels**: Undo, Redo and Move no longer leave patches of stale shading (#184, thanks
-  @HG4Science).
 - **Bake**: when the search distance is too short, the Bake panel says how much of the map missed and offers
   **Bake Again with Suggested Distance**.
 - **Stroke popup**: the Sub, Smooth, Mask and Select keys follow your input style (#233). Reported by @Velisariy.
