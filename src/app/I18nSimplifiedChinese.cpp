@@ -2568,6 +2568,16 @@ constexpr Entry kSimplifiedChinese[] = {
      "型用法：对副本运行 Quad Remesh，细分几次，显示原始模型，再 Project Detail。"},
     {"Quick Remesh", "Quick Remesh"},
     {"Remesh after each stroke", "每笔触后重新网格化"},
+    {"Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s",
+     "每笔触后重新网格化：已跳过，此部件有细分层级（重新网格化会移除它们）。%s"},
+    {"Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s",
+     "每笔触后重新网格化：已跳过，此部件有雕刻图层（重新网格化会移除它们）。%s"},
+    {"Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s",
+     "每笔触后重新网格化：已跳过，此部件有绘制贴图（转移贴图需要一些时间）。%s"},
+    {"%s remeshes it anyway.",
+     "按 %s 仍可重新网格化。"},
+    {"Tool > Remesh > Remesh remeshes it anyway.",
+     "按“工具 > 重新网格化 > 重新网格化”仍可重新网格化。"},
     {"After a stroke that stretched the surface (edges pulled to more than 1.6 times their length), the active Part "
      "is remeshed at the Resolution above in the background. Sculpting never waits: a stroke made meanwhile remeshes "
      "again. Each remesh is one undo step. Not on a Part with subdivision levels, sculpt layers or a painted texture.",

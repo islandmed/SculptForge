@@ -1,0 +1,46 @@
+# Remesh after each stroke passes over a Part with subdivision levels (a remesh would remove them) and says so once:
+# the status names the reason and the way out, the topology stays as it was, and the second stretching stroke is quiet.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+key f
+camera 0 0
+key ctrl+d
+expect_value sdiv_levels == 2
+remember triangles before
+click "Remesh##tool.remesh"
+click "Quick Remesh##remesh.quick"
+click "Remesh after each stroke##remesh.after_stroke"
+expect_value remesh_after_stroke == 1
+expect_value remesh_skip_notes == 0
+
+# A long Move pull on the levelled Part: no remesh, and the status says why (Shift+R is the bound key).
+click "Move##brush.move"
+snapshot
+stroke 0.86 0.5 0.98 0.38
+expect_value moved > 0
+wait_idle 30
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+expect_value sdiv_levels == 2
+expect_value remesh_skip_notes == 1
+expect_status Remesh after each stroke: skipped, this Part has subdivision levels
+expect_status Shift+R remeshes it anyway
+shot skipped_levels
+
+# Told once: the next stretching stroke adds nothing.
+stroke 0.86 0.5 0.98 0.62
+wait_idle 30
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+expect_value remesh_skip_notes == 1
+key ctrl+z
+key ctrl+z
+
+# Shift+R does remesh it anyway (the levels go, Undo brings them back).
+key shift+r
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value sdiv_levels == 0
+key ctrl+z
+expect_value sdiv_levels == 2
+expect_value triangles == $before
