@@ -244,7 +244,7 @@ private:
         std::vector<uint32_t> stamp;   // last dab that wrote the texel
         std::array<ChannelTile, kChannelCount> channels; // [c] valid when the stroke paints channel c
         std::vector<uint32_t> pendingTexel; // smoothDab: the texels (in tile) the dab computed, written once all are
-        std::vector<uint8_t> pendingRgba;   // and their new values
+        std::vector<uint32_t> pendingRgba;  // and their new values (RGBA bytes)
     };
     // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
     TileImage* channelTarget(PaintTexture& tex, int c) const;
@@ -289,7 +289,7 @@ private:
     uint32_t dab_ = 0;
     int smoothRadius_ = 0;                        // smoothDab: the largest blur radius in texels (0: not worked out yet this stroke)
     std::vector<std::vector<float>> smoothBlur_; // smoothDab: per tile, the box-blurred colour sums of the dab
-    std::vector<std::shared_ptr<SmoothWindow>> smoothWindows_; // smoothDab: per tile, its island map and borders (the UVs don't change in a stroke)
+    uint64_t smoothKey_ = 0;                      // smoothDab: what the cached tile windows were built for (the radii)
     std::vector<uint8_t> smoothIslandK_;          // smoothDab: the blur's radius in texels per UV island (the same 3D reach on every chart)
     std::shared_ptr<const SmoothTopo> smoothTopo_; // smoothDab: the UV islands and the triangles around each vertex (cached by UV layout)
     std::vector<uint32_t> tris_;
