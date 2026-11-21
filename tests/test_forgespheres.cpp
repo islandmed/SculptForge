@@ -469,3 +469,40 @@ TEST(forgespheres_move_branch_keeps_shape) {
     for (size_t j = 0; j < s.size(); ++j) CHECK(glm::distance(w[j].center, s[j].center + vec3(0.0f, 0.5f, 0.0f)) < 1e-6f);
     CHECK(!forgesphereMoveBranch(w, 99, vec3(0.0f), x));
 }
+
+// Letting go of a drag lands the moved armature with the tree the drag kept fitted (no rebuild): picks find the moved
+// sphere where it is now, and undo / redo swap the armature back and forth as with any edit.
+TEST(forgespheres_release_keeps_the_drag_tree) {
+    const Symmetry x{true, false, false};
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "forgesphere_new", {{"radius", 0.5}}).ok);
+    std::vector<ForgeSphere> s = creature(30);
+    doc.replaceMeshUndoable(forgesphereMesh(s, false), "creature");
+    const Mesh before = doc.mesh;
+    const int tip = int(s.size()) - 9;
+    // The drag: in place, refitting as it goes, then refitAll and the hand-off as forgesphereRelease does.
+    std::vector<uint32_t> moved;
+    std::vector<ForgeSphere> t = s;
+    CHECK(forgesphereSet(t, tip, s[size_t(tip)].center + vec3(0.0f, 1.5f, 0.0f), s[size_t(tip)].radius, x));
+    CHECK(forgesphereDisplayUpdate(doc.mesh, t, &moved));
+    doc.bvh.refit(doc.mesh, moved);
+    Mesh after = std::move(doc.mesh);
+    doc.bvh.refitAll(after);
+    BVH tree = std::move(doc.bvh);
+    doc.mesh = before;
+    doc.replaceMeshUndoable(std::move(after), "Forge Sphere move", std::move(tree));
+    CHECK(doc.bvh.nodeCount() > 0 && doc.mesh.forgespheres.size() == t.size());
+    RayHit hit;
+    const vec3 at = t[size_t(tip)].center;
+    CHECK(doc.bvh.raycast(doc.mesh, at + vec3(5, 0, 0), vec3(-1, 0, 0), hit));
+    CHECK(forgesphereOfGroup(doc.mesh.facegroupAt(hit.triangle)) == tip);
+    CHECK(!doc.bvh.raycast(doc.mesh, s[size_t(tip)].center + vec3(5, 0, 0), vec3(-1, 0, 0), hit) ||
+          forgesphereOfGroup(doc.mesh.facegroupAt(hit.triangle)) != tip);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.forgespheres[size_t(tip)].center == s[size_t(tip)].center);
+    CHECK(doc.bvh.raycast(doc.mesh, s[size_t(tip)].center + vec3(5, 0, 0), vec3(-1, 0, 0), hit));
+    CHECK(forgesphereOfGroup(doc.mesh.facegroupAt(hit.triangle)) == tip);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.forgespheres[size_t(tip)].center == t[size_t(tip)].center);
+}

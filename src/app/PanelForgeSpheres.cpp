@@ -401,8 +401,11 @@ void App::forgesphereRelease() {
     }
     if (d.changed) {
         Mesh after = std::move(doc_.mesh);
+        // The tree the drag kept fitted, tightened (a few ms) rather than built again (tens of ms on a long chain).
+        doc_.bvh.refitAll(after);
+        BVH tree = std::move(doc_.bvh);
         doc_.mesh = std::move(d.before);
-        doc_.replaceMeshUndoable(std::move(after), d.label);
+        doc_.replaceMeshUndoable(std::move(after), d.label, std::move(tree));
         status_ = std::string("Forge Spheres: ") + d.label + "; " + std::to_string(doc_.mesh.forgespheres.size()) + " spheres";
         if (d.added >= 0) forgesphereSelected_ = d.added; // the new sphere
         else if (d.op != ForgeSphereMode::Draw) forgesphereSelected_ = d.sphere; // moved or resized (an inserted joint, too)
