@@ -1373,6 +1373,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
     sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
+    sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
+    sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
+    sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
     sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
