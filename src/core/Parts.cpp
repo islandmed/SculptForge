@@ -195,6 +195,36 @@ int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float to
     return under;
 }
 
+int partEnclosing(Document& doc, const glm::vec3& point, int skip) {
+    // Three rays at right angles (a Part that is open, or a horn beside the point, answers some of them from
+    // outside): the point is inside when every ray meets a surface and the nearest hit faces away from the ray.
+    static const glm::vec3 dirs[3] = {{0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+    int inside = -1;
+    float insideSize = 0.0f;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        const Part& s = doc.parts[size_t(i)];
+        if (!s.visible || i == skip || !doc.partMesh(i).vertexCount()) continue;
+        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
+        const glm::vec3 o = glm::vec3(inv * glm::vec4(point, 1.0f));
+        bool all = true;
+        for (const glm::vec3& d : dirs) {
+            RayHit hit;
+            if (!doc.partBvh(i).raycast(doc.partMesh(i), o, glm::mat3(inv) * d, hit) ||
+                glm::dot(hit.normal, glm::mat3(inv) * d) <= 0.0f) {
+                all = false;
+                break;
+            }
+        }
+        if (!all) continue;
+        const float size = glm::length(doc.partMesh(i).bounds().extent()); // (the innermost of nested Parts)
+        if (inside < 0 || size < insideSize) {
+            inside = i;
+            insideSize = size;
+        }
+    }
+    return inside;
+}
+
 PartColorPick pickPartColor(Document& doc, const PartRayFn& rayAt, float x, float y, const glm::vec3& base) {
     PartColorPick r;
     glm::vec3 origin, dir;

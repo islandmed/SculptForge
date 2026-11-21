@@ -45,6 +45,10 @@ using PartRayFn = std::function<void(float x, float y, glm::vec3& origin, glm::v
 int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float tolerance = 0.0f, int active = -1,
                RayHit* hit = nullptr);
 
+// The visible Part (not `skip`) whose closed surface has the scene point inside it, or -1: the camera sitting inside
+// a head, the eye's view from within. The innermost when several enclose it.
+int partEnclosing(Document& doc, const glm::vec3& point, int skip = -1);
+
 // What the colour pick (C) finds under a screen point: the nearest hit across every visible Part, never only the active
 // one. The colour is that Part's texture or vertex paint under the point; a Part with neither gives `base` (the colour
 // the view shows it in). `hit` is in the Part's own space (what sampleColor and sampleTextureAt want). When nothing can

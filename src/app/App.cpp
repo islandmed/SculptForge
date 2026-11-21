@@ -2304,7 +2304,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
-        } else if (airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
+        } else if (notePressOnAnotherPart(x, y), airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
         } else if (blenderStyle()) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();

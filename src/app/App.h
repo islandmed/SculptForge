@@ -2958,6 +2958,10 @@ private:
     int measureKeyNavStep(bool& draw); // --measure-key-nav, once a loop pass: -1 running, else the exit code
     void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
+    void noteViewInsideAnotherPart();                // after Frame: the camera sits inside another Part (an eye in its head)
+    void notePressOnAnotherPart(float x, float y);   // a press the brush ignored because another Part is under it
+    uint64_t pressHintKey_ = 0;                      // ... (active Part id << 32 | the other's) it last said, and when:
+    Uint64 pressHintNs_ = 0;                         //     once per pair per half minute, orbiting over Parts is normal
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)
     Uint64 lastFrameKeyNs_ = 0;
     void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
