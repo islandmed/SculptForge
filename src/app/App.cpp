@@ -3405,7 +3405,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (!drainQueue_.empty()) runDrainQueue(); // (what a shortcut queued runs before this, as it was asked first)
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
-    if (name == "save_project") storeProjectSettings();
+    if (name == "save_project" || name == "save_visible_parts") storeProjectSettings(); // (the copy keeps the view's materials too)
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
