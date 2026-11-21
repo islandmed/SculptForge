@@ -1319,12 +1319,8 @@ constexpr Entry kTraditionalChinese[] = {
      "向 SculptForge 網站確認是否有新版本。SculptForge 每天也會自動檢查一次（偏好設定 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、授權，以及 SculptForge 所使用的開放原始碼元件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge 免費且將一直免費。成為會員可獲得 Beta 版與搶先版本、Member Requests（每月一個請求，先為你開發並列出你的名字）、投票決定下"
-     "一步開發內容，以及名列致謝名單：會在瀏覽器中開啟 sculptforge.app/support.html。無論如何，應用程式本身都不會有任"
-     "何改變。"},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge 免費且將保持免費。加入會員可獲得搶先版本（如現在的 Android 版 SculptForge）、Member Requests（每月一次請求，先為你開發並列出你的名字）、投票決定接下來的開發內容，以及在製作名單中列入你的名字：會在瀏覽器中開啟 sculptforge.app/support.html。無論如何，應用程式都不會有任何改變。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "SculptForge 官方 Discord 社群：提問、技巧與進行中的作品。會在瀏覽器中開啟邀請連結。錯誤回報仍請使用「回報問題」"
@@ -2324,7 +2320,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Pack on", "啟用套件"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "關閉：其項目會從清單中移除，直到你再次啟用（不會刪除任何內容）。"},
-    {"Free for everyone. Members get betas and a vote on what's next.", "人人免費使用。會員可搶先試用測試版，並投票決定接下來的開發方向。"},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "對所有人免費。會員可獲得搶先版本（如現在的 Android 版 SculptForge），並可投票決定接下來的內容。"},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "按住 Ctrl，將游標移至任何控制項上，即可查看其功能。Shift+F1 隨時開啟使用指南。"},
     {"Opens in your browser.", "在瀏覽器中開啟。"},
     {"Your art is never uploaded or used for training.", "你的作品絕不會被上傳或用於訓練。"},
@@ -2534,7 +2531,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Swap the left and right expressions (and the head's turn), if the character winks with the wrong eye.",
      "交換左右表情（與頭部轉向），用於角色眨錯眼睛時。"},
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
-    {"Members get betas early.", "會員可搶先取得 Beta 版。"},
+    {"Members get early builds, like SculptForge for Android today.",
+     "會員可獲得搶先版本，如現在的 Android 版 SculptForge。"},
     {"Become a member", "成為會員"},
     {"Featured creator", "精選創作者"},
     {"Hide this video.", "隱藏此影片。"},
@@ -2548,12 +2546,10 @@ constexpr Entry kTraditionalChinese[] = {
      "卡片也隨它而來（關閉此開關即可關閉）。不會傳送任何關於你或你電腦的資訊。"},
     {"Update channel", "更新頻道"},
     {"Stable", "穩定版"},
-    {"Preview (betas)", "預覽（Beta 版）"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "穩定版只提供正式發行版本。預覽另外也提供更新來源列出的 Beta 版。Beta 版是會員福利：會員可從私人會員儲存庫與 "
-     "Discord 的 #members 頻道取得。當穩定版超越某個 Beta 版時，預覽會改為提供穩定版。"},
+    {"Preview (early builds)",
+     "預覽（搶先版本）"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "當有搶先版本時，會員可在此取得。目前此頻道取得的版本與穩定版相同。"},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "自動四邊面重新拓樸：將部件重建為乾淨、全四邊面的拓樸，其邊環順著形體走，面數接近目標四邊面數。在背景中執行（「取消」可停止）；可復原。之後細分它，再用部件 > 投射 > Project Detail 找回細節。"},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
@@ -4453,8 +4449,6 @@ constexpr Entry kTraditionalChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 換了新外觀"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge 是免費的。會員可搶先取得測試版與早期版本、投票決定接下來開發什麼、提出會員請求（每月一個，先為你開發並列出你的名字），並列名於致謝名單。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜尋筆刷（鱗片、皮膚、石頭...）"},
     {"Selection brushes (Ctrl+Shift)",

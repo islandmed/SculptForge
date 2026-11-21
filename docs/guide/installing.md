@@ -292,7 +292,7 @@ that names the newest version; if yours is older, a banner at the top of the 3D 
 
 Nothing about you or your computer is sent. **Help > Check for updates** asks right away, and
 **Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
-for the betas).
+for early builds).
 
 **One-click update.** The Linux AppImage and the Windows installer and portable zip also get an **Update** button
 on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and

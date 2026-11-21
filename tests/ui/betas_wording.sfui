@@ -1,0 +1,41 @@
+# Member betas are paused (tools/ci/check_betas_paused.py): Help > Support SculptForge... and the Quick Tour's last page say what
+# a membership adds, "early builds, like SculptForge for Android today". READY shots at 1440 and 2880.
+run ui_look look=classic layout=classic        # the classic palette bar has the Help menu
+run new_sphere subdivisions=3
+click "Help##palette.help"
+hold ctrl
+hover "Support SculptForge...##help.support"
+expect_help "early builds, like SculptForge for Android today"
+shot help-support
+hold none
+key escape
+
+# Help > Quick tour, to its last page.
+click "Help##palette.help"
+click "Quick tour##help.quick_tour"
+expect_value quick_tour_open == 1
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+click "Next##quicktour"
+expect_value quick_tour_slide == 10
+expect_text SculptForge stays free
+expect_text early builds, like SculptForge for Android today
+shot quick-tour-last
+click "Maybe later##quicktour"
+
+# Preferences > Updates: the channel is "Preview (early builds)", and its help is true while betas are paused.
+click "Preferences##palette.preferences"
+click "Updates##preferences.updates"
+expect "Preview (early builds)##prefs.update_preview"
+expect_no_text "betas"
+hold ctrl
+hover "Preview (early builds)##prefs.update_preview"
+expect_help "Right now this channel gets the same releases as Stable."
+shot prefs-updates-channel
+hold none

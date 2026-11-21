@@ -1081,7 +1081,8 @@ constexpr Entry kSpanish[] = {
     {"Later", "Más tarde"},
     {"Skip this version", "Omitir esta versión"},
     {"Become a member", "Hazte miembro"},
-    {"Members get betas early.", "Los miembros reciben las betas antes."},
+    {"Members get early builds, like SculptForge for Android today.",
+     "Los miembros obtienen versiones anticipadas, como hoy SculptForge para Android."},
     {"Checking", "Comprobando"},
     {"This build gets its updates from your package manager.",
      "Esta compilación se actualiza desde tu gestor de paquetes."},
@@ -1536,12 +1537,8 @@ constexpr Entry kSpanish[] = {
      "al día (Preferencias > Actualizaciones)."},
     {"Version, licence and the open-source components SculptForge is built with.",
      "Versión, licencia y los componentes de código abierto con los que está hecho SculptForge."},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge es gratis y seguirá siéndolo. Ser miembro suma betas y versiones anticipadas, Member Requests "
-     "(una petición al mes, la hacemos primero y con tu nombre), voto sobre lo próximo que hacemos y tu nombre en los créditos: abre "
-     "sculptforge.app/support.html en tu navegador. En la app no cambia nada en ningún caso."},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge es gratis y seguirá siéndolo. Una membresía añade versiones anticipadas, como hoy SculptForge para Android, Member Requests (una petición al mes, desarrollada primero y acreditada a ti), un voto sobre lo próximo que desarrollemos y tu nombre en los créditos: abre sculptforge.app/support.html en tu navegador. Nada cambia en la app en ningún caso."},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "La comunidad oficial de SculptForge en Discord: preguntas, consejos y trabajos en curso. Abre la invitación en "
@@ -2589,7 +2586,8 @@ constexpr Entry kSpanish[] = {
     {"Pack on", "Paquete activo"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "Desactivado: sus elementos salen de las listas hasta que lo vuelvas a activar (no se borra nada)."},
-    {"Free for everyone. Members get betas and a vote on what's next.", "Gratis para todos. Los miembros reciben betas y votan qué se construye a continuación."},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "Gratis para todos. Los miembros obtienen versiones anticipadas, como hoy SculptForge para Android, y un voto sobre lo próximo."},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "Mantén Ctrl sobre cualquier control para ver qué hace. Shift+F1 abre la guía en cualquier momento."},
     {"Opens in your browser.", "Se abre en tu navegador."},
     {"Your art is never uploaded or used for training.", "Tu arte nunca se sube ni se usa para entrenar."},
@@ -2847,13 +2845,10 @@ constexpr Entry kSpanish[] = {
      "llega con él (se apaga con este interruptor). No se envía nada sobre ti ni sobre tu equipo."},
     {"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
-    {"Preview (betas)", "Vista previa (betas)"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "Estable ofrece solo versiones terminadas. Vista previa ofrece también las betas que nombra el feed de "
-     "actualizaciones. Las betas son una ventaja para miembros: las reciben del repositorio privado de miembros y "
-     "del canal #members de Discord. Cuando la versión estable supera a una beta, Vista previa ofrece esa."},
+    {"Preview (early builds)",
+     "Vista previa (versiones anticipadas)"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "Los miembros reciben versiones anticipadas aquí cuando las hay. Ahora mismo este canal recibe las mismas versiones que Estable."},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "Retopología automática en quads: reconstruye la Pieza como topología limpia, toda de quads, cuyos bucles de aristas siguen las formas, cerca de Quads objetivo. Se ejecuta en segundo plano (Cancelar la detiene); se puede deshacer. Luego divídela y usa Pieza > Proyectar > Project Detail para recuperar el detalle."},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
@@ -4896,8 +4891,6 @@ constexpr Entry kSpanish[] = {
      "Esculpir sobre splats"},
     {"SculptForge has a new look",
      "SculptForge tiene un aspecto nuevo"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge es gratis. Una membresía añade betas y versiones anticipadas, voto sobre lo próximo que hacemos, Peticiones de miembros (una petición al mes, la hacemos primero y con tu nombre) y tu nombre en los créditos. %s"},
     {"Search brushes (scales, skin, stone...)",
      "Buscar pinceles (escamas, piel, piedra...)"},
     {"Selection brushes (Ctrl+Shift)",
