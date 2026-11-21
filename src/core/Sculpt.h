@@ -570,6 +570,8 @@ private:
     std::vector<float> givenInfluence_;
     void flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> leaves);
     std::vector<glm::vec3> scratch_;
+    std::vector<int32_t> dabSlot_; // vertex -> its index in verts_ (-1 outside the dab), for a packed Inflate dab's smoothed normals
+    std::vector<glm::vec3> packedN_, packedTmp_;
     // Smooth with keepVolume: each brush vertex's shrunk position, and (vertex, index) sorted to look it up.
     void taubinShrink(const Mesh& mesh);
     std::vector<glm::vec3> shrunk_;

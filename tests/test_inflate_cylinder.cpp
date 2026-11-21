@@ -7,6 +7,8 @@
 // whole dab along one area normal (share along the own normals 0.07 to 0.5 at brushes of 2.7 radii and more).
 #include "TestHarness.h"
 
+#include "GeomInvariants.h"
+
 #include "core/Commands.h"
 #include "core/Sculpt.h"
 #include "core/StarterMeshes.h"
@@ -72,5 +74,57 @@ TEST(inflate_stock_cylinder_invariant_moves_along_own_normals) {
                                     m.triangleCount(), stretched ? " stretched" : "", int(sym), angle > 1.0f ? "half off" : "on", brush, share);
                         CHECK(share > 0.99f);
                     }
+        }
+}
+
+namespace {
+// A stroke of dabs along the horizontal line across the tube's front at height y (x from -0.8 R to 0.8 R), each on the surface under it.
+void acrossStroke(Document& d, BrushType type, const char* name, float y, float R, float radius, float strength) {
+    CHECK(d.sculptor.beginStroke(d.mesh, name));
+    const float step = std::max(0.15f * radius, 0.02f * R);
+    for (float x = -0.8f * R; x <= 0.8f * R; x += step) {
+        DabParams p;
+        p.center = vec3(x, y, 2.0f * R);
+        RayHit hit;
+        if (d.bvh.raycast(d.mesh, p.center, vec3(0, 0, -1), hit)) {
+            p.center = hit.position;
+            p.pickNormal = hit.normal;
+        }
+        p.viewDir = vec3(0, 0, -1);
+        p.radius = radius;
+        p.strength = strength;
+        d.sculptor.dab(d.mesh, d.bvh, type, p, Symmetry{false, false, false});
+    }
+    d.undo.push(d.sculptor.endStroke());
+}
+} // namespace
+
+TEST(inflate_stock_cylinder_groove_stays_whole) {
+    // The #194 groove on a tube (artist-qa): Crease a groove across the stock Cylinder, then Inflate wider than the tube across it.
+    // The groove's packed rows must carry along together: no triangle turns over, no needle or open rip along the groove.
+    const StarterMesh* starter = findStarterMesh("cylinder");
+    CHECK(starter != nullptr);
+    for (const int levels : {1, 2})
+        for (const float brush : {1.0f, 2.0f, 5.0f}) {
+            Document d0;
+            std::string error;
+            CHECK(loadStarterMesh(*starter, d0, levels, error));
+            Mesh m = d0.mesh;
+            for (vec3& p : m.positions) p *= vec3(0.47f, 1.75f, 0.47f);
+            m.recomputeAllNormals();
+            Document d;
+            d.setMesh(std::move(m), "Sculpt", nullptr);
+            const AABB b = d.mesh.bounds();
+            const float R = 0.5f * std::min(b.extent().x, b.extent().z);
+            for (int i = 0; i < 4; ++i) acrossStroke(d, BrushType::Crease, "Crease", 0.0f, R, 0.15f * R, 0.5f);
+            const std::vector<vec3> grooved = d.mesh.positions;
+            for (int i = 0; i < 3; ++i) acrossStroke(d, BrushType::Inflate, "Inflate", 0.0f, R, brush * R, 0.5f);
+            const size_t flipped = geom::flippedFaces(grooved, d.mesh), inverted = geom::invertedFaces(grooved, d.mesh);
+            const size_t folded = geom::foldedFaces(grooved, d.mesh);
+            std::printf("  groove on the stretched cylinder (%zu tris), Inflate %.1f R: %zu flipped, %zu inverted, %zu folded\n",
+                        d.mesh.triangleCount(), brush, flipped, inverted, folded);
+            CHECK(flipped == 0); // (the one-direction rule turned off for a wrapped dab: 686 flipped at 5 R)
+            CHECK(inverted == 0);
+            CHECK(folded == 0);
         }
 }

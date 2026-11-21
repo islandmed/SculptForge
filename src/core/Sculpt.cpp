@@ -1202,8 +1202,8 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
 // steps close the gap within a dab or two, the triangles between them flip, and stacked strokes tear needles and stretched
 // streaks into the surface. So a dab that reaches a packed grid (at least 32 vertices, and 0.2% of the dab's, whose shortest
 // edge is under 2/3 of the dab's typical shortest one; a lone odd vertex on a remeshed surface, or the one ring of a tube's round cap, is not one) moves all its vertices
-// along the brush's one area normal instead, which carries the whole groove alike, but only where the dab's surface faces one
-// way (its mean normal at least 0.5: a brush wrapped round a thin tube or its caps has no one normal); every other dab, the usual Inflate, is
+// along the brush's one area normal instead, which carries the whole groove alike (where the dab's surface faces one way; a brush
+// wrapped round a thin tube uses the normals smoothed over the dab, below); every other dab, the usual Inflate, is
 // unchanged. One choice for the whole dab, not a per-vertex mix: neighbours on different rules were what tore.
 //
 // The edge length an unpacked vertex of `verts` has, as its shortest edge (an even sample of 64: the upper quartile of
@@ -1341,6 +1341,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
 
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
+    const glm::vec3* packedNormals = nullptr; // a packed dab: each vertex's smoothed normal, by its index in verts_
     if (type == BrushType::Inflate) {
         const float typical = typicalEdge(mesh, verts_);
         // (an even sample of at most 4096 vertices: a packed cluster of 0.2% of a big dab still shows in it)
@@ -1353,13 +1354,41 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             bad.fetch_add(n, std::memory_order_relaxed);
         }, 512);
         inflateAlongNormals = bad.load() * stride < std::max<size_t>(32, verts_.size() / 500);
-        // One area normal needs a dab on a patch that faces one way (a groove's dab: mean normal 0.7 to 1). A brush wrapped round a
-        // tube and its caps (0.02 to 0.25) has none, and one direction carries the far side against its own normal.
+        // A packed dab on a patch that faces one way (a groove's: mean normal 0.7 to 1) moves along the one area normal. One that
+        // wraps a thin tube and its caps (0.02 to 0.25) has no such normal, and one direction would carry the far side against its
+        // own: its vertices swell along their normals smoothed over the dab (the groove's rows still move together, no gap
+        // closing, no flips). In between the two blend, so neighbouring dabs never change rule abruptly.
         if (!inflateAlongNormals) {
             glm::dvec3 nsum(0.0);
-            size_t n = 0;
-            for (size_t i = 0; i < verts_.size(); i += stride, ++n) nsum += glm::dvec3(mesh.normals[verts_[i]]);
-            inflateAlongNormals = glm::length(nsum) < 0.5 * double(n);
+            size_t sampled = 0;
+            for (size_t i = 0; i < verts_.size(); i += stride, ++sampled) nsum += glm::dvec3(mesh.normals[verts_[i]]);
+            const float faceOne = float(glm::length(nsum) / double(std::max<size_t>(1, sampled)));
+            const float areaShare = std::clamp((faceOne - 0.4f) / 0.3f, 0.0f, 1.0f); // 1 from a mean normal of 0.7, 0 at 0.4
+            if (areaShare < 1.0f) {
+                if (dabSlot_.size() < mesh.vertexCount()) dabSlot_.assign(mesh.vertexCount(), -1);
+                const size_t n = verts_.size();
+                for (size_t i = 0; i < n; ++i) dabSlot_[verts_[i]] = int32_t(i);
+                packedN_.resize(n);
+                packedTmp_.resize(n);
+                for (size_t i = 0; i < n; ++i) packedN_[i] = mesh.normals[verts_[i]];
+                constexpr int kSmoothRounds = 12;
+                for (int round = 0; round < kSmoothRounds; ++round) {
+                    poolFor(n, [&](size_t b, size_t e) {
+                        for (size_t i = b; i < e; ++i) {
+                            glm::vec3 sum = packedN_[i];
+                            for (uint32_t u : mesh.polygonNeighbors(verts_[i]))
+                                if (dabSlot_[u] >= 0) sum += packedN_[size_t(dabSlot_[u])];
+                            const float len = glm::length(sum);
+                            packedTmp_[i] = len > 1e-12f ? sum / len : packedN_[i];
+                        }
+                    }, 512);
+                    packedN_.swap(packedTmp_);
+                }
+                for (size_t i = 0; i < n; ++i) dabSlot_[verts_[i]] = -1;
+                if (areaShare > 0.0f) // (areaNormal is the one the dab's brush computed above, before the switch)
+                    for (glm::vec3& v : packedN_) v = glm::normalize(glm::mix(v, areaNormal, areaShare));
+                packedNormals = packedN_.data();
+            }
         }
     }
     scratch_.resize(verts_.size());
@@ -1395,7 +1424,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = plane.offsetWith(x, f); // (core/SculptKernel.h)
             break;
         case BrushType::Inflate:
-            d = (inflateAlongNormals ? nrm[v] : areaNormal) * (sign * s * r * 0.05f * f);
+            d = (inflateAlongNormals ? nrm[v] : packedNormals ? packedNormals[i] : areaNormal) * (sign * s * r * 0.05f * f);
             break;
         case BrushType::Smooth: case BrushType::SmoothPeaks: {
             if (p.groupBorders && type == BrushType::Smooth) { // along the border, on the tangent plane; junctions and inner vertices stay
