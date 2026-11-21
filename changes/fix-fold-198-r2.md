@@ -12,10 +12,10 @@ fixed: **Palette Knife folded the surface where two strokes overlapped** (Fixes 
   plane the two halves' drags now blend instead of adding up (they used to drag the clay between them twice as far), and the
   halves match to about half an edge (about 39 edges apart before). A drag alone carries the surface where it did before
   (within a tenth of an edge); with its flattening the knife's ridges stand a little higher than before (5.8 against 4.4 edges
-  on the test strokes), as the old vertices bunched ahead of the tip had pulled its plane down. Cost: a knife stroke takes about
-  1.7 times as long to compute (at a normal size on a 1.3M-triangle mesh its slowest frame goes from about 8 to 11 ms; at Size
-  200 from about 75 to 90 ms); other brushes are unchanged. Vertex paint under the knife now stays where it is instead of being
-  smeared along. Tendril is tracked in #204.
+  on the test strokes), as the old vertices bunched ahead of the tip had pulled its plane down. Palette Knife strokes cost more
+  to compute so they never fold: about 1.7 times as much, and at normal sizes its frames stay under about 14 ms on the floor
+  tier (8 to 9 ms before; at Size 200 about 90 ms against 75 ms); other brushes are unchanged. Vertex paint under the knife now
+  stays where it is instead of being smeared along. Tendril is tracked in #204.
 testers:
   - Any OS: Palette Knife, three or more strokes crossing and stacked, with X symmetry on and one stroke ending near the middle; close-up with a dark Lit Sphere or wireframe. Good = no dark creases or specks, the two halves alike.
   - Any OS: Palette Knife at Size 200 on a multi-million-triangle mesh, three to five strokes stacked at different pressures: no crumpled patch or speckled trail, and the stroke follows the pen about as well as before.

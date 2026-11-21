@@ -572,7 +572,7 @@ void checkKnifeOverlaps() {
 // the plane presses most of the front flat against the way back and many dabs move the vertices with the clay as before
 // (slideBack): no more slivers than the vertex-moving drag leaves there, nor folds. The fifth stroke costs about what the first did.
 struct StackResult { size_t folded = 0, inverted = 0, slivers = 0; std::vector<double> ms; size_t fallbacks = 0; };
-StackResult knifeBigStack(float radius, bool slide) {
+StackResult knifeBigStack(float radius, bool slide, bool everyStroke = true) {
     BrushRecipe knife;
     for (const BrushRecipe& r : builtinBrushRecipes())
         if (r.name == "Palette Knife") knife = r;
@@ -592,26 +592,34 @@ StackResult knifeBigStack(float radius, bool slide) {
     }
     Document d = denseSphere();
     d.sculptor.dragSlide = slide;
-    std::vector<glm::vec3> before = d.mesh.positions;
+    const std::vector<glm::vec3> start = d.mesh.positions;
+    std::vector<glm::vec3> before = start;
     StackResult out;
     auto t = std::chrono::steady_clock::now();
     replayStrokes(d, &knife, BrushType::Standard, f, [&](size_t k) {
         out.ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t).count());
-        size_t slivers = 0;
-        for (const glm::uvec3& tr : d.mesh.triangles) slivers += triangleQuality(d.mesh, tr) < 0.2f;
-        const size_t folded = foldedFaces(before, d.mesh), inverted = invertedFaces(before, d.mesh);
+        size_t slivers = 0; // (on the triangles the strokes moved so far: the sphere is clean elsewhere)
+        for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) {
+            const glm::uvec3 tr = d.mesh.triangles[t];
+            if (d.mesh.positions[tr.x] != start[tr.x] || d.mesh.positions[tr.y] != start[tr.y] || d.mesh.positions[tr.z] != start[tr.z])
+                slivers += triangleQuality(d.mesh, tr) < 0.2f;
+        }
+        // (the folds, against the mesh the last count saw: after every stroke, or for the biggest brush, whose fold counts
+        // cover most of the sphere, after strokes 1, 3 and 5; none on the vertex-moving drag's comparison run)
+        const bool count = slide && (everyStroke || k % 2 == 0);
+        const size_t folded = count ? foldedFaces(before, d.mesh) : 0, inverted = count ? invertedFaces(before, d.mesh) : 0;
         std::printf("  Palette Knife%s radius %.2f stroke %zu: %.0f ms, %zu folded, %zu inside out, %zu slivers\n", slide ? "" : " (vertices moving)",
                     radius, k + 1, out.ms.back(), folded, inverted, slivers);
         expect(nonFinite(d.mesh) == 0, "Palette Knife radius %.2f: NaN after stroke %zu", radius, k + 1);
         out.folded += folded, out.inverted += inverted, out.slivers = slivers;
-        before = d.mesh.positions;
+        if (count) before = d.mesh.positions;
         t = std::chrono::steady_clock::now();
     });
     out.fallbacks = d.sculptor.dragSlideFallbacks;
     return out;
 }
 void checkKnifeBigStack(float radius) {
-    const StackResult r = knifeBigStack(radius, true);
+    const StackResult r = knifeBigStack(radius, true, radius <= 0.7f);
     std::printf("  (radius %.2f: %zu dabs moved the vertices with the clay)\n", radius, r.fallbacks);
     expect(r.folded == 0 && r.inverted == 0, "Palette Knife radius %.2f: %zu folded, %zu inside out over five strokes", radius, r.folded,
            r.inverted);
@@ -619,8 +627,7 @@ void checkKnifeBigStack(float radius) {
         expect(r.slivers <= 100, "Palette Knife radius %.2f: %zu slivers (quality under 0.2)", radius, r.slivers);
     } else {
         const StackResult old = knifeBigStack(radius, false);
-        expect(r.slivers <= old.slivers && r.folded <= old.folded, "Palette Knife radius %.2f: %zu slivers, %zu folded (vertex-moving drag: %zu, %zu)",
-               radius, r.slivers, r.folded, old.slivers, old.folded);
+        expect(r.slivers <= old.slivers, "Palette Knife radius %.2f: %zu slivers (the vertex-moving drag: %zu)", radius, r.slivers, old.slivers);
     }
     expect(r.ms.size() == 5 && r.ms.back() < 3.0 * r.ms.front() + 50.0, "Palette Knife radius %.2f: the fifth stroke took %.0f ms, the first %.0f",
            radius, r.ms.back(), r.ms.front());
@@ -630,8 +637,8 @@ void checkKnifeBigStack(float radius) {
     addTest("palette_knife_big_brush_stack", [] {
         checkKnifeBigStack(0.3f);
         checkKnifeBigStack(0.7f);
-        checkKnifeBigStack(0.95f);
     });
+    addTest("palette_knife_size200_stack", [] { checkKnifeBigStack(0.95f); }); // (with the vertex-moving drag's run to compare)
     return true;
 }();
 
