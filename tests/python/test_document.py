@@ -129,9 +129,15 @@ def test_long_operations_release_the_gil(sphere):
     ticks = 0
     done = threading.Event()
 
+    errors = []
+
     def work():
-        sphere.remesh(256)
-        done.set()
+        try:
+            sphere.remesh(256)
+        except BaseException as e:  # (a refused remesh must end the test, not leave the loop below waiting for ever)
+            errors.append(e)
+        finally:
+            done.set()
 
     t = threading.Thread(target=work)
     t.start()
@@ -140,4 +146,5 @@ def test_long_operations_release_the_gil(sphere):
         ticks += 1  # this loop runs only while the remesh doesn't hold the GIL
         time.sleep(0.001)
     t.join()
+    assert not errors, errors
     assert time.perf_counter() - start < 1.0 or ticks > 10
