@@ -916,6 +916,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_brush") return double(int(app_.strokeBrush_));
     if (name == "stroke_slot") return double(int(app_.strokeSlot_));
     if (name == "main_brush") return double(int(app_.brush_));
+    if (name == "active_brush") return double(int(app_.activeBrush())); // the brush a stroke would use now (Shift: Smooth)
+    if (name == "paint_rgb") return app_.paintRgb_ ? 1.0 : 0.0;
+    if (name == "raise_on") return app_.invertToggle_ ? 0.0 : 1.0;
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);

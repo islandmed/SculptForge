@@ -1,0 +1,102 @@
+# A member (macOS 0.13.10): Paint brush selected, top bar Sculpt OFF / Paint ON, texture Part, PBR view. Pressing Shift lit the
+# Sculpt button. Invariant: after Shift goes up the toggles (Sculpt / Paint, Add / Sub, Rgb), the main brush and every
+# Intensity equal the state before Shift, for Shift alone, a Shift stroke, and Shift+click on a shelf brush.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+run set_color color=ff0000
+action brush.kelvingrab
+expect_value main_brush == 15
+action draw.paint
+expect_value paint_mode == 1
+
+# --- vertex paint ---
+snapshot
+remember paint_mode pm0
+remember main_brush mb0
+remember z_intensity z0
+remember rgb_intensity rgb0
+remember smooth_intensity sm0
+remember shift_intensity sh0
+remember paint_rgb prgb0
+remember raise_on raise0
+
+hold shift
+expect_value paint_mode == $pm0
+expect_value main_brush == $mb0
+hold none
+expect_value paint_mode == $pm0
+expect_value main_brush == $mb0
+expect_value rgb_intensity == $rgb0
+expect_value smooth_intensity == $sm0
+
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value paint_mode == $pm0
+expect_value main_brush == $mb0
+expect_value z_intensity == $z0
+expect_value rgb_intensity == $rgb0
+expect_value smooth_intensity == $sm0
+expect_value shift_intensity == $sh0
+expect_value paint_rgb == $prgb0
+expect_value raise_on == $raise0
+key ctrl+z
+
+# Shift+click a shelf brush while painting: it becomes the Shift brush, Paint stays.
+hold shift
+click "Trim##brush.trim"
+hold none
+expect_value paint_mode == $pm0
+expect_value main_brush == $mb0
+expect_value rgb_intensity == $rgb0
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value paint_mode == $pm0
+expect_value main_brush == $mb0
+expect_value rgb_intensity == $rgb0
+key ctrl+z
+
+# --- texture Part (Paint into: Texture, the member's setup) ---
+click "Texture Image##tool.texture"
+click "Texture Image/Auto UV"
+wait_idle 120
+click "Texture Image/New Texture"
+expect_value paint_texture == 1
+expect_value paint_mode == 1
+snapshot
+remember main_brush mb1
+remember rgb_intensity rgb1
+remember smooth_intensity sm1
+remember z_intensity z1
+
+hold shift
+hold none
+expect_value paint_mode == 1
+expect_value main_brush == $mb1
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value paint_mode == 1
+expect_value main_brush == $mb1
+expect_value rgb_intensity == $rgb1
+expect_value smooth_intensity == $sm1
+expect_value z_intensity == $z1
+expect_value raise_on == 1
+key ctrl+z
+
+hold shift
+click "KelvinGrab##brush.kelvingrab"
+hold none
+expect_value paint_mode == 1
+expect_value main_brush == $mb1
+expect_value shift_brush == 15
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value paint_mode == 1
+expect_value main_brush == $mb1
+expect_value rgb_intensity == $rgb1
+expect_value shift_intensity == 50
+key ctrl+z
