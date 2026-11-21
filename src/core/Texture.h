@@ -200,6 +200,9 @@ glm::vec3 sampleTextureAt(const Mesh& mesh, uint32_t triangle, const glm::vec3& 
 // end() moves the undo tiles into the stroke's record. Within a stroke each texel keeps its coverage
 // (repeated dabs build up as vertex paint does) and is computed from its colour before the stroke, so 8-bit
 // storage never stalls on small strengths.
+struct SmoothTopo;  // (Texture.cpp)
+struct SmoothWindow; // (Texture.cpp)
+
 class TexturePainter {
 public:
     // False (and nothing starts) when the mesh doesn't paint into a texture or the target layer is locked/hidden.
@@ -217,7 +220,8 @@ public:
     // Smooth colour (Shift with the Paint brush): blends the colour texels under the brush toward the average of their
     // neighbours by falloff x strength x pressure x (1 - mask), with symmetry, on the active layer (its coverage
     // smooths too). "Neighbours" are the UV-island texels within the mesh's mean triangle edge in texels, so a stroke
-    // smears as far as the same stroke does on vertex colours. Each dab reads the texels as the last one left them,
+    // smears as far as the same stroke does on vertex colours, and across UV seams (a texel next to an island's border
+    // averages the colours of the surface that continues on the other side, found through the mesh). Each dab reads the texels as the last one left them,
     // so a drag keeps smoothing.
     // Touches no material channel and never the shape. Needs begin(mesh, channelBit(BaseColor)). Returns texels changed.
     size_t smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
@@ -283,9 +287,11 @@ private:
     std::unique_ptr<std::atomic<Tile*>[]> tilePtr_; // the same tiles, for lock-free lookups from the band threads
     std::mutex tileMutex_;                          // guards making a tile
     uint32_t dab_ = 0;
-    int smoothRadius_ = 0;                        // smoothDab: the blur's radius in texels (0: not worked out yet this stroke)
+    int smoothRadius_ = 0;                        // smoothDab: the largest blur radius in texels (0: not worked out yet this stroke)
     std::vector<std::vector<float>> smoothBlur_; // smoothDab: per tile, the box-blurred colour sums of the dab
-    std::vector<uint32_t> smoothIsland_;          // smoothDab: each triangle's UV island (1-based), worked out once a stroke
+    std::vector<std::shared_ptr<SmoothWindow>> smoothWindows_; // smoothDab: per tile, its island map and borders (the UVs don't change in a stroke)
+    std::vector<uint8_t> smoothIslandK_;          // smoothDab: the blur's radius in texels per UV island (the same 3D reach on every chart)
+    std::shared_ptr<const SmoothTopo> smoothTopo_; // smoothDab: the UV islands and the triangles around each vertex (cached by UV layout)
     std::vector<uint32_t> tris_;
     std::vector<DabTri> dabTris_;
     std::vector<std::vector<uint32_t>> bandTris_; // per 16-row band: indices into dabTris_, in serial order
