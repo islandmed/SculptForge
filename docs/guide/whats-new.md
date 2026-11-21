@@ -12,7 +12,7 @@ date: 2026-11-20
 tagline: Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive.
 highlight: Sculpt layers travel to Blender and back as shape keys, with names and order kept
 highlight: Hold Shift with the Paint brush to blend colours smoothly
-highlight: Long Clay strokes on dense Micro levels keep up with your pen
+highlight: Long Clay strokes on dense Micro levels respond faster
 highlight: Voxel Remesh lets you proceed when memory is tight, and timelapses keep your Micro level strokes
 highlight: 16 new Creature Skin brushes for scales, hide and pores, made by request
 title: Layers to Blender and back
