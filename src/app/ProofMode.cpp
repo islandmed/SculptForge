@@ -17,6 +17,7 @@
 
 #include "core/Precision.h"
 
+#include "core/BenchLag.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
 
@@ -1195,7 +1196,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // How far the stroke on screen (the newest dab in this frame) trails the pointer (the newest sample).
             if (!p.dabs.empty()) {
                 const glm::vec2 d = p.dabs.back();
-                // Its sample: on the dab's own lap of the path (core/StrokePath.h), not a later one over the same spot.
+                // Its sample: on the dab's own lap of the path (core/BenchLag.h), not a later one over the same spot.
                 const size_t best = dabSampleIndex(p.samples.size(), p.dabFrom, d.x, d.y, [&](size_t i) { return p.samples[i].p; });
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);

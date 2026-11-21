@@ -9,4 +9,4 @@ changed: The benchmark results list shows only on-model lag, and none for result
 Reviewers: bench-only. A dab off the model costs nothing, so the frames after it are quick and their lag small; on the
 floor 1B "clay large" phase that alone flipped lag_ms p50 between 24 and 370 ms run to run (same dab work in v0.13.9 and
 v0.13.10), and 77-90% of every scene's 25 px dabs missed the model. Probe: App::strokeHitProbe_ / DabView::hitProbe
-beside strokeProbe_, set in dabAt. Matcher: core/StrokePath.h dabSampleIndex (tests/test_stroke_path.cpp).
+beside strokeProbe_, set in dabAt. Matcher: core/BenchLag.h dabSampleIndex (tests/test_bench_lag.cpp).
