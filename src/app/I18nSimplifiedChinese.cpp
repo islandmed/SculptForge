@@ -2089,6 +2089,16 @@ constexpr Entry kSimplifiedChinese[] = {
      "拖动球体即可移动；链接会伸展跟随。对称时其镜像也会一起移动。"},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "将球体向上或向右拖动可放大，向下或向左拖动可缩小。"},
+    {"Drag a sphere to move it; it stays under the pointer at its depth and the links stretch to follow. Hold Shift to swing it around the sphere it grows from (its link keeps its length). Symmetry moves its mirror twin too.",
+     "拖动球体即可移动；它保持在指针下方的同一深度，链接会伸展跟随。按住 Shift 可让它绕着它所长出的球旋转（链接长度不变）。对称时其镜像也会一起移动。"},
+    {"Snap to Surface",
+     "吸附到表面"},
+    {"Move Branch",
+     "连同子球移动"},
+    {"Moving a sphere puts its centre on the surface of the sphere under the pointer (off them, it moves at its depth as usual). Handy for seating a head or limb on the body.",
+     "移动球体时，其中心落在指针下方球体的表面上（不在球体上时，照常在原深度移动）。便于把头部或四肢安放到身体上。"},
+    {"Moving a sphere carries everything that grows from it along, keeping its shape: drag a leg and the foot comes too, drag the body and the whole creature moves. Off, only the sphere moves and its links stretch.",
+     "移动球体时，从它长出的所有部分会一起移动并保持形状：拖动腿，脚也跟着走；拖动身体，整个生物一起移动。关闭时只移动该球，链接会伸展。"},
     {"Drag places child", "拖动放置子球"},
     {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
      "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
@@ -3198,10 +3208,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "笔刷只影响与光标下的点相连、且在笔刷大小内的表面：另一条腿、旁边的手指或隔着缝隙的嘴唇都保持不变。随偏好设置与项目保存。"},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "笔刷衰减以屏幕测量：笔刷圆圈内的一切都会受影响，会穿过模型到背面，如同沿视线方向的圆柱。"
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "笔刷衰减以屏幕测量，如同沿视线方向的圆柱。移动和抓取会影响笔刷圆圈内的一切，穿过模型直到背面；"
+     "其他笔刷止于光标下表面之后约 1.5 至 3 倍笔刷半径处。"
      "同时打开“仅限相连”即可限制在单一区块。"},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+拖动以笔刷绘制遮罩；Ctrl+Alt+拖动擦除遮罩。在背景上 Ctrl+拖动可清除遮罩。"},
@@ -3863,6 +3874,14 @@ constexpr Entry kSimplifiedChinese[] = {
      "  正在设计笔刷%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "%.1f%% 的纹素找不到表面：请提高前方 / 后方"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "贴图中有 %.1f%% 未找到表面:请将搜索距离提高到 前方 %.1f%%、后方 %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "自动距离:前方 %.1f%%、后方 %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "以建议距离重新烘焙"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "上次烘焙中有部分像素因搜索距离过短而未找到表面。请关闭自动距离,将前方和后方设为能够到达高模的距离,然后重新烘焙。"},
     {"%d commands",
      "%d 个命令"},
     {"%d items",

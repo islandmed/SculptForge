@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.13.10 LANGUAGES C CXX)
+project(SculptForge VERSION 0.13.11 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -1579,6 +1579,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Forge Spheres in one mode (#167): the hover hint and drags at 1440 and 2880 px (tests/ui/forge_spheres_one_mode.sfui).
     sculptforge_ui_test(forge_spheres_one_mode_1440 forge_spheres_one_mode --size 1440x900)
     sculptforge_ui_test(forge_spheres_one_mode_2880 forge_spheres_one_mode --size 2880x1800)
+    # Moving Forge Spheres (tests/ui/forge_spheres_move.sfui): depth, Shift, Snap to Surface on a long chain, at 1440 and 2880 px.
+    sculptforge_ui_test(forge_spheres_move_1440 forge_spheres_move --size 1440x900)
+    sculptforge_ui_test(forge_spheres_move_2880 forge_spheres_move --size 2880x1800)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
@@ -1594,6 +1597,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
     sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
+    sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
+    sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
+    sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
     sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
@@ -1621,6 +1627,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
+    # The popup's key labels per input style (gh#233) at 100% and 200%: the 1440 and 2880 shots.
+    sculptforge_ui_test(stroke_popup_style_keys_1440 stroke_popup_style_keys --size 1440x810)
+    sculptforge_ui_test(stroke_popup_style_keys_2880 stroke_popup_style_keys --size 2880x1620)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
     sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.

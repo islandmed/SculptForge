@@ -59,6 +59,7 @@
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
+//   expect_popup_keys sub|smooth|mask|select KEYS  the keys the stroke popup's tile shows, e.g. expect_popup_keys sub Ctrl
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
@@ -234,7 +235,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -319,6 +320,9 @@
 //                            at: the event carries that position (window fractions) instead of the pen's, as a
 //                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
 //   pen_move X Y [S]         the same to a point of the window (fractions): a fixed path, whatever the view does
+//   view_trace on|off|check RATIO   on: note the camera's yaw and pitch at every pen_move sample; check: fail unless the view's step
+//                            per sample is smooth (no sample's step below 1/RATIO or above RATIO times the median, no step
+//                            against its neighbours' direction), ends excluded; off stops (the samples stay for check)
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -346,7 +350,7 @@
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
 //   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
 //                            warped or relative pointer)
-//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
+//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|kde_sparse|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
@@ -444,6 +448,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstring>
 #include <utility>
 #include <thread>
 #include <mutex>
@@ -867,6 +872,28 @@ double Demo::query(const std::string& name, bool& known) const {
         const ForgeSphere& p = m.forgespheres[size_t(m.forgespheres[i].parent)];
         return double(glm::distance(m.forgespheres[i].center, p.center) / p.radius);
     }
+    if (name.rfind("forgesphere_len", 0) == 0) { // forgesphere_len2: sphere 2's link length (to its parent), x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 15));
+        if (i == 0 || i >= m.forgespheres.size()) return -1.0;
+        return 1000.0 * double(glm::distance(m.forgespheres[i].center, m.forgespheres[size_t(m.forgespheres[i].parent)].center));
+    }
+    if (name.rfind("forgesphere_depth", 0) == 0) { // forgesphere_depth2: sphere 2's depth in the view, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 17));
+        if (i >= m.forgespheres.size()) return -1.0;
+        const Camera c = app_.partCamera();
+        return 1000.0 * double(glm::dot(m.forgespheres[i].center - c.position(), glm::normalize(c.forward())));
+    }
+    if (name == "forgesphere_snap") return app_.forgesphereSnap_ ? 1.0 : 0.0;
+    if (name.rfind("forgesphere_surface", 0) == 0) { // forgesphere_surface2: sphere 2's centre's gap to the nearest other sphere's surface, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 19));
+        if (i >= m.forgespheres.size()) return -1.0;
+        double best = 1e9;
+        for (size_t j = 0; j < m.forgespheres.size(); ++j)
+            if (j != i)
+                best = std::min(best, std::abs(double(glm::distance(m.forgespheres[i].center, m.forgespheres[j].center)) -
+                                               double(m.forgespheres[j].radius)));
+        return 1000.0 * best;
+    }
     if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
@@ -893,6 +920,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
         return m.triangleCount() ? 100.0 * double(m.quadCount()) / double(m.triangleCount() - m.quadCount()) : 0.0;
+    if (name == "texture_changed") { // texels that differ from the `snapshot`
+        if (!hasTexture(m) || baseTexels_.size() != m.texture->pixels.size()) return -1.0;
+        const std::vector<uint8_t>& px = m.texture->pixels;
+        double n = 0.0;
+        for (size_t i = 0; i < px.size(); i += 4) n += std::memcmp(&px[i], &baseTexels_[i], 4) != 0 ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "texture_painted" || name.rfind("texture_mean_", 0) == 0) {
         if (!hasTexture(m)) return 0.0;
         const std::vector<uint8_t>& px = m.texture->pixels;
@@ -988,6 +1022,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
     if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
     if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
+    if (name == "sculpt_mods") { // the held keys as the sculpting reads them (the classic meanings): Shift 1 + Ctrl 2 + Alt 4
+        const SDL_Keymod k = app_.keyMods();
+        return double(((k & SDL_KMOD_SHIFT) ? 1 : 0) + ((k & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) ? 2 : 0) + ((k & SDL_KMOD_ALT) ? 4 : 0));
+    }
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
     if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
     if (name == "radial_hover") return double(app_.radial_.hover);
@@ -1659,6 +1697,12 @@ double Demo::query(const std::string& name, bool& known) const {
             count += m.maskAt(uint32_t(v)) >= 0.5f && glm::length(m.positions[v] - basePositions_[v]) > 1e-6f ? 1.0 : 0.0;
         return count;
     }
+    if (name == "moved_exact") { // vertices whose position differs in any bit from the `snapshot`
+        if (basePositions_.size() != m.vertexCount()) return -1.0;
+        return double(m.vertexCount() - size_t(std::count_if(basePositions_.begin(), basePositions_.end(), [&](const glm::vec3& b) {
+            return std::memcmp(&b, &m.positions[size_t(&b - basePositions_.data())], sizeof(glm::vec3)) == 0;
+        })));
+    }
     if (name == "moved" || name == "moved_max" || name == "moved_sum" || name == "moved_out") {
         if (basePositions_.size() != m.vertexCount()) return -1.0; // no snapshot, or the topology changed
         double count = 0.0, maxD = 0.0, sum = 0.0, out = 0.0;
@@ -2045,7 +2089,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
-    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, DragTubePoint,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
@@ -2056,7 +2100,7 @@ enum class StepVerb { None,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
-    SpacemouseEcho, PenRest, Shot,
+    SpacemouseEcho, PenRest, ViewTrace, Shot,
 };
 static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
     static const std::unordered_map<std::string_view, StepVerb> verbs = {
@@ -2085,6 +2129,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"action", StepVerb::Action},
         {"set_shortcut", StepVerb::SetShortcut},
         {"expect_shortcut", StepVerb::ExpectShortcut},
+        {"expect_popup_keys", StepVerb::ExpectPopupKeys},
         {"drag_tube_point", StepVerb::DragTubePoint},
         {"drag_forgesphere", StepVerb::DragForgesphere},
         {"drag_landmark", StepVerb::DragLandmark},
@@ -2183,7 +2228,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_sample", StepVerb::PenSample},
         {"pen_lift", StepVerb::PenLift},
         {"spacemouse_echo", StepVerb::SpacemouseEcho},
-        {"pen_rest", StepVerb::PenRest},
+        {"pen_rest", StepVerb::PenRest}, {"view_trace", StepVerb::ViewTrace},
         {"shot", StepVerb::Shot},
     };
     return verbs;
@@ -2794,6 +2839,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::ExpectPopupKeys: { // expect_popup_keys sub|smooth|mask|select KEYS: what the stroke popup's tile shows
+        if (!need(2)) return false;
+        const std::string which = w[1], want = restOf(lineText_, 2);
+        run([this, line, which, want] {
+            const StrokeModifier m = which == "sub" ? StrokeModifier::Sub : which == "smooth" ? StrokeModifier::Smooth
+                                   : which == "mask" ? StrokeModifier::Mask : which == "select" ? StrokeModifier::Select
+                                                                                                : StrokeModifier::Count;
+            if (m == StrokeModifier::Count) return fail(line, "expect_popup_keys takes sub, smooth, mask or select");
+            const std::string got = app_.strokeModifierKeysText(m);
+            if (got != want) fail(line, "the " + which + " tile shows \"" + got + "\", expected \"" + want + "\"");
+        });
+        break;
+    }
     case StepVerb::DragTubePoint: {
         // drag_tube_point K DX DY [seconds] [keep]: press on control point K of the active Tube Part (else the first
         // visible one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click. keep: the button stays down
@@ -2833,15 +2891,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // drag_forgesphere K body|rim|link DX DY [seconds] [right]: press on Forge Sphere K's body (its centre), just
         // inside its outline (the rim band Draw resizes with, #167) or on its link to its parent (halfway across the
         // gap between the surfaces), and drag DX, DY pixels; 0 0 is a click; "right" uses the right button. "hover"
-        // in place of DX DY rests the pointer there (the hint, for shots).
+        // in place of DX DY rests the pointer there (the hint, for shots). events=N sends N pointer moves a frame along
+        // the way, as a fast mouse or pen does (default 1).
         if (!need(3)) return false;
         const int index = int(num(1, 0));
         const bool rim = w[2] == "rim", onLink = w[2] == "link", hoverOnly = w[3] == "hover";
         const float dx = hoverOnly ? 0.0f : num(3, 0), dy = hoverOnly ? 0.0f : num(4, 0), seconds = num(5, 0.4f);
         const Uint8 button = w.size() > 6 && w[6] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        int events = 1;
+        for (size_t k = 4; k < w.size(); ++k)
+            if (w[k].rfind("events=", 0) == 0) events = std::clamp(std::atoi(w[k].c_str() + 7), 1, 64);
         auto start = std::make_shared<ImVec2>();
         auto pressed = std::make_shared<bool>(false);
-        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, start, pressed](float t) {
+        auto lastU = std::make_shared<float>(0.0f);
+        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, events, start, pressed,
+                          lastU](float t) {
             if (t == 0.0f) {
                 const std::vector<ForgeSphere>& zs = app_.doc_.mesh.forgespheres;
                 ImVec2 c;
@@ -2867,7 +2931,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 *pressed = true;
             }
             const float u = std::min(t / seconds, 1.0f);
-            mouseMotion(start->x + dx * u, start->y + dy * u);
+            for (int e = 1; e <= events; ++e) {
+                const float v = *lastU + (u - *lastU) * float(e) / float(events);
+                mouseMotion(start->x + dx * v, start->y + dy * v);
+            }
+            *lastU = u;
             if (t >= seconds) {
                 mouseButton(false, button);
                 return true;
@@ -4143,6 +4211,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseTexels_ = hasTexture(app_.doc_.mesh) ? app_.doc_.mesh.texture->pixels : std::vector<uint8_t>{};
             baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
         break;
@@ -4372,8 +4441,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             huionStream_ = mode == "huion";
-            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : 0;
-            kdeStall_ = 0;
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : mode == "kde_sparse" ? 4 : 0;
+            kdeStall_ = kdeTick_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
         break;
@@ -4694,6 +4763,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::ViewTrace: {
+        if (!need(1)) return false;
+        const std::string mode = w[1];
+        const float ratio = num(2, 3.0f);
+        run([this, mode, ratio, line] {
+            if (mode == "on") {
+                viewTrace_ = true;
+                viewTraceData_.clear();
+            } else if (mode == "off") {
+                viewTrace_ = false;
+            } else {
+                checkViewTrace(line, ratio);
+            }
+        });
+        break;
+    }
     case StepVerb::PenRest: {
         if (!need(1)) return false;
         run([this, on = w[1] != "off"] {
@@ -4840,6 +4925,45 @@ void Demo::penProximity(bool in) {
     app_.handleEvent(e);
 }
 
+// view_trace check (steps in degrees of yaw, pitch and 1/100 units of the target): a steady pen drag turns the view by about the same each sample. A skip is a sample whose step is far
+// below its neighbours' (the view waited, then caught up) or above them, or one against their direction (#216).
+static float traceDot(const Demo::TraceSample& a, const Demo::TraceSample& b) {
+    float d = 0.0f;
+    for (size_t k = 0; k < a.size(); ++k) d += a[k] * b[k];
+    return d;
+}
+static float traceLength(const Demo::TraceSample& a) { return std::sqrt(traceDot(a, a)); }
+
+void Demo::checkViewTrace(int line, float ratio) {
+    const auto& d = viewTraceData_;
+    if (d.size() < 8) return fail(line, "view_trace: only " + std::to_string(d.size()) + " samples");
+    std::vector<Demo::TraceSample> step;
+    for (size_t i = 1; i < d.size(); ++i) {
+        Demo::TraceSample t;
+        for (size_t k = 0; k < t.size(); ++k) t[k] = d[i][k] - d[i - 1][k];
+        for (size_t k = 0; k < 2; ++k) t[k] = t[k] - 360.0f * std::round(t[k] / 360.0f); // (the angles wrap)
+        step.push_back(t);
+    }
+    step.erase(step.begin(), step.begin() + 3); // (the press and the first samples settle)
+    step.pop_back();
+    std::vector<float> len;
+    for (const auto& s : step) len.push_back(traceLength(s));
+    std::vector<float> sorted = len;
+    std::sort(sorted.begin(), sorted.end());
+    const float med = sorted[sorted.size() / 2];
+    if (med < 0.01f) return fail(line, "view_trace: the view moved in fewer than half the samples (median step " + std::to_string(med) + "): it waits, then catches up");
+    for (size_t i = 0; i < step.size(); ++i) {
+        const bool against = i > 0 && traceDot(step[i], step[i - 1]) < 0.0f;
+        if (len[i] < med / ratio || len[i] > med * ratio || against)
+            return fail(line, "view_trace: sample " + std::to_string(i) + " moved the view " + std::to_string(len[i]) + (against ? " against the one before" : "") +
+                                  " (median " + std::to_string(med) + "; steps " + [&] {
+                                      std::string all;
+                                      for (size_t k = 0; k < len.size() && k < 16; ++k) all += (k ? " " : "") + std::to_string(int(len[k] * 10.0f) / 10.0f).substr(0, 5);
+                                      return all;
+                                  }() + ")");
+    }
+}
+
 void Demo::penMove(float x, float y) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_MOTION;
@@ -4852,8 +4976,12 @@ void Demo::penMove(float x, float y) {
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
     // ... and the driver moves it too (kde_stalled: its pointer sends one move after a button, then no more: #216)
-    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0)))
+    // (kde_sparse: its pointer reports every third pen sample only, as a compositor that sends the pointer once a frame does)
+    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0) &&
+                        (kdeStream_ != 4 || ++kdeTick_ % 3 == 0)))
         mouseMotion(x, y, kDriverMouse);
+    if (viewTrace_) app_.flushPenMotion(); // (the frame's end does it before the view is drawn: what the frame shows)
+    if (viewTrace_) viewTraceData_.push_back({glm::degrees(app_.camera_.yaw), glm::degrees(app_.camera_.pitch), app_.camera_.target.x * 100.0f, app_.camera_.target.y * 100.0f, app_.camera_.target.z * 100.0f}); // (view_trace)
     if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
         lateRight_ = false;
         mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);

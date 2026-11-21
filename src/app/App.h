@@ -427,6 +427,7 @@ private:
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
+    std::vector<uint8_t>* strokeHitProbe_ = nullptr; // ... and whether it reached the surface (Help > Benchmark: 0 = off the model)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
@@ -478,6 +479,7 @@ private:
         DabSettings settings;
         std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
         std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
+        std::vector<uint8_t>* hitProbe = nullptr; // ... and whether each reached the surface
         // The batch's last dab on the Part's mesh: written by the solver thread (dabAt), read by the main thread once
         // the batch is done (the hand-over orders them), for lastStrokeLocal_.
         mutable glm::vec3 lastHit{0.0f};
@@ -1780,6 +1782,9 @@ private:
     void drawForgeSpheresContents();                          // Tool > Forge Spheres
     bool forgesphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void forgesphereDragTo(float x, float y);
+    void flushForgeSphereDrag();                                // the pointer's moves since the last frame, as one
+    void forgesphereShow(const std::vector<ForgeSphere>& s);    // a drag's armature on screen (in place when it can)
+    glm::vec3 forgesphereGrab(float x, float y, const glm::vec3& center) const; // Move: the centre's offset from the press
     void forgesphereRelease();
     void drawForgeSphereOverlay();                            // the hovered sphere's outline
     bool forgesphereActive() const { return !doc_.mesh.forgespheres.empty(); }
@@ -1788,6 +1793,8 @@ private:
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
     ForgeSphereMode forgesphereMode_ = ForgeSphereMode::Draw;
     bool forgespherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    bool forgesphereSnap_ = false;      // Move: a moved sphere's centre lands on the sphere under the pointer
+    bool forgesphereBranch_ = false;    // Move: what grows from a moved sphere comes along
     int forgesphereHint_ = 0;           // the overlay's hint: what a Draw drag would do (0 none, 1 move, 2 resize, 3 add)
     int forgesphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
     // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
@@ -1820,6 +1827,9 @@ private:
         float rimFrom = 0.0f;          // Draw's resize: the press's screen distance from the sphere's centre
         int added = -1;                // Draw: the new sphere's index
         const char* label = "";
+        bool pendingMove = false;      // a pointer move waits for the frame (flushForgeSphereDrag)
+        float atX = 0.0f, atY = 0.0f;  // ... where the pointer is
+        bool keepLength = false;       // Move: Shift held at the last update (its link keeps its length)
     } zsDrag_;
     // Tube (PanelTube.cpp, core/Tube.h): with Draw Tube on, a left-drag anywhere draws a clay tube in the air (on a
     // plane facing the view, or snapped onto surfaces); a Tube Part's points are dragged to move them (Ctrl: resize,
@@ -2958,6 +2968,10 @@ private:
     int measureKeyNavStep(bool& draw); // --measure-key-nav, once a loop pass: -1 running, else the exit code
     void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
+    void noteViewInsideAnotherPart();                // after Frame: the camera sits inside another Part (an eye in its head)
+    void notePressOnAnotherPart(float x, float y);   // a press the brush ignored because another Part is under it
+    uint64_t pressHintKey_ = 0;                      // ... (active Part id << 32 | the other's) it last said, and when:
+    Uint64 pressHintNs_ = 0;                         //     once per pair per half minute, orbiting over Parts is normal
     void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)
     Uint64 lastFrameKeyNs_ = 0;
     void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
@@ -3292,6 +3306,7 @@ private:
     void strokePopupKeyUp(SDL_Keycode key);
     void drawStrokePopup();
     bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
     struct StrokePopupOpen {

@@ -26,7 +26,9 @@ still navigates. The brush ring is hidden; the sphere under the cursor gets an o
 
 - **Click** a sphere to grow a new one from it, half its size, on the surface where you clicked.
 - **Drag** a sphere's middle to move it.
-- **Drag near its edge** (the outer band of the outline) to resize it: the edge follows the cursor.
+- **Drag its very edge** (a thin rim inside the outline, which thickens when the pointer is on it) to resize it:
+  the edge follows the cursor. A sphere drawn small on screen has no rim, so all of it moves; zoom in or use
+  **Scale** to resize it.
 
 The cursor and a small tag beside it (*drag: move*, *drag: resize*) show what a drag will do before you press.
 The **Move** and **Scale** modes are still there in **Tool > Forge Spheres** for when you want one action only:
@@ -34,7 +36,7 @@ The **Move** and **Scale** modes are still there in **Tool > Forge Spheres** for
 | Mode | On a sphere | On a link |
 |---|---|---|
 | **Draw** | Click to grow a new sphere; drag the middle to move it, the edge to resize it | Click to add a joint halfway along the link, and drag to place it |
-| **Move** | Drag to move it across the screen. The links stretch to follow | Moves the sphere at the end of the link |
+| **Move** | Drag to move it across the screen at its depth. The links stretch to follow | Moves the sphere at the end of the link |
 | **Scale** | Drag up or right to make it bigger, down or left to make it smaller | Scales the sphere at the end of the link |
 
 In every mode, <kbd>Alt</kbd>+click a sphere to delete it together with everything that grows from it. The root
@@ -43,6 +45,23 @@ sphere (orange) always stays.
 **Symmetry** (<kbd>X</kbd>) mirrors every edit: grow an arm on the right and the left one grows with it, move a
 leg and its twin moves too. A sphere on the centre line stays on it, and a new sphere placed closer to the centre
 line than its own radius snaps onto it as one sphere instead of two overlapping twins.
+
+## Moving spheres
+
+A dragged sphere stays under the pointer at its depth in the view (it doesn't drift nearer or farther as it
+crosses the screen), and follows the pointer as smoothly on a long tail or many fingers as on a few spheres. Three
+ways to control where it goes, in Draw and Move alike:
+
+- Hold <kbd>Shift</kbd> while you drag to swing the sphere around the sphere it grows from: its link keeps its
+  length, so you can aim a limb or bend a tail joint without changing its proportions. Press or let go of Shift
+  in the middle of a drag; the sphere goes on from where it is.
+- **Snap to Surface** (Tool > Forge Spheres): a moved sphere's centre lands on the surface of the sphere under the
+  pointer, half sunk in, as a new sphere is. Use it to seat a head or a limb on the body. Off every other sphere, it
+  moves at its depth as usual.
+- **Move Branch** (Tool > Forge Spheres): everything that grows from the moved sphere comes along and keeps its
+  shape: drag a leg and its foot follows, drag the body and the whole figure moves.
+
+With Symmetry on, the twin follows every move live.
 
 Every drag is one step of the Part's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
 you added, moved or scaled.

@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.10:</strong> sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes on dense Micro levels respond faster, and 16 new Creature Skin brushes arrive (<a href="https://sculptforge.app/guide/layers.md">how it works</a>)
+  <strong>New in 0.13.11:</strong> forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again (<a href="https://sculptforge.app/guide/forge-spheres.md">how it works</a>)
 </p>
 
 <p align="center">

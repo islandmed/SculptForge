@@ -1,0 +1,79 @@
+# Holding Shift with the Paint brush (Sculpt off) NEVER changes the shape, on any Part (member bug: on a Part that paints
+# into a texture, Shift smoothed the shape and dented his spikes). On a vertex Part and on a texture Part: after a Shift
+# stroke every vertex position is bit-identical (moved_exact == 0). On the texture Part Shift smooths the COLOUR: the
+# texels under the brush change (texture_changed; that they even out is tests/test_texture.cpp), one undo step per stroke. Negative control: with a sculpt brush
+# (Paint off) the same Shift stroke does move the shape, so moved_exact can fail.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+run set_color color=ff0000
+action draw.paint
+expect_value paint_mode == 1
+stroke 0.3 0.4 0.7 0.4
+run set_color color=0000ff
+stroke 0.3 0.5 0.7 0.5
+snapshot
+hold shift
+stroke 0.28 0.4 0.72 0.6
+stroke 0.28 0.6 0.72 0.4
+hold none
+expect_value moved_exact == 0
+
+# The texture Part (a fresh sphere: no vertex colours under it).
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+expect_value paint_texture == 1
+expect_value texture_size == 1024
+run set_color color=ff0000
+stroke 0.3 0.4 0.7 0.4
+stroke 0.3 0.5 0.7 0.5
+run set_color color=0000ff
+stroke 0.35 0.45 0.65 0.45
+stroke 0.3 0.55 0.7 0.55
+run set_color color=00ff00
+stroke 0.4 0.35 0.4 0.65
+stroke 0.5 0.35 0.5 0.65
+stroke 0.6 0.35 0.6 0.65
+snapshot
+remember texture_painted painted
+shot texture-before
+
+hold shift
+stroke 0.28 0.4 0.72 0.6
+stroke 0.28 0.6 0.72 0.4
+hold none
+expect_value moved_exact == 0
+expect_value texture_changed > 500
+shot texture-after
+
+# One undo step per stroke (two above): the texels back exactly, the shape never moved.
+key ctrl+z
+key ctrl+z
+expect_value texture_changed == 0
+expect_value moved_exact == 0
+
+# Shift over bare white lays nothing and moves nothing.
+hold shift
+stroke 0.05 0.9 0.2 0.9
+hold none
+expect_value texture_painted == $painted
+expect_value moved_exact == 0
+
+# Let go of Shift: the brush paints again.
+run set_color color=ffffff
+stroke 0.4 0.5 0.6 0.5
+expect_value texture_painted != $painted
+key ctrl+z
+
+# Negative control: a sculpt brush (Paint off, Rgb off) with Shift smooths the SHAPE.
+action draw.paint
+expect_value paint_mode == 0
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+snapshot
+hold shift
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved_exact > 0
+shot sculpt-shift

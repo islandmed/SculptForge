@@ -200,6 +200,9 @@ glm::vec3 sampleTextureAt(const Mesh& mesh, uint32_t triangle, const glm::vec3& 
 // end() moves the undo tiles into the stroke's record. Within a stroke each texel keeps its coverage
 // (repeated dabs build up as vertex paint does) and is computed from its colour before the stroke, so 8-bit
 // storage never stalls on small strengths.
+struct SmoothTopo;  // (Texture.cpp)
+struct SmoothWindow; // (Texture.cpp)
+
 class TexturePainter {
 public:
     // False (and nothing starts) when the mesh doesn't paint into a texture or the target layer is locked/hidden.
@@ -214,6 +217,14 @@ public:
     // The same with a material: every channel the brush has and the texture enables gets its value (BaseColor
     // only when `material.channels` has it), with the same falloff, coverage and undo.
     size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym);
+    // Smooth colour (Shift with the Paint brush): blends the colour texels under the brush toward the average of their
+    // neighbours by falloff x strength x pressure x (1 - mask), with symmetry, on the active layer (its coverage
+    // smooths too). "Neighbours" are the UV-island texels within the mesh's mean triangle edge in texels, so a stroke
+    // smears as far as the same stroke does on vertex colours, and across UV seams (a texel next to an island's border
+    // averages the colours of the surface that continues on the other side, found through the mesh). Each dab reads the texels as the last one left them,
+    // so a drag keeps smoothing.
+    // Touches no material channel and never the shape. Needs begin(mesh, channelBit(BaseColor)). Returns texels changed.
+    size_t smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
     // Ends the stroke: the touched tiles become `record.textureTiles` (nothing when no texel changed).
     void end(UndoRecord& record);
 
@@ -232,6 +243,8 @@ private:
         std::vector<float> coverage;   // stroke coverage per texel
         std::vector<uint32_t> stamp;   // last dab that wrote the texel
         std::array<ChannelTile, kChannelCount> channels; // [c] valid when the stroke paints channel c
+        std::vector<uint32_t> pendingTexel; // smoothDab: the texels (in tile) the dab computed, written once all are
+        std::vector<uint32_t> pendingRgba;  // and their new values (RGBA bytes)
     };
     // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
     TileImage* channelTarget(PaintTexture& tex, int c) const;
@@ -251,10 +264,11 @@ private:
     // the BVH leaves (no per-triangle work), then paints every texel of those tiles from its cached triangle and
     // barycentrics (PaintTexture::texelMaps), tiles in parallel. Costs the texels reached, not the triangles.
     struct DabContext;
-    bool useTilePath(const Mesh& mesh, PaintTexture& tex) const;
-    template <class Paint> // paint(tile record, texel in tile, x, y, coverage)
+    bool useTilePath(const Mesh& mesh, PaintTexture& tex, bool force = false) const;
+    template <class Paint> // paint(tile record, texel in tile, x, y, coverage, this dab's weight)
     size_t dabTiles(const DabContext& ctx, const Paint& paint, bool composite,
-                    std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects);
+                    std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects,
+                    const std::function<void(const std::vector<uint32_t>&)>* prepare = nullptr); // (called with the tiles the dab reaches, before any texel)
     std::vector<uint32_t> touched_;     // tiles a dab reaches
     std::vector<uint8_t> touchedFlag_;  // per tile
     // The tile's stroke record, made on first touch (thread-safe).
@@ -273,6 +287,11 @@ private:
     std::unique_ptr<std::atomic<Tile*>[]> tilePtr_; // the same tiles, for lock-free lookups from the band threads
     std::mutex tileMutex_;                          // guards making a tile
     uint32_t dab_ = 0;
+    int smoothRadius_ = 0;                        // smoothDab: the largest blur radius in texels (0: not worked out yet this stroke)
+    std::vector<std::vector<float>> smoothBlur_; // smoothDab: per tile, the box-blurred colour sums of the dab
+    uint64_t smoothKey_ = 0;                      // smoothDab: what the cached tile windows were built for (the radii)
+    std::vector<uint8_t> smoothIslandK_;          // smoothDab: the blur's radius in texels per UV island (the same 3D reach on every chart)
+    std::shared_ptr<const SmoothTopo> smoothTopo_; // smoothDab: the UV islands and the triangles around each vertex (cached by UV layout)
     std::vector<uint32_t> tris_;
     std::vector<DabTri> dabTris_;
     std::vector<std::vector<uint32_t>> bandTris_; // per 16-row band: indices into dabTris_, in serial order

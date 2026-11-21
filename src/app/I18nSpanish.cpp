@@ -2371,6 +2371,16 @@ constexpr Entry kSpanish[] = {
      "reflejada."},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "Arrastra una esfera hacia arriba o la derecha para agrandarla, hacia abajo o la izquierda para achicarla."},
+    {"Drag a sphere to move it; it stays under the pointer at its depth and the links stretch to follow. Hold Shift to swing it around the sphere it grows from (its link keeps its length). Symmetry moves its mirror twin too.",
+     "Arrastra una esfera para moverla; se queda bajo el puntero a su profundidad y los enlaces se estiran para seguirla. Mantén Shift para girarla alrededor de la esfera de la que crece (su enlace conserva la longitud). La simetría mueve también su gemela."},
+    {"Snap to Surface",
+     "Ajustar a superficie"},
+    {"Move Branch",
+     "Mover rama"},
+    {"Moving a sphere puts its centre on the surface of the sphere under the pointer (off them, it moves at its depth as usual). Handy for seating a head or limb on the body.",
+     "Al mover una esfera, su centro se coloca sobre la superficie de la esfera bajo el puntero (fuera de ellas, se mueve a su profundidad como siempre). Útil para asentar una cabeza o una extremidad en el cuerpo."},
+    {"Moving a sphere carries everything that grows from it along, keeping its shape: drag a leg and the foot comes too, drag the body and the whole creature moves. Off, only the sphere moves and its links stretch.",
+     "Al mover una esfera, todo lo que crece de ella la acompaña y conserva su forma: arrastra una pierna y el pie la sigue; arrastra el cuerpo y se mueve toda la criatura. Desactivado, solo se mueve la esfera y sus enlaces se estiran."},
     {"Drag places child", "Arrastrar coloca hija"},
     {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
      "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
@@ -3606,11 +3616,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles solo llegan a la superficie unida al punto bajo el cursor, dentro del tamaño del pincel: la otra "
      "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian. Se "
      "guarda con las preferencias y el proyecto."},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "La atenuación del pincel se mide en pantalla: se alcanza todo lo que está dentro del círculo del pincel, a "
-     "través del modelo y por detrás, como un cilindro en la dirección de la vista. "
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "La atenuación del pincel se mide en pantalla, como un cilindro en la dirección de la vista. Mover y Agarrar "
+     "alcanzan todo lo que está dentro del círculo del pincel, a través del modelo y por detrás; los demás pinceles "
+     "se detienen entre 1,5 y 3 radios de pincel detrás de la superficie bajo el cursor. "
      "Activa también Solo conectado para limitarlo a una pieza."},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+arrastrar pinta la máscara con el pincel; Ctrl+Alt+arrastrar la borra. Ctrl+arrastrar en el fondo la "
@@ -4304,6 +4315,14 @@ constexpr Entry kSpanish[] = {
      "  Diseñando el pincel%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "El %.1f%% de los téxeles no encontró superficie: sube Delante / Detrás"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "El %.1f%% del mapa no encontró superficie: sube la distancia de búsqueda a Delante %.1f%%, Detrás %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "Distancia automática: Delante %.1f%%, Detrás %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "Hacer bake de nuevo con la distancia sugerida"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "Algunos téxeles del último bake no encontraron superficie porque la distancia de búsqueda era demasiado corta. Desactiva la distancia automática, ajusta Delante y Detrás a las distancias que alcanzan la malla de alta resolución y haz bake de nuevo."},
     {"%d commands",
      "%d comandos"},
     {"%d items",
