@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SculptForge Benchmarks</title>
-  <meta name="description" content="Sculpting 6 to 805 million triangles in SculptForge, measured: frame times, stroke lag, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
+  <meta name="description" content="Sculpting 6 to 805 million triangles in SculptForge, measured: frame times, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
   <meta property="og:title" content="SculptForge benchmarks: a public scene pack, 6M to 201M triangles, measured on real computers">
-  <meta property="og:description" content="Frame time p50/p95/p99, stroke lag, worst stall and memory on a 33 million triangle head and micro-level scenes up to 805 million. Download the scene pack, run one command and compare for yourself.">
+  <meta property="og:description" content="Frame time p50/p95/p99, worst stall and memory on a 33 million triangle head and micro-level scenes up to 805 million. Download the scene pack, run one command and compare for yourself.">
   <meta property="og:url" content="https://sculptforge.app/benchmarks/">
   <link rel="canonical" href="https://sculptforge.app/benchmarks/">
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
@@ -107,7 +107,7 @@ sculptforge --benchmark-pack sculptforge-bench-pack-1 --out results.json</code><
     </ul>
     <p class="small" style="margin-bottom:0">Each scene gets the same scripted pen strokes (Clay at three sizes, Move, Smooth, a 240 px brush, an orbit) through the code a real pen uses.
       The file lists your CPU, graphics card and driver, memory and operating system (read by the program, nothing typed), the
-      SculptForge version and, per scene and stroke, frame time p50 / p95 / p99, frames a second, stroke lag and the slowest frame.
+      SculptForge version and, per scene and stroke, frame time p50 / p95 / p99, frames a second and the slowest frame. Stroke timings are being re-measured.
       The format: <a href="https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md#the-scene-pack">docs/benchmark.md</a>.</p>
   </div>
 
@@ -163,8 +163,7 @@ sculptforge --benchmark core-100m</code></pre></li>
     </div>
     <div class="card small">
       <strong>The numbers.</strong> <em>Frame p50 / p95 / p99</em>: time per frame, the median and the slow ones
-      you'd feel (16.7 ms is 60 fps). <em>Lag</em>: how far the stroke on screen trails the pointer, in pixels along
-      the path. <em>Worst stall</em>: the longest the screen froze, including lifting the pen. <em>Peak RAM</em>:
+      you'd feel (16.7 ms is 60 fps). <em>Stroke lag</em>: not shown; Stroke timings are being re-measured. <em>Worst stall</em>: the longest the screen froze, including lifting the pen. <em>Peak RAM</em>:
       the most memory SculptForge held; <em>GPU</em>: its vertex and index buffers (on unified-memory machines like
       Apple silicon these share RAM). Lower is better everywhere.
     </div>
@@ -184,7 +183,7 @@ sculptforge --benchmark core-100m</code></pre></li>
   </div>
   <p class="small muted">Worst stall, peak RAM and GPU memory are for the whole run of that size (every stroke).
     Colours: green within a 60 Hz frame (16.7 ms), amber within two, red slower. Raw data:
-    <a href="results.json">results.json</a>.</p>
+    <a href="results.json">results.json</a>. Stroke timings are being re-measured, so the lag column is hidden (the raw files below still hold the program's own lag fields, from the older method).</p>
 
   <h2 id="sizes">Dab time and view speed by mesh size</h2>
   <div class="scroll">
@@ -303,8 +302,6 @@ python3 tools/benchmark/submit.py add result.json \
     { h: "Frame p50", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p50), cls((ph.frame_ms || {}).p50)), key: ({ ph }) => (ph.frame_ms || {}).p50 },
     { h: "p95", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p95), cls((ph.frame_ms || {}).p95)), key: ({ ph }) => (ph.frame_ms || {}).p95 },
     { h: "p99", num: true, cell: ({ ph }) => td(ms((ph.frame_ms || {}).p99), cls((ph.frame_ms || {}).p99)), key: ({ ph }) => (ph.frame_ms || {}).p99 },
-    { h: "Lag p50", num: true, cell: ({ ph, phase }) => td(phase === "orbit" ? "-" : px((ph.lag_px || {}).p50)), key: ({ ph, phase }) => (phase === "orbit" ? null : (ph.lag_px || {}).p50) },
-    { h: "p95", num: true, cell: ({ ph, phase }) => td(phase === "orbit" ? "-" : px((ph.lag_px || {}).p95)), key: ({ ph, phase }) => (phase === "orbit" ? null : (ph.lag_px || {}).p95) },
     { h: "Worst stall", num: true, cell: ({ stall }) => td(ms(stall), num(stall) ? (stall <= 100 ? "ok" : stall <= 500 ? "meh" : "slow") : ""), key: ({ stall }) => stall },
     { h: "Peak RAM", num: true, cell: ({ run }) => td(mb(run.peak_ram_mb)), key: ({ run }) => run.peak_ram_mb },
     { h: "GPU", num: true, cell: ({ gpuMb }) => td(mb(gpuMb)), key: ({ gpuMb }) => gpuMb },
