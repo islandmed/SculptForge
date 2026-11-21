@@ -885,6 +885,17 @@ float viewDepthFade(const glm::vec3& x, const glm::vec3& center, const glm::vec3
     const float depth = std::abs(glm::dot(x - center, viewDir)) / l;
     return std::clamp((1.0f - depth / radius) * 4.0f, 0.0f, 1.0f);
 }
+// The brushes that add or cut along the normal (Standard, Inflate, Crease, Pinch, Sharp Crease) under View falloff leave what
+// lies deeper along the view than 3 radii from the cursor (the far side of a head or a sphere, seen after orbiting; gh#229
+// follow-up), full strength to 1.5 radii. A function of the place alone, so neighbouring points keep neighbouring weights, and
+// a wide, smooth band: a gate on which way a vertex faces, or a steep one, tore underhangs (nose, lips, jaw over the neck) from
+// the surface beside them, as these brushes move a vertex by about a radius.
+float viewAdditiveFade(const glm::vec3& x, const glm::vec3& center, const glm::vec3& viewDir, float radius) {
+    const float l = glm::length(viewDir);
+    if (!(l > 1e-12f) || !(radius > 0.0f)) return 1.0f;
+    const float t = std::clamp((std::abs(glm::dot(x - center, viewDir)) / l / radius - 1.5f) / 1.5f, 0.0f, 1.0f);
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
 } // namespace
 
 void Sculptor::displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence,
@@ -1350,8 +1361,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // cursor along the view (viewDepthFade): the cylinder's far side stays where it is (gh#229).
     const bool planeReach = p.viewFalloff && (type == BrushType::Clay || type == BrushType::ClayBlock ||
                                               type == BrushType::Flatten || type == BrushType::Trim);
+    const bool depthReach = p.viewFalloff && (type == BrushType::Standard || type == BrushType::Inflate || type == BrushType::Crease ||
+                                               type == BrushType::Pinch || type == BrushType::SharpCrease);
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
         float reachFade = 1.0f;
+        if (depthReach) {
+            reachFade = viewAdditiveFade(x, p.center, p.viewDir, r);
+            if (reachFade <= 0.0f) return glm::vec3(0.0f);
+        }
         if (planeReach) {
             reachFade = std::clamp((1.0f - std::abs(glm::dot(x - areaCenter, areaNormal)) / r) * 4.0f, 0.0f, 1.0f) *
                         viewDepthFade(x, p.center, p.viewDir, r);
@@ -2132,7 +2149,12 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         case BrushRecipe::Direction::Stroke: dir = strokeDir; break;
         default: dir = areaNormal; break;
         }
-        glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f);
+        // (View falloff, no plane: as dabSingle's Standard, the far side stays; the drag keeps the whole circle)
+        const float depthFade = p.viewFalloff && r.plane == BrushRecipe::Plane::None &&
+                                        (r.direction == BrushRecipe::Direction::Normal || r.direction == BrushRecipe::Direction::Inflate)
+                                    ? viewAdditiveFade(x, p.center, p.viewDir, rad)
+                                    : 1.0f;
+        glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f * depthFade);
 
         // Crisp edge: a Flatten plane only cuts (a member's ask: it never raises or adds clay, at any depth; the
         // regular Flatten brush is the one that fills). A point below the plane stays where it is, so no dip is
