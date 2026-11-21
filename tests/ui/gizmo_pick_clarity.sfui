@@ -4,7 +4,7 @@
 # Streamlined (the 1440 and 2880 runs are in CMakeLists.txt).
 run new_sphere subdivisions=5
 key f
-key numpad1
+camera 0 0
 run gizmo_mode mode=all
 expect_value gizmo_mode == 4
 wait 0.3
@@ -18,8 +18,8 @@ expect_value gizmo_hover == 1
 gizmo_hover move_y
 expect_value gizmo_hover == 2
 
-# Turned 25 degrees: the X ring is a rim-only ring, picked out past the arrow heads, and lights up there.
-orbit 25 0
+# Turned 25 degrees (camera YAW PITCH, in degrees): the X ring is a rim-only ring, picked out past the arrow heads, and lights up there.
+camera 25 0
 wait 0.3
 gizmo_hover rotate_x
 expect_value gizmo_hover == 8
@@ -27,12 +27,12 @@ shot rim-classic
 
 # The same in Streamlined.
 run ui_look look=forge scheme=neutral layout=sculptforge
-key numpad1
+camera 0 0
 wait 0.3
 shot front-streamlined
 gizmo_hover rotate_view
 expect_value gizmo_hover == 11
-orbit 25 0
+camera 25 0
 wait 0.3
 gizmo_hover rotate_x
 expect_value gizmo_hover == 8

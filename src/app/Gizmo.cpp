@@ -1027,7 +1027,7 @@ void App::drawGizmo() {
             const float face = std::abs(glm::dot(f[i], toEye));
             const ga::Screen::Axis::RingPick pickMode = all ? ga::ringPickFor(face) : ga::Screen::Axis::RingFull;
             const bool faded = pickMode == ga::Screen::Axis::RingFaded;
-            const float fade = faded ? 0.2f : all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
+            const float fade = faded ? 0.32f : all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
             const ImU32 front = withAlpha(col, fade), back = withAlpha(col, faded ? 0.1f : all ? 0.18f : 0.28f);
             const ImU32 rest = withAlpha(col, fade * 0.45f); // (the rim-only ring's part that does not pick)
             const float w = hot ? thick + 0.8f * s : all ? 2.2f * s : thick;
