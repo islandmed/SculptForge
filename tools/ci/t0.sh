@@ -64,6 +64,17 @@ stage=test
 case "${GITHUB_REF_NAME:-}" in t0/push/*) tier=push ;; esac; [ "${SF_T0_TIER:-}" = push ] && tier=push
 tierarg=(); grep -q -- '--tier' tools/test/impacted.py && tierarg=(--tier "$tier")
 mapfile -t files < <(git diff --name-only "$base" "$tip")
+# Without the precompiled standard headers, on the packages' standard library (tools/ci/iwyu_lite.py): the build above has the
+# PCH, which hides a missing #include <cstring> that breaks only the Ubuntu 22.04 packages (0.13.11 stage). Only the changed
+# C++ files and the .cpp files that include a changed header; seconds. g++-11 = 22.04's libstdc++ (t0.yml installs it).
+if printf '%s\n' "${files[@]}" | grep -qE '^(src|tests)/.*\.(cpp|cc|h|hpp)$' && [ -f tools/ci/iwyu_lite.py ]; then
+  stage=iwyu; t=$(date +%s)
+  if python3 -I tools/ci/iwyu_lite.py --build build ${SF_IWYU_CXX:+--cxx "$SF_IWYU_CXX"} -j 4 --max-fanout 40 --files "${files[@]}" > "$out/iwyu.log" 2>&1; then
+    echo "T0: $(head -1 "$out/iwyu.log") ($(($(date +%s) - t)) s)"; stage=test
+  else
+    cat "$out/iwyu.log"; cp "$out/iwyu.log" "$out/output.txt"; failed=iwyu_lite; finish
+  fi
+fi
 git diff -U0 "$base" "$tip" -- CMakeLists.txt > "$out/cmake.diff" # (test-only CMake edits run just those tests)
 regex=""; [ ${#files[@]} -gt 0 ] && regex=$(python3 tools/test/impacted.py --build build --base "$base" -v --cmake-diff "$out/cmake.diff" "${tierarg[@]}" \
   --files "${files[@]}" 2> "$out/impacted.log")
