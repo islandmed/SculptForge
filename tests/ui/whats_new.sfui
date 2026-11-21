@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.13.10"
-expect_text "Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive."
+expect_text "Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes respond faster on dense Micro levels, and 16 new Creature Skin brushes arrive."
 expect_text "Version 0.13.9"
 expect_text "The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes."
 expect_text "Version 0.13.8"

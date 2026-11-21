@@ -219,6 +219,16 @@ void App::registerBakeUiActions() {
         "UVs, in the background. Maps are saved as PNGs (displacement also as a 32-bit EXR, position as a 16-bit PNG) "
         "in the output folder, one set per UDIM tile when the UVs use them, and the normal map shows on the model.",
         "bake");
+    add("bake.again_suggested", "Bake Again with Suggested Distance", [this] {
+            const BakeResult& r = *bake_->result;
+            bake_->settings.autoDistance = false;
+            bake_->frontPct = std::clamp(100.0f * r.suggestFront / r.diagonal, 0.1f, 20.0f);
+            bake_->rearPct = std::clamp(100.0f * r.suggestRear / r.diagonal, 0.1f, 20.0f);
+            startBake();
+        },
+        nullptr, [this] { return !bake_->job && bake_->result && bake_->result->hasSuggestion() && bake_->result->diagonal > 0.0f; },
+        "Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance "
+        "off, set Front and Rear to the distances that reach the high-poly for them, and bake again.");
     add("bake.cancel", "Cancel Bake", [this] {
             if (bake_->job) bake_->job->cancel->store(true);
         },
@@ -548,10 +558,19 @@ void App::drawBakeContents() {
         ImGui::TextDisabled(tr("%dx%d in %.1f s from %zu tris"), r.width, r.height, r.seconds, r.sourceTriangles);
         if (r.has(BakeMap::Displacement))
             ImGui::TextDisabled(tr("Displacement: mid-grey = 0, white = +%.4g"), double(r.displacementScale));
-        if (r.missRatio() >= 0.0005f) {
+        if (r.autoDistance && r.diagonal > 0.0f)
+            ImGui::TextDisabled(tr("Auto distance: Front %.1f%%, Rear %.1f%%"), double(100.0f * r.front / r.diagonal),
+                                double(100.0f * r.rear / r.diagonal));
+        if (r.missRatio() >= BakeResult::kMissWarn) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::color::danger));
-            ImGui::TextWrapped(tr("%.1f%% of texels found no surface: raise Front / Rear"), double(100.0f * r.missRatio()));
+            if (r.hasSuggestion() && r.diagonal > 0.0f)
+                ImGui::TextWrapped(tr("%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%"),
+                                   double(100.0f * r.missRatio()), double(100.0f * r.suggestFront / r.diagonal),
+                                   double(100.0f * r.suggestRear / r.diagonal));
+            else
+                ImGui::TextWrapped(tr("%.1f%% of texels found no surface: raise Front / Rear"), double(100.0f * r.missRatio()));
             ImGui::PopStyleColor();
+            if (r.hasSuggestion()) ui::ActionButton(*this, "bake.again_suggested", ImVec2(-1, 0));
         }
         ImGui::Checkbox(tr("Preview Normal Map"), &b.preview);
         ui::HelpAction(*this, "bake.preview");

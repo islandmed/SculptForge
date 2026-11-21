@@ -3208,10 +3208,11 @@ constexpr Entry kTraditionalChinese[] = {
      "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "筆刷只影響與游標下的點相連、且在筆刷大小內的表面：另一條腿、旁邊的手指或隔著縫隙的嘴唇都保持不變。隨偏好設定與專案儲存。"},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "筆刷衰減以螢幕測量：筆刷圓圈內的一切都會受影響，會穿過模型到背面，如同沿視線方向的圓柱。"
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "筆刷衰減以螢幕測量，如同沿視線方向的圓柱。移動和抓取會影響筆刷圓圈內的一切，穿過模型直到背面；"
+     "其他筆刷止於游標下表面之後約 1.5 至 3 倍筆刷半徑處。"
      "同時開啟「僅限相連」即可限制在單一區塊。"},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+拖曳以筆刷繪製遮罩；Ctrl+Alt+拖曳擦除遮罩。在背景上 Ctrl+拖曳可清除遮罩。"},
@@ -3871,6 +3872,14 @@ constexpr Entry kTraditionalChinese[] = {
      "  正在設計筆刷%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "%.1f%% 的紋素找不到表面：請提高前方 / 後方"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "貼圖中有 %.1f%% 未找到表面:請將搜尋距離提高到 前方 %.1f%%、後方 %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "自動距離:前方 %.1f%%、後方 %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "以建議距離重新烘焙"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "上次烘焙中有部分像素因搜尋距離過短而未找到表面。請關閉自動距離,將前方和後方設為能夠到達高模的距離,然後重新烘焙。"},
     {"%d commands",
      "%d 個指令"},
     {"%d items",

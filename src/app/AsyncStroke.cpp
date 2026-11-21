@@ -85,6 +85,7 @@ void App::StrokeSolver::loop() {
         }
         probe.clear();
         radiusProbe.clear();
+        hitProbe.clear();
         double spent = 0.0;
         const SculptTimings before = app.doc_.sculptor.timings;
         view.lastHitSeen = false;
@@ -299,6 +300,7 @@ void App::commitSolverBatch() {
     }
     if (strokeProbe_) strokeProbe_->insert(strokeProbe_->end(), s.probe.begin(), s.probe.end());
     if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
+    if (strokeHitProbe_) strokeHitProbe_->insert(strokeHitProbe_->end(), s.hitProbe.begin(), s.hitProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
@@ -360,6 +362,7 @@ void App::pumpStroke() {
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
+        s.view.hitProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.setPersistentUpload(uiPrefs_.fastUpload);
@@ -388,6 +391,7 @@ void App::pumpStroke() {
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
+        s.view.hitProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.bindStrokeUpload(s.uploadId, s.upload);
@@ -417,6 +421,7 @@ void App::pumpStroke() {
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
     s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
+    s.view.hitProbe = strokeHitProbe_ ? &s.hitProbe : nullptr;
     s.view.settings = dabSettings();
     s.uploadId = doc_.activePartInfo().id;
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);

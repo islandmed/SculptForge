@@ -59,6 +59,7 @@
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
+//   expect_popup_keys sub|smooth|mask|select KEYS  the keys the stroke popup's tile shows, e.g. expect_popup_keys sub Ctrl
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
@@ -144,6 +145,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
 //                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
@@ -233,7 +235,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -443,6 +445,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstring>
 #include <utility>
 #include <thread>
 #include <mutex>
@@ -730,6 +733,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
     if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
+    if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
@@ -913,6 +917,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
         return m.triangleCount() ? 100.0 * double(m.quadCount()) / double(m.triangleCount() - m.quadCount()) : 0.0;
+    if (name == "texture_changed") { // texels that differ from the `snapshot`
+        if (!hasTexture(m) || baseTexels_.size() != m.texture->pixels.size()) return -1.0;
+        const std::vector<uint8_t>& px = m.texture->pixels;
+        double n = 0.0;
+        for (size_t i = 0; i < px.size(); i += 4) n += std::memcmp(&px[i], &baseTexels_[i], 4) != 0 ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "texture_painted" || name.rfind("texture_mean_", 0) == 0) {
         if (!hasTexture(m)) return 0.0;
         const std::vector<uint8_t>& px = m.texture->pixels;
@@ -1008,6 +1019,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
     if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
     if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
+    if (name == "sculpt_mods") { // the held keys as the sculpting reads them (the classic meanings): Shift 1 + Ctrl 2 + Alt 4
+        const SDL_Keymod k = app_.keyMods();
+        return double(((k & SDL_KMOD_SHIFT) ? 1 : 0) + ((k & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) ? 2 : 0) + ((k & SDL_KMOD_ALT) ? 4 : 0));
+    }
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
     if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
     if (name == "radial_hover") return double(app_.radial_.hover);
@@ -1679,6 +1694,12 @@ double Demo::query(const std::string& name, bool& known) const {
             count += m.maskAt(uint32_t(v)) >= 0.5f && glm::length(m.positions[v] - basePositions_[v]) > 1e-6f ? 1.0 : 0.0;
         return count;
     }
+    if (name == "moved_exact") { // vertices whose position differs in any bit from the `snapshot`
+        if (basePositions_.size() != m.vertexCount()) return -1.0;
+        return double(m.vertexCount() - size_t(std::count_if(basePositions_.begin(), basePositions_.end(), [&](const glm::vec3& b) {
+            return std::memcmp(&b, &m.positions[size_t(&b - basePositions_.data())], sizeof(glm::vec3)) == 0;
+        })));
+    }
     if (name == "moved" || name == "moved_max" || name == "moved_sum" || name == "moved_out") {
         if (basePositions_.size() != m.vertexCount()) return -1.0; // no snapshot, or the topology changed
         double count = 0.0, maxD = 0.0, sum = 0.0, out = 0.0;
@@ -2065,7 +2086,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
-    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, DragTubePoint,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
@@ -2105,6 +2126,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"action", StepVerb::Action},
         {"set_shortcut", StepVerb::SetShortcut},
         {"expect_shortcut", StepVerb::ExpectShortcut},
+        {"expect_popup_keys", StepVerb::ExpectPopupKeys},
         {"drag_tube_point", StepVerb::DragTubePoint},
         {"drag_forgesphere", StepVerb::DragForgesphere},
         {"drag_landmark", StepVerb::DragLandmark},
@@ -2811,6 +2833,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             std::string got = app_.actions_.shortcutText(id);
             if (!app_.actions_.find(id)) fail(line, "no action " + id);
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
+        });
+        break;
+    }
+    case StepVerb::ExpectPopupKeys: { // expect_popup_keys sub|smooth|mask|select KEYS: what the stroke popup's tile shows
+        if (!need(2)) return false;
+        const std::string which = w[1], want = restOf(lineText_, 2);
+        run([this, line, which, want] {
+            const StrokeModifier m = which == "sub" ? StrokeModifier::Sub : which == "smooth" ? StrokeModifier::Smooth
+                                   : which == "mask" ? StrokeModifier::Mask : which == "select" ? StrokeModifier::Select
+                                                                                                : StrokeModifier::Count;
+            if (m == StrokeModifier::Count) return fail(line, "expect_popup_keys takes sub, smooth, mask or select");
+            const std::string got = app_.strokeModifierKeysText(m);
+            if (got != want) fail(line, "the " + which + " tile shows \"" + got + "\", expected \"" + want + "\"");
         });
         break;
     }
@@ -4173,6 +4208,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseTexels_ = hasTexture(app_.doc_.mesh) ? app_.doc_.mesh.texture->pixels : std::vector<uint8_t>{};
             baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
         break;

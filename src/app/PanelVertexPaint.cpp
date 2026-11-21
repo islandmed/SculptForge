@@ -424,7 +424,8 @@ const BrushRecipe* App::strokeRecipe() const {
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
     if (strokeColourSmooth_) { // Smooth's own Intensity (dabAt put it in p.strength); the shape stays where it is
-        paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
+        if (texturePainter_.active()) texturePainter_.smoothDab(doc_.mesh, doc_.bvh, p, symmetry_);
+        else if (!paintsTexture(doc_.mesh)) paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
         return;
     }
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
@@ -442,7 +443,7 @@ void App::beginPaintStroke() {
     if (strokePaint_ && !strokeColourSmooth_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
     const Mesh& m = doc_.mesh;
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
-        if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {
+        if (!texturePainter_.begin(doc_.mesh, strokeColourSmooth_ ? channelBit(Channel::BaseColor) : doc_.paintMaterial.channels)) {
             const PaintTexture& t = *m.texture;
             if (!(doc_.paintMaterial.channels & enabledChannelMask(t)))
                 status_ = "The brush paints no channel this texture has (Color > Material)";

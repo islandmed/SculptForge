@@ -670,3 +670,144 @@ TEST(texture_dab_sharpness_does_not_depend_on_mesh_density) {
     std::printf("  square alpha at 1K: %d edge texels across the row (2 edges)\n", ramp);
     CHECK(ramp <= 2 * 2);
 }
+
+// --- Smooth colour on a texture (Shift with the Paint brush): TexturePainter::smoothDab ---
+
+namespace {
+
+// Hash noise over the whole base (or the layer's) texels, opaque.
+void noisyTexels(std::vector<uint8_t>& px) {
+    for (size_t i = 0; i < px.size() / 4; ++i) {
+        const uint32_t h = uint32_t(i) * 2654435761u;
+        px[i * 4] = uint8_t(h >> 8), px[i * 4 + 1] = uint8_t(h >> 16), px[i * 4 + 2] = uint8_t(h >> 24);
+        px[i * 4 + 3] = 255;
+    }
+}
+
+// Variance of the red channel of the texels whose 3D point is within [r0, r1) of the origin.
+double redVariance(const PaintTexture& t, float r0, float r1) {
+    double sum = 0.0, sum2 = 0.0;
+    size_t n = 0;
+    for (int y = 0; y < t.height; ++y)
+        for (int x = 0; x < t.width; ++x) {
+            const float d = glm::length(planePoint(t, x, y));
+            if (d < r0 || d >= r1) continue;
+            const double v = texel(t, x, y)[0];
+            sum += v, sum2 += v * v, ++n;
+        }
+    const double mean = sum / double(n);
+    return sum2 / double(n) - mean * mean;
+}
+
+} // namespace
+
+TEST(texture_smooth_dab_evens_out_the_texels_under_the_brush_only) {
+    Document doc = makeDoc(texturedPlane(24, 256));
+    Mesh& m = doc.mesh;
+    noisyTexels(m.texture->pixels);
+    const std::vector<uint8_t> before = m.texture->pixels;
+    const std::vector<glm::vec3> shape = m.positions;
+    const float r = 0.4f;
+    const double inside0 = redVariance(*m.texture, 0.0f, r * 0.7f), ring0 = redVariance(*m.texture, r * 1.1f, 0.9f);
+    CHECK(inside0 > 1500.0);
+
+    TexturePainter painter;
+    CHECK(painter.begin(m, channelBit(Channel::BaseColor)));
+    double last = inside0;
+    for (int i = 0; i < 5; ++i) {
+        CHECK(painter.smoothDab(m, doc.bvh, dab(glm::vec3(0.0f), r, 0.8f), Symmetry{false, false, false}) > 0);
+        const double v = redVariance(*m.texture, 0.0f, r * 0.7f);
+        CHECK(v < last); // every dab smooths further
+        last = v;
+    }
+    UndoRecord rec;
+    rec.label = "Paint";
+    painter.end(rec);
+    doc.undo.push(std::move(rec));
+    std::printf("  texel variance under the brush %.0f -> %.0f over 5 dabs\n", inside0, last);
+    CHECK(last < inside0 * 0.25);
+    // Outside the brush every texel is as it was, and so is the shape.
+    const PaintTexture& t = *m.texture;
+    bool outsideSame = true;
+    for (int y = 0; y < t.height; ++y)
+        for (int x = 0; x < t.width; ++x)
+            if (glm::length(planePoint(t, x, y)) > r * 1.02f)
+                outsideSame = outsideSame && std::memcmp(texel(t, x, y), &before[(size_t(y) * 256 + size_t(x)) * 4], 4) == 0;
+    CHECK(outsideSame);
+    CHECK(redVariance(t, r * 1.1f, 0.9f) == ring0);
+    CHECK(m.positions == shape);
+    // One stroke is one undo step.
+    const std::vector<uint8_t> after = t.pixels;
+    CHECK(doc.undo.undo(m, doc.bvh));
+    CHECK(m.texture->pixels == before);
+    CHECK(doc.undo.redo(m, doc.bvh));
+    CHECK(m.texture->pixels == after);
+}
+
+TEST(texture_smooth_dab_keeps_mask_symmetry_and_layers) {
+    const Symmetry none{false, false, false};
+    // Masked texels (x < 0) stay as they were; the free side smooths.
+    {
+        Document doc = makeDoc(texturedPlane(32, 256));
+        Mesh& m = doc.mesh;
+        noisyTexels(m.texture->pixels);
+        m.ensureMask();
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) m.mask[v] = m.positions[v].x < -0.01f ? 1.0f : 0.0f;
+        doc.bvh.build(m);
+        const std::vector<uint8_t> before = m.texture->pixels;
+        TexturePainter painter;
+        CHECK(painter.begin(m, channelBit(Channel::BaseColor)));
+        for (int i = 0; i < 3; ++i) painter.smoothDab(m, doc.bvh, dab(glm::vec3(0.0f), 0.5f, 1.0f), none);
+        UndoRecord rec;
+        painter.end(rec);
+        bool maskedSame = true, freeChanged = false;
+        for (int y = 0; y < 256; ++y)
+            for (int x = 0; x < 256; ++x) {
+                const glm::vec3 p = planePoint(*m.texture, x, y);
+                const bool same = std::memcmp(texel(*m.texture, x, y), &before[(size_t(y) * 256 + size_t(x)) * 4], 4) == 0;
+                if (p.x < -2.0f / 32.0f) maskedSame = maskedSame && same;
+                if (p.x > 0.1f && glm::length(p) < 0.3f) freeChanged = freeChanged || !same;
+            }
+        CHECK(maskedSame);
+        CHECK(freeChanged);
+    }
+    // X symmetry: the mirrored spot smooths too.
+    {
+        Document doc = makeDoc(texturedPlane(24, 256));
+        Mesh& m = doc.mesh;
+        noisyTexels(m.texture->pixels);
+        const std::vector<uint8_t> before = m.texture->pixels;
+        TexturePainter painter;
+        CHECK(painter.begin(m, channelBit(Channel::BaseColor)));
+        painter.smoothDab(m, doc.bvh, dab(glm::vec3(0.5f, 0, 0), 0.2f, 1.0f), Symmetry{true, false, false});
+        UndoRecord rec;
+        painter.end(rec);
+        size_t left = 0, right = 0;
+        for (int y = 0; y < 256; ++y)
+            for (int x = 0; x < 256; ++x)
+                if (std::memcmp(texel(*m.texture, x, y), &before[(size_t(y) * 256 + size_t(x)) * 4], 4) != 0) (x < 128 ? left : right)++;
+        CHECK(left > 100 && right > 100);
+    }
+    // The active layer: its texels (colour and coverage) smooth, the Base under it does not, the composite follows.
+    {
+        Document doc = makeDoc(texturedPlane(24, 256));
+        CommandRegistry reg;
+        CHECK(reg.execute(doc, "paint_layer_add", {{"name", std::string("Top")}}).ok);
+        Mesh& m = doc.mesh;
+        CHECK(m.texture->layers.size() == 1);
+        noisyTexels(m.texture->layers[0].rgba);
+        const std::vector<uint8_t> baseBefore = m.texture->base, layerBefore = m.texture->layers[0].rgba;
+        TexturePainter painter;
+        CHECK(painter.begin(m, channelBit(Channel::BaseColor)));
+        for (int i = 0; i < 3; ++i) CHECK(painter.smoothDab(m, doc.bvh, dab(glm::vec3(0.0f), 0.4f, 0.8f), none) > 0);
+        UndoRecord rec;
+        painter.end(rec);
+        doc.undo.push(std::move(rec));
+        CHECK(m.texture->base == baseBefore);
+        CHECK(m.texture->layers[0].rgba != layerBefore);
+        // (a normal-blend opaque layer: the composite is the layer)
+        CHECK(texel(*m.texture, 128, 128)[0] == m.texture->layers[0].rgba[(size_t(128) * 256 + 128) * 4]);
+        CHECK(doc.undo.undo(m, doc.bvh));
+        CHECK(m.texture->layers[0].rgba == layerBefore);
+    }
+}

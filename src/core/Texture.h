@@ -214,6 +214,11 @@ public:
     // The same with a material: every channel the brush has and the texture enables gets its value (BaseColor
     // only when `material.channels` has it), with the same falloff, coverage and undo.
     size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym);
+    // Smooth colour (Shift with the Paint brush): blends the colour texels under the brush toward the average of their
+    // neighbours (3x3, UV islands only) by falloff x strength x pressure x (1 - mask), with symmetry, on the active
+    // layer (its coverage smooths too). Each dab reads the texels as the last one left them, so a drag keeps smoothing.
+    // Touches no material channel and never the shape. Needs begin(mesh, channelBit(BaseColor)). Returns texels changed.
+    size_t smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
     // Ends the stroke: the touched tiles become `record.textureTiles` (nothing when no texel changed).
     void end(UndoRecord& record);
 
@@ -232,6 +237,8 @@ private:
         std::vector<float> coverage;   // stroke coverage per texel
         std::vector<uint32_t> stamp;   // last dab that wrote the texel
         std::array<ChannelTile, kChannelCount> channels; // [c] valid when the stroke paints channel c
+        std::vector<uint32_t> pendingTexel; // smoothDab: the texels (in tile) the dab computed, written once all are
+        std::vector<uint8_t> pendingRgba;   // and their new values
     };
     // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
     TileImage* channelTarget(PaintTexture& tex, int c) const;
@@ -251,8 +258,8 @@ private:
     // the BVH leaves (no per-triangle work), then paints every texel of those tiles from its cached triangle and
     // barycentrics (PaintTexture::texelMaps), tiles in parallel. Costs the texels reached, not the triangles.
     struct DabContext;
-    bool useTilePath(const Mesh& mesh, PaintTexture& tex) const;
-    template <class Paint> // paint(tile record, texel in tile, x, y, coverage)
+    bool useTilePath(const Mesh& mesh, PaintTexture& tex, bool force = false) const;
+    template <class Paint> // paint(tile record, texel in tile, x, y, coverage, this dab's weight)
     size_t dabTiles(const DabContext& ctx, const Paint& paint, bool composite,
                     std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects);
     std::vector<uint32_t> touched_;     // tiles a dab reaches
