@@ -1,12 +1,13 @@
 {
-  "version": "0.13.9",
+  "version": "0.13.10",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "The Gizmo and the Move brush now follow the pen on meshes of millions of triangles",
-    "Crisp Flatten cuts ridges and steep walls clean, with Symmetry on too",
-    "Quad Remesh finishes on grainy, scanned sculpts, and Cancel stops it at once",
-    "Big micro levels settle back to a smooth view right after your strokes"
+    "Sculpt layers travel to Blender and back as shape keys, with names and order kept",
+    "Hold Shift with the Paint brush to blend colours smoothly",
+    "Long Clay strokes on dense Micro levels keep up with your pen",
+    "Voxel Remesh lets you proceed when memory is tight, and timelapses keep your Micro level strokes",
+    "16 new Creature Skin brushes for scales, hide and pores, made by request"
   ],
   "support": {
     "founding": {
