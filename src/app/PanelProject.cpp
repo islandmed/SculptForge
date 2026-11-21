@@ -1064,7 +1064,9 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
-        ImGui::TextDisabled("%s %s", kFreeReleaseNote, tr("Members get betas early.")); // memberships (Support.h)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)); // wrapped: the sentence is long
+        ImGui::TextWrapped("%s %s", kFreeReleaseNote, tr("Members get early builds, like SculptForge for Android today.")); // memberships (Support.h)
+        ImGui::PopStyleColor();
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;

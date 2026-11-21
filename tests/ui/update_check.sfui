@@ -10,7 +10,7 @@ wait_idle 20
 expect_text "SculptForge 99.0.0 is available"
 expect_text "bug-fix and security releases go out to everyone the same day"
 expect "Become a member"
-expect_text "Members get betas early."
+expect_text "Members get early builds, like SculptForge for Android today."
 expect_text "Twice as fast"
 expect "Download"
 shot update-banner

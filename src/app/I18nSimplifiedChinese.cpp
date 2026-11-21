@@ -1319,12 +1319,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "向 SculptForge 网站确认是否有新版本。SculptForge 每天也会自动检查一次（偏好设置 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、许可，以及 SculptForge 所使用的开源组件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge 免费且将一直免费。成为会员可获得 Beta 版与抢先版本、Member Requests（每月一个请求，先为你开发并列出你的名字）、投票决定下"
-     "一步开发内容，以及名列致谢名单：会在浏览器中打开 sculptforge.app/support.html。无论如何，应用程序本身都不会有任"
-     "何改变。"},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge 免费且将始终免费。加入会员可获得抢先版本（如现在的 Android 版 SculptForge）、Member Requests（每月一个请求，先为你开发并列出你的名字）、投票决定接下来开发的内容，以及在致谢名单中列入你的名字：在浏览器中打开 sculptforge.app/support.html。无论如何，应用内的内容均保持不变。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "SculptForge 官方 Discord 社区：提问、技巧与进行中的作品。会在浏览器中打开邀请链接。错误报告仍请使用“报告问题”"
@@ -2314,7 +2310,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Pack on", "启用资源包"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "关闭：其项目会从列表中移除，直到你再次启用（不会删除任何内容）。"},
-    {"Free for everyone. Members get betas and a vote on what's next.", "人人免费使用。会员可抢先体验测试版，并投票决定接下来的开发方向。"},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "对所有人免费。会员可获得抢先版本（如现在的 Android 版 SculptForge），并可投票决定后续内容。"},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "按住 Ctrl，将光标移至任何控件上，即可查看其功能。Shift+F1 随时打开用户指南。"},
     {"Opens in your browser.", "在浏览器中打开。"},
     {"Your art is never uploaded or used for training.", "你的作品绝不会被上传或用于训练。"},
@@ -2524,7 +2521,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Swap the left and right expressions (and the head's turn), if the character winks with the wrong eye.",
      "交换左右表情（与头部转向），用于角色眨错眼睛时。"},
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
-    {"Members get betas early.", "会员可抢先获取 Beta 版。"},
+    {"Members get early builds, like SculptForge for Android today.",
+     "会员可获得抢先版本，如现在的 Android 版 SculptForge。"},
     {"Become a member", "成为会员"},
     {"Featured creator", "特色创作者"},
     {"Hide this video.", "隐藏此视频。"},
@@ -4436,8 +4434,6 @@ constexpr Entry kSimplifiedChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 换了新外观"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge 是免费的。会员可抢先获得测试版和早期版本、投票决定接下来开发什么、提出会员请求（每月一个，先为你开发并列出你的名字），并列名于致谢名单。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜索笔刷（鳞片、皮肤、石头...）"},
     {"Selection brushes (Ctrl+Shift)",

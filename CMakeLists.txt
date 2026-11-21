@@ -1119,6 +1119,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
     # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
     add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
+    # Member betas are paused: no member-facing copy (app strings, guide, README, site) promises them; exceptions in
+    # tools/ci/betas_allow.txt, each with a reason.
+    add_test(NAME betas_paused COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py)
+    add_test(NAME betas_paused_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py --self-test)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # Our email address stays off everything public (website/, docs/, README*): hello@ is a private support inbox.
     add_test(NAME public_email COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py
@@ -1594,6 +1598,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
     sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
+    # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
+    sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
+    sculptforge_ui_test(betas_wording_2880 betas_wording --size 2880x1620)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
     sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
