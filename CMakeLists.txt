@@ -1621,7 +1621,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
-    # The popup's key labels per input style (gh#233) at 200%: the 2880 shots.
+    # The popup's key labels per input style (gh#233) at 100% and 200%: the 1440 and 2880 shots.
+    sculptforge_ui_test(stroke_popup_style_keys_1440 stroke_popup_style_keys --size 1440x810)
     sculptforge_ui_test(stroke_popup_style_keys_2880 stroke_popup_style_keys --size 2880x1620)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
     sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
