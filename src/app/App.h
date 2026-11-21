@@ -3292,6 +3292,7 @@ private:
     void strokePopupKeyUp(SDL_Keycode key);
     void drawStrokePopup();
     bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
     struct StrokePopupOpen {

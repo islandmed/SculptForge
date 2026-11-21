@@ -59,6 +59,7 @@
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
 //   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
+//   expect_popup_keys sub|smooth|mask|select KEYS  the keys the stroke popup's tile shows, e.g. expect_popup_keys sub Ctrl
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
@@ -233,7 +234,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -986,6 +987,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
     if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
     if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
+    if (name == "sculpt_mods") { // the held keys as the sculpting reads them (the classic meanings): Shift 1 + Ctrl 2 + Alt 4
+        const SDL_Keymod k = app_.keyMods();
+        return double(((k & SDL_KMOD_SHIFT) ? 1 : 0) + ((k & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) ? 2 : 0) + ((k & SDL_KMOD_ALT) ? 4 : 0));
+    }
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
     if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
     if (name == "radial_hover") return double(app_.radial_.hover);
@@ -2043,7 +2048,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
-    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, DragTubePoint,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
@@ -2083,6 +2088,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"action", StepVerb::Action},
         {"set_shortcut", StepVerb::SetShortcut},
         {"expect_shortcut", StepVerb::ExpectShortcut},
+        {"expect_popup_keys", StepVerb::ExpectPopupKeys},
         {"drag_tube_point", StepVerb::DragTubePoint},
         {"drag_forgesphere", StepVerb::DragForgesphere},
         {"drag_landmark", StepVerb::DragLandmark},
@@ -2789,6 +2795,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             std::string got = app_.actions_.shortcutText(id);
             if (!app_.actions_.find(id)) fail(line, "no action " + id);
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
+        });
+        break;
+    }
+    case StepVerb::ExpectPopupKeys: { // expect_popup_keys sub|smooth|mask|select KEYS: what the stroke popup's tile shows
+        if (!need(2)) return false;
+        const std::string which = w[1], want = restOf(lineText_, 2);
+        run([this, line, which, want] {
+            const StrokeModifier m = which == "sub" ? StrokeModifier::Sub : which == "smooth" ? StrokeModifier::Smooth
+                                   : which == "mask" ? StrokeModifier::Mask : which == "select" ? StrokeModifier::Select
+                                                                                                : StrokeModifier::Count;
+            if (m == StrokeModifier::Count) return fail(line, "expect_popup_keys takes sub, smooth, mask or select");
+            const std::string got = app_.strokeModifierKeysText(m);
+            if (got != want) fail(line, "the " + which + " tile shows \"" + got + "\", expected \"" + want + "\"");
         });
         break;
     }

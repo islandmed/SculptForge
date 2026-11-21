@@ -429,10 +429,12 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, then 
 
 | Modifier | What it does | Instead of holding |
 |---|---|---|
-| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> |
+| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> (<kbd>Ctrl</kbd> in the Blender and Maya styles) |
 | **Smooth** | Strokes smooth. | <kbd>Shift</kbd> |
-| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
+| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> (<kbd>Alt</kbd> in the Blender style, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> in Maya) |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
+
+The keys are the ones your input style (**Edit > Preferences > Input > Style**) uses; each tile's corner shows them.
 
 **Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask**, **Rectangle Mask** and **Circle Mask** turn Mask on with that
 shape, **Cut Line**, **Cut Lasso**, **Cut Rect**, **Cut Circle** and **Cut Polyline** turn Select on with that Cut shape. A plain drag

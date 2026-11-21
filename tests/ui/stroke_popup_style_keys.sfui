@@ -1,0 +1,87 @@
+# The stroke popup's Sub / Smooth / Mask / Select tiles show the keys of the ACTIVE input style (gh#233, @Velisariy: with
+# the Blender style the popup still read Alt / Ctrl). core/StrokePopup.h holds one row per style; here each style's row is
+# checked against what the sculpting really does with those keys held: sculpt_mods is the held keys as the brushes read
+# them (Shift 1 = smooth, Ctrl 2 = mask, Alt 4 = sub, Ctrl+Shift 3 = select), and a shot of the open popup per style.
+run new_sphere subdivisions=3
+camera 0 0
+hover_window 0.5 0.5
+
+# --- SculptForge (the default) and Classic: Alt, Shift, Ctrl, Ctrl+Shift.
+input_style sculptforge
+expect_popup_keys sub Alt
+expect_popup_keys smooth Shift
+expect_popup_keys mask Ctrl
+expect_popup_keys select Ctrl+Shift
+hold alt
+expect_value sculpt_mods == 4
+hold shift
+expect_value sculpt_mods == 1
+hold ctrl
+expect_value sculpt_mods == 2
+hold ctrl+shift
+expect_value sculpt_mods == 3
+hold none
+key g
+expect_value stroke_popup_open == 1
+shot sculptforge
+key escape
+
+input_style classic
+expect_popup_keys sub Alt
+expect_popup_keys smooth Shift
+expect_popup_keys mask Ctrl
+expect_popup_keys select Ctrl+Shift
+hold alt
+expect_value sculpt_mods == 4
+hold ctrl
+expect_value sculpt_mods == 2
+hold none
+key g
+expect_value stroke_popup_open == 1
+shot classic
+key escape
+
+# --- Blender: Ctrl inverts (Sub), Alt masks, Shift smooths, Ctrl+Shift selects. (Z opens the popup there.)
+input_style blender
+expect_popup_keys sub Ctrl
+expect_popup_keys smooth Shift
+expect_popup_keys mask Alt
+expect_popup_keys select Ctrl+Shift
+hold ctrl
+expect_value sculpt_mods == 4
+hold shift
+expect_value sculpt_mods == 1
+hold alt
+expect_value sculpt_mods == 2
+hold ctrl+shift
+expect_value sculpt_mods == 3
+hold none
+key z
+expect_value stroke_popup_open == 1
+shot blender
+key escape
+
+# --- Maya: Ctrl inverts, Ctrl+Alt masks, Shift smooths, Ctrl+Shift selects.
+input_style maya
+expect_popup_keys sub Ctrl
+expect_popup_keys smooth Shift
+expect_popup_keys mask Ctrl+Alt
+expect_popup_keys select Ctrl+Shift
+hold ctrl
+expect_value sculpt_mods == 4
+hold shift
+expect_value sculpt_mods == 1
+hold ctrl+alt
+expect_value sculpt_mods == 2
+hold ctrl+shift
+expect_value sculpt_mods == 3
+hold none
+key g
+expect_value stroke_popup_open == 1
+shot maya
+key escape
+
+# --- Back to a style with the same keys as before: the tiles follow at once (no restart).
+input_style sculptforge
+expect_popup_keys sub Alt
+expect_popup_keys mask Ctrl
