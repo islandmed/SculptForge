@@ -31,6 +31,27 @@ int forgesphereOfGroup(uint32_t group, bool* link = nullptr);
 // and the spheres coloured (the root a little warmer). Carries `spheres` in Mesh::Forge Spheres.
 Mesh forgesphereDisplayMesh(const std::vector<ForgeSphere>& spheres);
 
+// A drag's redraw (once a frame, so moving a sphere stays smooth on long chains): moves the vertices of the spheres
+// whose centre or size differs between m.forgespheres and `s`, and of the links touching them, in place, updates their
+// normals and marks them for the GPU, and sets m.forgespheres = s; `moved` gets those vertices (for BVH::refit). The
+// cost follows what moved, not the armature's size. False, leaving `m` alone, when `m` isn't the display mesh of an
+// armature with the same tree and links: build it again with forgesphereMesh.
+bool forgesphereDisplayUpdate(Mesh& m, const std::vector<ForgeSphere>& s, std::vector<uint32_t>* moved = nullptr);
+
+// How a moved sphere keeps its depth.
+enum class ForgeSphereDepth {
+    View,       // on the plane through where it started, facing the view: the same depth, 1:1 under the pointer
+    KeepLength, // on the sphere around its parent through where it started, on the half (towards the view or away) it
+                // started in: its link keeps its length (the root: View)
+    Surface,    // its centre on the surface of the sphere under the pointer (not itself, its twins or what grows from
+                // them), half sunk in as a new sphere is; off every other sphere, as View
+};
+// Where a Move drag puts sphere `i`'s centre (before symmetry) for the pointer's ray o + t*d (d unit length): the
+// grabbed point, `grab` from the centre the drag started at (start[i]), follows the ray. `forward` is the view's
+// direction (unit length); `sym` names the twins Surface skips. start[i]'s centre for a ray through the grabbed point.
+glm::vec3 forgesphereMoveTarget(const std::vector<ForgeSphere>& start, int i, const glm::vec3& grab, const glm::vec3& o,
+                                const glm::vec3& d, const glm::vec3& forward, ForgeSphereDepth depth, Symmetry sym);
+
 // The skin over the armature: watertight quads, `resolution` cells across its longest side, `smooth` Taubin passes,
 // one face group per link (the root sphere's own group when there are no links). A plain mesh (no Forge Spheres).
 Mesh forgesphereSkin(const std::vector<ForgeSphere>& spheres, int resolution = 128, int smooth = 2);
@@ -52,6 +73,9 @@ bool forgesphereAdd(std::vector<ForgeSphere>& spheres, int parent, const glm::ve
                 int* added = nullptr);
 // Moves and resizes sphere `i`; a sphere on a mirror plane stays on it.
 bool forgesphereSet(std::vector<ForgeSphere>& spheres, int i, const glm::vec3& center, float radius, Symmetry sym);
+// Moves sphere `i` as forgesphereSet does (its size kept) and everything that grows from it along with it: each
+// moved sphere's branch shifts by as much as it did, so the branch keeps its shape (a leg with its foot).
+bool forgesphereMoveBranch(std::vector<ForgeSphere>& s, int i, const glm::vec3& center, Symmetry sym);
 // Deletes sphere `i` and everything that grows from it (never the root).
 bool forgesphereDelete(std::vector<ForgeSphere>& spheres, int i, Symmetry sym);
 // Inserts a sphere halfway along the link from `child` to its parent; `added` gets its index.

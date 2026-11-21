@@ -108,9 +108,16 @@ void appendPart(Mesh& dst, const Mesh& src, uint32_t group, const vec3& color) {
     dst.facegroups.insert(dst.facegroups.end(), src.triangles.size(), group);
 }
 
-Mesh unitSphere() {
+const Mesh& unitSphere() {
     static const Mesh sphere = makeIcosphere(3, 1.0f);
     return sphere;
+}
+
+// The display mesh draws link i (child i to its parent) unless its spheres share a centre.
+bool linkDrawn(const std::vector<ForgeSphere>& s, size_t i) {
+    const ForgeSphere& c = s[i];
+    const ForgeSphere& p = s[size_t(c.parent)];
+    return glm::length(c.center - p.center) >= 1e-6f * (c.radius + p.radius);
 }
 
 // An open tapered tube from a (radius ra) to b (rb).
@@ -179,7 +186,7 @@ Mesh forgesphereDisplayMesh(const std::vector<ForgeSphere>& s) {
     for (size_t i = 1; i < s.size(); ++i) {
         const ForgeSphere& c = s[i];
         const ForgeSphere& p = s[size_t(c.parent)];
-        if (glm::length(c.center - p.center) < 1e-6f * (c.radius + p.radius)) continue;
+        if (!linkDrawn(s, i)) continue;
         appendPart(m, tube(p.center, c.center, kLinkThickness * p.radius, kLinkThickness * c.radius),
                    kForgeSphereLinkGroup + uint32_t(i), kLinkColor);
     }
@@ -187,6 +194,123 @@ Mesh forgesphereDisplayMesh(const std::vector<ForgeSphere>& s) {
     m.recomputeAllNormals();
     m.forgespheres = s;
     return m;
+}
+
+bool forgesphereDisplayUpdate(Mesh& m, const std::vector<ForgeSphere>& s, std::vector<uint32_t>* moved) {
+    const std::vector<ForgeSphere>& old = m.forgespheres;
+    if (m.forgespherePreview || old.size() != s.size() || !forgespheresValidate(s).empty()) return false;
+    const size_t sphereVerts = unitSphere().positions.size(), linkVerts = 2 * size_t(kLinkSides);
+    size_t links = 0;
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i].parent != old[i].parent) return false;
+        if (i > 0) {
+            if (linkDrawn(s, i) != linkDrawn(old, i)) return false;
+            links += linkDrawn(s, i);
+        }
+    }
+    if (m.positions.size() != s.size() * sphereVerts + links * linkVerts || m.triangles.empty()) return false;
+    std::vector<char> changed(s.size(), 0);
+    for (size_t i = 0; i < s.size(); ++i) changed[i] = s[i].center != old[i].center || s[i].radius != old[i].radius;
+    std::vector<uint32_t> verts;
+    const std::vector<vec3>& unit = unitSphere().positions;
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (!changed[i]) continue;
+        const uint32_t base = uint32_t(i * sphereVerts);
+        for (size_t k = 0; k < sphereVerts; ++k) {
+            m.positions[base + k] = s[i].center + unit[k] * s[i].radius;
+            verts.push_back(base + uint32_t(k));
+        }
+    }
+    uint32_t base = uint32_t(s.size() * sphereVerts);
+    for (size_t i = 1; i < s.size(); ++i) {
+        if (!linkDrawn(s, i)) continue;
+        const ForgeSphere& c = s[i];
+        const ForgeSphere& p = s[size_t(c.parent)];
+        if (changed[i] || changed[size_t(c.parent)]) {
+            const Mesh t = tube(p.center, c.center, kLinkThickness * p.radius, kLinkThickness * c.radius);
+            for (size_t k = 0; k < linkVerts; ++k) {
+                m.positions[base + k] = t.positions[k];
+                verts.push_back(base + uint32_t(k));
+            }
+        }
+        base += uint32_t(linkVerts);
+    }
+    m.updateNormals(verts);
+    m.forgespheres = s;
+    if (moved) *moved = std::move(verts);
+    return true;
+}
+
+vec3 forgesphereMoveTarget(const std::vector<ForgeSphere>& start, int i, const vec3& grab, const vec3& o0, const vec3& d,
+                           const vec3& forward, ForgeSphereDepth depth, Symmetry sym) {
+    if (!validIndex(start, i)) return vec3(0.0f);
+    const vec3 c0 = start[size_t(i)].center;
+    const vec3 o = o0 + grab; // the centre's ray: the grabbed point's, shifted by the grab
+    // View: the plane through the starting centre, facing the view.
+    const float dn = glm::dot(d, forward);
+    const float tv = std::abs(dn) > 1e-12f ? glm::dot(c0 - o, forward) / dn : glm::dot(c0 - o, d);
+    const vec3 onView = o + d * std::max(tv, 0.0f);
+    // Where the centre's ray meets the sphere at `at`, radius r: the hit nearest `near`; false for a miss.
+    const auto raySphere = [&](const vec3& at, float r, const vec3& near, vec3& hit, float* t = nullptr) {
+        const vec3 oc = o - at;
+        const float b = glm::dot(oc, d), c = glm::dot(oc, oc) - r * r, disc = b * b - c;
+        if (disc < 0.0f) return false;
+        const float q = std::sqrt(disc), t1 = -b - q, t2 = -b + q;
+        if (t2 < 0.0f) return false;
+        const vec3 h1 = o + d * t1, h2 = o + d * t2;
+        const bool first = t1 >= 0.0f && glm::distance(h1, near) <= glm::distance(h2, near);
+        hit = first ? h1 : h2;
+        if (t) *t = first ? t1 : t2;
+        return true;
+    };
+    // A sphere on a mirror plane stays on it (as forgesphereSet keeps it): a point on the sphere at `at`, radius r,
+    // goes onto that plane and back onto the sphere, which keeps it on both when the sphere sits on the plane too.
+    vec3 plane(1.0f); // 0 for each axis whose mirror plane holds sphere i
+    for (const vec3& m : otherMirrors(sym))
+        if (forgesphereMirror(start, i, m) == i)
+            for (int a = 0; a < 3; ++a)
+                if (m[a] < 0.0f) plane[a] = 0.0f;
+    const auto keepOnPlane = [&](const vec3& c, const vec3& at, float r) {
+        if (plane == vec3(1.0f)) return c;
+        const vec3 out = c * plane - at;
+        return glm::length(out) > 1e-12f ? at + out * (r / glm::length(out)) : c;
+    };
+    if (depth == ForgeSphereDepth::KeepLength && i > 0) {
+        const vec3 p = start[size_t(start[size_t(i)].parent)].center;
+        const float len = glm::distance(c0, p);
+        if (len <= 1e-12f) return onView;
+        // The half of that sphere it started in (towards the view or away): the hit there, so it never flips
+        // between front and back; the two meet at the silhouette, so it moves on smoothly past it.
+        const vec3 oc = o - p;
+        const float b = glm::dot(oc, d), disc = b * b - (glm::dot(oc, oc) - len * len);
+        if (disc >= 0.0f) {
+            const bool back = glm::dot(c0 - p, forward) > 0.0f;
+            const float t = -b + (back ? 1.0f : -1.0f) * std::sqrt(disc);
+            if (t >= 0.0f) return keepOnPlane(o + d * t, p, len);
+        }
+        // Past the silhouette: the point of that sphere nearest the ray, so it follows the pointer's direction.
+        const vec3 closest = o + d * std::max(glm::dot(p - o, d), 0.0f);
+        const vec3 out = closest - p;
+        return glm::length(out) > 1e-12f ? keepOnPlane(p + out * (len / glm::length(out)), p, len) : onView;
+    }
+    if (depth == ForgeSphereDepth::Surface) {
+        std::vector<int> skip{i};
+        for (const vec3& m : otherMirrors(sym))
+            if (const int j = forgesphereMirror(start, i, m); j >= 0) skip.push_back(j);
+        const std::vector<char> moving = subtrees(start, skip);
+        float best = std::numeric_limits<float>::max();
+        int on = -1;
+        vec3 out = onView;
+        for (size_t j = 0; j < start.size(); ++j) {
+            if (moving[j]) continue;
+            vec3 hit;
+            float t = 0.0f;
+            // The front of each sphere the ray meets; the nearest wins.
+            if (raySphere(start[j].center, start[j].radius, o, hit, &t) && t < best) best = t, out = hit, on = int(j);
+        }
+        return on >= 0 ? keepOnPlane(out, start[size_t(on)].center, start[size_t(on)].radius) : out;
+    }
+    return onView;
 }
 
 Mesh forgesphereSkin(const std::vector<ForgeSphere>& s, int resolution, int smooth) {
@@ -300,6 +424,25 @@ bool forgesphereSet(std::vector<ForgeSphere>& s, int i, const vec3& center, floa
         if (j == i && m != vec3(1.0f)) continue;
         s[size_t(j)].center = c * m;
         s[size_t(j)].radius = radius;
+    }
+    return true;
+}
+
+bool forgesphereMoveBranch(std::vector<ForgeSphere>& s, int i, const vec3& center, Symmetry sym) {
+    if (!validIndex(s, i)) return false;
+    std::vector<int> roots{i};
+    for (const vec3& m : otherMirrors(sym))
+        if (const int j = forgesphereMirror(s, i, m); j >= 0 && j != i) roots.push_back(j);
+    std::vector<vec3> was;
+    for (int r : roots) was.push_back(s[size_t(r)].center);
+    if (!forgesphereSet(s, i, center, s[size_t(i)].radius, sym)) return false;
+    std::vector<char> done(s.size(), 0);
+    for (size_t k = 0; k < roots.size(); ++k) {
+        const vec3 by = s[size_t(roots[k])].center - was[k];
+        const std::vector<char> branch = subtrees(s, {roots[k]});
+        for (size_t j = 0; j < s.size(); ++j)
+            if (branch[j] && int(j) != roots[k] && !done[j]) s[j].center += by, done[j] = 1;
+        done[size_t(roots[k])] = 1;
     }
     return true;
 }

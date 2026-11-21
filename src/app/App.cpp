@@ -1452,6 +1452,7 @@ int App::run() {
         if (solverBound_ && (drag_ == Drag::Stroke || solverBusy())) waitLastFrame();
         flushGrab(); // Move: the pointer's moves since the last frame, as one
         flushGizmoDrag(); // a Gizmo drag: where the pointer is now
+        flushForgeSphereDrag(); // a Forge Sphere drag: the same
         if (drainNextFrame_) { // (the stroke ended last frame: what waited for it runs now, its own frame)
             drainNextFrame_ = false;
             runDrainQueue();
@@ -2482,7 +2483,10 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::Stencil: stencilMouseMove(x, y); break;
     case Drag::Reference: referenceMouseMove(x, y); break;
-    case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
+    case Drag::ForgeSphere:
+        if (interactiveStrokes_) zsDrag_.pendingMove = true, zsDrag_.atX = x, zsDrag_.atY = y; // (flushForgeSphereDrag)
+        else forgesphereDragTo(x, y);
+        break;
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
