@@ -37,21 +37,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 36.6,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 11.48,
-                "p95": 80.23,
-                "p99": 104.05,
-                "max": 115.27,
-                "mean": 22
-              },
-              "lag_px": {
-                "p50": 7.86,
-                "p95": 93.45,
-                "p99": 113.01,
-                "max": 149.09,
-                "mean": 21.28
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -65,21 +51,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 29.4,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 16.4,
-                "p95": 141.62,
-                "p99": 165.28,
-                "max": 183.93,
-                "mean": 40.08
-              },
-              "lag_px": {
-                "p50": 12.58,
-                "p95": 143.46,
-                "p99": 181.95,
-                "max": 210.17,
-                "mean": 38.37
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -93,21 +65,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 42,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 231.32,
-                "p95": 367.41,
-                "p99": 416.92,
-                "max": 455.58,
-                "mean": 230.2
-              },
-              "lag_px": {
-                "p50": 204.8,
-                "p95": 365.03,
-                "p99": 417.26,
-                "max": 433.87,
-                "mean": 214.59
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -135,21 +93,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 27.2,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 18.17,
-                "p95": 164.92,
-                "p99": 191.21,
-                "max": 207.84,
-                "mean": 52.48
-              },
-              "lag_px": {
-                "p50": 13.86,
-                "p95": 170.35,
-                "p99": 211.27,
-                "max": 232.07,
-                "mean": 50.13
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -163,21 +107,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 48.3,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 730.4,
-                "p95": 1011.55,
-                "p99": 1097.02,
-                "max": 1131.18,
-                "mean": 725.46
-              },
-              "lag_px": {
-                "p50": 722.67,
-                "p95": 996.09,
-                "p99": 1069.02,
-                "max": 1137.8,
-                "mean": 720.99
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -252,21 +182,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 31.5,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 11.29,
-                "p95": 78.5,
-                "p99": 97.7,
-                "max": 120.42,
-                "mean": 21.48
-              },
-              "lag_px": {
-                "p50": 7.88,
-                "p95": 89.32,
-                "p99": 119.31,
-                "max": 155.34,
-                "mean": 20.64
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -280,21 +196,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 29.3,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 15.94,
-                "p95": 142.64,
-                "p99": 171.74,
-                "max": 192.14,
-                "mean": 39.41
-              },
-              "lag_px": {
-                "p50": 12.17,
-                "p95": 147.88,
-                "p99": 202.14,
-                "max": 238.2,
-                "mean": 38.01
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -308,21 +210,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 59.2,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 234.98,
-                "p95": 389.47,
-                "p99": 444.6,
-                "max": 467.47,
-                "mean": 233.74
-              },
-              "lag_px": {
-                "p50": 207.89,
-                "p95": 406.39,
-                "p99": 480.92,
-                "max": 508.04,
-                "mean": 219.59
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -350,21 +238,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 27,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 18.13,
-                "p95": 160.86,
-                "p99": 193.16,
-                "max": 206.93,
-                "mean": 49.76
-              },
-              "lag_px": {
-                "p50": 13.81,
-                "p95": 157.48,
-                "p99": 220.12,
-                "max": 235,
-                "mean": 47.28
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -378,21 +252,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 65.7,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 715.66,
-                "p95": 1019.09,
-                "p99": 1074.62,
-                "max": 1118.89,
-                "mean": 721.17
-              },
-              "lag_px": {
-                "p50": 705.47,
-                "p95": 1000.46,
-                "p99": 1041.37,
-                "max": 1136.69,
-                "mean": 708.71
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -467,21 +327,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 32.2,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 11.39,
-                "p95": 80.32,
-                "p99": 102.62,
-                "max": 116.14,
-                "mean": 21.96
-              },
-              "lag_px": {
-                "p50": 7.86,
-                "p95": 91.56,
-                "p99": 118.14,
-                "max": 149.09,
-                "mean": 21.1
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -495,21 +341,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 27.9,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 16.19,
-                "p95": 131.47,
-                "p99": 169.03,
-                "max": 188.83,
-                "mean": 38.18
-              },
-              "lag_px": {
-                "p50": 11.86,
-                "p95": 138.09,
-                "p99": 198.27,
-                "max": 222.14,
-                "mean": 36.54
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -523,21 +355,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 43.9,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 237.36,
-                "p95": 398.42,
-                "p99": 449.69,
-                "max": 468.39,
-                "mean": 238.29
-              },
-              "lag_px": {
-                "p50": 209.93,
-                "p95": 373.68,
-                "p99": 429.03,
-                "max": 452.74,
-                "mean": 220.67
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -565,21 +383,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 28.2,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 18.51,
-                "p95": 157.02,
-                "p99": 194.87,
-                "max": 212.19,
-                "mean": 50.77
-              },
-              "lag_px": {
-                "p50": 13.87,
-                "p95": 160.13,
-                "p99": 210.44,
-                "max": 238.07,
-                "mean": 48.4
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -593,21 +397,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 73.1,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 723.62,
-                "p95": 953.94,
-                "p99": 1018.85,
-                "max": 1060.57,
-                "mean": 703.39
-              },
-              "lag_px": {
-                "p50": 704.35,
-                "p95": 941.77,
-                "p99": 999.45,
-                "max": 1060.84,
-                "mean": 693.66
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -682,21 +472,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 25.8,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 5.99,
-                "p95": 10.98,
-                "p99": 37.06,
-                "max": 59.16,
-                "mean": 6.65
-              },
-              "lag_px": {
-                "p50": 3.09,
-                "p95": 9.34,
-                "p99": 43.7,
-                "max": 65.41,
-                "mean": 4.21
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -710,21 +486,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 10.9,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 17.35,
-                "p95": 29.04,
-                "p99": 32.94,
-                "max": 37,
-                "mean": 17.96
-              },
-              "lag_px": {
-                "p50": 14.82,
-                "p95": 23.03,
-                "p99": 25.36,
-                "max": 29.99,
-                "mean": 14.68
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -738,21 +500,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 15.3,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 27.15,
-                "p95": 50.5,
-                "p99": 58.38,
-                "max": 62.17,
-                "mean": 28.33
-              },
-              "lag_px": {
-                "p50": 24.07,
-                "p95": 39.76,
-                "p99": 42.83,
-                "max": 47.92,
-                "mean": 24.42
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -827,21 +575,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 18.9,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 5.98,
-                "p95": 11.11,
-                "p99": 31.57,
-                "max": 61.9,
-                "mean": 6.5
-              },
-              "lag_px": {
-                "p50": 3.04,
-                "p95": 9.25,
-                "p99": 34.21,
-                "max": 53.53,
-                "mean": 4.03
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -855,21 +589,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 11.5,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 17.45,
-                "p95": 29.02,
-                "p99": 32.9,
-                "max": 37.38,
-                "mean": 18.11
-              },
-              "lag_px": {
-                "p50": 14.97,
-                "p95": 23.26,
-                "p99": 28.41,
-                "max": 30.09,
-                "mean": 14.81
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -883,21 +603,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 15.1,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 27.14,
-                "p95": 51.5,
-                "p99": 59.02,
-                "max": 62.6,
-                "mean": 28.55
-              },
-              "lag_px": {
-                "p50": 24.07,
-                "p95": 39.76,
-                "p99": 43.7,
-                "max": 47.82,
-                "mean": 24.49
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -972,21 +678,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 26.2,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 5.96,
-                "p95": 10.88,
-                "p99": 37.32,
-                "max": 58.95,
-                "mean": 6.57
-              },
-              "lag_px": {
-                "p50": 2.99,
-                "p95": 9.23,
-                "p99": 45.65,
-                "max": 65.6,
-                "mean": 4.13
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -1000,21 +692,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 13.3,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 17.72,
-                "p95": 29.31,
-                "p99": 33.04,
-                "max": 37.5,
-                "mean": 18.1
-              },
-              "lag_px": {
-                "p50": 15.03,
-                "p95": 23.39,
-                "p99": 27.2,
-                "max": 30.04,
-                "mean": 14.85
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -1028,21 +706,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 16.9,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 27.67,
-                "p95": 51.34,
-                "p99": 58.53,
-                "max": 62.56,
-                "mean": 28.64
-              },
-              "lag_px": {
-                "p50": 24.34,
-                "p95": 39.88,
-                "p99": 46.2,
-                "max": 48.06,
-                "mean": 24.74
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1117,21 +781,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 53.5,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 6.12,
-                "p95": 12.48,
-                "p99": 49.83,
-                "max": 66.53,
-                "mean": 7.21
-              },
-              "lag_px": {
-                "p50": 3.32,
-                "p95": 9.25,
-                "p99": 54.64,
-                "max": 70.42,
-                "mean": 4.86
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -1145,21 +795,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 18.7,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 18.72,
-                "p95": 29.56,
-                "p99": 33.63,
-                "max": 38.19,
-                "mean": 19.21
-              },
-              "lag_px": {
-                "p50": 16.11,
-                "p95": 24.05,
-                "p99": 29.15,
-                "max": 30.04,
-                "mean": 15.87
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -1173,21 +809,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 19.7,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 29.59,
-                "p95": 52.58,
-                "p99": 59.3,
-                "max": 63.77,
-                "mean": 30.88
-              },
-              "lag_px": {
-                "p50": 26.47,
-                "p95": 41.29,
-                "p99": 46.2,
-                "max": 49.38,
-                "mean": 26.49
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1262,21 +884,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 47.6,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 6.08,
-                "p95": 14.46,
-                "p99": 45.99,
-                "max": 67.1,
-                "mean": 7.16
-              },
-              "lag_px": {
-                "p50": 3.32,
-                "p95": 11.97,
-                "p99": 53.18,
-                "max": 69.97,
-                "mean": 4.85
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -1290,21 +898,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 21.5,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 18.47,
-                "p95": 30.12,
-                "p99": 33.82,
-                "max": 37.77,
-                "mean": 18.94
-              },
-              "lag_px": {
-                "p50": 16.16,
-                "p95": 23.98,
-                "p99": 29.16,
-                "max": 30.04,
-                "mean": 15.8
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -1318,21 +912,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 22.1,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 28.3,
-                "p95": 50.84,
-                "p99": 59.16,
-                "max": 63.92,
-                "mean": 29.46
-              },
-              "lag_px": {
-                "p50": 25.76,
-                "p95": 40.31,
-                "p99": 45.05,
-                "max": 48.91,
-                "mean": 25.6
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1407,21 +987,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 48.5,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 6.09,
-                "p95": 13.13,
-                "p99": 49.95,
-                "max": 66.25,
-                "mean": 7.27
-              },
-              "lag_px": {
-                "p50": 3.32,
-                "p95": 11.58,
-                "p99": 56.47,
-                "max": 72.03,
-                "mean": 4.96
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -1435,21 +1001,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 20,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 18.54,
-                "p95": 29.47,
-                "p99": 33.51,
-                "max": 37.22,
-                "mean": 18.96
-              },
-              "lag_px": {
-                "p50": 15.9,
-                "p95": 23.93,
-                "p99": 28.98,
-                "max": 44.13,
-                "mean": 15.75
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -1463,21 +1015,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 16.6,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 28.37,
-                "p95": 51.67,
-                "p99": 59.72,
-                "max": 62.97,
-                "mean": 29.58
-              },
-              "lag_px": {
-                "p50": 25.65,
-                "p95": 40.31,
-                "p99": 45.05,
-                "max": 48.91,
-                "mean": 25.51
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1552,21 +1090,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 94.2,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 124.21,
-                "p95": 320.96,
-                "p99": 357.13,
-                "max": 384.09,
-                "mean": 135.28
-              },
-              "lag_px": {
-                "p50": 108.84,
-                "p95": 320.31,
-                "p99": 395.22,
-                "max": 443.64,
-                "mean": 127.33
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "large brush stroke",
@@ -1580,21 +1104,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 112,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 648.97,
-                "p95": 1853.12,
-                "p99": 1972.25,
-                "max": 2015.89,
-                "mean": 751.28
-              },
-              "lag_px": {
-                "p50": 639.33,
-                "p95": 1813.68,
-                "p99": 1940.31,
-                "max": 1995.2,
-                "mean": 740.69
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1667,21 +1177,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 71.6,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 119.82,
-                "p95": 310.51,
-                "p99": 339.24,
-                "max": 365.95,
-                "mean": 134.86
-              },
-              "lag_px": {
-                "p50": 128.41,
-                "p95": 315.03,
-                "p99": 368,
-                "max": 417.3,
-                "mean": 126.02
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "large brush stroke",
@@ -1695,21 +1191,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 123.4,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 912.62,
-                "p95": 1910.86,
-                "p99": 2013.01,
-                "max": 2042.87,
-                "mean": 924.78
-              },
-              "lag_px": {
-                "p50": 864.52,
-                "p95": 1866.7,
-                "p99": 1995.2,
-                "max": 2036.88,
-                "mean": 908.32
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1782,21 +1264,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 60.4,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 128.65,
-                "p95": 320.68,
-                "p99": 371.6,
-                "max": 395.64,
-                "mean": 140.59
-              },
-              "lag_px": {
-                "p50": 127.64,
-                "p95": 326.97,
-                "p99": 406.36,
-                "max": 430.67,
-                "mean": 132.1
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "large brush stroke",
@@ -1810,21 +1278,7 @@
               },
               "brush": "Standard",
               "worst_stall_ms": 91.2,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 699.04,
-                "p95": 1867.62,
-                "p99": 1965.42,
-                "max": 2028.51,
-                "mean": 760.52
-              },
-              "lag_px": {
-                "p50": 672.01,
-                "p95": 1833.13,
-                "p99": 1931.19,
-                "max": 2013.17,
-                "mean": 751.01
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -1897,21 +1351,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 56.9,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 16.75,
-                "p95": 96.2,
-                "p99": 122.8,
-                "max": 141.93,
-                "mean": 29.87
-              },
-              "lag_px": {
-                "p50": 12.48,
-                "p95": 111.82,
-                "p99": 149.07,
-                "max": 174.94,
-                "mean": 29.5
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -1925,21 +1365,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 46.8,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 27.7,
-                "p95": 149.28,
-                "p99": 174.95,
-                "max": 191.53,
-                "mean": 54.79
-              },
-              "lag_px": {
-                "p50": 22.94,
-                "p95": 162.84,
-                "p99": 194.68,
-                "max": 212.39,
-                "mean": 52.5
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -1953,21 +1379,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 36.4,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 212.3,
-                "p95": 312.51,
-                "p99": 339.66,
-                "max": 361.71,
-                "mean": 208.32
-              },
-              "lag_px": {
-                "p50": 194.75,
-                "p95": 308.05,
-                "p99": 356.92,
-                "max": 395.24,
-                "mean": 196.16
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -1995,21 +1407,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 44.2,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 43.34,
-                "p95": 179.15,
-                "p99": 207.15,
-                "max": 216.31,
-                "mean": 65.75
-              },
-              "lag_px": {
-                "p50": 31.72,
-                "p95": 179.8,
-                "p99": 235.52,
-                "max": 247.24,
-                "mean": 63.6
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -2023,21 +1421,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 45.1,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 806.75,
-                "p95": 1082.98,
-                "p99": 1196.35,
-                "max": 1243.59,
-                "mean": 800.57
-              },
-              "lag_px": {
-                "p50": 807.55,
-                "p95": 1064.35,
-                "p99": 1139.44,
-                "max": 1174.7,
-                "mean": 788.73
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2111,21 +1495,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 39.6,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 17.63,
-                "p95": 103.95,
-                "p99": 153.15,
-                "max": 189.97,
-                "mean": 31.74
-              },
-              "lag_px": {
-                "p50": 13.06,
-                "p95": 118.1,
-                "p99": 182.74,
-                "max": 253.96,
-                "mean": 31.63
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -2139,21 +1509,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 75.6,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 39.93,
-                "p95": 163.33,
-                "p99": 200.72,
-                "max": 217.62,
-                "mean": 62.24
-              },
-              "lag_px": {
-                "p50": 28.65,
-                "p95": 176.82,
-                "p99": 229.16,
-                "max": 256.4,
-                "mean": 61.03
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -2167,21 +1523,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 36.9,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 212.72,
-                "p95": 327.41,
-                "p99": 367.08,
-                "max": 395.86,
-                "mean": 208.99
-              },
-              "lag_px": {
-                "p50": 194.76,
-                "p95": 320.42,
-                "p99": 388.65,
-                "max": 426.14,
-                "mean": 195.96
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -2209,21 +1551,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 56.8,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 47.99,
-                "p95": 185.73,
-                "p99": 210.87,
-                "max": 220.15,
-                "mean": 71.7
-              },
-              "lag_px": {
-                "p50": 33.97,
-                "p95": 194.36,
-                "p99": 241.72,
-                "max": 253.75,
-                "mean": 68.95
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -2237,21 +1565,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 51.6,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 787.84,
-                "p95": 1083.57,
-                "p99": 1243.42,
-                "max": 1307.98,
-                "mean": 785.82
-              },
-              "lag_px": {
-                "p50": 798.88,
-                "p95": 1062.56,
-                "p99": 1173.52,
-                "max": 1246.6,
-                "mean": 779.23
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2325,21 +1639,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 56.4,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 17.09,
-                "p95": 95.51,
-                "p99": 126.65,
-                "max": 144.52,
-                "mean": 30.41
-              },
-              "lag_px": {
-                "p50": 12.72,
-                "p95": 111.28,
-                "p99": 153.17,
-                "max": 182.31,
-                "mean": 29.73
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay medium",
@@ -2353,21 +1653,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 50.1,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 26.02,
-                "p95": 149.48,
-                "p99": 182.43,
-                "max": 198.47,
-                "mean": 53.09
-              },
-              "lag_px": {
-                "p50": 19.84,
-                "p95": 165.96,
-                "p99": 206.78,
-                "max": 227.92,
-                "mean": 51.22
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "clay large",
@@ -2381,21 +1667,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 37.3,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 201.09,
-                "p95": 319.24,
-                "p99": 365.79,
-                "max": 398.58,
-                "mean": 201.32
-              },
-              "lag_px": {
-                "p50": 186.01,
-                "p95": 310.38,
-                "p99": 352.31,
-                "max": 393.2,
-                "mean": 189.58
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "move",
@@ -2423,21 +1695,7 @@
               },
               "brush": "Smooth",
               "worst_stall_ms": 33.7,
-              "brush_radius_px": 60,
-              "lag_ms": {
-                "p50": 25.79,
-                "p95": 177.83,
-                "p99": 208.36,
-                "max": 222.36,
-                "mean": 60.72
-              },
-              "lag_px": {
-                "p50": 20.64,
-                "p95": 186.28,
-                "p99": 239.56,
-                "max": 263.42,
-                "mean": 59.05
-              }
+              "brush_radius_px": 60
             },
             {
               "name": "240 px brush",
@@ -2451,21 +1709,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 35.8,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 791.05,
-                "p95": 1122.27,
-                "p99": 1191.32,
-                "max": 1244.9,
-                "mean": 787.53
-              },
-              "lag_px": {
-                "p50": 779.13,
-                "p95": 1104.23,
-                "p99": 1164,
-                "max": 1200.72,
-                "mean": 775.38
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2539,21 +1783,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 27,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 8.17,
-                "p95": 19.94,
-                "p99": 37.6,
-                "max": 50.25,
-                "mean": 9.22
-              },
-              "lag_px": {
-                "p50": 4.6,
-                "p95": 21.7,
-                "p99": 42.81,
-                "max": 54.36,
-                "mean": 6.79
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -2567,21 +1797,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 14,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 16.39,
-                "p95": 28.22,
-                "p99": 32.24,
-                "max": 35.83,
-                "mean": 17
-              },
-              "lag_px": {
-                "p50": 13.68,
-                "p95": 22.18,
-                "p99": 23.84,
-                "max": 30.09,
-                "mean": 13.75
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -2595,21 +1811,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 16.5,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 26.15,
-                "p95": 50.74,
-                "p99": 58.13,
-                "max": 62.24,
-                "mean": 27.37
-              },
-              "lag_px": {
-                "p50": 23.51,
-                "p95": 38.59,
-                "p99": 41.48,
-                "max": 43.51,
-                "mean": 23.48
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2683,21 +1885,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 19.5,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 7.99,
-                "p95": 21.24,
-                "p99": 39.21,
-                "max": 47.22,
-                "mean": 9.06
-              },
-              "lag_px": {
-                "p50": 4.55,
-                "p95": 22.87,
-                "p99": 45.32,
-                "max": 52.3,
-                "mean": 6.7
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -2711,21 +1899,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 13.9,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 16.49,
-                "p95": 28.53,
-                "p99": 32.44,
-                "max": 36.2,
-                "mean": 17
-              },
-              "lag_px": {
-                "p50": 13.69,
-                "p95": 22.16,
-                "p99": 23.9,
-                "max": 29.09,
-                "mean": 13.81
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -2739,21 +1913,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 14.2,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 26.02,
-                "p95": 50.33,
-                "p99": 57.84,
-                "max": 61.74,
-                "mean": 27.27
-              },
-              "lag_px": {
-                "p50": 23.39,
-                "p95": 38.52,
-                "p99": 41.28,
-                "max": 42.53,
-                "mean": 23.4
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2827,21 +1987,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 29.7,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 8.71,
-                "p95": 27.37,
-                "p99": 46.45,
-                "max": 59.66,
-                "mean": 10.38
-              },
-              "lag_px": {
-                "p50": 5.39,
-                "p95": 29.82,
-                "p99": 50.69,
-                "max": 65.49,
-                "mean": 8.09
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -2855,21 +2001,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 13.8,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 16.37,
-                "p95": 28.31,
-                "p99": 32.23,
-                "max": 36.79,
-                "mean": 17.01
-              },
-              "lag_px": {
-                "p50": 13.73,
-                "p95": 22.18,
-                "p99": 24.01,
-                "max": 29.84,
-                "mean": 13.81
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -2883,21 +2015,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 15.1,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 26.06,
-                "p95": 50.8,
-                "p99": 57.85,
-                "max": 61.7,
-                "mean": 27.35
-              },
-              "lag_px": {
-                "p50": 23.41,
-                "p95": 38.39,
-                "p99": 41.41,
-                "max": 43.51,
-                "mean": 23.37
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -2974,21 +2092,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 224.3,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 8.74,
-                "p95": 39.59,
-                "p99": 57.53,
-                "max": 245.79,
-                "mean": 11.6
-              },
-              "lag_px": {
-                "p50": 5.28,
-                "p95": 46.85,
-                "p99": 66.68,
-                "max": 276.97,
-                "mean": 9.54
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -3002,21 +2106,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 26.2,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 19.82,
-                "p95": 31.38,
-                "p99": 34.53,
-                "max": 43.91,
-                "mean": 20.43
-              },
-              "lag_px": {
-                "p50": 17.29,
-                "p95": 26.22,
-                "p99": 31.83,
-                "max": 42.1,
-                "mean": 17.2
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -3030,21 +2120,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 51.8,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 34.38,
-                "p95": 56.72,
-                "p99": 63.62,
-                "max": 66.62,
-                "mean": 35.82
-              },
-              "lag_px": {
-                "p50": 32.18,
-                "p95": 44.61,
-                "p99": 47.92,
-                "max": 50.7,
-                "mean": 32.31
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -3134,21 +2210,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 216.2,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 8.71,
-                "p95": 36.78,
-                "p99": 58.28,
-                "max": 239.4,
-                "mean": 11.47
-              },
-              "lag_px": {
-                "p50": 5.27,
-                "p95": 42.1,
-                "p99": 67.53,
-                "max": 274.09,
-                "mean": 9.32
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -3162,21 +2224,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 30.3,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 19.44,
-                "p95": 31.15,
-                "p99": 35.02,
-                "max": 41.7,
-                "mean": 20.05
-              },
-              "lag_px": {
-                "p50": 17.08,
-                "p95": 24.61,
-                "p99": 28.95,
-                "max": 45.5,
-                "mean": 16.79
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -3190,21 +2238,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 58.4,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 32.54,
-                "p95": 55.65,
-                "p99": 63.5,
-                "max": 65.93,
-                "mean": 33.88
-              },
-              "lag_px": {
-                "p50": 30.72,
-                "p95": 42.32,
-                "p99": 47.93,
-                "max": 56.93,
-                "mean": 30.29
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
@@ -3294,21 +2328,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 217.6,
-              "brush_radius_px": 25,
-              "lag_ms": {
-                "p50": 8.74,
-                "p95": 36.99,
-                "p99": 57.47,
-                "max": 237.06,
-                "mean": 11.44
-              },
-              "lag_px": {
-                "p50": 5.28,
-                "p95": 43.35,
-                "p99": 69.21,
-                "max": 268.07,
-                "mean": 9.37
-              }
+              "brush_radius_px": 25
             },
             {
               "name": "clay large",
@@ -3322,21 +2342,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 34.6,
-              "brush_radius_px": 120,
-              "lag_ms": {
-                "p50": 19.93,
-                "p95": 31.14,
-                "p99": 34.94,
-                "max": 41.8,
-                "mean": 20.45
-              },
-              "lag_px": {
-                "p50": 17.39,
-                "p95": 25.74,
-                "p99": 29.88,
-                "max": 34.47,
-                "mean": 17.21
-              }
+              "brush_radius_px": 120
             },
             {
               "name": "240 px brush",
@@ -3350,21 +2356,7 @@
               },
               "brush": "Clay",
               "worst_stall_ms": 54.7,
-              "brush_radius_px": 240,
-              "lag_ms": {
-                "p50": 35.21,
-                "p95": 55.6,
-                "p99": 63.04,
-                "max": 66.03,
-                "mean": 36.18
-              },
-              "lag_px": {
-                "p50": 32.53,
-                "p95": 44.25,
-                "p99": 47.67,
-                "max": 48.05,
-                "mean": 32.61
-              }
+              "brush_radius_px": 240
             },
             {
               "name": "orbit",
