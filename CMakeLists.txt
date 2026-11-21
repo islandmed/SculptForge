@@ -1161,14 +1161,14 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
-    if(UNIX)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux") # (the scripts that run release.sh run on the Linux release host only)
       add_test(NAME release_card COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_card_test.sh)
       set_tests_properties(release_card PROPERTIES TIMEOUT 60)
     endif()
     add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
     # The members' beta step creates the release in the insiders repository with --target (its checkout has the tag, that repository not).
-    # That step only runs on ubuntu, and the test's stand-in gh is a /bin/sh script Windows can't run: not on Windows.
-    if(NOT WIN32)
+    # That step only runs on the Linux release host (input 11-21: the release-script self-tests are Linux only; 11-21 the winget one failed on macOS).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
     endif()
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
@@ -1178,7 +1178,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_install_assets COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py)
     add_test(NAME release_install_assets_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py --self-test)
     # release.sh --stage warns (never fails) when the CMO's launch headline is missing or its keywords miss HIGHLIGHTS line 1 / the tagline.
-    if(UNIX)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       add_test(NAME release_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_headline_test.sh)
       set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
       add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
