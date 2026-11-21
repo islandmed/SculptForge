@@ -64,10 +64,13 @@ build = "cp312-* cp313-* cp314-*"
 skip = "*-musllinux_* *-win32 *_i686"
 build-frontend = "build"
 test-requires = ["pytest"]
-test-command = "pytest -q -p no:cacheprovider {project}/tests/python"
+# -v names each test in the log; faulthandler_timeout prints every thread's stack when one runs over 2 minutes (the
+# whole suite takes 5-15 s), so a hang under Rosetta (11-20, macOS x86_64) says where.
+test-command = "pytest -v -p no:cacheprovider -o faulthandler_timeout=120 {project}/tests/python"
 # SF_DEPS_CACHE: the pinned downloads (cmake/Fetch.cmake) once per job, not once per Python; SF_WHEEL_TEST: the
 # tests that only hold for the wheels (no HTTP).
 environment = { SF_DEPS_CACHE = ".deps", SF_WHEEL_TEST = "1" }
+test-environment = { PYTHONUNBUFFERED = "1" } # (a killed run keeps the lines pytest had printed)
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 
