@@ -25,9 +25,8 @@ wait 0.4
 expect_value support_card_open == 0
 
 # The monthly link opens the monthly checkout.
-click "Preferences##palette.preferences"
-click "Support##preferences.support"
-click "Show the memberships"
+support_card first_run
+expect_value support_card_open == 1
 wait 0.8
 click "or $5 a month##card.member_monthly"
 expect_value support_requests == 2
