@@ -140,14 +140,14 @@ sculptforge --benchmark core-100m</code></pre></li>
       The scene needs about 4.2 GB of memory and a 0.6 GB scene file, written once; with too little of either the program says so and exits.
       The first run writes the scene file; every run after that opens it (about a second here: 0.7 to 1.1 s). Send the JSON as <a href="#submit">below</a> to be listed.</p>
     <ul>
-      <li><strong>What we measured</strong> (three runs, the evening of 2026-11-18, built from the 0.13.8 tag, commit d25dfe75, the program's own JSON for each:
-        <a href="raw/floor-core-800m-1.json">run 1</a>, <a href="raw/floor-core-800m-2.json">run 2</a>, <a href="raw/floor-core-800m-3.json">run 3</a>): orbit
-        <strong>208 to 211 frames a second</strong> (median 209); the 240 px Clay stroke <strong>79 to 100 frames a second</strong> with the stroke trailing the pointer by
-        <strong>63 to 64 ms</strong> at the 99th percentile; the slowest frames of that stroke 36 to 41 ms (99th percentile); worst stall 216 to 224 ms (the first small stroke).
+      <li><strong>What we measured</strong> (three runs, the evening of 2026-11-20 US Mountain time, built from the 0.13.10 tag, commit 4e39ba3a, the program's own JSON for each:
+        <a href="raw/tag-0.13.10-floor-core-800m-1.json">run 1</a>, <a href="raw/tag-0.13.10-floor-core-800m-2.json">run 2</a>, <a href="raw/tag-0.13.10-floor-core-800m-3.json">run 3</a>): orbit
+        <strong>208 to 209 frames a second</strong> (median 208); the 240 px Clay stroke <strong>74 to 90 frames a second</strong> with the stroke trailing the pointer by
+        <strong>63 to 66 ms</strong> at the 99th percentile (median 35 ms); the slowest frames of that stroke 37 to 45 ms (99th percentile); worst stall 204 to 217 ms (the first small stroke).
         Three runs on one laptop: a range, not a promise.</li>
       <li><strong>The machine</strong>: an Apple M1 Pro laptop (10 cores, 30.9 GB, Linux), 1920 x 1080, vertical sync off, held to SculptForge's entry-level budget with
         <code>SF_HW_SIMULATE=floor</code>. It is a fast laptop slowed down in software, not a real entry-level computer: your numbers will differ, in either direction.</li>
-      <li><strong>Memory</strong>: SculptForge held a peak of 1,645 to 1,656 MB (resident) plus 2,563 MB of graphics buffers; on integrated graphics those buffers are system memory, so about
+      <li><strong>Memory</strong>: SculptForge held a peak of 1,636 to 1,670 MB (resident) plus 2,563 MB of graphics buffers; on integrated graphics those buffers are system memory, so about
         <strong>4,200 MB in all</strong>. The program asks for about <strong>8 GB free</strong> (6.4 GB and a margin: 7 GB is refused, 8 GB runs) before it starts, and stops with one line saying how much it needs and how much is free if you have less.
         A computer with a separate graphics card needs the 2,563 MB on the card.</li>
       <li><strong>Disk</strong>: the scene file is <strong>0.6 GB</strong> (609 MB), written once to the program's cache folder. It needs about 0.9 GB free to write; with less it stops with a message and writes nothing.</li>
