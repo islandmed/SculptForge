@@ -385,6 +385,8 @@ struct PhaseResult {
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
+    double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
+    bool pathUpright = false;
     size_t dabs = 0, dabsOffModel = 0, samples = 0; // dabsOffModel: dabs that found no surface (a path's stretch off the model)
     std::vector<double> frameMs, lagMs, lagPx;
     // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
@@ -461,6 +463,8 @@ struct ProofState {
     // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
     size_t dabFrom = 0, previewFrom = 0;
     bool sweep = false; // PhaseSpec::sweep
+    bool upright = false; // the path turned a quarter (a tall model: Lucy)
+    double laps = 1.0;    // times round the path in the phase: a path fitted smaller goes round more, at the same pointer speed
     bool pressed = false;
     bool releasing = false; // let go: the phase ends with the stroke (predictive strokes finish after the release)
     double releaseAt = 0;
@@ -480,13 +484,16 @@ struct ProofState {
 namespace {
 
 glm::vec2 strokePoint(const ProofState& p, double u) {
+    u *= p.laps;
+    glm::vec2 d;
     if (p.sweep) { // zigzags across the framed model while the height swings once up and down: fresh surface all the way
         const double phi = 2.0 * 3.14159265358979 * u;
-        return {p.cx + 1.2f * p.R * float(std::sin(11.0 * phi)), p.cy + 0.9f * p.R * float(std::sin(phi))};
+        d = {1.2f * p.R * float(std::sin(11.0 * phi)), 0.9f * p.R * float(std::sin(phi))};
+    } else { // A figure eight across the front of the model, three times round.
+        const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
+        d = {p.R * 1.25f * float(std::sin(phi)), p.R * 0.75f * float(std::sin(2.0 * phi))};
     }
-    // A figure eight across the front of the model, three times round.
-    const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
-    return {p.cx + p.R * 1.25f * float(std::sin(phi)), p.cy + p.R * 0.75f * float(std::sin(2.0 * phi))};
+    return p.upright ? glm::vec2(p.cx + d.y, p.cy + d.x) : glm::vec2(p.cx + d.x, p.cy + d.y);
 }
 
 std::string isoDate() {
@@ -879,19 +886,36 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.sweep = spec.sweep;
             // The path stays on the model: a dab off it costs nothing, and the quick frames after it made the lag
             // read 24 ms or 370 ms by where they fell (#184; the 1B scene had 88% of its small dabs off the model).
-            // Smaller until at most 2% of the path misses; a model that fills the view keeps the path as it was.
+            // Smaller until at most 2% of the path misses, lying or upright (a tall model), whichever stays larger, and
+            // round it more often: the pointer keeps its speed (lag depends on it). A model that fills the view keeps the
+            // path as it was.
             {
                 RayHit h;
-                auto misses = [&] {
-                    int miss = 0;
-                    for (int k = 0; k < 120; ++k) {
-                        const glm::vec2 q = strokePoint(p, double(k) / 120.0);
-                        if (!pick(q.x, q.y, h)) ++miss;
-                    }
-                    return miss;
+                const float full = p.R;
+                p.laps = 1.0;
+                auto fit = [&](bool upright) {
+                    p.upright = upright;
+                    p.R = full;
+                    auto misses = [&] {
+                        int miss = 0;
+                        for (int k = 0; k < 120; ++k) {
+                            const glm::vec2 q = strokePoint(p, double(k) / 120.0);
+                            if (!pick(q.x, q.y, h)) ++miss;
+                        }
+                        return miss;
+                    };
+                    for (int k = 0; k < 12 && misses() > 2; ++k) p.R *= 0.85f;
+                    return p.R;
                 };
-                for (int k = 0; k < 12 && misses() > 2; ++k) p.R *= 0.85f;
+                const float lying = fit(false);
+                if (lying < full && fit(true) < lying) {
+                    p.upright = false;
+                    p.R = lying;
+                }
+                p.laps = double(full / p.R);
                 r.phases.back().pathRadiusPx = p.R;
+                r.phases.back().pathLaps = p.laps;
+                r.phases.back().pathUpright = p.upright;
             }
             const double start = nowSeconds(); // (the fit's picks are not the phase's)
             p.stageStart = p.lastFrame = start;
@@ -1398,6 +1422,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("dabs", double(ph.dabs));
                     j.set("dabs_off_model", double(ph.dabsOffModel));
                     j.set("path_radius_px", std::round(double(ph.pathRadiusPx)));
+                    j.set("path_laps", std::round(ph.pathLaps * 100) / 100);
+                    if (ph.pathUpright) j.set("path_upright", true);
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
