@@ -1,6 +1,5 @@
 ---
 whats_new: **Forge Spheres move smoothly**: a dragged sphere stays under the pointer at its depth, even on long chains; hold **Shift** to swing it around the sphere it grows from (its link keeps its length), **Tool > Forge Spheres > Snap to Surface** seats it on the sphere under the pointer, and **Move Branch** brings what grows from it along.
-highlight: Smoother Forge Spheres placing
 changed: **Forge Spheres**: moving a sphere follows the pointer smoothly on any armature size (the pointer's moves are taken once a frame and only the moved spheres and their links are redrawn, instead of the whole armature on every move); a moved sphere keeps its depth in the view; Draw's resize band is a thin rim (none on spheres drawn small), so most of a sphere moves it. Reported in a public review.
 added: **Forge Spheres**: hold **Shift** while moving a sphere to swing it around its parent with the link keeping its length; **Snap to Surface** (Tool > Forge Spheres) puts a moved sphere's centre on the surface of the sphere under the pointer; **Move Branch** (Tool > Forge Spheres) carries everything growing from a moved sphere along, keeping its shape.
 testers:

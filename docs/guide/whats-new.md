@@ -5,6 +5,42 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.11
+
+```features
+date: unreleased
+tagline: Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again.
+highlight: Forge Sphere chains stay smooth while you drag, even with hundreds of spheres
+highlight: Shift with the Paint brush blends colour on textured Parts and never moves the shape
+highlight: View falloff keeps Standard, Inflate and Crease off the far side of your model
+highlight: Pen side-button orbit and pan move steadily again, and Inflate swells evenly at tube ends
+highlight: Bakes tell you when the search distance is too short, with one click to bake again
+title: Smooth Forge Sphere chains
+line: Moving a sphere follows the pointer smoothly on any armature size, and picks, delete and undo answer right after you let go.
+action: guide:forge-spheres.md
+title: Smooth colour on textures
+line: With the Paint brush, hold Shift to blend texture colour into its neighbours, across UV seams; the shape stays put.
+action: guide:texture-painting.md
+title: View falloff stays in front
+line: With View falloff on, Standard, Inflate, Crease and Pinch fade out behind the surface; Move and grab brushes still reach through.
+action: guide:sculpting.md
+```
+
+- **Forge Spheres**: moving a sphere follows the pointer smoothly on big armatures.
+- **Smooth colour on textures**: with the Paint brush, **Shift** blends texture colour like vertex colour, across UV
+  seams, and never moves the shape.
+- **View falloff**: Standard, Inflate, Crease, Pinch and Sharp Crease no longer change the far side of the model;
+  Move and the grab brushes still reach through.
+- **Pen side buttons** (KDE on Wayland): orbit and pan follow the pen steadily again (#216).
+- **Undo on dense Micro levels**: Undo, Redo and Move no longer leave patches of stale shading (#184, thanks
+  @HG4Science).
+- **Bake**: when the search distance is too short, the Bake panel says how much of the map missed and offers
+  **Bake Again with Suggested Distance**.
+- **Stroke popup**: the Sub, Smooth, Mask and Select keys follow your input style (#233). Reported by @Velisariy.
+- **Inflate** swells evenly at the ends of tubes; **Save Visible Parts As** keeps PBR, environment and exposure.
+- **Parts**: a press that lands on a Part in front of the one you're sculpting says so in the status line.
+- **macOS**: Voxel Remesh no longer refuses modest jobs on Macs running the Intel build.
+
 ## Version 0.13.10
 
 ```features
