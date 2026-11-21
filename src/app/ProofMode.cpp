@@ -384,6 +384,7 @@ struct PhaseResult {
     int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
+    float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     size_t dabs = 0, dabsOffModel = 0, samples = 0; // dabsOffModel: dabs that found no surface (a path's stretch off the model)
     std::vector<double> frameMs, lagMs, lagPx;
     // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
@@ -876,9 +877,27 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.cy = c.y + c.h * 0.5f;
             p.R = 0.26f * std::min(c.w, c.h) * spec.pathScale;
             p.sweep = spec.sweep;
+            // The path stays on the model: a dab off it costs nothing, and the quick frames after it made the lag
+            // read 24 ms or 370 ms by where they fell (#184; the 1B scene had 88% of its small dabs off the model).
+            // Smaller until at most 2% of the path misses; a model that fills the view keeps the path as it was.
+            {
+                RayHit h;
+                auto misses = [&] {
+                    int miss = 0;
+                    for (int k = 0; k < 120; ++k) {
+                        const glm::vec2 q = strokePoint(p, double(k) / 120.0);
+                        if (!pick(q.x, q.y, h)) ++miss;
+                    }
+                    return miss;
+                };
+                for (int k = 0; k < 12 && misses() > 2; ++k) p.R *= 0.85f;
+                r.phases.back().pathRadiusPx = p.R;
+            }
+            const double start = nowSeconds(); // (the fit's picks are not the phase's)
+            p.stageStart = p.lastFrame = start;
             const glm::vec2 q = strokePoint(p, 0.0);
-            p.samples.push_back({now, q, 0.0});
-            p.lastSample = now;
+            p.samples.push_back({start, q, 0.0});
+            p.lastSample = start;
             // SF_BENCH_STENCIL=Cobblestone (a built-in alpha's name) or =photo.png: the strokes go through that Stencil
             // (#155), tiled so every dab reads it; SF_BENCH_STENCIL_SIZE=0.1 its height as a fraction of the view's (default
             // 0.8; small: vertices many image pixels apart, every read a disc). bench.sh stencil.
@@ -1378,6 +1397,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     if (!ph.lagOnModelMs.empty()) j.set("lag_on_model_ms", percentilesJson(percentiles(ph.lagOnModelMs)));
                     j.set("dabs", double(ph.dabs));
                     j.set("dabs_off_model", double(ph.dabsOffModel));
+                    j.set("path_radius_px", std::round(double(ph.pathRadiusPx)));
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
