@@ -384,8 +384,11 @@ struct PhaseResult {
     int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
-    size_t dabs = 0, samples = 0;
+    size_t dabs = 0, dabsOffModel = 0, samples = 0; // dabsOffModel: dabs that found no surface (a path's stretch off the model)
     std::vector<double> frameMs, lagMs, lagPx;
+    // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
+    // it are quick and their lag small; where they fall decided whether a heavy stroke's lag_ms p50 read 24 or 370 ms (#184)
+    std::vector<double> lagOnModelMs;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
@@ -446,6 +449,7 @@ struct ProofState {
     };
     std::vector<Sample> samples;
     std::vector<glm::vec2> dabs;
+    std::vector<uint8_t> dabHits; // (App::strokeHitProbe_) 1: that dab reached the surface
     size_t sent = 1; // samples handed to onMouseMove (the first went to onMouseDown)
     // SF_BENCH_DENSE: Move and the Gizmo follow the pointer on the main thread (no dabs to match): their lag is the
     // age of the oldest sample handed over last frame when this frame shows it (its index; -1: none handed).
@@ -785,6 +789,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (p.pressed) onMouseUp();
         p.pressed = false;
         strokeProbe_ = nullptr;
+        strokeHitProbe_ = nullptr;
         p.stage = Stage::Finish;
     }
 
@@ -815,6 +820,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         proofGpuMs_.clear(); // (frames from before the phase)
         p.samples.clear();
         p.dabs.clear();
+        p.dabHits.clear();
         p.sent = 1;
         p.dabFrom = p.previewFrom = 0;
         // SF_BENCH_REFERENCES=a.png;b.png: reference images in the view for every phase (View > Reference images): the
@@ -899,10 +905,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 benchStampFootprint_ = std::getenv("SF_BENCH_STAMP") != nullptr; // every dab as a stamp's (dabAt)
             }
             strokeProbe_ = &p.dabs;
+            strokeHitProbe_ = &p.dabHits;
             onMouseDown(q.x, q.y, SDL_BUTTON_LEFT);
             p.pressed = drag_ == Drag::Stroke;
             if (!p.pressed) {
                 strokeProbe_ = nullptr;
+                strokeHitProbe_ = nullptr;
                 p.error = "No stroke began on the " + r.label + " mesh (nothing under the pointer)";
             }
         } else if (spec.gizmo) { // the centre handle: Move drags in the view plane, Rotate turns about the view axis
@@ -1072,7 +1080,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
             ph.strokeFrames = perf_.lastStrokeFrames;
             strokeProbe_ = nullptr;
+            strokeHitProbe_ = nullptr;
             ph.dabs = p.dabs.size();
+            ph.dabsOffModel = size_t(std::count(p.dabHits.begin(), p.dabHits.end(), uint8_t(0)));
             // SF_BENCH_DUMP=<prefix>: the positions after each stroke (<prefix>-<phase>.bin, raw floats), to compare
             // what two settings' strokes made (a result check beside the timings).
             // SF_BENCH_DUMP_PHASES="clay large,smooth": only those.
@@ -1149,6 +1159,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 }
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
+                if (p.dabHits.size() == p.dabs.size() && p.dabHits.back()) ph.lagOnModelMs.push_back(ph.lagMs.back());
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
@@ -1263,6 +1274,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (const char* sim = std::getenv("SF_HW_SIMULATE"); sim && *sim) settings.set("hw_simulate", std::string(sim)); // a simulated tier says so (not in the hardware fields)
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
+        settings.set("lag_on_model", "lag over the frames whose newest dab reached the surface (dabs_off_model: those that found none)");
         root.set("settings", settings);
         Json runs = Json::array(), skipped = Json::array();
         for (const SizeResult& r : p.results) {
@@ -1363,7 +1375,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("spacing_floor_ms", std::round(floorMs * 10) / 10);
                         j.set("lag_adjusted_ms", percentilesJson(percentiles(adjusted)));
                     }
+                    if (!ph.lagOnModelMs.empty()) j.set("lag_on_model_ms", percentilesJson(percentiles(ph.lagOnModelMs)));
                     j.set("dabs", double(ph.dabs));
+                    j.set("dabs_off_model", double(ph.dabsOffModel));
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
