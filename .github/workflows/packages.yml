@@ -726,15 +726,17 @@ jobs:
       id-token: write
       attestations: write
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    # About 2x the normal time of each (11-19/20: Linux 13 min, macOS 27, Windows 39-45), so a hang fails fast; on
+    # 11-20 the macOS job hung 2 of 2 times in pytest under Rosetta (x86_64) until the 120 minute cut.
+    timeout-minutes: ${{ matrix.minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux x86_64, id: linux-x86_64, os: ubuntu-24.04 }
-          - { name: Linux aarch64, id: linux-aarch64, os: ubuntu-24.04-arm }
-          - { name: macOS universal2, id: macos, os: macos-15 }
-          - { name: Windows x64, id: windows, os: windows-2022 }
+          - { name: Linux x86_64, id: linux-x86_64, os: ubuntu-24.04, minutes: 30 }
+          - { name: Linux aarch64, id: linux-aarch64, os: ubuntu-24.04-arm, minutes: 30 }
+          - { name: macOS universal2, id: macos, os: macos-15, minutes: 45 }
+          - { name: Windows x64, id: windows, os: windows-2022, minutes: 90 }
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}', persist-credentials: false }
