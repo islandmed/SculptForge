@@ -1709,13 +1709,13 @@ void Sculptor::relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lam
 // relax of fixed triangles takes a shear out (a sheared lattice is already at its rings' middles). So the dab's other moves (its
 // plane, along the plane's normal) are made first, by every copy, and then all the copies' drags at once (where copies overlap
 // they blend, dabRecipeSingle, so a mirror's two halves don't drag the same clay twice or tear it across the plane). The vertices
-// move with the drag, and then each goes back to over where the drag found it, seen along its normal, on the dragged triangles: a
-// straight walk across them finds the one there, and the point in it is where the drag took the surface that was there (over a
-// triangle the drag is the same mix of its corners'). Every vertex lands on the drag's own moved triangles, which the drag doesn't
-// fold (each copy squeezes a triangle by under 0.35 of itself), at any brush size or step. The drag runs along the surface (the
-// stroke's own step), so the vertices' normals, a few degrees apart, see nearly the same move; the plane's pull, many edges along
-// the normal with a big brush, stays out of it. A vertex whose walk can't be followed (an open edge; a dragged triangle on the
-// way turned away from its normal) stays where the drag put it.
+// move with the drag, and then each goes back to over where the drag found it, seen along the dragged surface's normal at it, on
+// the dragged triangles: a straight walk across them finds the one there, and the point in it is where the drag took the surface
+// that was there (over a triangle the drag is the same mix of its corners'). Every vertex lands on the drag's own moved triangles,
+// which the drag doesn't fold. Where that can't be followed for every vertex of the dab (a walk meets a triangle turned away, the
+// surface pressed flat by a very big brush's plane), or going back would turn a triangle over, the whole dab keeps the vertices
+// where the drag put them, as before (dragSlideFallbacks): all or none, as a vertex left behind among neighbours that went back
+// folds the triangles between them.
 namespace {
 using dvec2 = glm::dvec2;
 double cross2(const dvec2& a, const dvec2& b) { return a.x * b.y - a.y * b.x; }
@@ -1726,32 +1726,25 @@ double cross2(const dvec2& a, const dvec2& b) { return a.x * b.y - a.y * b.x; }
 // the way turns away, an open edge).
 template <class At>
 bool walkTo(const Mesh& mesh, uint32_t v, const glm::dvec3& origin, const glm::dvec3& e1, const glm::dvec3& e2, const dvec2& target,
-            const At& at, uint32_t& tri, double l[3], uint32_t start = ~0u) {
+            const At& at, uint32_t& tri, double l[3]) {
     const auto flat = [&](uint32_t u) { const glm::dvec3 d = at(u) - origin; return dvec2(glm::dot(d, e1), glm::dot(d, e2)); };
-    dvec2 p(0.0);
     tri = ~0u;
-    if (start != ~0u) { // (from inside that triangle, seen along n: the walk then goes where it would have from v)
-        const glm::uvec3 c = mesh.triangles[start];
-        const dvec2 a = flat(c.x), b = flat(c.y), d = flat(c.z);
-        if (cross2(b - a, d - a) > 0.0) tri = start, p = (a + b + d) / 3.0;
-    }
-    if (tri == ~0u) {
-        if (glm::dot(target, target) < 1e-30) { // (stays: v itself)
-            for (uint32_t f : mesh.vertexTriangles(v)) {
-                const glm::uvec3 c = mesh.triangles[f];
-                tri = f, l[0] = c.x == v, l[1] = c.y == v, l[2] = c.z == v;
-                return true;
-            }
-            return false;
-        }
-        for (uint32_t f : mesh.vertexTriangles(v)) { // (the corner of v's fan whose sector holds the way)
+    if (glm::dot(target, target) < 1e-30) { // (stays: v itself)
+        for (uint32_t f : mesh.vertexTriangles(v)) {
             const glm::uvec3 c = mesh.triangles[f];
-            const int k = c.x == v ? 0 : c.y == v ? 1 : 2;
-            const dvec2 fa = flat(c[(k + 1) % 3]), fb = flat(c[(k + 2) % 3]);
-            if (cross2(fa, fb) > 0.0 && cross2(fa, target) >= 0.0 && cross2(target, fb) >= 0.0) { tri = f; break; }
+            tri = f, l[0] = c.x == v, l[1] = c.y == v, l[2] = c.z == v;
+            return true;
         }
-        if (tri == ~0u) return false;
+        return false;
     }
+    for (uint32_t f : mesh.vertexTriangles(v)) { // (the corner of v's fan whose sector holds the way)
+        const glm::uvec3 c = mesh.triangles[f];
+        const int k = c.x == v ? 0 : c.y == v ? 1 : 2;
+        const dvec2 fa = flat(c[(k + 1) % 3]), fb = flat(c[(k + 2) % 3]);
+        if (cross2(fa, fb) > 0.0 && cross2(fa, target) >= 0.0 && cross2(target, fb) >= 0.0) { tri = f; break; }
+    }
+    if (tri == ~0u) return false;
+    dvec2 p(0.0);
     uint32_t from = ~0u;
     for (int step = 0; step < 256; ++step) {
         const glm::uvec3 c = mesh.triangles[tri];
@@ -1814,18 +1807,21 @@ void Sculptor::slideBack(Mesh& mesh, BVH& bvh) {
     slideOld_.resize(verts.size());
     for (size_t i = 0; i < verts.size(); ++i) slideOld_[i] = pos[verts[i]];
     displaceAll(mesh, verts, slideTo_); // (the drag, the vertices moving)
-    const auto& nrm = mesh.normals;     // (those of before the dab: updateDabNormals comes later)
     const auto now = [&](uint32_t u) { return glm::dvec3(pos[u]); };
+    std::atomic<bool> lost{false};
     poolFor(verts.size(), [&](size_t b, size_t e) {
-        uint32_t last = ~0u; // (where the vertex before this one landed: vertices come in runs of neighbours, so a walk from
-                             // there is a step or two, not the whole drag's length)
-        for (size_t i = b; i < e; ++i) {
+        for (size_t i = b; i < e && !lost.load(std::memory_order_relaxed); ++i) {
             const uint32_t v = verts[i];
             slideTo_[i] = glm::vec3(0.0f);
             const glm::dvec3 o(slideOld_[i]), x(pos[v]);
-            const glm::dvec3 n(nrm[v]);
+            if (o == x) continue;
+            glm::dvec3 n(0.0); // (the dragged surface's own, at v: a big brush's plane turns it a long way in one dab)
+            for (uint32_t f : mesh.vertexTriangles(v)) {
+                const glm::uvec3 c = mesh.triangles[f];
+                n += glm::cross(glm::dvec3(pos[c.y]) - glm::dvec3(pos[c.x]), glm::dvec3(pos[c.z]) - glm::dvec3(pos[c.x]));
+            }
             const double nl = glm::length(n);
-            if (o == x || nl < 1e-30) continue;
+            if (nl < 1e-30) { lost.store(true, std::memory_order_relaxed); break; }
             const glm::dvec3 nn = n / nl;
             const glm::dvec3 e1 = glm::normalize(std::abs(nn.x) < 0.9 ? glm::cross(nn, glm::dvec3(1, 0, 0)) : glm::cross(nn, glm::dvec3(0, 1, 0)));
             const glm::dvec3 e2 = glm::cross(nn, e1);
@@ -1834,16 +1830,45 @@ void Sculptor::slideBack(Mesh& mesh, BVH& bvh) {
             // as the drag is the same mix of its corners' over a triangle)
             uint32_t tri = ~0u;
             double l[3];
-            if (!(last != ~0u && walkTo(mesh, v, x, e1, e2, flat(o - x), now, tri, l, last)) &&
-                !walkTo(mesh, v, x, e1, e2, flat(o - x), now, tri, l))
-                continue;
-            last = tri;
+            if (!walkTo(mesh, v, x, e1, e2, flat(o - x), now, tri, l)) {
+                lost.store(true, std::memory_order_relaxed);
+                break;
+            }
             const glm::uvec3 c = mesh.triangles[tri];
             const glm::dvec3 at = glm::dvec3(pos[c.x]) * l[0] + glm::dvec3(pos[c.y]) * l[1] + glm::dvec3(pos[c.z]) * l[2];
             slideTo_[i] = glm::vec3(at - x);
         }
     });
-    displaceAll(mesh, verts, slideTo_);
+    // All of the dab's vertices go back, or none: a vertex left where the drag put it among neighbours that went back folds the
+    // triangles between them. The same if going back would turn a triangle over that the drag left facing its way (a big brush's
+    // plane can press the surface flat against the way back). Such a dab moves the vertices with the clay, as before #198 (a
+    // drag folds nothing by itself: it shears).
+    bool keep = !lost.load();
+    if (keep) {
+        if (slideSlot_.size() != mesh.vertexCount()) slideSlot_.assign(mesh.vertexCount(), ~0u);
+        for (size_t i = 0; i < verts.size(); ++i) slideSlot_[verts[i]] = uint32_t(i);
+        std::atomic<bool> turned{false};
+        const auto after = [&](uint32_t u) {
+            const uint32_t k = slideSlot_[u];
+            return glm::dvec3(pos[u]) + (k != ~0u ? glm::dvec3(slideTo_[k]) : glm::dvec3(0.0));
+        };
+        poolFor(verts.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e && !turned.load(std::memory_order_relaxed); ++i) {
+                const uint32_t v = verts[i];
+                for (uint32_t f : mesh.vertexTriangles(v)) {
+                    const glm::uvec3 c = mesh.triangles[f];
+                    if (std::min({slideSlot_[c.x], slideSlot_[c.y], slideSlot_[c.z]}) != uint32_t(i)) continue; // (once each)
+                    const glm::dvec3 was = glm::cross(glm::dvec3(pos[c.y]) - glm::dvec3(pos[c.x]), glm::dvec3(pos[c.z]) - glm::dvec3(pos[c.x]));
+                    const glm::dvec3 will = glm::cross(after(c.y) - after(c.x), after(c.z) - after(c.x));
+                    if (glm::dot(was, will) <= 0.0) { turned.store(true, std::memory_order_relaxed); break; }
+                }
+            }
+        });
+        for (uint32_t v : verts) slideSlot_[v] = ~0u;
+        keep = !turned.load();
+    }
+    if (keep) displaceAll(mesh, verts, slideTo_);
+    else ++dragSlideFallbacks;
     timings.kernelMs += lapMs(clock);
     bvh.refit(mesh, verts);
     timings.bvhMs += lapMs(clock);

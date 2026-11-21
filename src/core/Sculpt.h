@@ -321,6 +321,8 @@ public:
     // vertices themselves travel with the stroke (0.13.x and before; the invariant tests compare the two shapes).
     // SF_DRAG_SLIDE=0: off (A/B).
     bool dragSlide = dragSlideDefault();
+    // Dabs whose drag moved the vertices with the clay after all (slideBack could not put them all back; the tests count them).
+    size_t dragSlideFallbacks = 0;
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
@@ -481,7 +483,7 @@ private:
     // their planes by slideBack, which puts each vertex back on the dragged surface over where the drag found it (slideOld_).
     void slideBack(Mesh& mesh, BVH& bvh);
     static bool dragSlideDefault();
-    std::vector<uint32_t> slideVerts_;
+    std::vector<uint32_t> slideVerts_, slideSlot_;
     std::vector<glm::vec3> slideOld_, slideTo_, dragPart_;
     std::vector<uint32_t> foldSlot_;
     std::vector<float> foldScale_;
