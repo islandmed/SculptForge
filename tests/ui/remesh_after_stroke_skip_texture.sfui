@@ -1,0 +1,27 @@
+# Remesh after each stroke passes over a Part with a painted texture (Keep Texture carries it over, which takes a while)
+# and says so, naming the key that remeshes it anyway; the topology stays as it was.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+camera 0 0
+click "Texture Image##tool.texture"
+click "Texture Image/Auto UV"
+wait_idle 120
+click "Texture Image/New Texture"
+expect_value texture_size == 2048
+remember triangles before
+click "Remesh##tool.remesh"
+click "Quick Remesh##remesh.quick"
+click "Remesh after each stroke##remesh.after_stroke"
+expect_value remesh_skip_notes == 0
+click "Move##brush.move"
+snapshot
+stroke 0.86 0.5 0.98 0.38
+expect_value moved > 0
+wait_idle 30
+expect_value voxel_remesh_running == 0
+expect_value triangles == $before
+expect_value remesh_skip_notes == 1
+expect_status this Part has a painted texture
+expect_status Shift+R remeshes it anyway
+shot skipped_texture
