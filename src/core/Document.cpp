@@ -443,6 +443,14 @@ std::string Document::assetName() const {
 }
 
 void Document::replaceMeshUndoable(Mesh m, std::string label, bool keepTree) {
+    replaceMeshUndoable(std::move(m), std::move(label), keepTree, nullptr);
+}
+
+void Document::replaceMeshUndoable(Mesh m, std::string label, BVH tree) {
+    replaceMeshUndoable(std::move(m), std::move(label), false, &tree);
+}
+
+void Document::replaceMeshUndoable(Mesh m, std::string label, bool keepTree, BVH* tree) {
     if (!m.selectionSets) m.selectionSets = mesh.selectionSets; // the Part keeps its sets (restoring checks they fit)
     if (m.multires && !subdivMatches(m)) m.multires.reset();
     if (mesh.multires && !m.multires) {
@@ -460,7 +468,8 @@ void Document::replaceMeshUndoable(Mesh m, std::string label, bool keepTree) {
     mesh = std::move(m);
     mesh.topologyDirty = true;
     try {
-        bvh.build(mesh);
+        if (tree && tree->nodeCount()) bvh = std::move(*tree);
+        else bvh.build(mesh);
     } catch (const std::bad_alloc&) { // out of memory landing a big mesh: the Part goes back as it was, then the caller reports
         mesh = std::move(*r.mesh);
         bvhDirty = true;

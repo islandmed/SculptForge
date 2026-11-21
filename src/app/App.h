@@ -1782,6 +1782,9 @@ private:
     void drawForgeSpheresContents();                          // Tool > Forge Spheres
     bool forgesphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void forgesphereDragTo(float x, float y);
+    void flushForgeSphereDrag();                                // the pointer's moves since the last frame, as one
+    void forgesphereShow(const std::vector<ForgeSphere>& s);    // a drag's armature on screen (in place when it can)
+    glm::vec3 forgesphereGrab(float x, float y, const glm::vec3& center) const; // Move: the centre's offset from the press
     void forgesphereRelease();
     void drawForgeSphereOverlay();                            // the hovered sphere's outline
     bool forgesphereActive() const { return !doc_.mesh.forgespheres.empty(); }
@@ -1790,6 +1793,8 @@ private:
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
     ForgeSphereMode forgesphereMode_ = ForgeSphereMode::Draw;
     bool forgespherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    bool forgesphereSnap_ = false;      // Move: a moved sphere's centre lands on the sphere under the pointer
+    bool forgesphereBranch_ = false;    // Move: what grows from a moved sphere comes along
     int forgesphereHint_ = 0;           // the overlay's hint: what a Draw drag would do (0 none, 1 move, 2 resize, 3 add)
     int forgesphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
     // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
@@ -1822,6 +1827,9 @@ private:
         float rimFrom = 0.0f;          // Draw's resize: the press's screen distance from the sphere's centre
         int added = -1;                // Draw: the new sphere's index
         const char* label = "";
+        bool pendingMove = false;      // a pointer move waits for the frame (flushForgeSphereDrag)
+        float atX = 0.0f, atY = 0.0f;  // ... where the pointer is
+        bool keepLength = false;       // Move: Shift held at the last update (its link keeps its length)
     } zsDrag_;
     // Tube (PanelTube.cpp, core/Tube.h): with Draw Tube on, a left-drag anywhere draws a clay tube in the air (on a
     // plane facing the view, or snapped onto surfaces); a Tube Part's points are dragged to move them (Ctrl: resize,

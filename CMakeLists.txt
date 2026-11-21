@@ -1579,6 +1579,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Forge Spheres in one mode (#167): the hover hint and drags at 1440 and 2880 px (tests/ui/forge_spheres_one_mode.sfui).
     sculptforge_ui_test(forge_spheres_one_mode_1440 forge_spheres_one_mode --size 1440x900)
     sculptforge_ui_test(forge_spheres_one_mode_2880 forge_spheres_one_mode --size 2880x1800)
+    # Moving Forge Spheres (tests/ui/forge_spheres_move.sfui): depth, Shift, Snap to Surface on a long chain, at 1440 and 2880 px.
+    sculptforge_ui_test(forge_spheres_move_1440 forge_spheres_move --size 1440x900)
+    sculptforge_ui_test(forge_spheres_move_2880 forge_spheres_move --size 2880x1800)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)

@@ -872,6 +872,28 @@ double Demo::query(const std::string& name, bool& known) const {
         const ForgeSphere& p = m.forgespheres[size_t(m.forgespheres[i].parent)];
         return double(glm::distance(m.forgespheres[i].center, p.center) / p.radius);
     }
+    if (name.rfind("forgesphere_len", 0) == 0) { // forgesphere_len2: sphere 2's link length (to its parent), x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 15));
+        if (i == 0 || i >= m.forgespheres.size()) return -1.0;
+        return 1000.0 * double(glm::distance(m.forgespheres[i].center, m.forgespheres[size_t(m.forgespheres[i].parent)].center));
+    }
+    if (name.rfind("forgesphere_depth", 0) == 0) { // forgesphere_depth2: sphere 2's depth in the view, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 17));
+        if (i >= m.forgespheres.size()) return -1.0;
+        const Camera c = app_.partCamera();
+        return 1000.0 * double(glm::dot(m.forgespheres[i].center - c.position(), glm::normalize(c.forward())));
+    }
+    if (name == "forgesphere_snap") return app_.forgesphereSnap_ ? 1.0 : 0.0;
+    if (name.rfind("forgesphere_surface", 0) == 0) { // forgesphere_surface2: sphere 2's centre's gap to the nearest other sphere's surface, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 19));
+        if (i >= m.forgespheres.size()) return -1.0;
+        double best = 1e9;
+        for (size_t j = 0; j < m.forgespheres.size(); ++j)
+            if (j != i)
+                best = std::min(best, std::abs(double(glm::distance(m.forgespheres[i].center, m.forgespheres[j].center)) -
+                                               double(m.forgespheres[j].radius)));
+        return 1000.0 * best;
+    }
     if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
@@ -2869,15 +2891,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // drag_forgesphere K body|rim|link DX DY [seconds] [right]: press on Forge Sphere K's body (its centre), just
         // inside its outline (the rim band Draw resizes with, #167) or on its link to its parent (halfway across the
         // gap between the surfaces), and drag DX, DY pixels; 0 0 is a click; "right" uses the right button. "hover"
-        // in place of DX DY rests the pointer there (the hint, for shots).
+        // in place of DX DY rests the pointer there (the hint, for shots). events=N sends N pointer moves a frame along
+        // the way, as a fast mouse or pen does (default 1).
         if (!need(3)) return false;
         const int index = int(num(1, 0));
         const bool rim = w[2] == "rim", onLink = w[2] == "link", hoverOnly = w[3] == "hover";
         const float dx = hoverOnly ? 0.0f : num(3, 0), dy = hoverOnly ? 0.0f : num(4, 0), seconds = num(5, 0.4f);
         const Uint8 button = w.size() > 6 && w[6] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        int events = 1;
+        for (size_t k = 4; k < w.size(); ++k)
+            if (w[k].rfind("events=", 0) == 0) events = std::clamp(std::atoi(w[k].c_str() + 7), 1, 64);
         auto start = std::make_shared<ImVec2>();
         auto pressed = std::make_shared<bool>(false);
-        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, start, pressed](float t) {
+        auto lastU = std::make_shared<float>(0.0f);
+        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, events, start, pressed,
+                          lastU](float t) {
             if (t == 0.0f) {
                 const std::vector<ForgeSphere>& zs = app_.doc_.mesh.forgespheres;
                 ImVec2 c;
@@ -2903,7 +2931,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 *pressed = true;
             }
             const float u = std::min(t / seconds, 1.0f);
-            mouseMotion(start->x + dx * u, start->y + dy * u);
+            for (int e = 1; e <= events; ++e) {
+                const float v = *lastU + (u - *lastU) * float(e) / float(events);
+                mouseMotion(start->x + dx * v, start->y + dy * v);
+            }
+            *lastU = u;
             if (t >= seconds) {
                 mouseButton(false, button);
                 return true;
