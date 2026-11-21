@@ -118,7 +118,6 @@
             <tr><td>🧩 Parts &amp; Scene: Numbered duplicates (Head.01) instead of &quot;copy copy&quot;</td><td class="st">Building</td></tr>
             <tr><td>⚡ Performance: Faster Quad Remesh at high polygon counts</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Python scripting inside the regular app&#x27;s console and scripts (loops, conditions); today the flat command language only, while the sculptforge Python module ships in studio/VFX Platform builds and source builds</td><td class="st">Building</td></tr>
-            <tr><td>🎨 Painting: Smooth / blur vertex colours (e.g. Shift while painting, or a colour-blur brush); today Shift smooths the shape only and the Smooth brush never changes colour</td><td class="st">Building</td></tr>
             <tr><td>📦 Files &amp; Pipeline: Bones and skin weights as USD skeletons, posing first</td><td class="st">Designing</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Paint layers exported as separate colour attributes</td><td class="st">Planned</td></tr>
             <tr><td>🔷 Topology: Sculpt layers on micro levels</td><td class="st">Planned</td></tr>
@@ -170,7 +169,6 @@
             <tr><td>⌨️ Interface: Startup splash screen (with the first-run welcome card)</td><td class="st">Queued</td></tr>
             <tr><td>🧩 Parts &amp; Scene: Primitive blockout kit: more primitives (cylinder, capsule, cone, torus), click-to-place on the surface, then merge the blockout into one mesh (Voxel Remesh)</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: Quad Remesh options: adaptive (curvature-based) density, Repeat, Retry, curve strength for guide curves</td><td class="st">Queued</td></tr>
-            <tr><td>⚡ Performance: Remesh low-memory: &quot;Proceed anyway&quot; warning (allow swapping) instead of a hard stop, clear feedback if memory runs out</td><td class="st">Queued</td></tr>
             <tr><td>👕 Cloth &amp; Garments: Wind for the Drape tool: direction, turbulence and similar parameters</td><td class="st">Queued</td></tr>
             <tr><td>🔷 Topology: Panel tool: turn a selection / face group into a thin panel with thickness and edge loops (hard-surface panels)</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Alternate interface</td><td class="st">Queued</td></tr>
@@ -211,7 +209,6 @@
             <tr><td>🎨 Paint &amp; Materials: Shadow intensity slider (deeper, more contrasty cast shadows); today only Shadow softness, AO strength and AO softness</td><td class="st">Queued</td></tr>
             <tr><td>🖌️ Brushes: Simple soft brush trio: (1) lift-only brush that doesn&#x27;t move polygons, (2) clay that adds only where needed, (3) fine line/stroke brush for mouth and eyes without flattening; all soft, pressure-sensitive, Alt inverts</td><td class="st">Queued</td></tr>
             <tr><td>🖌️ Brushes: Move variants: (1) move without tearing polygons, (2) move only the connected surface, (3) parallel move (rigid translate), (4) elastic move; part of his feedback that Standard/Clay/Crease/Clay Rock feel wrong</td><td class="st">Queued</td></tr>
-            <tr><td>🖌️ Brushes: Higher-resolution, production-ready built-in alphas and brush packs for micro levels (sharper detail, fewer filler brushes)</td><td class="st">Queued</td></tr>
             <tr><td>🎨 Paint &amp; Materials: Add your own HDRI environments from the Material panel (a button), not only via a folder in the SCULPTFORGE_HDRI_PATH variable</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Preview window for the clicked mesh: a small window showing the Part you clicked</td><td class="st">Queued</td></tr>
             <tr><td>⌨️ Interface: Choose which tray a palette opens in when you click its name in the Classic top bar (it opens in the left tray; he works from the right one)</td><td class="st">Queued</td></tr>
@@ -248,13 +245,16 @@
             <tr><td>📦 Files &amp; Pipeline: Render bridge: send a quick render straight to an image editor (any program) for client previews</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Hydra render delegate (low priority, with the render bridge)</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Mesh Boolean: live Union/Subtract/Intersect preview + Make Boolean Mesh (new mesh, sources untouched), weld and face group options</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
+            <tr><td>⚡ Performance: Remesh low-memory: &quot;Proceed anyway&quot; warning (allow swapping) instead of a hard stop, clear feedback if memory runs out</td><td class="st">Shipped<span class="detail">in 0.13.10</span></td></tr>
             <tr><td>🖌️ Brushes: Smooth-peaks brush: smooths only the high points (peaks), valleys untouched</td><td class="st">Shipped<span class="detail">in 0.12.7</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Save a project with only some Parts (e.g. only the visible ones) to slim the file after working on different versions</td><td class="st">Shipped<span class="detail">in 0.12.6</span></td></tr>
             <tr><td>🎭 Masking &amp; Face Groups: Cut Circle: cut the mesh with a circle/ellipse shape (resizable, free or locked round), next to Cut Line/Lasso/Rectangle/Polyline</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>🎭 Masking &amp; Face Groups: Hold Space while drawing a mask/select/cut shape (rectangle, lasso, line) to slide it into place instead of redrawing</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>⌨️ Interface: Double-click any slider/knob to type an exact value (consistent everywhere)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
+            <tr><td>🖌️ Brushes: Higher-resolution, production-ready built-in alphas and brush packs for micro levels (sharper detail, fewer filler brushes)</td><td class="st">Shipped<span class="detail">in 0.13.10</span></td></tr>
             <tr><td>🧩 Parts &amp; Scene: Insert (Append &gt; Insert on the model) on meshes that keep their subdivision levels, instead of refusing; today needs a mesh without levels (Freeze Levels first)</td><td class="st">Shipped<span class="detail">in 0.13.7</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Script-made buttons and panels: a script as a shelf button or a My Panel entry (today no script can add UI; saved scripts run via File &gt; Script &gt; Run script file...)</td><td class="st">Shipped<span class="detail">in 0.13.8</span></td></tr>
+            <tr><td>🎨 Painting: Smooth / blur vertex colours (e.g. Shift while painting, or a colour-blur brush); today Shift smooths the shape only and the Smooth brush never changes colour</td><td class="st">Shipped<span class="detail">in 0.13.10</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Python sf.ui: expose the main window&#x27;s native handle (HWND on Windows) so custom PySide dialogs can group with the main window</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>📦 Files &amp; Pipeline: Environment variable search path for Python scripts (like SCULPTFORGE_BRUSH_PATH), so scripts can live in shared folders</td><td class="st">Shipped<span class="detail">in 0.13.9</span></td></tr>
             <tr><td>Light rotation on one axis</td><td class="st">Already in the app<span class="detail">PBR shading &gt; Rotation</span></td></tr>
