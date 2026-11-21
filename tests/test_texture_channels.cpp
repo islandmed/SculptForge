@@ -756,3 +756,109 @@ TEST(texture_edits_replace_the_texture_object) {
     CHECK(old.expired());
     CHECK(channelEnabled(*doc.mesh.texture, Channel::Roughness));
 }
+
+// Member bug (macOS, Option-paint): after painting metal, Alt with a colour brush put white over it but left the metal
+// under it. A true erase on Base clears every channel; on a layer it goes back to transparent.
+TEST(alt_erase_on_base_clears_every_channel_even_with_a_colour_only_brush) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Roughness, true);
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    doc.syncBvh();
+    paintCentre(m, doc.bvh, rustyMetal(), 0.4f);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+    CHECK(m.texture->pixels[(size_t(256) * 512 + 256) * 4 + 2] < 100); // rust: not white
+
+    // The App begins an erase stroke with every enabled channel; the brush itself only paints colour.
+    BrushMaterial colourOnly;
+    colourOnly.color = glm::vec3(1, 0, 0);
+    colourOnly.channels = channelBit(Channel::BaseColor);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f);
+    d.invert = true;
+    CHECK(p.dab(m, doc.bvh, d, colourOnly, Symmetry{}) > 0);
+    UndoRecord e;
+    p.end(e);
+    CHECK(centreValue(*m.texture, Channel::Metallic) < 0.02f);
+    CHECK(std::abs(centreValue(*m.texture, Channel::Roughness) - 0.65f) < 0.02f);
+    CHECK(m.texture->pixels[(size_t(256) * 512 + 256) * 4 + 2] > 250); // back to white
+    doc.undo.push(std::move(e));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh)); // one undo step brings the metal back
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+
+    // A brush that paints only roughness still erases only roughness (no colour in it).
+    BrushMaterial roughOnly;
+    roughOnly.channels = channelBit(Channel::Roughness);
+    TexturePainter q;
+    CHECK(q.begin(m, roughOnly.channels));
+    q.dab(m, doc.bvh, d, roughOnly, Symmetry{});
+    UndoRecord e2;
+    q.end(e2);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+}
+
+TEST(alt_erase_on_a_texture_layer_goes_back_to_transparent) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    const int li = addTextureLayer(*m.texture, "Gold");
+    CHECK(li == 0);
+    doc.syncBvh();
+    BrushMaterial gold = rustyMetal();
+    gold.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Metallic);
+    paintCentre(m, doc.bvh, gold, 0.4f);
+    const PaintTexture& t = *m.texture;
+    const size_t px = (size_t(256) * 512 + 256) * 4;
+    CHECK(t.layers[0].rgba[px + 3] > 250);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f);
+    d.invert = true;
+    p.dab(m, doc.bvh, d, gold, Symmetry{});
+    UndoRecord e;
+    p.end(e);
+    CHECK(t.layers[0].rgba[px + 3] < 3);                          // colour coverage gone
+    CHECK(centreValue(t, Channel::Metallic) < 0.02f);                // the composite shows no metal
+    CHECK(t.pixels[px + 2] > 250 || t.base[px + 2] > 250);           // what shows is the Base below
+}
+
+// The soft rim of a stroke is faint paint; erasing with the same brush must not leave a ghost outline of it (member
+// bug: a jagged grey/white outline where the paint was).
+TEST(alt_erase_over_the_same_soft_stroke_leaves_no_ghost_rim) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Roughness, true);
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    setChannelEnabled(*m.texture, Channel::Opacity, true);
+    doc.syncBvh();
+    BrushMaterial purple = rustyMetal();
+    purple.color = glm::vec3(0.3f, 0.05f, 0.6f);
+    purple.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic) |
+                      channelBit(Channel::Opacity);
+    purple.opacity = 0.5f;
+    paintCentre(m, doc.bvh, purple, 0.4f);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+    size_t tinted = 0;
+    for (size_t i = 0; i < m.texture->pixels.size(); i += 4) tinted += m.texture->pixels[i + 1] < 255;
+    CHECK(tinted > 1000);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f);
+    d.invert = true;
+    p.dab(m, doc.bvh, d, purple, Symmetry{});
+    UndoRecord e;
+    p.end(e);
+    size_t left = 0, metal = 0, notOpaque = 0;
+    for (size_t i = 0; i < m.texture->pixels.size(); i += 4) left += m.texture->pixels[i + 1] < 255;
+    const TileImage& mi = channelImage(*m.texture, Channel::Metallic);
+    const TileImage& oi = channelImage(*m.texture, Channel::Opacity);
+    for (int y = 0; y < m.texture->height; ++y)
+        for (int x = 0; x < m.texture->width; ++x) {
+            metal += mi.value(x, y) > 0.0f;
+            notOpaque += oi.value(x, y) < 1.0f;
+        }
+    CHECK(left == 0);       // every texel white again, rim included
+    CHECK(metal == 0);      // no metal left at the rim
+    CHECK(notOpaque == 0);  // Opacity is among the channels Alt resets
+}

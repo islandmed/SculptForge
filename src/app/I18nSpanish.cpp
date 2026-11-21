@@ -4353,6 +4353,7 @@ constexpr Entry kSpanish[] = {
      "%s: %s, %s, %d%%\nClic: activar / desactivar. Clic derecho: fusión y opacidad."},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: rugosidad %.2f, metálico %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "El metal refleja su entorno: se ve oscuro en un entorno oscuro."},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu puntos, altura %.3g, alcance %.2f radios"},
     {"%zu result",

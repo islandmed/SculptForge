@@ -533,6 +533,13 @@ private:
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
+    // The brush material before a swatch set it, and what the swatch set: a plain colour picked afterwards gives the
+    // roughness / metallic / channels back, so red after Gold is red paint, not red metal (beginPaintStroke).
+    struct MaterialSwatchMemo {
+        bool active = false;
+        BrushMaterial before, applied;
+        glm::vec3 color{1.0f};
+    } swatchMemo_;
     glm::vec3 grabLast_{0.0f};
     // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
     // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the

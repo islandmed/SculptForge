@@ -4856,6 +4856,7 @@ constexpr Entry kJapanese[] = {
      "%s: %s、%s、%d%%\nクリック: オン/オフ。右クリック: ブレンドと不透明度。"},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: 粗さ%.2f、メタリック%.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "金属は周囲を映します。暗い環境では暗く見えます。"},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zuポイント、高さ%.3g、到達範囲%.2f半径"},
     {"%zu result",
