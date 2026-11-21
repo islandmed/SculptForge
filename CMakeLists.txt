@@ -1604,6 +1604,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
     sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
     sculptforge_ui_test(betas_wording_2880 betas_wording --size 2880x1620)
+    sculptforge_ui_test(member_card_1440 member_card --size 1440x900) # the Updated member card's wording (shot "updated")
+    sculptforge_ui_test(member_card_2880 member_card --size 2880x1620)
     sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
     sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
     sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)

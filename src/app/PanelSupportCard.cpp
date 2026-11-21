@@ -708,7 +708,7 @@ void App::drawMemberCard() {
             case MemberMoment::Sculpted: line = "Twenty minutes of sculpting. Members keep SculptForge free and moving."; break;
             case MemberMoment::SavedRender: line = "Nice render. Members keep SculptForge free and moving."; break;
             case MemberMoment::Updated:
-                line = std::string("SculptForge ") + appVersionLabel() + " is here. Members get new versions early, as betas.";
+                line = std::string("SculptForge ") + appVersionLabel() + " is here. Members get early builds, like SculptForge for Android today.";
                 break;
             case MemberMoment::Challenge:
                 line = challengeTitle_.empty() ? std::string("The monthly challenge results are in, on Discord.")
@@ -723,7 +723,7 @@ void App::drawMemberCard() {
             ImGui::TextWrapped("%s", line.c_str());
             if (bold) ImGui::PopFont();
             ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
-            ImGui::TextWrapped("%s", "$48 a year or $5 a month: betas early, the feature vote, Member Requests and your "
+            ImGui::TextWrapped("%s", "$48 a year or $5 a month: early builds, the feature vote, Member Requests and your "
                                      "name in the credits. Nothing in the app is ever paywalled.");
             ImGui::PopStyleColor();
             // The feed's honest line in turn (latest.json's "support"), else the Founding Members' offer.
