@@ -1016,14 +1016,20 @@ void App::drawGizmo() {
     } else {
         // Rotate: rings with their back halves dimmed, the view ring outside them. In All, a ring seen nearly
         // edge-on (a line through the centre, over the shafts) and the back halves fade further: the shafts own it.
+        // Within 15 degrees of edge-on it is faint and cannot be picked; up to 35 degrees only its rim picks (the
+        // rest is drawn fainter), so what is drawn solid is what a press takes (app/GizmoAll.h).
+        const ga::Screen sc0 = all ? gizmoAllScreen() : ga::Screen{};
         for (int i = 0; i < 3; ++i) {
             const glm::vec3 u = f[(i + 1) % 3], v = f[(i + 2) % 3];
             const H h = H(int(H::RotateX) + i);
             const bool hot = gizmo_.hover == h;
             const ImU32 col = colorFor(h, i);
             const float face = std::abs(glm::dot(f[i], toEye));
-            const float fade = all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
-            const ImU32 front = withAlpha(col, fade), back = withAlpha(col, all ? 0.18f : 0.28f);
+            const ga::Screen::Axis::RingPick pickMode = all ? ga::ringPickFor(face) : ga::Screen::Axis::RingFull;
+            const bool faded = pickMode == ga::Screen::Axis::RingFaded;
+            const float fade = faded ? 0.2f : all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
+            const ImU32 front = withAlpha(col, fade), back = withAlpha(col, faded ? 0.1f : all ? 0.18f : 0.28f);
+            const ImU32 rest = withAlpha(col, fade * 0.45f); // (the rim-only ring's part that does not pick)
             const float w = hot ? thick + 0.8f * s : all ? 2.2f * s : thick;
             ImVec2 prev;
             bool havePrev = false, prevFront = true;
@@ -1038,8 +1044,10 @@ void App::drawGizmo() {
                 const bool isFront = glm::dot(r, toEye) > -0.02f;
                 if (havePrev) {
                     if (isFront && prevFront) {
-                        dl->AddLine(prev, p, withAlpha(shadow, fade * 0.8f), w + 2.0f * s);
-                        dl->AddLine(prev, p, front, w);
+                        const bool picks = !all || (ga::ringPointPicks(sc0, sc0.axis[i], glm::vec2(p.x, p.y)) &&
+                                                    ga::ringPointPicks(sc0, sc0.axis[i], glm::vec2(prev.x, prev.y)));
+                        if (!faded && picks) dl->AddLine(prev, p, withAlpha(shadow, fade * 0.8f), w + 2.0f * s);
+                        dl->AddLine(prev, p, picks || faded ? front : rest, faded ? 1.4f * s : w);
                     } else {
                         dl->AddLine(prev, p, back, 1.4f * s);
                     }
@@ -1089,6 +1097,12 @@ void App::drawGizmo() {
         std::sort(order, order + 3, [&](int a, int b) { return sc.axis[a].depth < sc.axis[b].depth; });
         for (int i : order) {
             const ga::Screen::Axis& ax = sc.axis[i];
+            if (ax.arrowFaded) { // pointing at the viewer: a faint hollow marker where it ends, nothing to press
+                const ImU32 ghost = withAlpha(axisColor(i, 1.0f), 0.32f);
+                if (glm::length(ax.tip - ax.from) > 1.0f) dl->AddLine(im(ax.from), im(ax.tip), ghost, 1.2f * s);
+                dl->AddCircle(im(ax.tip), 4.5f * s, ghost, 16, 1.2f * s);
+                continue;
+            }
             if (!ax.arrow) continue;
             const H h = H(int(H::MoveX) + i);
             const ImU32 col = colorFor(h, i);
