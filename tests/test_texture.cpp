@@ -811,3 +811,124 @@ TEST(texture_smooth_dab_keeps_mask_symmetry_and_layers) {
         CHECK(m.texture->layers[0].rgba == layerBefore);
     }
 }
+
+// "Smooth colour" on a texture smears about as far as the same dabs do on vertex colours (the blur's radius is the
+// mesh's mean triangle edge in texels): a hard red / blue edge on a plane, three full-strength dabs on each.
+TEST(texture_smooth_smears_like_vertex_colours) {
+    const float r = 0.5f;
+    auto edge = [](float x) { return x < 0.0f ? 1.0f : 0.0f; }; // red (R = 1) on the left, blue (R = 0) on the right
+    // Vertex colours.
+    Document vd = makeDoc(makePlane(32));
+    Mesh& vm = vd.mesh;
+    vm.ensureColors();
+    for (uint32_t v = 0; v < vm.vertexCount(); ++v) vm.colors[v] = glm::vec3(edge(vm.positions[v].x), 0.0f, 1.0f - edge(vm.positions[v].x));
+    const std::vector<glm::vec3> v0 = vm.colors;
+    CHECK(vd.sculptor.beginStroke(vm, "Paint"));
+    for (int i = 0; i < 3; ++i) paintSmoothDab(vd.sculptor, vm, vd.bvh, dab(glm::vec3(0.0f), r, 1.0f), Symmetry{false, false, false});
+    vd.undo.push(vd.sculptor.endStroke());
+    double vertexChange = 0.0;
+    size_t vn = 0;
+    for (uint32_t v = 0; v < vm.vertexCount(); ++v)
+        if (glm::length(vm.positions[v]) < r * 0.9f) vertexChange += std::abs(vm.colors[v].x - v0[v].x), ++vn;
+    vertexChange /= double(vn);
+    // Texels: the same edge in linear colour.
+    Document td = makeDoc(texturedPlane(32, 512));
+    Mesh& tm = td.mesh;
+    PaintTexture& tex = *tm.texture;
+    for (int y = 0; y < tex.height; ++y)
+        for (int x = 0; x < tex.width; ++x) {
+            uint8_t* p = &tex.pixels[(size_t(y) * size_t(tex.width) + size_t(x)) * 4];
+            const float red = edge(planePoint(tex, x, y).x);
+            p[0] = uint8_t(red * 255.0f), p[1] = 0, p[2] = uint8_t((1.0f - red) * 255.0f), p[3] = 255;
+        }
+    const std::vector<uint8_t> t0 = tex.pixels;
+    TexturePainter painter;
+    CHECK(painter.begin(tm, channelBit(Channel::BaseColor)));
+    for (int i = 0; i < 3; ++i) painter.smoothDab(tm, td.bvh, dab(glm::vec3(0.0f), r, 1.0f), Symmetry{false, false, false});
+    UndoRecord rec;
+    painter.end(rec);
+    double texelChange = 0.0;
+    size_t tn = 0;
+    for (int y = 0; y < tex.height; ++y)
+        for (int x = 0; x < tex.width; ++x)
+            if (glm::length(planePoint(tex, x, y)) < r * 0.9f) {
+                const size_t i = (size_t(y) * size_t(tex.width) + size_t(x)) * 4;
+                texelChange += std::abs(srgbToLinear(glm::vec3(float(tex.pixels[i]) / 255.0f)).x - srgbToLinear(glm::vec3(float(t0[i]) / 255.0f)).x), ++tn; // (linear, as the vertex colours are)
+            }
+    texelChange /= double(tn);
+    std::printf("  mean red change under the brush after 3 full dabs: vertex colours %.4f, texels %.4f\n", vertexChange, texelChange);
+    CHECK(vertexChange > 0.01);
+    CHECK(texelChange > vertexChange * 0.5 && texelChange < vertexChange * 2.0);
+}
+
+TEST(texture_smooth_dab_is_interactive_at_4k_on_a_million_triangles) {
+    // The floor row for Shift's smooth colour on a texture: ms per dab next to a paint dab on the same scene.
+    Mesh m = makeIcosphere(8); // 1.3M triangles
+    sphericalUvs(m);
+    m.texture = makeTexture(4096, 4096);
+    m.paintToTexture = true;
+    BVH bvh;
+    bvh.build(m);
+    DabParams p = dab(glm::vec3(0, 0, 1), 0.08f, 0.5f);
+    p.viewDir = glm::vec3(0, 0, -1);
+    std::printf("  smooth colour vs paint at 4K / %zu tris (X symmetry, 20 dabs): radius -> ms per dab (texels)\n", m.triangleCount());
+    for (float radius : {0.08f, 0.25f}) {
+        p.radius = radius;
+        double ms[2] = {0, 0};
+        size_t texels[2] = {0, 0};
+        for (int smooth = 0; smooth < 2; ++smooth) {
+            TexturePainter painter;
+            CHECK(painter.begin(m, channelBit(Channel::BaseColor)));
+            auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 20; ++i) {
+                p.center = glm::normalize(glm::vec3(-0.3f + 0.03f * float(i), 0.1f, 1.0f));
+                texels[smooth] += smooth ? painter.smoothDab(m, bvh, p, Symmetry{true, false, false})
+                                         : painter.dab(m, bvh, p, glm::vec3(1, 0, 0), Symmetry{true, false, false});
+            }
+            ms[smooth] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+            UndoRecord rec;
+            painter.end(rec);
+        }
+        std::printf("    r %.2f: paint %.2f ms (%zu), smooth %.2f ms (%zu)\n", double(radius), ms[0], texels[0] / 20, ms[1], texels[1] / 20);
+        CHECK(texels[1] > 0);
+        CHECK(ms[1] < timeLimit(60.0));
+    }
+}
+
+TEST(texture_smooth_stays_inside_its_uv_island) {
+    // Two islands packed 2.5 texels apart (the left half of a plane squeezed to u < 0.495), red and blue: the blur's
+    // radius is about 11 texels here, so a plain box would carry blue into the red island and back.
+    Mesh m = texturedPlane(32, 512);
+    for (size_t t = 0; t < m.triangleCount(); ++t) {
+        const float cx = (m.positions[m.triangles[t].x].x + m.positions[m.triangles[t].y].x + m.positions[m.triangles[t].z].x) / 3.0f;
+        if (cx < 0.0f)
+            for (int c = 0; c < 3; ++c) m.uvs[t * 3 + size_t(c)].x *= 0.99f;
+    }
+    Document doc = makeDoc(std::move(m));
+    PaintTexture& tex = *doc.mesh.texture;
+    for (int y = 0; y < tex.height; ++y)
+        for (int x = 0; x < tex.width; ++x) {
+            uint8_t* p = &tex.pixels[(size_t(y) * size_t(tex.width) + size_t(x)) * 4];
+            p[0] = x < 256 ? uint8_t(128 + ((uint32_t(y * 512 + x) * 2654435761u >> 24) & 127u)) : 0, p[1] = 0, p[2] = x < 256 ? 0 : 255, p[3] = 255;
+        } // (the red island is noisy, so smoothing inside it has something to do)
+    const std::vector<uint8_t> before = tex.pixels;
+    TexturePainter painter;
+    CHECK(painter.begin(doc.mesh, channelBit(Channel::BaseColor)));
+    size_t changed = 0;
+    for (int i = 0; i < 6; ++i)
+        changed += painter.smoothDab(doc.mesh, doc.bvh, dab(glm::vec3(0.0f), 0.5f, 1.0f), Symmetry{false, false, false});
+    UndoRecord rec;
+    painter.end(rec);
+    CHECK(changed > 0);
+    int blueInRed = 0, redInBlue = 0;
+    for (int y = 0; y < tex.height; ++y)
+        for (int x = 0; x < tex.width; ++x) {
+            const uint8_t* p = texel(tex, x, y);
+            if (x <= 252 && p[2] != 0) ++blueInRed;
+            if (x >= 258 && p[0] != 0) ++redInBlue;
+        }
+    CHECK(blueInRed == 0);
+    CHECK(redInBlue == 0);
+    // ...and the red island does smooth inside itself.
+    CHECK(tex.pixels != before);
+}

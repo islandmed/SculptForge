@@ -215,8 +215,10 @@ public:
     // only when `material.channels` has it), with the same falloff, coverage and undo.
     size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym);
     // Smooth colour (Shift with the Paint brush): blends the colour texels under the brush toward the average of their
-    // neighbours (3x3, UV islands only) by falloff x strength x pressure x (1 - mask), with symmetry, on the active
-    // layer (its coverage smooths too). Each dab reads the texels as the last one left them, so a drag keeps smoothing.
+    // neighbours by falloff x strength x pressure x (1 - mask), with symmetry, on the active layer (its coverage
+    // smooths too). "Neighbours" are the UV-island texels within the mesh's mean triangle edge in texels, so a stroke
+    // smears as far as the same stroke does on vertex colours. Each dab reads the texels as the last one left them,
+    // so a drag keeps smoothing.
     // Touches no material channel and never the shape. Needs begin(mesh, channelBit(BaseColor)). Returns texels changed.
     size_t smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
     // Ends the stroke: the touched tiles become `record.textureTiles` (nothing when no texel changed).
@@ -261,7 +263,8 @@ private:
     bool useTilePath(const Mesh& mesh, PaintTexture& tex, bool force = false) const;
     template <class Paint> // paint(tile record, texel in tile, x, y, coverage, this dab's weight)
     size_t dabTiles(const DabContext& ctx, const Paint& paint, bool composite,
-                    std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects);
+                    std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects,
+                    const std::function<void(const std::vector<uint32_t>&)>* prepare = nullptr); // (called with the tiles the dab reaches, before any texel)
     std::vector<uint32_t> touched_;     // tiles a dab reaches
     std::vector<uint8_t> touchedFlag_;  // per tile
     // The tile's stroke record, made on first touch (thread-safe).
@@ -280,6 +283,9 @@ private:
     std::unique_ptr<std::atomic<Tile*>[]> tilePtr_; // the same tiles, for lock-free lookups from the band threads
     std::mutex tileMutex_;                          // guards making a tile
     uint32_t dab_ = 0;
+    int smoothRadius_ = 0;                        // smoothDab: the blur's radius in texels (0: not worked out yet this stroke)
+    std::vector<std::vector<float>> smoothBlur_; // smoothDab: per tile, the box-blurred colour sums of the dab
+    std::vector<uint32_t> smoothIsland_;          // smoothDab: each triangle's UV island (1-based), worked out once a stroke
     std::vector<uint32_t> tris_;
     std::vector<DabTri> dabTris_;
     std::vector<std::vector<uint32_t>> bandTris_; // per 16-row band: indices into dabTris_, in serial order
