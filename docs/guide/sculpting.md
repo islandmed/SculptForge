@@ -232,7 +232,7 @@ are saved with the preferences and the project (custom brushes can turn them on 
 | Option | What it does |
 |---|---|
 | **Connected only** | The brush only moves the surface joined to the point under the cursor, within the brush size. Inflate a finger and the next finger stays as it is; Move one leg and the other doesn't follow, however close they are. |
-| **View falloff** | The falloff is measured on screen, across the view: everything inside the brush circle is reached, through the model and out the back, as a cylinder along the view. Add **Connected only** to keep it to the piece under the cursor. The brushes that pull to a plane (Clay, Clay Block, Flatten, Trim) take the plane of the surface under the cursor and reach as deep behind it as the brush is wide: through an ear or a horn, not out the back of a head. |
+| **View falloff** | The falloff is measured on screen, across the view, as a cylinder along the view: Move and the grab brushes reach everything inside the brush circle, through the model and out the back. Add **Connected only** to keep it to the piece under the cursor. The brushes that pull to a plane (Clay, Clay Block, Flatten, Trim) take the plane of the surface under the cursor and reach as deep behind it as the brush is wide: through an ear or a horn, not out the back of a head. The brushes that build or cut along the surface (Standard, Inflate, Crease, Pinch, Sharp Crease) stop about 1.5 to 3 brush radii behind the surface under the cursor, so the far side of the model stays as it is. |
 
 Kelvinlet brushes keep their own elastic falloff, and the Gizmo's falloff eases in from the mask's edge rather
 than from a brush centre, so these options don't apply to them. On a 10-million-vertex Part a dab that moves half

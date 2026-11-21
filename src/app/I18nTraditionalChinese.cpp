@@ -3198,10 +3198,11 @@ constexpr Entry kTraditionalChinese[] = {
      "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "筆刷只影響與游標下的點相連、且在筆刷大小內的表面：另一條腿、旁邊的手指或隔著縫隙的嘴唇都保持不變。隨偏好設定與專案儲存。"},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "筆刷衰減以螢幕測量：筆刷圓圈內的一切都會受影響，會穿過模型到背面，如同沿視線方向的圓柱。"
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "筆刷衰減以螢幕測量，如同沿視線方向的圓柱。移動和抓取會影響筆刷圓圈內的一切，穿過模型直到背面；"
+     "其他筆刷止於游標下表面之後約 1.5 至 3 倍筆刷半徑處。"
      "同時開啟「僅限相連」即可限制在單一區塊。"},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+拖曳以筆刷繪製遮罩；Ctrl+Alt+拖曳擦除遮罩。在背景上 Ctrl+拖曳可清除遮罩。"},
