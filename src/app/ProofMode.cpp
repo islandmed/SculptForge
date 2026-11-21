@@ -391,7 +391,7 @@ struct PhaseResult {
     std::vector<double> frameMs, lagMs, lagPx;
     // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
     // it are quick and their lag small; where they fall decided whether a heavy stroke's lag_ms p50 read 24 or 370 ms (#184)
-    std::vector<double> lagOnModelMs;
+    std::vector<double> lagOnModelMs, lagOnModelPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
@@ -1194,16 +1194,31 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // How far the stroke on screen (the newest dab in this frame) trails the pointer (the newest sample).
             if (!p.dabs.empty()) {
                 const glm::vec2 d = p.dabs.back();
-                size_t best = p.samples.size() - 1;
-                float bestDist = 1e30f;
-                for (size_t i = p.samples.size(); i-- > p.dabFrom && p.samples.size() - i < 2000;) {
-                    const float dist = glm::length(p.samples[i].p - d);
-                    if (dist < bestDist) bestDist = dist, best = i;
+                // Its sample: on the first stretch of the path after the last dab's that it lies on (within 1.5 px), the
+                // nearer end. The nearest sample of all matched a later lap passing over the same spot (a path fitted
+                // small to the model goes round several times) and read the lag short; it stays the fallback (a dab
+                // placed on a curve between samples).
+                const size_t n = p.samples.size();
+                size_t best = n;
+                for (size_t i = p.dabFrom; i + 1 < n && best == n; ++i) {
+                    const glm::vec2 a = p.samples[i].p, ab = p.samples[i + 1].p - a;
+                    const float len2 = glm::dot(ab, ab);
+                    const float t = len2 > 0.0f ? std::clamp(glm::dot(d - a, ab) / len2, 0.0f, 1.0f) : 0.0f;
+                    if (glm::length(a + t * ab - d) <= 1.5f) best = t < 0.5f ? i : i + 1;
+                }
+                if (best == n) {
+                    best = n - 1;
+                    float bestDist = 1e30f;
+                    for (size_t i = n; i-- > p.dabFrom && n - i < 2000;) {
+                        const float dist = glm::length(p.samples[i].p - d);
+                        if (dist < bestDist) bestDist = dist, best = i;
+                    }
                 }
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
-                if (p.dabHits.size() == p.dabs.size() && p.dabHits.back()) ph.lagOnModelMs.push_back(ph.lagMs.back());
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
+                if (p.dabHits.size() == p.dabs.size() && p.dabHits.back())
+                    ph.lagOnModelMs.push_back(ph.lagMs.back()), ph.lagOnModelPx.push_back(ph.lagPx.back());
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
                 size_t nearest = p.samples.size() - 1;
@@ -1419,6 +1434,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("lag_adjusted_ms", percentilesJson(percentiles(adjusted)));
                     }
                     if (!ph.lagOnModelMs.empty()) j.set("lag_on_model_ms", percentilesJson(percentiles(ph.lagOnModelMs)));
+                    if (!ph.lagOnModelPx.empty()) j.set("lag_on_model_px", percentilesJson(percentiles(ph.lagOnModelPx)));
                     j.set("dabs", double(ph.dabs));
                     j.set("dabs_off_model", double(ph.dabsOffModel));
                     j.set("path_radius_px", std::round(double(ph.pathRadiusPx)));
