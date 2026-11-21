@@ -1202,7 +1202,8 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
 // steps close the gap within a dab or two, the triangles between them flip, and stacked strokes tear needles and stretched
 // streaks into the surface. So a dab that reaches a packed grid (at least 32 vertices, and 0.2% of the dab's, whose shortest
 // edge is under 2/3 of the dab's typical shortest one; a lone odd vertex on a remeshed surface, or the one ring of a tube's round cap, is not one) moves all its vertices
-// along the brush's one area normal instead, which carries the whole groove alike; every other dab, the usual Inflate, is
+// along the brush's one area normal instead, which carries the whole groove alike, but only where the dab's surface faces one
+// way (its mean normal at least 0.5: a brush wrapped round a thin tube or its caps has no one normal); every other dab, the usual Inflate, is
 // unchanged. One choice for the whole dab, not a per-vertex mix: neighbours on different rules were what tore.
 //
 // The edge length an unpacked vertex of `verts` has, as its shortest edge (an even sample of 64: the upper quartile of
@@ -1352,6 +1353,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             bad.fetch_add(n, std::memory_order_relaxed);
         }, 512);
         inflateAlongNormals = bad.load() * stride < std::max<size_t>(32, verts_.size() / 500);
+        // One area normal needs a dab on a patch that faces one way (a groove's dab: mean normal 0.7 to 1). A brush wrapped round a
+        // tube and its caps (0.02 to 0.25) has none, and one direction carries the far side against its own normal.
+        if (!inflateAlongNormals) {
+            glm::dvec3 nsum(0.0);
+            size_t n = 0;
+            for (size_t i = 0; i < verts_.size(); i += stride, ++n) nsum += glm::dvec3(mesh.normals[verts_[i]]);
+            inflateAlongNormals = glm::length(nsum) < 0.5 * double(n);
+        }
     }
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
