@@ -1601,6 +1601,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
     sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
     sculptforge_ui_test(betas_wording_2880 betas_wording --size 2880x1620)
+    sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
+    sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
+    sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
     # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
     sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
@@ -1628,6 +1631,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
+    # The popup's key labels per input style (gh#233) at 100% and 200%: the 1440 and 2880 shots.
+    sculptforge_ui_test(stroke_popup_style_keys_1440 stroke_popup_style_keys --size 1440x810)
+    sculptforge_ui_test(stroke_popup_style_keys_2880 stroke_popup_style_keys --size 2880x1620)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
     sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.

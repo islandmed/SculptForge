@@ -3601,11 +3601,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles solo llegan a la superficie unida al punto bajo el cursor, dentro del tamaño del pincel: la otra "
      "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian. Se "
      "guarda con las preferencias y el proyecto."},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "La atenuación del pincel se mide en pantalla: se alcanza todo lo que está dentro del círculo del pincel, a "
-     "través del modelo y por detrás, como un cilindro en la dirección de la vista. "
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "La atenuación del pincel se mide en pantalla, como un cilindro en la dirección de la vista. Mover y Agarrar "
+     "alcanzan todo lo que está dentro del círculo del pincel, a través del modelo y por detrás; los demás pinceles "
+     "se detienen entre 1,5 y 3 radios de pincel detrás de la superficie bajo el cursor. "
      "Activa también Solo conectado para limitarlo a una pieza."},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+arrastrar pinta la máscara con el pincel; Ctrl+Alt+arrastrar la borra. Ctrl+arrastrar en el fondo la "
@@ -4299,6 +4300,14 @@ constexpr Entry kSpanish[] = {
      "  Diseñando el pincel%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "El %.1f%% de los téxeles no encontró superficie: sube Delante / Detrás"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "El %.1f%% del mapa no encontró superficie: sube la distancia de búsqueda a Delante %.1f%%, Detrás %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "Distancia automática: Delante %.1f%%, Detrás %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "Hacer bake de nuevo con la distancia sugerida"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "Algunos téxeles del último bake no encontraron superficie porque la distancia de búsqueda era demasiado corta. Desactiva la distancia automática, ajusta Delante y Detrás a las distancias que alcanzan la malla de alta resolución y haz bake de nuevo."},
     {"%d commands",
      "%d comandos"},
     {"%d items",

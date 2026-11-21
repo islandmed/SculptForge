@@ -64,6 +64,7 @@
 #include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "render/MicroFocus.h"
 #include "core/Utf8Path.h"
 
 #include <imgui.h>
@@ -1611,10 +1612,24 @@ int App::run() {
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
-        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
-            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
-                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
-                    phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && frameLogMs >= 0.0) {
+            // A streamed Micro level (Focus Detail) adds its main-thread parts and the coarse shading still waiting (#184's
+            // freeze: SF_FRAME_LOG=100 for the reporter's log). (Taken every frame, so a slow frame shows its own; not while
+            // Help > Benchmark runs, which takes them itself.)
+            double f[MicroFocus::kParts] = {};
+            const bool focus = !proof_ && doc_.mesh.micro && doc_.mesh.micro->focus;
+            if (focus) renderer_.takeFocusSplit(f);
+            if (phase[6] - phase[0] > frameLogMs) {
+                SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                        phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                        phase[5] - phase[4], phase[6] - phase[5]);
+                if (focus)
+                    SDL_Log("frame micro: promote %.1f, coarse %.1f, records %.1f, shade coarse %.1f, pages %.1f, shade pages %.1f, "
+                            "whole %.1f ms; %zu tiles waiting for shading%s",
+                            doc_.mesh.micro->focus->lastUpdateMs(), f[0], f[1], f[2], f[3], f[4], f[5], renderer_.microPendingCoarse(),
+                            doc_.sculptor.strokeActive() ? ", stroking" : "");
+            }
+        }
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
@@ -2850,9 +2865,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift with the Paint brush smooths the colour and leaves the shape alone; with a sculpt brush (Rgb on) it still
-    // smooths the shape. A Part painting into a texture has no colour smooth yet: Shift smooths its shape as before.
-    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_ && !paintsTexture(doc_.mesh);
+    // Shift with the Paint brush smooths the colour (vertex colours or texels) and never the shape; with a sculpt brush
+    // (Rgb on) it still smooths the shape.
+    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
@@ -3164,6 +3179,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         strokeProbe_->emplace_back(x, y);
         if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
+    std::vector<uint8_t>* hitProbe = dabView_ ? dabView_->hitProbe : strokeProbe_ ? strokeHitProbe_ : nullptr;
+    if (hitProbe) hitProbe->push_back(1); // (0 below when the dab finds no surface)
     const Camera cam = dabView_ ? dabView_->camera : partCamera(); // (a moved linked copy: its own space)
     const glm::vec2 pathPoint(x, y); // (before any scatter: the rake follows the stroke itself)
     const BrushRecipe* recipe = st.recipe;
@@ -3191,7 +3208,10 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     RayHit hit;
     // Off the surface but the brush still over it (sliding over a silhouette, #84): the nearest surface within it.
     auto cast = [&](float cx, float cy, RayHit& h) { return dabView_ ? pickWith(*dabView_, cx, cy, h) : pick(cx, cy, h); };
-    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) return;
+    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) {
+        if (hitProbe) hitProbe->back() = 0;
+        return;
+    }
     if (pressure < 0.0f) pressure = strokePressure();
     pressure = st.pressureCurve.apply(pressure); // the brush's own curve, after the tablet's
 
@@ -3390,7 +3410,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (!drainQueue_.empty()) runDrainQueue(); // (what a shortcut queued runs before this, as it was asked first)
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
-    if (name == "save_project") storeProjectSettings();
+    if (name == "save_project" || name == "save_visible_parts") storeProjectSettings(); // (the copy keeps the view's materials too)
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();

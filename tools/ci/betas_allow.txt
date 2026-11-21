@@ -1,4 +1,3 @@
 # Member betas are paused (tools/ci/check_betas_paused.py). path<TAB>text on the line<TAB>reason. A line that matches nothing fails.
-src/app/PanelSupportCard.cpp	{"Betas and early builds of the next version"	PanelSupportCard.cpp is member-perk-55's branch (it rewrites these lines); drop this line when that merges
 src/app/PanelSupportCard.cpp	line = std::string("SculptForge ") + appVersi	PanelSupportCard.cpp is member-perk-55's branch (it rewrites these lines); drop this line when that merges
-src/app/PanelSupportCard.cpp	ImGui::TextWrapped("%s", "$5 a month or $48 a	PanelSupportCard.cpp is member-perk-55's branch (it rewrites these lines); drop this line when that merges
+src/app/PanelSupportCard.cpp	ImGui::TextWrapped("%s", "$48 a year or $5 a month: betas early	PanelSupportCard.cpp is member-perk-55's (batch/0.13.11): still promises betas; it owns the rewrite (flagged to merge-0106-4b). Drop this line when it changes

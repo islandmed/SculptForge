@@ -427,6 +427,7 @@ private:
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
+    std::vector<uint8_t>* strokeHitProbe_ = nullptr; // ... and whether it reached the surface (Help > Benchmark: 0 = off the model)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
@@ -478,6 +479,7 @@ private:
         DabSettings settings;
         std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
         std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
+        std::vector<uint8_t>* hitProbe = nullptr; // ... and whether each reached the surface
         // The batch's last dab on the Part's mesh: written by the solver thread (dabAt), read by the main thread once
         // the batch is done (the hand-over orders them), for lastStrokeLocal_.
         mutable glm::vec3 lastHit{0.0f};
@@ -3292,6 +3294,7 @@ private:
     void strokePopupKeyUp(SDL_Keycode key);
     void drawStrokePopup();
     bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
     struct StrokePopupOpen {

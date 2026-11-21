@@ -140,6 +140,7 @@ bool App::kelvinPump() {
     s.view.canvas = canvasRect();
     s.view.probe = nullptr;
     s.view.radiusProbe = nullptr;
+    s.view.hitProbe = nullptr;
     s.view.settings = dabSettings();
     s.uploadId = doc_.meshKey(doc_.activePart);
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);

@@ -77,6 +77,7 @@ struct BakeResult {
     std::vector<uint8_t> coverage;   // 1 = inside a UV island, 2 = padding, 0 = empty
     std::vector<glm::vec4> tangents; // MikkTSpace tangent + sign per low-poly corner (for previews)
     float front = 0, rear = 0;       // ray range used (world units)
+    bool autoDistance = false;       // the range was measured (BakeSettings::autoDistance)
     float diagonal = 0;              // the low-poly's bounding-box diagonal
     float displacementMin = 0, displacementMax = 0; // range found (world units)
     float displacementScale = 0;     // world units at white / black of the 16-bit PNG (mid-grey = 0)
@@ -87,6 +88,13 @@ struct BakeResult {
     double seconds = 0, bvhSeconds = 0;
     bool has(BakeMap m) const { return (maps & bakeBit(m)) != 0; }
     float missRatio() const { return islandTexels ? float(missedTexels) / float(islandTexels) : 0.0f; }
+    // When texels missed and a longer range reaches the high-poly for them: the range to bake again with
+    // (world units, each at least the one used; 0 = no suggestion). Found by casting long rays from a sample
+    // of the missed texels.
+    float suggestFront = 0, suggestRear = 0;
+    bool hasSuggestion() const { return suggestFront > 0.0f || suggestRear > 0.0f; }
+    // Misses above this share of the island texels get a warning and a suggested distance.
+    static constexpr float kMissWarn = 0.005f;
 };
 
 // Progress 0..1; return false to cancel (bakeMaps then fails with "Cancelled").

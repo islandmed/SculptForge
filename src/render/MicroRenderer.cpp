@@ -855,7 +855,12 @@ bool MicroRenderer::sync(Mesh& mesh) {
         if (focus_) {
             static const std::vector<uint64_t> none;
             if (mm.allDirty || mm.rescaled) focus_->syncAll(mesh, *this);
-            else focus_->cameraMoving = cameraMoving, focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            else {
+                focus_->cameraMoving = cameraMoving;
+                // Undo, redo, a Move and a base moved by anything but a stroke (a transform, its undo) show whole on this frame.
+                focus_->shadeAll = mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking);
+                focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            }
         } else if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
