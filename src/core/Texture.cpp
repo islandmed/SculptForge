@@ -1159,7 +1159,7 @@ void TexturePainter::prewarm(Mesh& mesh, const BVH* bvh, std::span<const glm::ve
     dp.strength = 0.0f;
     const DabContext ctx{mesh, *bvh, dp, tex, tex.pixels, 0.0f, false, false, false, radius, radius * radius, mirrors};
     std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
-    dabTiles(ctx, [](Tile&, size_t, int, int, float) {}, false, rects);
+    dabTiles(ctx, [](Tile&, size_t, int, int, float, float) {}, false, rects);
 }
 
 void prewarmTexturePainting(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
@@ -1196,11 +1196,11 @@ size_t texturePaintCacheBytes() {
 }
 
 
-bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
+bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex, bool force) const {
     const Path path = Path(gDabPath.load());
-    if (path == Path::Triangles) return false;
+    if (path == Path::Triangles && !force) return false;
     if (tileCount(tex.width) > 256 || tileCount(tex.height) > 256) return false;
-    if (path == Path::Auto && mesh.triangleCount() * 64 < tex.texelCount()) return false;
+    if (path == Path::Auto && !force && mesh.triangleCount() * 64 < tex.texelCount()) return false;
     const uint64_t key = texelMapKey(mesh, tex);
     if (!tex.uvIndex || tex.uvIndex->key != key || !tex.texelMaps || tex.texelMaps->key != key) {
         const PaintCacheEntry e = paintCache(mesh, tex.width, tex.height, key);
@@ -1327,7 +1327,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
                     t.stamp[li] = mi.stamp;
                     float& acc = t.coverage[li];
                     acc += std::min(wgt, 1.0f) * (1.0f - acc);
-                    paint(t, li, x, y, acc);
+                    paint(t, li, x, y, acc, std::min(wgt, 1.0f));
                     res.lo = glm::min(res.lo, glm::ivec2(x, y));
                     res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
                     ++res.changed;
@@ -1422,7 +1422,7 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     if (useTilePath(mesh, tex)) {
         const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, masked, normals, r, r2, mirrors};
         std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
-        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc) {
+        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc, float) {
             if (paintColor)
                 paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
             for (const ChanJob& j : jobs) {
@@ -1570,6 +1570,99 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
                 for (const ChanJob& j : jobs) compositeChannel(tex, Channel(j.c), res.lo.x, res.lo.y, res.hi.x, res.hi.y);
             tex.markDirty(res.lo.x, res.lo.y, res.hi.x, res.hi.y);
         }
+    return changed;
+}
+
+size_t TexturePainter::smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym) {
+    if (!active_ || p.radius <= 0.0f || !hasTexture(mesh)) return 0;
+    PaintTexture& tex = mutableTexture(mesh);
+    if (!textureLayerEditable(tex, layer_) || (layer_ >= 0 && layer_ >= int(tex.layers.size()))) return 0;
+    const int w = tex.width, h = tex.height;
+    const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
+    if (s <= 0.0f || !useTilePath(mesh, tex, true)) return 0; // (textures over 256 tiles a side: no smooth colour)
+    const std::shared_ptr<const std::vector<uint8_t>> covered = cachedCoverage(mesh, w, h);
+    if (!covered) return 0;
+    std::vector<uint8_t>& target = tex.target(layer_);
+    const bool onLayer = layer_ >= 0;
+    const bool useAlpha = p.alpha && !p.alpha->empty();
+    std::vector<DabMirror> mirrors;
+    for (const SymCopy& m : Sculptor::copies(sym)) {
+        DabMirror mi;
+        mi.center = m.point(p.center);
+        mi.viewDir = m.dir(p.viewDir);
+        glm::vec3 aUp = m.dir(p.alphaUp);
+        aUp -= mi.viewDir * glm::dot(aUp, mi.viewDir);
+        mi.aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
+        mi.aRight = glm::cross(mi.aUp, -mi.viewDir);
+        mi.stamp = ++dab_;
+        mirrors.push_back(mi);
+    }
+    const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, mesh.hasMask(), mesh.normals.size() == mesh.vertexCount(),
+                         p.radius, p.radius * p.radius, mirrors};
+    // Pass 1 (tiles in parallel): every new texel from the texels before the dab; they are written in pass 2.
+    std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+    const std::vector<uint8_t>& cov = *covered;
+    dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float, float dabWeight) {
+        constexpr float kTent[3] = {1.0f, 2.0f, 1.0f};
+        float sum = 0.0f, alphaSum = 0.0f, weight = 0.0f;
+        glm::vec3 colour(0.0f);
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                const size_t ni = size_t(ny) * size_t(w) + size_t(nx);
+                if (!(cov[ni >> 3] & (1u << (ni & 7)))) continue; // outside the UV islands: no colour to lend
+                const float k = kTent[dx + 1] * kTent[dy + 1];
+                const uint8_t* np = &target[ni * 4];
+                const float a = onLayer ? float(np[3]) / 255.0f : 1.0f; // a transparent texel lends no colour
+                colour += linearRgb(np) * (k * a);
+                alphaSum += k * a;
+                weight += k;
+                sum += k;
+            }
+        if (weight <= 0.0f) return;
+        const float wd = std::clamp(dabWeight, 0.0f, 1.0f);
+        const size_t i = size_t(y) * size_t(w) + size_t(x);
+        const uint8_t* own = &target[i * 4];
+        uint8_t out[4];
+        if (!onLayer) {
+            putLinear(out, glm::mix(linearRgb(own), colour / alphaSum, wd));
+            out[3] = 255;
+        } else {
+            const float a = float(own[3]) / 255.0f;
+            const glm::vec3 avg = alphaSum > 1e-6f ? colour / alphaSum : linearRgb(own);
+            putLinear(out, a > 1e-6f ? glm::mix(linearRgb(own), avg, wd) : avg);
+            out[3] = unit8(glm::mix(a, alphaSum / sum, wd));
+        }
+        t.pendingTexel.push_back(uint32_t(li));
+        t.pendingRgba.insert(t.pendingRgba.end(), out, out + 4);
+    }, false, rects);
+    // Pass 2: write them (the tile's undo original was kept when the dab first reached it).
+    size_t changed = 0;
+    for (uint32_t ti : touched_) {
+        Tile* t = tilePtr_[ti].load(std::memory_order_acquire);
+        if (!t) continue;
+        const int x0 = int(ti % uint32_t(tilesX_)) * kTextureTile, y0 = int(ti / uint32_t(tilesX_)) * kTextureTile;
+        glm::ivec2 lo{INT32_MAX}, hi{INT32_MIN};
+        for (size_t k = 0; k < t->pendingTexel.size(); ++k) {
+            const uint32_t li = t->pendingTexel[k];
+            const int x = x0 + int(li % kTextureTile), y = y0 + int(li / kTextureTile);
+            std::memcpy(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t->pendingRgba[k * 4], 4);
+            lo = glm::min(lo, glm::ivec2(x, y));
+            hi = glm::max(hi, glm::ivec2(x + 1, y + 1));
+        }
+        if (t->pendingTexel.empty()) continue;
+        changed += t->pendingTexel.size();
+        t->pendingTexel.clear();
+        t->pendingRgba.clear();
+        if (!tex.layers.empty() && tex.base.size() == tex.pixels.size())
+            for (int y = lo.y; y < hi.y; ++y)
+                for (int x = lo.x; x < hi.x; ++x) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    compositeTexel(tex, i, &tex.pixels[i * 4]);
+                }
+        tex.markDirty(lo.x, lo.y, hi.x, hi.y);
+    }
     return changed;
 }
 

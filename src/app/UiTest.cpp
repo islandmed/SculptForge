@@ -444,6 +444,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstring>
 #include <utility>
 #include <thread>
 #include <mutex>
@@ -893,6 +894,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
         return m.triangleCount() ? 100.0 * double(m.quadCount()) / double(m.triangleCount() - m.quadCount()) : 0.0;
+    if (name == "texture_changed") { // texels that differ from the `snapshot`
+        if (!hasTexture(m) || baseTexels_.size() != m.texture->pixels.size()) return -1.0;
+        const std::vector<uint8_t>& px = m.texture->pixels;
+        double n = 0.0;
+        for (size_t i = 0; i < px.size(); i += 4) n += std::memcmp(&px[i], &baseTexels_[i], 4) != 0 ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "texture_painted" || name.rfind("texture_mean_", 0) == 0) {
         if (!hasTexture(m)) return 0.0;
         const std::vector<uint8_t>& px = m.texture->pixels;
@@ -1658,6 +1666,12 @@ double Demo::query(const std::string& name, bool& known) const {
         for (size_t v = 0; v < basePositions_.size(); ++v)
             count += m.maskAt(uint32_t(v)) >= 0.5f && glm::length(m.positions[v] - basePositions_[v]) > 1e-6f ? 1.0 : 0.0;
         return count;
+    }
+    if (name == "moved_exact") { // vertices whose position differs in any bit from the `snapshot`
+        if (basePositions_.size() != m.vertexCount()) return -1.0;
+        return double(m.vertexCount() - size_t(std::count_if(basePositions_.begin(), basePositions_.end(), [&](const glm::vec3& b) {
+            return std::memcmp(&b, &m.positions[size_t(&b - basePositions_.data())], sizeof(glm::vec3)) == 0;
+        })));
     }
     if (name == "moved" || name == "moved_max" || name == "moved_sum" || name == "moved_out") {
         if (basePositions_.size() != m.vertexCount()) return -1.0; // no snapshot, or the topology changed
@@ -4143,6 +4157,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseTexels_ = hasTexture(app_.doc_.mesh) ? app_.doc_.mesh.texture->pixels : std::vector<uint8_t>{};
             baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
         break;

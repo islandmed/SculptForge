@@ -2865,9 +2865,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift with the Paint brush smooths the colour and leaves the shape alone; with a sculpt brush (Rgb on) it still
-    // smooths the shape. A Part painting into a texture has no colour smooth yet: Shift smooths its shape as before.
-    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_ && !paintsTexture(doc_.mesh);
+    // Shift with the Paint brush smooths the colour (vertex colours or texels) and never the shape; with a sculpt brush
+    // (Rgb on) it still smooths the shape.
+    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();

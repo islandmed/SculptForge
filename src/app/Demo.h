@@ -280,6 +280,7 @@ private:
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
+    std::vector<uint8_t> baseTexels_; // (snapshot: the texture's texels, for texture_changed)
     std::vector<int16_t> baseMicro_; // (snapshot: the micro level's grid, for micro_moved)
     std::map<std::string, double> remembered_;
     std::map<std::string, std::vector<std::string>> rememberedItems_; // remember_items NAME SCOPE
