@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <random>
 
