@@ -2835,13 +2835,10 @@ constexpr Entry kSpanish[] = {
      "llega con él (se apaga con este interruptor). No se envía nada sobre ti ni sobre tu equipo."},
     {"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
-    {"Preview (betas)", "Vista previa (betas)"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "Estable ofrece solo versiones terminadas. Vista previa ofrece también las betas que nombra el feed de "
-     "actualizaciones. Las betas son una ventaja para miembros: las reciben del repositorio privado de miembros y "
-     "del canal #members de Discord. Cuando la versión estable supera a una beta, Vista previa ofrece esa."},
+    {"Preview (early builds)",
+     "Vista previa (versiones anticipadas)"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "Los miembros reciben versiones anticipadas aquí cuando las hay. Ahora mismo este canal recibe las mismas versiones que Estable."},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "Retopología automática en quads: reconstruye la Pieza como topología limpia, toda de quads, cuyos bucles de aristas siguen las formas, cerca de Quads objetivo. Se ejecuta en segundo plano (Cancelar la detiene); se puede deshacer. Luego divídela y usa Pieza > Proyectar > Project Detail para recuperar el detalle."},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "

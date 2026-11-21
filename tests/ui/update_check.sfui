@@ -43,7 +43,7 @@ click "Stable##prefs.update_stable"
 click "Check for updates##help.check_updates"
 wait_idle 20
 expect_status "is the newest version"
-click "Preview (betas)##prefs.update_preview"
+click "Preview (early builds)##prefs.update_preview"
 shot update-channel
 click "Check for updates##help.check_updates"
 wait_idle 20

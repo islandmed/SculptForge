@@ -27,3 +27,15 @@ expect_value quick_tour_slide == 10
 expect_text SculptForge stays free
 expect_text early builds, like SculptForge for Android today
 shot quick-tour-last
+click "Maybe later##quicktour"
+
+# Preferences > Updates: the channel is "Preview (early builds)", and its help is true while betas are paused.
+click "Preferences##palette.preferences"
+click "Updates##preferences.updates"
+expect "Preview (early builds)##prefs.update_preview"
+expect_no_text "betas"
+hold ctrl
+hover "Preview (early builds)##prefs.update_preview"
+expect_help "Right now this channel gets the same releases as Stable."
+shot prefs-updates-channel
+hold none

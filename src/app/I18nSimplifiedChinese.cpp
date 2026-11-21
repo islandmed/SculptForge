@@ -2536,12 +2536,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "卡片也随它而来（关闭此开关即可关闭）。不会发送任何关于你或你电脑的信息。"},
     {"Update channel", "更新通道"},
     {"Stable", "稳定版"},
-    {"Preview (betas)", "预览（Beta 版）"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "稳定版只提供正式发布版本。预览另外也提供更新来源列出的 Beta 版。Beta 版是会员福利：会员可从私人会员仓库与 "
-     "Discord 的 #members 频道获取。当稳定版超越某个 Beta 版时，预览会改为提供稳定版。"},
+    {"Preview (early builds)",
+     "预览（抢先版本）"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "当有抢先版本时，会员可在此获取。目前此频道获取的版本与稳定版相同。"},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "自动四边面重新拓扑：将部件重建为干净、全四边面的拓扑，其边环顺着形体走，面数接近目标四边面数。在后台运行（“取消”可停止）；可撤销。之后细分它，再用部件 > 投影 > Project Detail 找回细节。"},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
