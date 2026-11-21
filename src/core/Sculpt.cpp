@@ -292,6 +292,7 @@ constexpr float kMaxDragSqueeze = 0.35f;
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
 constexpr int kRelaxRounds = 2;
 constexpr size_t kLimitVerts = 12000; // (the flip limiter costs a look at every vertex of the region, a few per dab: only for a small brush's)
+constexpr float kDragShare = 1.0f; // (overlapping copies' drags blend by nearness, over about the brush's radius)
 constexpr float kRelaxStep = 0.1f; // (a dab that moves less than this share of the brush radius relaxes in proportion: slow strokes place many)
 
 // Weighted sums over a brush region: per-block partials added in block order, so the result doesn't
@@ -468,6 +469,14 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     kelvinMaskBlocked_.v = false;
     active_ = true;
     return true;
+}
+
+bool Sculptor::dragSlideDefault() {
+    static const bool on = [] {
+        const char* e = std::getenv("SF_DRAG_SLIDE");
+        return !(e && e[0] == '0');
+    }();
+    return on;
 }
 
 bool Sculptor::microBaseDefault() {
@@ -1694,6 +1703,152 @@ void Sculptor::relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lam
     }
 }
 
+// A recipe's Drag (Palette Knife): the dab carries the shape, and the vertices stay spread as they were. Moving the vertices
+// themselves, the tip's plateau travels with the stroke while the outside stays: the band between shears by the whole stroke's
+// drag over its width (about 4 on a knife stroke of a brush and a half), into slivers a crossing stroke turns over (#198), and no
+// relax of fixed triangles takes a shear out (a sheared lattice is already at its rings' middles). So the dab's other moves (its
+// plane, along the plane's normal) are made first, by every copy, and then all the copies' drags at once (where copies overlap
+// they blend, dabRecipeSingle, so a mirror's two halves don't drag the same clay twice or tear it across the plane). The vertices
+// move with the drag, and then each goes back to over where the drag found it, seen along its normal, on the dragged triangles: a
+// straight walk across them finds the one there, and the point in it is where the drag took the surface that was there (over a
+// triangle the drag is the same mix of its corners'). Every vertex lands on the drag's own moved triangles, which the drag doesn't
+// fold (each copy squeezes a triangle by under 0.35 of itself), at any brush size or step. The drag runs along the surface (the
+// stroke's own step), so the vertices' normals, a few degrees apart, see nearly the same move; the plane's pull, many edges along
+// the normal with a big brush, stays out of it. A vertex whose walk can't be followed (an open edge; a dragged triangle on the
+// way turned away from its normal) stays where the drag put it.
+namespace {
+using dvec2 = glm::dvec2;
+double cross2(const dvec2& a, const dvec2& b) { return a.x * b.y - a.y * b.x; }
+
+// From `origin` (vertex v's place), triangle to triangle along the straight line to `target` (coordinates in the plane across
+// n through it, basis e1 e2; each triangle seen flat along n, its corners at at(u)) until the triangle that holds it: that
+// triangle and the target's barycentric coordinates in it. False where the way can't be followed (seen along n a triangle on
+// the way turns away, an open edge).
+template <class At>
+bool walkTo(const Mesh& mesh, uint32_t v, const glm::dvec3& origin, const glm::dvec3& e1, const glm::dvec3& e2, const dvec2& target,
+            const At& at, uint32_t& tri, double l[3], uint32_t start = ~0u) {
+    const auto flat = [&](uint32_t u) { const glm::dvec3 d = at(u) - origin; return dvec2(glm::dot(d, e1), glm::dot(d, e2)); };
+    dvec2 p(0.0);
+    tri = ~0u;
+    if (start != ~0u) { // (from inside that triangle, seen along n: the walk then goes where it would have from v)
+        const glm::uvec3 c = mesh.triangles[start];
+        const dvec2 a = flat(c.x), b = flat(c.y), d = flat(c.z);
+        if (cross2(b - a, d - a) > 0.0) tri = start, p = (a + b + d) / 3.0;
+    }
+    if (tri == ~0u) {
+        if (glm::dot(target, target) < 1e-30) { // (stays: v itself)
+            for (uint32_t f : mesh.vertexTriangles(v)) {
+                const glm::uvec3 c = mesh.triangles[f];
+                tri = f, l[0] = c.x == v, l[1] = c.y == v, l[2] = c.z == v;
+                return true;
+            }
+            return false;
+        }
+        for (uint32_t f : mesh.vertexTriangles(v)) { // (the corner of v's fan whose sector holds the way)
+            const glm::uvec3 c = mesh.triangles[f];
+            const int k = c.x == v ? 0 : c.y == v ? 1 : 2;
+            const dvec2 fa = flat(c[(k + 1) % 3]), fb = flat(c[(k + 2) % 3]);
+            if (cross2(fa, fb) > 0.0 && cross2(fa, target) >= 0.0 && cross2(target, fb) >= 0.0) { tri = f; break; }
+        }
+        if (tri == ~0u) return false;
+    }
+    uint32_t from = ~0u;
+    for (int step = 0; step < 256; ++step) {
+        const glm::uvec3 c = mesh.triangles[tri];
+        const dvec2 a = flat(c.x), b = flat(c.y), d = flat(c.z);
+        const double area = cross2(b - a, d - a);
+        if (area <= 0.0) return false; // (seen along n it turns away: v's normal is no guide this far out)
+        const double lq[3] = {cross2(d - b, target - b) / area, cross2(a - d, target - d) / area, 0.0};
+        const double lq2 = 1.0 - lq[0] - lq[1];
+        if (lq[0] >= -1e-12 && lq[1] >= -1e-12 && lq2 >= -1e-12) {
+            l[0] = std::max(lq[0], 0.0), l[1] = std::max(lq[1], 0.0), l[2] = std::max(lq2, 0.0);
+            const double sum = l[0] + l[1] + l[2];
+            l[0] /= sum, l[1] /= sum, l[2] /= sum;
+            return true;
+        }
+        // Out by the edge the line from p leaves through: the corner whose coordinate turns negative first.
+        const double lp0 = cross2(d - b, p - b) / area, lp1 = cross2(a - d, p - d) / area;
+        const double lp[3] = {lp0, lp1, 1.0 - lp0 - lp1}, lt[3] = {lq[0], lq[1], lq2};
+        double best = 2.0;
+        int k = -1;
+        for (int j = 0; j < 3; ++j)
+            if (lt[j] < 0.0) {
+                const double from_ = std::max(0.0, lp[j]);
+                const double t = from_ / (from_ - lt[j]);
+                if (t < best) best = t, k = j;
+            }
+        if (k < 0) return false;
+        p += (target - p) * best;
+        const uint32_t ea = c[(k + 1) % 3], eb = c[(k + 2) % 3];
+        uint32_t next = ~0u;
+        for (uint32_t f : mesh.vertexTriangles(ea)) {
+            if (f == tri) continue;
+            const glm::uvec3 o = mesh.triangles[f];
+            if (o.x == eb || o.y == eb || o.z == eb) { next = f; break; }
+        }
+        if (next == ~0u || next == from) return false;
+        from = tri, tri = next;
+    }
+    return false;
+}
+} // namespace
+
+void Sculptor::slideBack(Mesh& mesh, BVH& bvh) {
+    auto clock = std::chrono::steady_clock::now();
+    { // (each vertex once, every copy's drag added: where mirrored copies meet, both reached it)
+        std::vector<size_t> order(slideVerts_.size());
+        for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+        std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return slideVerts_[a] < slideVerts_[b]; });
+        std::vector<uint32_t> vs;
+        std::vector<glm::vec3> ds;
+        vs.reserve(order.size()), ds.reserve(order.size());
+        for (size_t i : order) {
+            if (!vs.empty() && vs.back() == slideVerts_[i]) ds.back() += slideTo_[i];
+            else vs.push_back(slideVerts_[i]), ds.push_back(slideTo_[i]);
+        }
+        slideVerts_.swap(vs);
+        slideTo_.swap(ds);
+    }
+    const std::vector<uint32_t>& verts = slideVerts_;
+    const auto& pos = mesh.positions;
+    slideOld_.resize(verts.size());
+    for (size_t i = 0; i < verts.size(); ++i) slideOld_[i] = pos[verts[i]];
+    displaceAll(mesh, verts, slideTo_); // (the drag, the vertices moving)
+    const auto& nrm = mesh.normals;     // (those of before the dab: updateDabNormals comes later)
+    const auto now = [&](uint32_t u) { return glm::dvec3(pos[u]); };
+    poolFor(verts.size(), [&](size_t b, size_t e) {
+        uint32_t last = ~0u; // (where the vertex before this one landed: vertices come in runs of neighbours, so a walk from
+                             // there is a step or two, not the whole drag's length)
+        for (size_t i = b; i < e; ++i) {
+            const uint32_t v = verts[i];
+            slideTo_[i] = glm::vec3(0.0f);
+            const glm::dvec3 o(slideOld_[i]), x(pos[v]);
+            const glm::dvec3 n(nrm[v]);
+            const double nl = glm::length(n);
+            if (o == x || nl < 1e-30) continue;
+            const glm::dvec3 nn = n / nl;
+            const glm::dvec3 e1 = glm::normalize(std::abs(nn.x) < 0.9 ? glm::cross(nn, glm::dvec3(1, 0, 0)) : glm::cross(nn, glm::dvec3(0, 1, 0)));
+            const glm::dvec3 e2 = glm::cross(nn, e1);
+            const auto flat = [&](const glm::dvec3& d) { return dvec2(glm::dot(d, e1), glm::dot(d, e2)); };
+            // (the dragged triangles seen along n from v to over o: the one there holds the point the drag took there, exactly,
+            // as the drag is the same mix of its corners' over a triangle)
+            uint32_t tri = ~0u;
+            double l[3];
+            if (!(last != ~0u && walkTo(mesh, v, x, e1, e2, flat(o - x), now, tri, l, last)) &&
+                !walkTo(mesh, v, x, e1, e2, flat(o - x), now, tri, l))
+                continue;
+            last = tri;
+            const glm::uvec3 c = mesh.triangles[tri];
+            const glm::dvec3 at = glm::dvec3(pos[c.x]) * l[0] + glm::dvec3(pos[c.y]) * l[1] + glm::dvec3(pos[c.z]) * l[2];
+            slideTo_[i] = glm::vec3(at - x);
+        }
+    });
+    displaceAll(mesh, verts, slideTo_);
+    timings.kernelMs += lapMs(clock);
+    bvh.refit(mesh, verts);
+    timings.bvhMs += lapMs(clock);
+}
+
 // Taubin's lambda | mu smoothing ("A signal processing approach to fair surface design", 1995): a Laplacian step
 // forward (lambda), then a slightly larger one back (mu < -lambda). Bumps (high frequencies) shrink in both steps;
 // the large form (low frequencies) shrinks in the first and grows back in the second, so the volume stays.
@@ -1848,12 +2003,15 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     crispCopies_ = all; // (a crisp cut shares each vertex out among the copies: dabRecipeSingle)
     crispCopyCenters_.clear();
     for (const SymCopy& m : all) crispCopyCenters_.push_back(m.point(base.center));
+    slideVerts_.clear();
+    slideTo_.clear();
     for (size_t k = 0; k < all.size(); ++k) {
         const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? base : transformed(base, m);
         dabRecipeSingle(mesh, bvh, recipe, mp, k, m);
     }
+    if (!slideVerts_.empty()) slideBack(mesh, bvh);
     if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh); // (as dab)
     repairDab(mesh, bvh);
 }
@@ -2077,6 +2235,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         const float slope = exponent * 1.5f / (edge * rad); // (the steepest rise of the weight with distance)
         dragScale = std::min(1.0f, kMaxDragSqueeze / std::max(r.drag * strokeLen * slope, 1e-12f));
     }
+    const bool slide = r.drag > 0.0f && dragSlide && !dynTopo_.active() && !crispMax; // (the drag after the plane: slideBack)
+    if (slide) dragPart_.assign(verts_.size(), glm::vec3(0.0f));
     scratch_.resize(verts_.size());
     poolFor(verts_.size(), [&](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
@@ -2188,7 +2348,24 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         default: break;
         }
         if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
-        if (r.drag > 0.0f) d += p.strokeDelta * (dragScale * r.drag * f);
+        if (r.drag > 0.0f) {
+            glm::vec3 drag = p.strokeDelta * (dragScale * r.drag * f);
+            if (slide && crispCopyCenters_.size() > 1 && copy < crispCopyCenters_.size()) {
+                // (where copies' dabs overlap, each drags its share, softly by nearness: their drags blend instead of adding
+                // up, the mirror's two ways cancel across it, and nothing is dragged twice as far along it)
+                const float mine = glm::distance(x, crispCopyCenters_[copy]);
+                float sum = 1.0f;
+                for (size_t k = 0; k < crispCopyCenters_.size(); ++k) {
+                    if (k == copy) continue;
+                    const float apart = glm::distance(crispCopyCenters_[copy], crispCopyCenters_[k]) / rad;
+                    const float t = std::clamp(2.0f - apart, 0.0f, 1.0f); // (all of it a radius apart or closer, none past two)
+                    if (t > 0.0f) sum += t * t * (3.0f - 2.0f * t) * std::exp(-(glm::distance(x, crispCopyCenters_[k]) - mine) * kDragShare / rad);
+                }
+                drag /= sum;
+            }
+            if (slide) dragPart_[i] = drag; // (made after every copy's plane: slideBack)
+            else d += drag;
+        }
         scratch_[i] = d;
     }
     });
@@ -2199,8 +2376,14 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             if (scratch_[i] != glm::vec3(0.0f)) crispMovedVerts_.push_back(verts_[i]), crispMoved_.push_back(scratch_[i]);
         displaceAll(mesh, crispMovedVerts_, crispMoved_);
     } else {
-        displaceAll(mesh, verts_, scratch_);
-        if (r.drag > 0.0f) relaxDrag(mesh, weights_, kRelaxLambda * std::min(1.0f, strokeLen / (kRelaxStep * rad)), kRelaxRounds);
+        if (slide) {
+            displaceAll(mesh, verts_, scratch_);
+            for (size_t i = 0; i < verts_.size(); ++i)
+                if (dragPart_[i] != glm::vec3(0.0f)) slideVerts_.push_back(verts_[i]), slideTo_.push_back(dragPart_[i]);
+        } else {
+            displaceAll(mesh, verts_, scratch_);
+            if (r.drag > 0.0f) relaxDrag(mesh, weights_, kRelaxLambda * std::min(1.0f, strokeLen / (kRelaxStep * rad)), kRelaxRounds);
+        }
     }
 
     if (crispMax) {

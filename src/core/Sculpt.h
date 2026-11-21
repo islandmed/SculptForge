@@ -317,6 +317,10 @@ public:
     // at the end) without fused batches: on by default (perf plan item 2: the normals were half of a big brush's
     // time). Fused batches stay with adaptiveDabs (Fast Big Brushes, Experimental).
     bool analyticNormals = true;
+    // A recipe's Drag (Palette Knife) carries the shape and leaves the vertices spread as they were (slideBack, #198). Off: the
+    // vertices themselves travel with the stroke (0.13.x and before; the invariant tests compare the two shapes).
+    // SF_DRAG_SLIDE=0: off (A/B).
+    bool dragSlide = dragSlideDefault();
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
@@ -473,6 +477,12 @@ private:
     // triangle over or squash it to a sliver; and the vertices slid back toward the middle of their neighbours after the dab.
     void limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d);
     void relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lambda, int rounds);
+    // A recipe's Drag (dragSlide): every copy's drag of the dab (slideVerts_ / slideTo_, dragPart_ per region vertex), made after
+    // their planes by slideBack, which puts each vertex back on the dragged surface over where the drag found it (slideOld_).
+    void slideBack(Mesh& mesh, BVH& bvh);
+    static bool dragSlideDefault();
+    std::vector<uint32_t> slideVerts_;
+    std::vector<glm::vec3> slideOld_, slideTo_, dragPart_;
     std::vector<uint32_t> foldSlot_;
     std::vector<float> foldScale_;
     std::vector<glm::vec3> foldD_;

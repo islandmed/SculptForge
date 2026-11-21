@@ -353,8 +353,10 @@ Profile oneDab(BrushType t, float radius, float& peak) {
 // (what the artist's report lists; X symmetry, a second stroke crossing a dragged area, a long pull). 0.12.7 folded
 // 186 / 4572 / 1381 / 5347 triangles over their neighbours in these steps (the app's own close-up: 0 / 3269 / 1444 / 4972).
 // Tendril is left as 0.12.7 had it (its pulled horn folds into its own pinch, smooth to the eye; the app's own close-up
-// shows 0 folds on its crossing): its steps only guard against getting worse. Palette Knife (relaxed, no flip limiter: that costs
-// too much a dab) still leaves about 600 of its 1381; Nudge (limiter for a small brush) a few dozen.
+// shows 0 folds on its crossing): its steps only guard against getting worse. Palette Knife carries the shape, not the vertices
+// (slideBack): on a clean sphere its strokes fold nothing (palette_knife_overlaps_never_fold, palette_knife_big_brush_stack); here
+// it crosses the surface Tendril dragged (and folded, #204) first: every one of its folds is there (512; 618 with the vertices moving), none
+// elsewhere. Nudge (limiter for a small brush) a few dozen.
 void checkReplaySession() {
     BrushRecipe knife;
     for (const BrushRecipe& r : builtinBrushRecipes())
@@ -362,13 +364,47 @@ void checkReplaySession() {
     struct Step { const char* label; const BrushRecipe* recipe; BrushType type; const char* fixture; size_t allowed; };
     const Step steps[] = {{"Tendril", nullptr, BrushType::SnakeHook, "tendril_cross", 250},
                           {"Tendril", nullptr, BrushType::SnakeHook, "tendril_long", 4800},
-                          {"Palette Knife", &knife, BrushType::Standard, "knife_cross_overlap", 700},
+                          {"Palette Knife", &knife, BrushType::Standard, "knife_cross_overlap", 618},
                           {"Nudge", nullptr, BrushType::Nudge, "nudge_cross", 50}};
     Document d = denseSphere();
+    const std::vector<glm::vec3> fresh = d.mesh.positions;
+    std::vector<glm::vec3> afterTendril;
     for (const Step& st : steps) {
         const std::vector<glm::vec3> before = d.mesh.positions;
+        if (std::string(st.label) == "Palette Knife") afterTendril = before;
         replayStrokes(d, st.recipe, st.type, loadStrokeFixture(st.fixture));
         const size_t folded = foldedFaces(before, d.mesh);
+        if (std::string(st.label) == "Palette Knife") { // (its folds, the triangles it moved that lie against a neighbour: on Tendril's?)
+            const Mesh& m = d.mesh;
+            std::vector<glm::vec3> nrm(m.triangleCount());
+            for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+                const glm::uvec3 f = m.triangles[t];
+                const glm::vec3 c = glm::cross(m.positions[f.y] - m.positions[f.x], m.positions[f.z] - m.positions[f.x]);
+                nrm[t] = glm::length(c) > 0.0f ? glm::normalize(c) : glm::vec3(0.0f);
+            }
+            std::unordered_map<uint64_t, uint32_t> first;
+            std::vector<uint8_t> bad(m.triangleCount(), 0);
+            for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+                const glm::uvec3 f = m.triangles[t];
+                const uint32_t c[3] = {f.x, f.y, f.z};
+                for (int k = 0; k < 3; ++k) {
+                    const uint32_t a = std::min(c[k], c[(k + 1) % 3]), b = std::max(c[k], c[(k + 1) % 3]);
+                    const auto [it, isNew] = first.emplace((uint64_t(a) << 32) | b, t);
+                    if (!isNew && glm::dot(nrm[t], nrm[it->second]) < -0.5f) bad[t] = bad[it->second] = 1;
+                }
+            }
+            size_t onTendril = 0, elsewhere = 0;
+            for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+                if (!bad[t]) continue;
+                const glm::uvec3 f = m.triangles[t];
+                const auto moved = [&](const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+                    return a[f.x] != b[f.x] || a[f.y] != b[f.y] || a[f.z] != b[f.z];
+                };
+                if (moved(m.positions, before)) (moved(afterTendril, fresh) ? onTendril : elsewhere)++;
+            }
+            std::printf("    Palette Knife's folded triangles: %zu on the ground Tendril dragged first, %zu elsewhere\n", onTendril, elsewhere);
+            expect(elsewhere == 0, "Palette Knife folded %zu triangles away from Tendril's (dark creases)", elsewhere);
+        }
         std::printf("  session %s %s: moved %.4f, %zu triangles folded\n", st.label, st.fixture, maxMove(before, d.mesh), folded);
         expect(nonFinite(d.mesh) == 0, "%s: NaN in %s", st.label, st.fixture);
         expect(folded <= st.allowed, "%s: %zu triangles folded over a neighbour in %s (allowed %zu; dark creases)", st.label, folded,
@@ -378,6 +414,205 @@ void checkReplaySession() {
 
 [[maybe_unused]] const bool kReplayRegistered = [] {
     addTest("drag_brushes_replay_session", [] { checkReplaySession(); });
+    return true;
+}();
+
+// Palette Knife on its own, on a fresh dense sphere (#198: creases where two strokes overlap): the close-up session's three
+// strokes, then the same three again a third of a brush further down and backwards (six strokes, each over two or more
+// dragged areas), X symmetry on, every stroke counted against the mesh before it. No triangle may end folded over a
+// neighbour or as a sliver (a long knife stroke used to shear the band along its sides by about 4, into the slivers the next
+// stroke turned over). And the knife must still carry the shape as far: after the first two strokes (which the vertex-moving
+// drag of 0.13 left unfolded) the surface lies within a fraction of an edge of that drag's, both ways.
+float triangleQuality(const Mesh& m, const glm::uvec3& t) { // (1 is equilateral)
+    const glm::vec3 e1 = m.positions[t.y] - m.positions[t.x], e2 = m.positions[t.z] - m.positions[t.x];
+    const float sum = glm::dot(e1, e1) + glm::dot(e2, e2) + glm::dot(e2 - e1, e2 - e1);
+    return sum > 0.0f ? 1.7320508f * glm::length(glm::cross(e1, e2)) / sum : 0.0f;
+}
+// The distance from p to triangle (a, b, c) (Ericson, Real-Time Collision Detection 5.1.5).
+float pointTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+    const glm::vec3 ab = b - a, ac = c - a, ap = p - a;
+    const float d1 = glm::dot(ab, ap), d2 = glm::dot(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) return glm::length(ap);
+    const glm::vec3 bp = p - b;
+    const float d3 = glm::dot(ab, bp), d4 = glm::dot(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) return glm::length(bp);
+    const float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) return glm::distance(p, a + ab * (d1 / (d1 - d3)));
+    const glm::vec3 cp = p - c;
+    const float d5 = glm::dot(ab, cp), d6 = glm::dot(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) return glm::length(cp);
+    const float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) return glm::distance(p, a + ac * (d2 / (d2 - d6)));
+    const float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+        return glm::distance(p, b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6))));
+    const float den = 1.0f / (va + vb + vc);
+    return glm::distance(p, a + ab * (vb * den) + ac * (vc * den));
+}
+// How far each moved vertex of `a` lies from the surface of `b` (the triangles around b's vertices within two edges of it):
+// the median and the 95th percentile.
+std::pair<float, float> surfaceGap(const Document& a, const std::vector<glm::vec3>& start, const Document& b, float edge) {
+    const float cell = 2.0f * edge;
+    const auto key = [cell](const glm::vec3& x) {
+        const glm::ivec3 c = glm::ivec3(glm::floor(x / cell));
+        return (uint64_t(uint32_t(c.x) & 0x1fffff) << 42) | (uint64_t(uint32_t(c.y) & 0x1fffff) << 21) | uint64_t(uint32_t(c.z) & 0x1fffff);
+    };
+    std::unordered_map<uint64_t, std::vector<uint32_t>> grid;
+    for (uint32_t v = 0; v < b.mesh.vertexCount(); ++v) grid[key(b.mesh.positions[v])].push_back(v);
+    std::vector<float> gaps;
+    for (uint32_t v = 0; v < a.mesh.vertexCount(); ++v) {
+        if (a.mesh.positions[v] == start[v]) continue;
+        const glm::vec3 x = a.mesh.positions[v];
+        float best = 1e9f;
+        for (int dx = -1; dx <= 1; ++dx)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dz = -1; dz <= 1; ++dz) {
+                    auto it = grid.find(key(x + glm::vec3(float(dx), float(dy), float(dz)) * cell));
+                    if (it == grid.end()) continue;
+                    for (uint32_t u : it->second)
+                        for (uint32_t t : b.mesh.vertexTriangles(u)) {
+                            const glm::uvec3 f = b.mesh.triangles[t];
+                            best = std::min(best, pointTriangle(x, b.mesh.positions[f.x], b.mesh.positions[f.y], b.mesh.positions[f.z]));
+                        }
+                }
+        gaps.push_back(std::min(best, 2.0f * cell)); // (nothing within two cells: counted as two cells off)
+    }
+    if (gaps.empty()) return {0.0f, 0.0f};
+    std::sort(gaps.begin(), gaps.end());
+    return {gaps[gaps.size() / 2], gaps[std::min(gaps.size() - 1, size_t(0.95 * double(gaps.size())))]};
+}
+void checkKnifeOverlaps() {
+    BrushRecipe knife;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Palette Knife") knife = r;
+    StrokeFixture f = loadStrokeFixture("knife_cross_overlap");
+    expect(f.strokes.size() == 3, "knife_cross_overlap: %zu strokes", f.strokes.size());
+    for (size_t k = 0; k < 3; ++k) {
+        StrokeFixture::One s = f.strokes[k];
+        for (glm::vec3& p : s.points) p = glm::normalize(p + glm::vec3(0.0f, -0.33f * f.radius, 0.0f));
+        std::reverse(s.points.begin(), s.points.end());
+        std::swap(s.p0, s.p1);
+        f.strokes.push_back(s);
+    }
+    const float edge = meanEdge(denseSphereFixture().mesh);
+    Document d = denseSphere();
+    const std::vector<glm::vec3> start = d.mesh.positions;
+    std::vector<glm::vec3> before = start;
+    replayStrokes(d, &knife, BrushType::Standard, f, [&](size_t k) {
+        const size_t folded = foldedFaces(before, d.mesh), inverted = invertedFaces(before, d.mesh);
+        size_t slivers = 0;
+        float worst = 1.0f;
+        for (const glm::uvec3& t : d.mesh.triangles) {
+            const float q = triangleQuality(d.mesh, t);
+            slivers += q < 0.2f;
+            worst = std::min(worst, q);
+        }
+        std::printf("  Palette Knife stroke %zu: %zu folded, %zu inside out, %zu slivers (worst triangle %.2f)\n", k + 1, folded,
+                    inverted, slivers, worst);
+        expect(nonFinite(d.mesh) == 0, "Palette Knife: NaN after stroke %zu", k + 1);
+        expect(folded == 0 && inverted == 0, "Palette Knife stroke %zu: %zu triangles folded over a neighbour, %zu inside out",
+               k + 1, folded, inverted);
+        expect(slivers == 0, "Palette Knife stroke %zu: %zu slivers (quality under 0.2; worst %.3f)", k + 1, slivers, worst);
+        before = d.mesh.positions;
+    });
+    const float sym = symmetryError(d.mesh, sphereMirror());
+    std::printf("  Palette Knife: mirror %.3g (%.2f edges)\n", sym, sym / edge);
+
+    // The shape. A drag alone (the knife without its plane) carries the surface where the vertex-moving drag of 0.13 did, on
+    // the first stroke without symmetry (that drag left it unfolded; with symmetry the two halves' drags used to add up where
+    // they overlap, twice as far, and now blend): the vertices go back across it, the surface stays. With its plane the
+    // knife flattens from an even spread of vertices, not the bunched ones that drag left ahead of the tip (they pulled the plane
+    // toward the carried, flattened clay): its ridges stand at least as high as before, never softer.
+    double ms = 0.0; // (the strokes' own time, the last carry's)
+    const auto carry = [&](const BrushRecipe& recipe, bool slideOn, size_t strokes, bool mirror = true) {
+        StrokeFixture g = f;
+        g.strokes.resize(strokes);
+        g.symmetry.x = mirror;
+        Document x = denseSphere();
+        x.sculptor.dragSlide = slideOn;
+        const auto t = std::chrono::steady_clock::now();
+        replayStrokes(x, &recipe, BrushType::Standard, g);
+        ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t).count();
+        return x;
+    };
+    BrushRecipe drag = knife;
+    drag.planeAmount = 0.0f;
+    const Document slide = carry(drag, true, 1, false), moving = carry(drag, false, 1, false);
+    const auto [midA, p95A] = surfaceGap(slide, start, moving, edge);
+    const auto [midB, p95B] = surfaceGap(moving, start, slide, edge);
+    float carried = 0.0f;
+    for (uint32_t v = 0; v < moving.mesh.vertexCount(); ++v) carried = std::max(carried, glm::distance(moving.mesh.positions[v], start[v]));
+    std::printf("  drag alone vs the vertex-moving drag: %.2f / %.2f edges apart (median), %.2f / %.2f (95%%); it carried %.1f edges\n",
+                midA / edge, midB / edge, p95A / edge, p95B / edge, carried / edge);
+    expect(p95A < 0.5f * edge && p95B < 0.5f * edge, "a drag moved the surface elsewhere than before: %.2f / %.2f edges (95%%)",
+           p95A / edge, p95B / edge);
+    const auto relief = [](const Mesh& m) {
+        float r = 0.0f;
+        for (const glm::vec3& x : m.positions) r = std::max(r, std::abs(glm::length(x) - 1.0f));
+        return r;
+    };
+    const float now = relief(carry(knife, true, 2).mesh);
+    const double msNow = ms;
+    const float old = relief(carry(knife, false, 2).mesh);
+    std::printf("  (two knife strokes: %.0f ms, %.0f ms with the vertices moving)\n", msNow, ms);
+    std::printf("  Palette Knife relief: %.1f edges (the vertex-moving drag: %.1f)\n", now / edge, old / edge);
+    expect(now >= 0.9f * old, "Palette Knife: its ridges stand %.1f edges high, %.1f before (softened)", now / edge, old / edge);
+}
+
+[[maybe_unused]] const bool kKnifeRegistered = [] {
+    addTest("palette_knife_overlaps_never_fold", [] { checkKnifeOverlaps(); });
+    return true;
+}();
+
+
+// Palette Knife with a big brush, strokes stacked on one another (artist-qa, #198: at Size 200 the first fix folded thousands of
+// triangles a stroke and every stroke took longer than the last, minutes by the fifth): a brush of 0.3 and of 0.7 (most of the
+// sphere's front: the two mirror halves overlap almost wholly), five strokes crossing, X symmetry. No stroke folds a triangle or
+// turns one inside out, slivers stay a few dozen of 1.3M (on the steepest walls the knife piles up: the vertices stay spread
+// across the surface, a wall stretches them up it; the vertex-moving drag left 190,000), and the fifth stroke costs about what
+// the first did.
+void checkKnifeBigStack(float radius) {
+    BrushRecipe knife;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Palette Knife") knife = r;
+    StrokeFixture f;
+    f.radius = radius, f.strength = 0.5f, f.symmetry.x = true;
+    const glm::vec2 lines[5][2] = {{{-0.44f, 0.2f}, {0.04f, -0.1f}}, {{-0.4f, -0.16f}, {0.0f, 0.16f}}, {{-0.18f, 0.3f}, {-0.18f, -0.36f}},
+                                   {{-0.4f, 0.1f}, {0.04f, 0.06f}}, {{-0.34f, -0.2f}, {-0.06f, 0.24f}}};
+    for (const auto& l : lines) {
+        StrokeFixture::One s;
+        for (int k = 0; k <= 24; ++k) {
+            const glm::vec2 q = glm::mix(l[0], l[1], float(k) / 24.0f);
+            s.points.push_back(glm::vec3(q, std::sqrt(std::max(0.0f, 1.0f - glm::dot(q, q)))));
+        }
+        f.strokes.push_back(s);
+    }
+    Document d = denseSphere();
+    std::vector<glm::vec3> before = d.mesh.positions;
+    std::vector<double> ms;
+    auto t = std::chrono::steady_clock::now();
+    replayStrokes(d, &knife, BrushType::Standard, f, [&](size_t k) {
+        ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t).count());
+        size_t slivers = 0;
+        for (const glm::uvec3& tr : d.mesh.triangles) slivers += triangleQuality(d.mesh, tr) < 0.2f;
+        const size_t folded = foldedFaces(before, d.mesh), inverted = invertedFaces(before, d.mesh);
+        std::printf("  Palette Knife radius %.1f stroke %zu: %.0f ms, %zu folded, %zu inside out, %zu slivers\n", radius, k + 1, ms.back(),
+                    folded, inverted, slivers);
+        expect(nonFinite(d.mesh) == 0, "Palette Knife radius %.1f: NaN after stroke %zu", radius, k + 1);
+        expect(folded == 0 && inverted == 0, "Palette Knife radius %.1f stroke %zu: %zu folded, %zu inside out", radius, k + 1, folded, inverted);
+        expect(slivers <= 100, "Palette Knife radius %.1f stroke %zu: %zu slivers (quality under 0.2)", radius, k + 1, slivers);
+        before = d.mesh.positions;
+        t = std::chrono::steady_clock::now();
+    });
+    expect(ms.size() == 5 && ms.back() < 3.0 * ms.front() + 50.0, "Palette Knife radius %.1f: the fifth stroke took %.0f ms, the first %.0f",
+           radius, ms.back(), ms.front());
+}
+
+[[maybe_unused]] const bool kKnifeBigRegistered = [] {
+    addTest("palette_knife_big_brush_stack", [] {
+        checkKnifeBigStack(0.3f);
+        checkKnifeBigStack(0.7f);
+    });
     return true;
 }();
 
