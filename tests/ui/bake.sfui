@@ -96,6 +96,21 @@ expect_status "Baked normal, cavity at 1024x1024"
 expect_value baked_maps == 2
 expect_value normal_map_preview == 1
 
+# A search distance that is too short: the panel says how much of the map found no surface and what distance fixes it,
+# and one click bakes again with it.
+run bake source=Source maps=normal size=1024 front=0.0005 rear=0.0005 out=ui-shots/bake/short-maps
+expect_status "found no surface"
+expect_status "bake again with front="
+expect_text "of the map found no surface: raise the search distance to"
+expect_no_text "Auto distance: Front"
+shot bake-short-distance
+click "Bake/Bake Again with Suggested Distance"
+expect_value bake_running == 1
+wait_idle 300
+expect_value bake_running == 0
+expect_no_text "found no surface"
+expect_text "Displacement: mid-grey = 0"
+
 # The commands in the F3 palette.
 key f3
 type "##Command palette" "preview normal"
