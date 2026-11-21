@@ -17,7 +17,7 @@ if [ "${1:-}" = --self-test ]; then
   out=$(git -C "$t/origin.git" show ci-status:status.tsv)
   [ "$(printf '%s\n' "$out" | wc -l | tr -d " ")" -eq 3 ] || { echo "FAIL: expected 3 kept lines: $out"; exit 1; }
   printf '%s\n' "$out" | tail -1 | awk -F'\t' '$1=="9"&&$2=="CI"&&$5=="failure"&&NF==6{ok=1}END{exit !ok}' || { echo "FAIL: last line: $out"; exit 1; }
-  printf '%s\n' "$out" | head -1 | awk -F'\t' '$3=="t0/fix/a_b"{ok=1}END{exit !ok}' || { echo "FAIL: branch not cleaned: $out"; exit 1; }
+  printf '%s\n' "$out" | awk -F'\t' 'NR==1&&$3=="t0/fix/a_b"{ok=1}END{exit !ok}' || { echo "FAIL: branch not cleaned: $out"; exit 1; }
   [ "$(git -C "$t/origin.git" rev-list --count ci-status | tr -d " ")" -eq 1 ] || { echo "FAIL: history grew"; exit 1; }
   echo "ci_status OK"; exit 0
 fi

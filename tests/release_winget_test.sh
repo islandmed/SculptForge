@@ -83,7 +83,7 @@ grep -q "InstallerSha256: $(upper "$SHA")" "$S/wg/dry/9.9.9/SculptForge.SculptFo
 out=$(step_winget 2>&1) || fail "open: $out"
 [ "$(main_head)" != "$before" ] || fail "main didn't get packaging/winget at 9.9.9: $out"
 git -C "$S/origin.git" show main:packaging/winget/SculptForge.SculptForge.yaml | grep -q 'PackageVersion: 9.9.9' || fail "main's manifest not at 9.9.9"
-[ "$(forkbranch sculptforge-0.9.2 | head -1)" = "Replace 0.9.3 with 9.9.9" ] || fail "no replace commit: $(forkbranch sculptforge-0.9.2): $out"
+[ "$(forkbranch sculptforge-0.9.2 | sed -n 1p)" = "Replace 0.9.3 with 9.9.9" ] || fail "no replace commit: $(forkbranch sculptforge-0.9.2): $out"
 [ "$(files sculptforge-0.9.2 | tr ' ' '\n' | sed "s#$WP/##; s#/.*##" | sort -u | paste -sd' ' -)" = 9.9.9 ] || fail "the branch's versions: $(files sculptforge-0.9.2)"
 git -C "$S/fork.git" show "sculptforge-0.9.2:$WP/9.9.9/SculptForge.SculptForge.installer.yaml" | grep -q "InstallerSha256: $(upper "$SHA")" || fail "branch checksum"
 [ "$(cat "$GH_STATE/prtitle")" = "New package: SculptForge.SculptForge version 9.9.9" ] || fail "title: $(cat "$GH_STATE/prtitle")"
@@ -97,7 +97,7 @@ git pull -q origin main 2>/dev/null
 # 3. the first PR merged: a PR of its own for the next release
 setv 9.9.10; setpr MERGED "New package: SculptForge.SculptForge version 9.9.9"; : > "$GH_LOG"
 out=$(step_winget 2>&1) || fail "merged: $out"
-[ "$(forkbranch sculptforge-9.9.10 | head -1)" = "New version: SculptForge.SculptForge version 9.9.10" ] || fail "no new branch: $out"
+[ "$(forkbranch sculptforge-9.9.10 | sed -n 1p)" = "New version: SculptForge.SculptForge version 9.9.10" ] || fail "no new branch: $out"
 [ "$(files sculptforge-9.9.10)" = "$WP/0.13.10/a.yaml $WP/9.9.10/SculptForge.SculptForge.installer.yaml $WP/9.9.10/SculptForge.SculptForge.locale.en-US.yaml $WP/9.9.10/SculptForge.SculptForge.yaml" ] ||
     fail "the new branch's files: $(files sculptforge-9.9.10)"
 [ "$(ncommits sculptforge-9.9.10)" = 2 ] || fail "the branch isn't upstream master + one commit: $(forkbranch sculptforge-9.9.10)"
