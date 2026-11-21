@@ -1194,26 +1194,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // How far the stroke on screen (the newest dab in this frame) trails the pointer (the newest sample).
             if (!p.dabs.empty()) {
                 const glm::vec2 d = p.dabs.back();
-                // Its sample: on the first stretch of the path after the last dab's that it lies on (within 1.5 px), the
-                // nearer end. The nearest sample of all matched a later lap passing over the same spot (a path fitted
-                // small to the model goes round several times) and read the lag short; it stays the fallback (a dab
-                // placed on a curve between samples).
-                const size_t n = p.samples.size();
-                size_t best = n;
-                for (size_t i = p.dabFrom; i + 1 < n && best == n; ++i) {
-                    const glm::vec2 a = p.samples[i].p, ab = p.samples[i + 1].p - a;
-                    const float len2 = glm::dot(ab, ab);
-                    const float t = len2 > 0.0f ? std::clamp(glm::dot(d - a, ab) / len2, 0.0f, 1.0f) : 0.0f;
-                    if (glm::length(a + t * ab - d) <= 1.5f) best = t < 0.5f ? i : i + 1;
-                }
-                if (best == n) {
-                    best = n - 1;
-                    float bestDist = 1e30f;
-                    for (size_t i = n; i-- > p.dabFrom && n - i < 2000;) {
-                        const float dist = glm::length(p.samples[i].p - d);
-                        if (dist < bestDist) bestDist = dist, best = i;
-                    }
-                }
+                // Its sample: on the dab's own lap of the path (core/StrokePath.h), not a later one over the same spot.
+                const size_t best = dabSampleIndex(p.samples.size(), p.dabFrom, d.x, d.y, [&](size_t i) { return p.samples[i].p; });
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
