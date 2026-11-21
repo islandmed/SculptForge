@@ -855,3 +855,40 @@ TEST(focus_detail_every_micro_brush_matches_in_memory) {
 }
 
 #endif
+
+// #184: a long stroke leaves thousands of edited tiles full, far over the budget; each demotion compresses one. The
+// demotions go within the frame's budget (a batch at least), over the following frames, never all in one (1.6-2.8 s on
+// the floor tier), and no edit is lost on the way.
+TEST(focus_detail_demotions_over_budget_spread_over_frames) {
+    const std::string path = writeSmall("demote-frames.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    MicroMesh& mm = *m.micro;
+    std::vector<uint32_t> all(mm.baseTriangles);
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) all[t] = t;
+    fd->ensureFull(mm, all, true); // (every tile edited: a stroke over all of it)
+    const size_t inner = MicroMesh::index(1, 1, mm.n); // (a point of the tile's own, not on a shared edge)
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) mm.disp[size_t(t) * mm.samples + inner] = int16_t(t % 97 + 1);
+    CHECK(fd->stats().fullTiles > 256);
+    fd->budgetBytes = size_t(mm.samples) * 2 * 8;
+    const FocusView far; // (wants nothing: every tile goes once it has lingered)
+    size_t prev = fd->stats().fullTiles;
+    int frames = 0;
+    while (fd->stats().fullTiles > 8 && frames < 10000) {
+        fd->update(m, far, FocusBrush{}, 0.0); // (a frame with no time to spare)
+        const size_t now = fd->stats().fullTiles;
+        CHECK(now <= prev && prev - now <= 64);
+        prev = now;
+        ++frames;
+    }
+    CHECK(fd->stats().fullTiles <= 8);
+    CHECK(frames > 8);
+    CHECK(edgesShared(m));
+    fd->ensureFull(mm, all, false);
+    bool kept = true;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) kept = kept && mm.disp[size_t(t) * mm.samples + inner] == int16_t(t % 97 + 1);
+    CHECK(kept);
+}

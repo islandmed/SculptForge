@@ -854,8 +854,11 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
         if (focus_) {
             static const std::vector<uint64_t> none;
-            if (mm.allDirty || mm.rescaled) focus_->syncAll(mesh, *this);
-            else focus_->cameraMoving = cameraMoving, focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            if (mm.allDirty) focus_->syncAll(mesh, *this);
+            else {
+                if (mm.rescaled) focus_->resendHeights(mesh, *this); // (the same surface: then this sync's tiles as usual)
+                focus_->cameraMoving = cameraMoving, focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            }
         } else if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
