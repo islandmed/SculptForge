@@ -887,8 +887,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             // The path stays on the model: a dab off it costs nothing, and the quick frames after it made the lag
             // read 24 ms or 370 ms by where they fell (#184; the 1B scene had 88% of its small dabs off the model).
             // Smaller until at most 2% of the path misses, lying or upright (a tall model), whichever stays larger, and
-            // round it more often: the pointer keeps its speed (lag depends on it). A model that fills the view keeps the
-            // path as it was.
+            // round it more often: the pointer keeps its speed (lag depends on it). A miss is the dab's own (dabAt: no
+            // surface within the brush circle), so a phase whose dabs all land keeps the full path and stays comparable
+            // with earlier results (in practice only the small brushes are fitted).
             {
                 RayHit h;
                 const float full = p.R;
@@ -900,7 +901,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         int miss = 0;
                         for (int k = 0; k < 120; ++k) {
                             const glm::vec2 q = strokePoint(p, double(k) / 120.0);
-                            if (!pick(q.x, q.y, h)) ++miss;
+                            if (!pickNearCursor(q.x, q.y, radiusPx_, [&](float x, float y, RayHit& c) { return pick(x, y, c); }, h)) ++miss;
                         }
                         return miss;
                     };
