@@ -145,7 +145,6 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
-//                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
 //                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
@@ -736,7 +735,6 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
     if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
-    if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());

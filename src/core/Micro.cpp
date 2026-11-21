@@ -63,7 +63,6 @@ void MicroMesh::clearDirty() {
     allDirty = false;
     maskDirty = false;
     rescaled = false;
-    shadeNow = false;
 }
 
 int MicroMesh::widen(float need) {
@@ -1179,7 +1178,6 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
-    mm.shadeNow = true; // (undo and redo show whole at once, not within a stroke's shading budget)
     if (!tileKeys.empty() && !mm.tiles) {
         mm.tiles = std::make_shared<MicroTiles>();
         mm.tiles->resize(mm.baseTriangles);

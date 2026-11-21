@@ -368,8 +368,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         // however many frames change it). While the view or the camera moves a tenth of that (an orbit after a stroke isn't slowed by the
         // catch-up), at rest the same as while stroking (a rest frame stays near 30 fps), until the queue is empty.
         const TierConfig& tc = currentTierConfig();
-        const size_t take = shadeAll ? pendingCoarse()
-                                     : coarseShadeBatch(pendingCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
+        const size_t take = coarseShadeBatch(pendingCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
         std::vector<uint32_t> batch(pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_ + take));
         for (uint32_t t : batch) coarseQueued_[t] = 0;
         coarseHead_ += take;

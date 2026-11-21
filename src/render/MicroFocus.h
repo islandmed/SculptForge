@@ -59,9 +59,6 @@ public:
     void takeSplit(double* out) { for (int k = 0; k < kParts; ++k) out[k] += splitMs_[k], splitMs_[k] = 0; }
 
     bool cameraMoving = false; // set before sync: the camera moved since the last frame (the coarse shading queue drains slowly)
-    // Set before sync: this frame shades every tile waiting, outside the budget (undo, redo, Move, a moved base at rest:
-    // only a Clay-type stroke's own tiles catch up over frames; #184 0.13.10 showed undo's stale shading for seconds).
-    bool shadeAll = false;
     size_t poolBudgetBytes = size_t(384) << 20; // the pool's most (full grid + full shading: 6 bytes a point)
 
 private:
