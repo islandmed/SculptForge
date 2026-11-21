@@ -142,8 +142,7 @@ sculptforge --benchmark core-100m</code></pre></li>
     <ul>
       <li><strong>What we measured</strong> (three runs, the evening of 2026-11-20 US Mountain time, built from the 0.13.10 tag, commit 4e39ba3a, the program's own JSON for each:
         <a href="raw/tag-0.13.10-floor-core-800m-1.json">run 1</a>, <a href="raw/tag-0.13.10-floor-core-800m-2.json">run 2</a>, <a href="raw/tag-0.13.10-floor-core-800m-3.json">run 3</a>): orbit
-        <strong>208 to 209 frames a second</strong> (median 208); the 240 px Clay stroke <strong>74 to 90 frames a second</strong> with the stroke trailing the pointer by
-        <strong>63 to 66 ms</strong> at the 99th percentile (median 35 ms); the slowest frames of that stroke 37 to 45 ms (99th percentile); worst stall 204 to 217 ms (the first small stroke).
+        <strong>208 to 209 frames a second</strong> (median 208); the 240 px Clay stroke <strong>74 to 90 frames a second</strong>; the slowest frames of that stroke 37 to 45 ms (99th percentile); worst stall 204 to 217 ms (the first small stroke).
         Three runs on one laptop: a range, not a promise.</li>
       <li><strong>The machine</strong>: an Apple M1 Pro laptop (10 cores, 30.9 GB, Linux), 1920 x 1080, vertical sync off, held to SculptForge's entry-level budget with
         <code>SF_HW_SIMULATE=floor</code>. It is a fast laptop slowed down in software, not a real entry-level computer: your numbers will differ, in either direction.</li>
