@@ -2206,7 +2206,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     // The right button is already down and dragging the view: a driver's second press for the same button (beside a pen's
     // side button) is not a new click, which would arm the menu again in the middle of the drag.
     if (button == SDL_BUTTON_RIGHT && rightClick_.down && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) return;
-    dragFromPen_ = lastInputPen_;
+    // A right / middle click the compositor's pointer sends for the pen's barrel buttons while the pen is sending samples
+    // (KDE's tablet defaults) is the pen's drag: the pen is the one source that never lags, the pointer only shadows it, and
+    // a drag the pointer owned ignored the pen's samples whenever the pointer had just moved and caught up after: the view
+    // skipped (#216). One source for the whole drag, chosen here; the pointer's moves are strays until the release.
+    constexpr Uint64 kPenActiveNs = 100000000ull;
+    const bool penActive = button != SDL_BUTTON_LEFT && penInProximity_ && clickClockNs() - lastPenNs_ < kPenActiveNs;
+    dragFromPen_ = lastInputPen_ || penActive;
     pointerDragMoved_ = false;
     doc_.syncBvh();
     if (button == SDL_BUTTON_LEFT && erasing() && eraserAction() != PenAction::Invert && eraserAction() != PenAction::Smooth) {

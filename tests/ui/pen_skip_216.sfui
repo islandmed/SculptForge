@@ -1,0 +1,138 @@
+# A steady pen drag with a side button turns the view by about the same every frame, whatever the compositor's pointer does
+# beside the pen (gh#216, 0.13.10: "the mesh skips on screen when rotating or panning with the stylus buttons"). A skip is a
+# frame where the view waited and then caught up (the pen's samples ignored while a lagging pointer owned the drag), a jump
+# between two position sources, or a step against the drag. Each event shape of a KDE Wayland tablet: the pen's own events,
+# the tablet protocol's button and a pointer click, the pointer click alone, a pointer that goes quiet after the click, one
+# that reports every third sample.
+run ui_look look=classic layout=classic
+wait 0.2
+run new_sphere subdivisions=4
+snapshot
+
+pen_stream ink
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 1 down
+pen_move 0.65 0.5 1.0
+pen_button 1 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream ink
+
+pen_stream kde
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 1 down
+pen_move 0.65 0.5 1.0
+pen_button 1 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 2 down
+pen_move 0.65 0.5 1.0
+pen_button 2 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_pointer
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 1 down
+pen_move 0.65 0.5 1.0
+pen_button 1 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_pointer
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 2 down
+pen_move 0.65 0.5 1.0
+pen_button 2 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_stalled
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 1 down
+pen_move 0.65 0.5 1.0
+pen_button 1 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_stalled
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 2 down
+pen_move 0.65 0.5 1.0
+pen_button 2 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_sparse
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 1 down
+pen_move 0.65 0.5 1.0
+pen_button 1 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
+
+pen_stream kde_sparse
+key f
+camera 0 0
+pen_move 0.35 0.4
+view_trace on
+pen_button 2 down
+pen_move 0.65 0.5 1.0
+pen_button 2 up
+view_trace off
+view_trace check 2.5
+key f
+camera 0 0
+pen_stream ink
