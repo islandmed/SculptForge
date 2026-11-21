@@ -64,6 +64,7 @@ cd "$S/repo"
 setv() { V=$1 T=v$1; echo "$SHA  SculptForge-$1-windows-x86_64.exe" > "$GH_STATE/sums"; }
 setpr() { printf '%s' "$1" > "$GH_STATE/prstate"; printf '%s' "$2" > "$GH_STATE/prtitle"; }
 forkbranch() { git -C "$S/fork.git" log --format=%s "$1"; }
+ncommits() { git -C "$S/fork.git" rev-list --count "$1"; } # (not wc -l: macOS pads it with spaces)
 files() { git -C "$S/fork.git" ls-tree -r --name-only "$1" -- "$WP" | paste -sd' ' -; }
 main_head() { git -C "$S/origin.git" rev-parse main; }
 upper() { printf '%s' "$1" | tr a-f A-F; }
@@ -88,9 +89,9 @@ git -C "$S/fork.git" show "sculptforge-0.9.2:$WP/9.9.9/SculptForge.SculptForge.i
 [ "$(cat "$GH_STATE/prtitle")" = "New package: SculptForge.SculptForge version 9.9.9" ] || fail "title: $(cat "$GH_STATE/prtitle")"
 grep -q 'OPEN' "$S/wg/status-9.9.9.txt" || fail "status: $(cat "$S/wg/status-9.9.9.txt")"
 # again: nothing new anywhere
-n=$(forkbranch sculptforge-0.9.2 | wc -l); m=$(main_head); : > "$GH_LOG"
+n=$(ncommits sculptforge-0.9.2); m=$(main_head); : > "$GH_LOG"
 step_winget >/dev/null 2>&1 || fail "second run"
-[ "$(forkbranch sculptforge-0.9.2 | wc -l)" = "$n" ] && [ "$(main_head)" = "$m" ] && ! grep -q 'pr edit' "$GH_LOG" || fail "second run changed something"
+[ "$(ncommits sculptforge-0.9.2)" = "$n" ] && [ "$(main_head)" = "$m" ] && ! grep -q 'pr edit' "$GH_LOG" || fail "second run changed something"
 git pull -q origin main 2>/dev/null
 
 # 3. the first PR merged: a PR of its own for the next release
@@ -99,7 +100,7 @@ out=$(step_winget 2>&1) || fail "merged: $out"
 [ "$(forkbranch sculptforge-9.9.10 | head -1)" = "New version: SculptForge.SculptForge version 9.9.10" ] || fail "no new branch: $out"
 [ "$(files sculptforge-9.9.10)" = "$WP/0.13.10/a.yaml $WP/9.9.10/SculptForge.SculptForge.installer.yaml $WP/9.9.10/SculptForge.SculptForge.locale.en-US.yaml $WP/9.9.10/SculptForge.SculptForge.yaml" ] ||
     fail "the new branch's files: $(files sculptforge-9.9.10)"
-[ "$(forkbranch sculptforge-9.9.10 | wc -l)" = 2 ] || fail "the branch isn't upstream master + one commit: $(forkbranch sculptforge-9.9.10)"
+[ "$(ncommits sculptforge-9.9.10)" = 2 ] || fail "the branch isn't upstream master + one commit: $(forkbranch sculptforge-9.9.10)"
 grep -q -- '--head islandmed:sculptforge-9.9.10 --base master --title SculptForge.SculptForge version 9.9.10' "$GH_LOG" || fail "pr create: $(cat "$GH_LOG")"
 grep -q 'pull/999' "$S/wg/status-9.9.10.txt" || fail "status: $(cat "$S/wg/status-9.9.10.txt")"
 # a PR for it exists / winget-pkgs has it: no second PR
