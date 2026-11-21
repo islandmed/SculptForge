@@ -341,7 +341,7 @@ void App::drawSupportCard() {
     const bool yearly = kSupportUrlMemberYearly[0] != '\0'; // (the yearly checkout, once it exists)
     const Tier kTiers[2] = {
         {"Member", yearly ? "$48" : "$5", yearly ? "/ year" : "/ month",
-         {"Betas and early builds of the next version", "The monthly feature vote: pick what we build next",
+         {"Early builds, like SculptForge for Android today", "The monthly feature vote: pick what we build next",
           "Member Requests: one a month, built first, credited to you", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
          "Become a member", "Become a member##card.member", yearly ? kSupportUrlMemberYearly : kSupportUrlMember,
