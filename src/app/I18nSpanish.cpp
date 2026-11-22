@@ -4726,6 +4726,8 @@ constexpr Entry kSpanish[] = {
      "Siguiente"},
     {"No UVs: Auto UV makes them",
      "Sin UV: Auto UV las crea"},
+    {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
+     "Este chip gráfico no puede mostrar la textura en un modelo tan denso. La pintura sigue yendo a la textura (verla en la vista UV o exportarla); reduce el número de triángulos para verla en el modelo."},
     {"No UVs: Tool > Texture Image > Auto UV",
      "Sin UV: Herramienta > Imagen de textura > Auto UV"},
     {"No alpha matches \"%s\"",

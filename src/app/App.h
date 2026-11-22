@@ -580,6 +580,7 @@ private:
     glm::vec3 alongNormalTarget(float x, float y) const;
 
     std::string status_;
+    bool textureNoticeShown_ = false; // the "texture not shown on this GPU" status was given for the Part's texture
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
