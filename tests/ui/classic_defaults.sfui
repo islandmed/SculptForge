@@ -1,7 +1,7 @@
-# The Classic layout's defaults, pinned (classic-drift audit 11-22): what a Classic user sees the first time, so a later change that
+# The Classic layout's defaults, pinned (Classic is a promise: nothing lost): what a Classic user sees the first time, so a later change that
 # moves a menu row, a shelf item, a tray panel, a colour cell or a Preference they never touched fails here unless
 # tests/ui/golden/classic_defaults.json is updated on purpose (SF_UI_GOLDEN_UPDATE=1 rewrites it; review the diff).
-# "Newer" rows (File > Render with..., Preferences > Scripts, > Render bridge: audit row 8) stay off in Classic by default.
+# "Newer" rows (File > Render with..., Preferences > Scripts, > Render bridge) stay off in Classic by default.
 run ui_look look=classic layout=classic
 ui_scale 100
 run new_sphere subdivisions=3
