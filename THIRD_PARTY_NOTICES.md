@@ -688,7 +688,8 @@ freely, subject to the following restrictions:
 ## Zstandard (decoder)
 
 https://github.com/facebook/zstd — BSD License (v1.5.7, decoder only, third_party/zstd; builds without a system
-libzstd: Windows, macOS, Android)
+libzstd: Windows, macOS, Android). Source: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz,
+SHA-256 eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3 (third_party/zstd/VENDORED.md).
 
 ```
 BSD License
