@@ -3130,6 +3130,13 @@ void App::strokeTo(float x, float y) {
 
 void App::drainStrokeDabs(double budgetSeconds) {
     if (dabQueue_.empty()) return;
+    // A dab that widened a Micro level's range (MicroMesh::widen) ends its frame's dabs, and the next frame places none
+    // while the renderer re-sends the heights (MicroRenderer::sync): the widen's work spread over two frames, not one
+    // (#184: 0.7-1 s mid-stroke on a 2.6M base). (Unbudgeted calls place every dab: a stroke's end, scripts.)
+    // A widen due within two dabs happens first, alone in its frame (MicroStroke::widenAhead).
+    auto widened = [&] { return budgetSeconds > 0.0 && doc_.mesh.micro && doc_.mesh.micro->rescaled && doc_.mesh.micro->stroking; };
+    if (widened()) return;
+    if (budgetSeconds > 0.0 && doc_.mesh.micro && doc_.mesh.micro->stroking && doc_.sculptor.microStroke().widenAhead(*doc_.mesh.micro)) return;
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
     const auto start = std::chrono::steady_clock::now();
     const size_t waiting = dabQueue_.size();
@@ -3141,6 +3148,7 @@ void App::drainStrokeDabs(double budgetSeconds) {
         const auto dabStart = std::chrono::steady_clock::now();
         dabAt(d.x, d.y, d.pressure, d.stamp);
         ++placed;
+        if (widened()) break;
         if (doc_.sculptor.batchWaiting() > 0) continue; // (its cost shows when the batch is placed, below)
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();

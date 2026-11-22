@@ -776,6 +776,15 @@ bool MicroRenderer::sync(Mesh& mesh) {
                       level_ != mm.level || mesh.topologyDirty;
     for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
     }
+    // A range widen during a stroke (MicroMesh::widen) shows one frame later: this frame the GPU keeps the old heights
+    // and step (the same surface) while the widen's own work takes the frame, and the next re-sends them, placing no
+    // dabs (App::drainStrokeDabs). #184: both in one frame were 0.7-1 s on a 2.6M base on the floor tier.
+    if (!full && focus_ && mm.rescaled && mm.stroking && !rescaleDeferred_) {
+        rescaleDeferred_ = true;
+        ++widenDeferrals_;
+        return true;
+    }
+    rescaleDeferred_ = false;
     if (full) {
         serial_ = mm.serial;
         baseTriangles_ = mm.baseTriangles;

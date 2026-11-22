@@ -348,6 +348,9 @@ public:
     // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
     // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
+    // Widens now when the range is within two of the last dab's additions of full (App: at the start of a frame's
+    // dabs, so the widen's frame holds nothing else, #184). True when it widened.
+    bool widenAhead(MicroMesh& mm);
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);
     // Puts every grid point the stroke changed back (the stroke stays open).
@@ -399,6 +402,7 @@ private:
     void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed = nullptr);
     bool active_ = false;
     float strokeStep_ = 0.0f;
+    float lastAdd_ = 0.0f; // what the last dab could add to the range (widenAhead)
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)
     std::vector<uint32_t> tiles_;         // the touched base triangles, in order
     std::vector<int16_t> oldDisp_;        // tiles_.size() * samples
