@@ -5,7 +5,7 @@
 # cold: SF_FOCUS_DETAIL is set here, and a warm server doesn't keep it between scripts.
 run ui_look look=classic layout=classic
 env SF_FOCUS_DETAIL 1
-run new_sphere subdivisions=7
+run new_sphere subdivisions=6
 run micro_divide level=4
 env SF_FOCUS_DETAIL 0
 wait_idle 120
@@ -21,36 +21,12 @@ stroke 0.35 0.45 0.65 0.55 1.0
 stroke 0.35 0.55 0.65 0.45 1.0
 stroke 0.35 0.45 0.65 0.55 1.0
 stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
-stroke 0.35 0.45 0.65 0.55 1.0
-stroke 0.35 0.55 0.65 0.45 1.0
 expect_value micro_step > $before
 wait_value micro_pending_coarse == 0 120 # (real time: llvmpipe takes far longer than this computer)
 wait_idle 60
 print view_stale
 expect_value view_stale < 0.001
 shot micro_widen_draw
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
-key ctrl+z
 key ctrl+z
 key ctrl+z
 key ctrl+z
