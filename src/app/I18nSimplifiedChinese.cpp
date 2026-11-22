@@ -1799,6 +1799,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Keep the plane the stroke starts on for the whole stroke.", "整个笔触都保持笔触起点的平面。"},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而干净的笔尖边缘并完全压平，用于硬表面平面。"},
     {"View falloff", "视图衰减"},
+    {"Contact facing", "接触面朝向"},
+    {"Facing angle %.0f", "朝向角度 %.0f"},
+    {"The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.",
+     "光标下的表面决定移动的部分：衰减沿着表面测量，因此细槽的对面墙壁或折痕的另一侧保持不动，而光标下的边缘跟着移动。朝向角度（默认 180）也会降低朝向其他方向的表面：角度一半以内为全强度，超过则无作用。平滑的形体移动方式与未开启时相同。移动与抓取仍可触及所有部分。随偏好设置与项目一并保存。"},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
      "smooth for the rest of the stroke.",

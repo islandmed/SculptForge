@@ -90,6 +90,13 @@ struct DabParams {
     // on screen, so the brush reaches through the model along the view as a cylinder.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Contact facing: the surface under the cursor decides what moves. The falloff is measured along the surface (the
+    // Connected only flood's edge paths, Sculptor::keepFacing), so what the brush reaches only round a fold (the far wall
+    // of a narrow slot) stays put while the rim under the cursor follows smoothly; and each vertex's weight fades with the
+    // angle between its normal and the contact normal (the averaged normal right under the cursor): full up to half of
+    // `facingAngle` (degrees), none from `facingAngle` on (the back of a thin part). Not on Move (it grabs what it reaches).
+    bool contactFacing = false;
+    float facingAngle = 180.0f;
     // A stamp (Drag Stamp, Slide Stamp: one big dab per drag step) with an alpha also takes the visible surface under
     // its footprint on the view plane, which a surface curving away puts outside the dab's sphere (#174). Not on the
     // many-dab alpha brushes (Dots, Spray), which keep the sphere: a dab there is per-frame hot.
@@ -146,11 +153,15 @@ inline float brushDistance(const struct DabParams& p, const glm::vec3& x) {
 // Scratch for keepConnected (a stamp per vertex, so nothing is cleared between dabs).
 struct ConnectedScratch {
     std::vector<uint32_t> stamp, queue;
+    std::vector<float> dist; // (`surface`: per vertex, valid where stamped reached)
     uint32_t epoch = 0;
 };
 // Connected only: keeps the vertices of `verts` (in increasing order) that the vertex of `verts` nearest `seed`
-// reaches through edges between vertices of `verts`; the order stays.
-void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
+// reaches through edges between vertices of `verts`; the order stays. `surface` (Contact facing): also each kept
+// vertex's distance from `seed` along the surface (the flood's edge paths, each vertex relaxed from the neighbours
+// reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
+                   std::vector<float>* surface = nullptr);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
 // (viewFalloff), then keepConnected from `center` (connectedOnly). `footprint` (an alpha stamp, #174): also the
 // surface facing the viewer under the stamp's footprint on the view plane, which a surface curving away reaches
@@ -162,6 +173,32 @@ void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, cons
 // falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
 // there is no surface there).
 glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, float focal = 0.0f);
+// Contact facing (DabParams::contactFacing): the contact normal, the falloff-weighted average normal of the region's
+// vertices within a quarter of `radius` of `center` that face within kContactCone of `hint` (the picked triangle's normal,
+// else against the view): it smooths the picked normal's noise, and neither the far wall of a narrow gap nor the rim a
+// cursor near it reaches tilts it. `hint` when none does.
+constexpr float kContactCone = 0.9f; // (cosine: 26 degrees)
+glm::vec3 contactNormal(const Mesh& mesh, std::span<const uint32_t> verts, const glm::vec3& center, float radius,
+                        const glm::vec3& hint);
+// The hint contactNormal starts from: the picked normal, else against the view.
+inline glm::vec3 contactHint(const DabParams& p) {
+    return glm::dot(p.pickNormal, p.pickNormal) > 1e-12f ? p.pickNormal : -p.viewDir;
+}
+// The weight of a vertex with normal `n` against the contact normal: 1 up to half of `angleDeg`, 0 from it on, a
+// smoothstep in the cosine between.
+// The distance a vertex `inSpace` from the dab's centre counts for, `along` the surface (the flood's edge paths, which can
+// run a third over the true surface distance on a triangle mesh, and an edge or two near the centre: `edge`, the mesh's
+// edge length there): only what lies beyond that (round a fold, the far wall of a slot) is pushed out, so smooth forms
+// keep their falloff.
+inline float surfaceReach(float inSpace, float along, float edge) {
+    return inSpace + std::max(0.0f, along - 1.5f * inSpace - 2.0f * edge);
+}
+inline float facingWeight(const glm::vec3& n, const glm::vec3& contact, float angleDeg) {
+    const float a = glm::radians(std::clamp(angleDeg, 10.0f, 180.0f));
+    const float lo = std::cos(a), hi = std::cos(0.5f * a);
+    const float t = std::clamp((glm::dot(n, contact) - lo) / (hi - lo), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
 // The parameter s of the point point + s * dir (dir unit length) nearest the ray origin + t * rayDir: where a
 // cursor ray says a grab sliding along the line should be. False when the line is within `minSine` (the sine of
 // the angle between them) of parallel to the ray, so the cursor can't say where along it.
@@ -587,6 +624,14 @@ private:
     std::vector<glm::vec3> shrunk_;
     std::vector<std::pair<uint32_t, uint32_t>> shrunkIndex_;
     std::vector<float> weights_, influence_;
+    // Contact facing (DabParams::contactFacing): each of verts_'s weight (the angle gate times the falloff along the surface
+    // over the one in space, `reach` radii); keepFacing fills it and drops the vertices at 0.
+    std::vector<float> facing_, surface_;
+    std::vector<uint32_t> facingVerts_;
+    static constexpr size_t kSurfaceMax = size_t(1) << 21; // (the surface distance's flood: about 15 ms a dab there)
+    bool keepFacing(const Mesh& mesh, const DabParams& p, float reach);
+    // ... on a micro level: copy `m`'s contact hint (contactHint) into `d` (kept for Forge Ink's replays) and the grid's stroke.
+    void microFacing(const DabParams& p, const SymCopy& m, MicroDab& d);
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;
     // Move brush: each mirror's vertices and weights (grabMirrors_: where each mirror's run ends, and its

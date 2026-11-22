@@ -225,6 +225,8 @@
     "alongNormal": "invert_key",
     "connectedOnly": false,
     "viewFalloff": false,
+    "contactFacing": false,
+    "facingAngle": 180,
     "dyntopoSmoothRemesh": 1,
     "airStrokes": false,
     "slideRotateKey": "shift",
