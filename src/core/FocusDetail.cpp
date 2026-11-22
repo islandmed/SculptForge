@@ -757,14 +757,18 @@ void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, b
     stats_.promoteMs += msSince(t0);
 }
 
-void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t) {
-    int16_t* g = mm.disp.data() + size_t(t) * samples_;
-    if (state_[t] == kDirty) { // keep the edit: compressed in memory until saved, coarse grid refreshed
-        const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
-        dir_[t].coarseErr = info.coarseErr;
-        dir_[t].range = std::max(dir_[t].range, info.range);
-        compressTile(writeCodec_, g, n_, samples_, parked_[t]);
-    }
+void FocusDetail::parkLocked(MicroMesh& mm, uint32_t t) {
+    if (state_[t] != kDirty) return;
+    // keep the edit: compressed in memory until saved, coarse grid refreshed (this tile's own fields only: parallel)
+    const int16_t* g = mm.disp.data() + size_t(t) * samples_;
+    const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
+    dir_[t].coarseErr = info.coarseErr;
+    dir_[t].range = std::max(dir_[t].range, info.range);
+    compressTile(writeCodec_, g, n_, samples_, parked_[t]);
+}
+
+void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park) {
+    if (park) parkLocked(mm, t);
     fillCoarse(mm, t);
     state_[t] = kCoarse;
     --fullTiles_;
@@ -946,11 +950,19 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
         }
-        while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
+        // The tiles to demote first, then their edits compressed in parallel (after strokes a new view demotes
+        // hundreds of dirty tiles at once: one by one that was a 389 ms frame on Windows), then demoted in order.
+        std::vector<uint32_t>& victims = victims_;
+        victims.clear();
+        for (size_t full = fullTiles_; full + room > maxFull && !lru.empty();) { // (back = oldest)
             const uint32_t t = lru.back();
             lru.pop_back();
-            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t);
+            if (t < T && state_[t] != kCoarse) victims.push_back(t), --full;
         }
+        poolFor(victims.size(), [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
+        }, 8);
+        for (uint32_t t : victims) demoteLocked(mm, t, false);
         return fullTiles_ + room <= maxFull;
     };
     size_t done = 0;

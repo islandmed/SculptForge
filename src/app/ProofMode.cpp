@@ -29,6 +29,7 @@
 #include "core/BrushAlpha.h"
 #include "core/HardwareProfile.h"
 #include "core/HardwareTier.h"
+#include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
@@ -1021,6 +1022,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.hardware.set("gpu_name", std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))));
             p.hardware.set("driver", std::string(reinterpret_cast<const char*>(gl::GetString(GL_VERSION))));
             p.hardware.set("hw_tier", std::string(hwTierName(currentTierConfig().hwTier)));
+            p.hardware.set("brush_threads", double(ThreadPool::shared().threads())); // (like-for-like comparisons: the tier sets it)
             int ww = 0, wh = 0;
             SDL_GetWindowSize(window_, &ww, &wh);
             Json win = Json::array();
