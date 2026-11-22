@@ -76,7 +76,7 @@ HAND_MAP = [
 # Public text is checked for third-party marks on every change: cheap, and the one check nobody may skip. stale_tree
 # (a branch on an old base reverting main's work, ~10 s) too: 11-11 qa-lean replay, 5 of its reds only ran because a
 # CMake edit made the run full.
-ALWAYS = ["marks", "stale_tree"]
+ALWAYS = ["marks", "stale_tree", "betas_paused", "betas_paused_self_test"]
 # The app's own sanity set, whenever the app program changed.
 SMOKE = ["ui_shell_layout", "ui_sculpt_basics", "ui_idle_redraw", "ui_release_smoke", "ui_render_matrix",
          "ui_mode_matrix_0of4", "ui_mode_matrix_1of4", "ui_mode_matrix_2of4", "ui_mode_matrix_3of4", "ui_monkey"]  # (every mode can be left; seeded user-action fuzz: UiTestModes.cpp)

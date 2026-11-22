@@ -1,6 +1,6 @@
 # Script-made interface (sf.ui, app/Python.h): a script declares an action and a panel; SculptForge draws them with
 # its own widgets in File > Script, puts the action on a shelf, and runs the script's callbacks, each one undo step.
-run ui_look look=classic layout=classic        # the classic palette bar (Script##palette.script)
+run ui_look look=classic layout=classic newer_rows=true        # the classic palette bar (Script##palette.script)
 run new_sphere subdivisions=2
 expect_value triangles == 320
 click "Preferences##palette.preferences"

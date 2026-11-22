@@ -25,7 +25,7 @@ key f3
 type "##Command palette" "welcome"
 key enter
 expect_value welcome_open == 1
-expect_text "Free for everyone. Members get betas and a vote on what's next."
+expect_text "Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next."
 expect_text "Your art is never uploaded or used for training."
 shot welcome
 # Its Support button shows the membership card (each tier a click from its checkout) over the welcome.

@@ -5,6 +5,42 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.12
+
+```features
+date: 2026-11-22
+tagline: Tendril pulls round horns, Palette Knife strokes cross without creasing, dense Micro levels stall far less, and the Gizmo stays smooth on heavy Parts.
+highlight: Tendril pulls round, tapering horns, even with Dynamic on
+highlight: Palette Knife strokes cross and stack without creasing
+highlight: Dense Micro levels: Undo, Redo and Move shade at once, and strokes stall far less when they start and end
+highlight: The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode
+highlight: Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once
+title: Round Tendril horns
+line: With Dynamic on, a long Tendril pull stays a round, tapering tube instead of thinning into a flat sheet.
+action: guide:sculpting.md
+title: Clean Palette Knife
+line: Crossing and stacked knife strokes, big brushes and mirrored strokes leave the surface smooth, with no dark creases.
+action: guide:sculpting.md
+title: Smoother dense Micro levels
+line: Undo, Redo and Move show their new shading on the next frame, and letting go of a stroke holds the window far less.
+action: guide:micro-levels.md
+```
+
+- **Tendril**: with Dynamic on, long pulls stay round tubes; with **View falloff** on, the far side stays put.
+  Reported by @Tpqz_.
+- **Palette Knife** no longer creases where strokes overlap, with big brushes and mirrored strokes too (#198).
+- **Dense Micro levels**: Undo, Redo and Move show the new shading at once, the first stroke on a new level
+  pauses far less, and letting go of a stroke packs its undo step in the background (#184). Reported by @HG4Science.
+- **Gizmo**: dragging a handle on a multi-million triangle Part stays as smooth as turning the view; in **All** mode
+  a ring seen edge-on fades and can't be pressed by mistake. Idea by Fenix on Discord.
+- **Nudge and Layer** with **View falloff** work only the surface facing you; Move and Grab still reach through.
+- **Level slider**: a click switches the level at once again; a double-click still opens the number field.
+- **Classic layout**: File > Render with..., Preferences > Scripts and > Render bridge show when you turn on
+  **Preferences > Interface > Show newer menu rows**.
+- **Remesh after each stroke** says why it skipped a Part and names the key that remeshes it anyway.
+- **Texture painting**: Alt-erase on the Base also clears metal; **Forge Spheres**: a selecting click adds no
+  empty undo step.
+
 ## Version 0.13.11
 
 ```features

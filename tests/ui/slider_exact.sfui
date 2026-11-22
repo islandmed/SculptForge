@@ -37,35 +37,32 @@ type_here 35
 key enter
 expect_value z_intensity == 35
 
-# The Level slider switches a level (slow on a dense Part), so a double-click must switch once, with the typed number,
-# never for the first click's jump; Esc switches nothing; a single click still switches once the double-click time is past.
+# The Level slider applies a plain click at once (no wait, any setup); a double-click's first click has already switched
+# (the middle of 3 levels = 2), then the typed field opens: Esc leaves that level, Enter switches once more.
 run subdiv_divide
 run subdiv_divide
 expect_value subdiv_level == 3
 click "Geometry##tool.geometry"
 expect "Geometry/##level"
 remember level_switches sw0
+click "Geometry/##level"
+expect_value level_switches == $sw0+1
+expect_value subdiv_level != 3
+run subdiv_level level=3
+wait 0.5
+remember level_switches sw1
 double_click "Geometry/##level"
 expect_value typing == 1
-wait 0.6
-expect_value level_switches == $sw0
-expect_value subdiv_level == 3
+expect_value level_switches == $sw1+1
 key escape
 wait 0.6
-expect_value level_switches == $sw0
-expect_value subdiv_level == 3
+expect_value level_switches == $sw1+1
+expect_value subdiv_level != 3
 double_click "Geometry/##level"
 type_here 1
 key enter
 wait 0.6
 expect_value subdiv_level == 1
-expect_value level_switches == $sw0+1
-wait 0.5
-click "Geometry/##level"
-expect_value level_switches == $sw0+1
-wait 0.6
-expect_value level_switches == $sw0+2
-expect_value subdiv_level != 1
 
 # The Remesh palette: an integer slider (Target Quads), and the voxel slider with its own typed field.
 click "Remesh##tool.remesh"

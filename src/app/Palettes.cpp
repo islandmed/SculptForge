@@ -12,6 +12,7 @@
 #include "app/Config.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
+#include "app/Python.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
@@ -571,7 +572,7 @@ void App::drawPalette_Edit() {
 
 const App::SizeBounds& App::sizeBounds() {
     if (doc_.sculptor.strokeActive() || solverBusy()) return sizeBounds_; // (holds still during a stroke)
-    uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
+    uint64_t key = doc_.undo.baseRevision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
                    uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.parts.size()) << 56);
     for (size_t i = 0; i < doc_.parts.size(); ++i)
         if (!doc_.parts[i].visible) key ^= 0xC2B2AE3D27D4EB4Full * (i + 1);
@@ -625,7 +626,7 @@ void App::drawPalette_File() {
     menuAction(*this, "file.export_fbx");
     menuAction(*this, "file.send_unreal");
     menuAction(*this, "file.save_splats");
-    if (policy::renderBridgeAllowed()) menuAction(*this, "file.render_with"); // (PanelRenderBridge.cpp)
+    if (policy::renderBridgeAllowed() && (newerMenuRows() || renderBridgeSetUp())) menuAction(*this, "file.render_with"); // (PanelRenderBridge.cpp)
     menuAction(*this, "pack.install"); // a review screen first (PanelPacks.cpp)
     ImGui::Separator();
     drawBridgeMenu();
@@ -770,11 +771,11 @@ void App::drawPalette_Preferences() {
             drawAiPrefsSection(); // the Hugging Face token
         }
     }
-    if (subpalette("preferences.scripts", "Scripts")) {
+    if ((newerMenuRows() || python().enabled()) && subpalette("preferences.scripts", "Scripts")) {
         tray::Section section;
         drawPythonPrefs(); // Enable Python scripts (PanelPython.cpp)
     }
-    if (subpalette("preferences.render_bridge", "Render bridge")) {
+    if ((newerMenuRows() || renderBridgeSetUp()) && subpalette("preferences.render_bridge", "Render bridge")) {
         tray::Section section;
         drawRenderBridgePrefs(); // the render helper, the image editor, the Renders folder (PanelRenderBridge.cpp)
     }

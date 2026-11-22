@@ -210,16 +210,26 @@ void App::drawBrushMaterialContents() {
         const MaterialSwatch& s = kMaterialSwatches[i];
         ImGui::PushID(i);
         // The swatch shows colour; a metal's darker rim hints at its metalness, a rough one is flatter.
-        if (ImGui::ColorButton("##matswatch", ImVec4(s.color.x, s.color.y, s.color.z, 1.0f), ImGuiColorEditFlags_NoTooltip,
+        if (ImGui::ColorButton((std::string("##matswatch.") + s.name).c_str(), ImVec4(s.color.x, s.color.y, s.color.z, 1.0f), ImGuiColorEditFlags_NoTooltip,
                                ImVec2(sw, sw * 0.45f))) {
+            if (!swatchMemo_.active) swatchMemo_.before = mat; // (the material before the first swatch of a run)
             doc_.paintColor = srgbToLinear(s.color);
             mat.roughness = s.roughness;
             mat.metallic = s.metallic;
             mat.channels |= channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic);
+            swatchMemo_.applied = mat;
+            swatchMemo_.color = doc_.paintColor;
+            swatchMemo_.active = true;
             status_ = std::string("Brush material: ") + s.name;
         }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(tr("%s: roughness %.2f, metallic %.0f"), s.name, double(s.roughness), double(s.metallic));
+        if (ImGui::IsItemHovered()) {
+            char tip[200];
+            std::snprintf(tip, sizeof tip, tr("%s: roughness %.2f, metallic %.0f"), s.name, double(s.roughness), double(s.metallic));
+            if (s.metallic >= 0.99f && s.roughness <= 0.5f)
+                ImGui::SetTooltip("%s\n%s", tip, tr("Metal reflects its surroundings: it looks dark in a dark environment."));
+            else
+                ImGui::SetTooltip("%s", tip);
+        }
         ImGui::PopID();
         if (i % 4 != 3) ImGui::SameLine();
     }
@@ -232,7 +242,7 @@ void App::drawBrushMaterialContents() {
         if (!channelEnabled(t, c)) continue;
         ImGui::PushID(ci);
         bool paints = (mat.channels & channelBit(c)) != 0;
-        if (ImGui::Checkbox(channelFormat(c).label, &paints)) mat.channels ^= channelBit(c);
+        if (ImGui::Checkbox(channelFormat(c).label, &paints)) mat.channels ^= channelBit(c), swatchMemo_.active = false;
         ui::HelpText(channelFormat(c).label, nullptr,
                      (channelHelp(c) + " Ticked: the Paint brush paints this channel. C over the model picks every "
                                        "channel at once.")
@@ -248,13 +258,14 @@ void App::drawBrushMaterialContents() {
                 if (ImGui::ColorButton("##val", ImVec4(g, g, g, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(box, box))) {
                     *v = g;
                     mat.channels |= channelBit(c);
+                    swatchMemo_.active = false; // (a value the artist chose stays)
                 }
                 ImGui::PopID();
                 if (k < 4) ImGui::SameLine(0, style.ItemInnerSpacing.x);
             }
             ImGui::SetNextItemWidth(-1);
             const std::string fmt = std::string(channelFormat(c).label) + " %.2f";
-            if (ui::SliderInside("##value", v, 0.0f, 1.0f, fmt.c_str())) mat.channels |= channelBit(c);
+            if (ui::SliderInside("##value", v, 0.0f, 1.0f, fmt.c_str())) mat.channels |= channelBit(c), swatchMemo_.active = false;
         } else if (c == Channel::BaseColor) {
             ImGui::SameLine();
             const glm::vec3 s = linearToSrgb(doc_.paintColor);
@@ -402,6 +413,19 @@ double App::pbrTestValue(const std::string& name) const {
         if (!tex || !channelEnabled(*m.texture, Channel::Roughness)) return 0.0;
         const TileImage& img = channelImage(*m.texture, Channel::Roughness);
         const float def = channelFormat(Channel::Roughness).defaultValue[0];
+        double n = 0;
+        for (size_t ti = 0; ti < img.tileCount(); ++ti) {
+            if (!img.tile(ti)) continue;
+            const int x0 = int(ti % size_t(img.tilesX())) * kTileImageTile, y0 = int(ti / size_t(img.tilesX())) * kTileImageTile;
+            for (int y = y0; y < std::min(y0 + kTileImageTile, img.height()); ++y)
+                for (int x = x0; x < std::min(x0 + kTileImageTile, img.width()); ++x) n += std::abs(img.value(x, y) - def) > 0.02f;
+        }
+        return n;
+    }
+    if (name == "metallic_painted") {
+        if (!tex || !channelEnabled(*m.texture, Channel::Metallic)) return 0.0;
+        const TileImage& img = channelImage(*m.texture, Channel::Metallic);
+        const float def = channelFormat(Channel::Metallic).defaultValue[0];
         double n = 0;
         for (size_t ti = 0; ti < img.tileCount(); ++ti) {
             if (!img.tile(ti)) continue;

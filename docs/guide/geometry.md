@@ -152,7 +152,7 @@ drag on the background: without it, a drag there turns, pans or zooms the view, 
 exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
 
 **Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched the
-surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active Part is
+surface (edges pulled to more than 1.6 times their length, as a long Move or Tendril pull does), the active Part is
 remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
 
 Sculpting never waits for it. It skips Parts with subdivision levels, sculpt layers or a painted texture (Keep

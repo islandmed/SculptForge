@@ -1,7 +1,7 @@
 # Python scripting (app/Python.h): off by default, and nothing you open runs Python or even loads it: a project
 # whose names hold Python, a .py file given to open, a script file of commands. Then Preferences > Scripts turns
 # it on and the console's Python mode runs lines and blocks against the open scene, each one undo step.
-run ui_look look=classic layout=classic        # the classic palette bar (Preferences##palette.preferences)
+run ui_look look=classic layout=classic newer_rows=true        # the classic palette bar (Preferences##palette.preferences)
 run new_sphere subdivisions=2
 expect_value triangles == 320
 expect_value python_enabled == 0
