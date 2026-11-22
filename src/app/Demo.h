@@ -70,6 +70,7 @@ public:
     // The full labels ("Adjust##stencil.adjust") of the items drawn last frame inside SCOPE that are within their window's
     // sides (not pushed past a panel's edge), sorted: what a person can reach there. Vertical scrolling doesn't count.
     static std::vector<std::string> scopeItems(const std::string& scope);
+    static std::vector<std::string> scopeItemsInOrder(const std::string& scope); // the same, in drawing order (dump_ui)
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);
