@@ -19,13 +19,17 @@ interactive_strokes on
 click "Standard##brush.standard"
 run brush_set_alpha name=Bolt
 brush_size 120
-stroke 0.35 0.45 0.65 0.55 1.0
+# The first Draw stroke on a new level widens. Held down, every frame drains its dabs on the frame's budget (a quick `stroke`
+# on a slow renderer can land whole in its release, which places every dab at once: no deferral to see).
+drag_path 0.35 0.45 0.5 0.5 0.65 0.55 keep
+expect_value stroking == 1
+wait_value micro_widen_deferrals > $deferred 60 # (real time)
+expect_value micro_step > $before
+release
 stroke 0.35 0.55 0.65 0.45 1.0
 stroke 0.35 0.45 0.65 0.55 1.0
 stroke 0.35 0.55 0.65 0.45 1.0
 wait_idle 60
-expect_value micro_step > $before
-expect_value micro_widen_deferrals > $deferred
 wait_value micro_pending_coarse == 0 120 # (real time: llvmpipe takes far longer than this computer)
 wait_idle 60
 print view_stale
