@@ -289,6 +289,8 @@ float samplePattern(BrushRecipe::Pattern pattern, const glm::vec3& p) {
 // a half it squeezes the triangles at the steepest part of the falloff to a quarter of their area or less, the slivers the
 // next dab turns over.
 constexpr float kMaxDragSqueeze = 0.35f;
+constexpr float kTendrilRingEdges = 2.0f; // Tendril with Dynamic on: its horn never pinches thinner than this many edges of radius
+constexpr float kTendrilDepth = 0.5f;     // Tendril under View falloff: full strength to 0.75 radii of depth from the tip, none beyond 1.5
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
 constexpr int kRelaxRounds = 2;
 constexpr size_t kLimitVerts = 12000; // (the flip limiter costs a look at every vertex of the region, a few per dab: only for a small brush's)
@@ -1363,10 +1365,19 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                                               type == BrushType::Flatten || type == BrushType::Trim);
     const bool depthReach = p.viewFalloff && (type == BrushType::Standard || type == BrushType::Inflate || type == BrushType::Crease ||
                                                type == BrushType::Pinch || type == BrushType::SharpCrease);
+    // Tendril under View falloff: the far side of a thick part stays put, so a pull does not drag front and back into a sheet.
+    const bool tendrilReach = p.viewFalloff && type == BrushType::SnakeHook;
+    // With Dynamic on, the horn's pinch stops at a radius its triangles can still round (about 2 edges; at 0 it thinned to a
+    // thread under the remesher's edge length and folded into a flat sheet): the horn tapers, never to less than a ring of vertices.
+    if (type == BrushType::SnakeHook && dyntopo.enabled && dyntopo.constantDetail && strokeDiagonal_ <= 0.0f)
+        strokeDiagonal_ = glm::length(mesh.bounds().extent());
+    const float tendrilRadius = type == BrushType::SnakeHook && dyntopo.enabled && !topologyHeld_
+                                    ? kTendrilRingEdges * dyntopoEdgeLength(dyntopo, p.radius, strokeDiagonal_)
+                                    : 0.0f;
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
         float reachFade = 1.0f;
-        if (depthReach) {
-            reachFade = viewAdditiveFade(x, p.center, p.viewDir, r);
+        if (depthReach || tendrilReach) {
+            reachFade = viewAdditiveFade(x, p.center, p.viewDir, tendrilReach ? kTendrilDepth * r : r);
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
         if (planeReach) {
@@ -1447,6 +1458,10 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             d = p.strokeDelta * f;
             glm::vec3 side = p.center - x;
             side -= strokeDir * glm::dot(side, strokeDir);
+            if (tendrilRadius > 0.0f) { // (the pinch closes the gap down to tendrilRadius, no further)
+                const float len = glm::length(side);
+                side = len > tendrilRadius ? side * (1.0f - tendrilRadius / len) : glm::vec3(0.0f);
+            }
             d += side * (0.1f * s * f * std::min(1.0f, strokeLen / (0.1f * r)));
             break;
         }
