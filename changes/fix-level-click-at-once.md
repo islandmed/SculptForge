@@ -6,4 +6,4 @@ testers:
   - Any OS, Classic and SculptForge layouts: on a Part with 3+ levels, click the Level slider at another level; it switches on the click, no pause.
   - Double-click the slider: the number field opens; Esc leaves the level, Enter switches to the number.
 ---
-Audit: ~/Work/.sf/state/classic-drift (row 2). No setting: a click that applies at once suits both layouts.
+No setting: a click that applies at once suits both layouts.

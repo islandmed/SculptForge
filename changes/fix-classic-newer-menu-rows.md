@@ -7,4 +7,4 @@ testers:
   - Classic layout, fresh preferences: File has no "Render with..." row and Preferences has no Scripts or Render bridge rows.
   - Preferences > Interface > Show newer menu rows: the three rows appear; in the SculptForge layout they are there by default.
 ---
-Audit row 8 (~/Work/.sf/state/classic-drift). The setting is unset by default (follows the layout) and stored only once changed.
+The setting is unset by default (follows the layout) and stored only once changed.
