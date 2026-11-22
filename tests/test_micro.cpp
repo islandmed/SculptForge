@@ -1150,19 +1150,22 @@ TEST(micro_adaptive_brush_matches_full) {
     CHECK(watertight(b.mesh));
 }
 
-TEST(micro_big_plane_brush_on_a_coarse_plane_stride_matches) {
+TEST(micro_big_plane_brush_invariant_coarse_plane_stride) {
     // #184: a big brush's plane (Clay, Flatten, Trim) is found on fewer grid points (while thousands stay under the
     // brush), a small one's on every second point as before. Overlapping dabs over a rough surface land where the
-    // every-second-point plane puts them (no wobble that could stack up), and a small brush is bit-identical.
+    // every-second-point plane puts them (no wobble that could stack up), a small brush is bit-identical, and the
+    // brushes keep their promise on either plane: Clay only adds, Trim only cuts.
     for (BrushType type : {BrushType::Clay, BrushType::Flatten, BrushType::Trim})
         for (float r : {0.6f, 0.04f}) {
             Document a = microDoc(5), b = microDoc(5);
             Symmetry sym;
             a.sculptor.microStroke().planeSamples = 1e30f; // (every second point)
             std::vector<int16_t> start;
+            float startStep = 0.0f;
             for (Document* d : {&a, &b}) {
                 microNoise(d->mesh, 0.002f, 60.0f, 7);
                 start = d->mesh.micro->disp;
+                startStep = d->mesh.micro->step;
                 d->sculptor.beginStroke(d->mesh, "Clay");
                 for (int i = 0; i < 6; ++i)
                     d->sculptor.dab(d->mesh, d->bvh, type, dabAt(glm::normalize(glm::vec3(r * 0.4f * float(i - 3), 0.05f, 1.0f)), r, 0.8f), sym);
@@ -1180,6 +1183,12 @@ TEST(micro_big_plane_brush_on_a_coarse_plane_stride_matches) {
                         b.sculptor.microStroke().lastPlaneStride, change, diff);
             CHECK(change > 0.0f);
             CHECK(watertight(b.mesh));
+            if (mb.step == startStep && (type == BrushType::Clay || type == BrushType::Trim)) { // (a widen rescales the units)
+                size_t wrong = 0;
+                for (size_t k = 0; k < mb.disp.size(); ++k)
+                    wrong += type == BrushType::Clay ? mb.disp[k] < start[k] : mb.disp[k] > start[k];
+                CHECK(wrong == 0);
+            }
             if (r < 0.1f) {
                 CHECK(b.sculptor.microStroke().lastPlaneStride == 2);
                 CHECK(ma.disp == mb.disp);
