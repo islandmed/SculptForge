@@ -95,6 +95,18 @@ elsewhere.
     proxy ?pose
 <!-- marks:end -->
 
+## Borrowed brush names
+
+Another app's brush names are not ours to use either, even where that app's own name is not a registered mark. Ours:
+Tendril (not the name another sculpting program gave the same kind of brush). The one exception is interop: Blender's
+own brush identifier appears where the Blender add-on, the Blender keymap reader and its test export must name what
+Blender calls its tool (`BORROWED_ALLOWED` in `tools/check_marks.py` lists those files). Saved files from older
+versions are read through the whole-name table below, which does not spell it.
+
+<!-- borrowed:begin -->
+    snake ?hook
+<!-- borrowed:end -->
+
 ## Their interface's labels (#117)
 
 Their exact UI labels are theirs too: SculptForge names its controls by function. Scripts and saved files keep
