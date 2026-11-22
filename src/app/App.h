@@ -191,6 +191,9 @@ public:
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
+    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge): off in the Classic
+    // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
+    bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
     ThumbnailCache& thumbnails() { return thumbs_; }
     // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
     // (true) instead of the main one (ModifierBrush.cpp).
@@ -2293,6 +2296,7 @@ private:
     void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
     ShellMetrics shellMetrics() const;
     bool sculptForgeLayout() const { return uiPrefs_.shellLayout == 1; }
+    bool renderBridgeSetUp() const; // a render helper is chosen (PanelRenderBridge.cpp)
     void setShellLayout(int layout); // swaps the shelves to that layout's standard ones
     bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
     CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
