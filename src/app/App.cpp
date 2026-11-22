@@ -1084,7 +1084,8 @@ bool App::wantsFrames(double now) const {
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
            renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
            renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
-           renderer_.microPendingCoarse() > 0; // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microPendingCoarse() > 0 || // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microShadingWantsFrame(); // ... and without Focus Detail its patches' shading (a big stroke's backlog, #184)
 }
 
 uint64_t App::frameKey() const {

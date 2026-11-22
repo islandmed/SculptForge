@@ -313,6 +313,7 @@ public:
     size_t microTilePages() const;
     size_t microTilePageBytes() const;
     bool microTilePagesWantFrame() const; // (MicroTilePages::wantsFrame: one more frame pages what came into view)
+    bool microShadingWantsFrame() const;  // a shown micro level's shading still drains over frames (MicroRenderer::pendingShading)
     // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
     void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
