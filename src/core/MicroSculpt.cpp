@@ -462,11 +462,24 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     touch(mm, cand_);
     findMs += lapMs(clock);
 
-    // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
+    // The kernel's stride (step 3).
+    const float microEdge = baseEdge_ / float(n);
+    uint32_t stride = 1;
+    if (adaptive && microEdge > 0.0f)
+        while (stride < n && microEdge * float(stride * 2) <= r / float(kBrushSamples)) stride *= 2;
+
+    // 2. The brush plane: weighted area normal and centre over every second grid point under the brush, coarser (up
+    // to the kernel's stride) only while the brush still covers planeSamples points (#184: every second fine point
+    // of every triangle a big brush reached was a fifth of a stroke frame at a high micro level). Small and detail
+    // brushes keep every second point.
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
     const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Inflate && type != BrushType::Pinch;
     if (needPlane) {
-        const uint32_t stride = n >= 4 ? 2 : 1;
+        uint32_t planeStride = n >= 4 ? 2 : 1;
+        // (grid points in the brush's disc at a spacing: one per 0.866 spacing^2)
+        auto covers = [&](uint32_t st) { const float e = microEdge * float(st); return 3.14159265f * r2 / (0.866f * e * e); };
+        while (planeStride * 2 <= stride && covers(planeStride * 2) >= planeSamples) planeStride *= 2;
+        lastPlaneStride = planeStride;
         struct Sum {
             glm::dvec3 nrm{0.0}, ctr{0.0};
             double w = 0.0;
@@ -480,8 +493,8 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                 const uint32_t t = cand_[ci];
                 T.set(m, t, n);
                 const int16_t* g = mm.disp.data() + size_t(t) * S;
-                for (uint32_t j = 0; j <= n; j += stride)
-                    for (uint32_t i = 0; i + j <= n; i += stride) {
+                for (uint32_t j = 0; j <= n; j += planeStride)
+                    for (uint32_t i = 0; i + j <= n; i += planeStride) {
                         glm::vec3 sp, nn;
                         T.eval(i, j, sp, nn);
                         const glm::vec3 p = sp + nn * (float(g[MicroMesh::index(i, j, n)]) * mm.step);
@@ -546,10 +559,6 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     // get the change interpolated over the coarse micro triangle holding them (a big brush moves big forms; the
     // finer displacement rides on top unchanged). Brush evaluation then costs the same at any micro level; what
     // grows with the level is only writing the interpolated values.
-    const float microEdge = baseEdge_ / float(n);
-    uint32_t stride = 1;
-    if (adaptive && microEdge > 0.0f)
-        while (stride < n && microEdge * float(stride * 2) <= r / float(kBrushSamples)) stride *= 2;
     lastStride = stride;
     const uint32_t cm = n / stride;
     std::vector<uint64_t> visited((cand_.size() + 7) / 8, 0);
