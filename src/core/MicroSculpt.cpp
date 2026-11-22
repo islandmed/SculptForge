@@ -25,9 +25,20 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <cmath>
 
 namespace sf {
+
+namespace {
+// When the last dab on a micro level was placed (steady clock, ns): a stroke's undo packing on its own thread pauses while
+// the next stroke's dabs run (MicroStroke::end, #184). A time, not a count: nothing can leave it stuck.
+std::atomic<int64_t> gLastMicroDabNs{0};
+int64_t steadyNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+void noteMicroDab() { gLastMicroDabNs.store(steadyNs(), std::memory_order_relaxed); }
+bool microDabRecently() { return steadyNs() - gLastMicroDabNs.load(std::memory_order_relaxed) < 50'000'000; } // (50 ms)
+} // namespace
 
 int microBrushSupport(BrushType type) {
     switch (type) {
@@ -397,6 +408,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                       const glm::vec3& strokeDir, float pxPerUnit) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro; // (made unique by begin)
     const uint32_t n = mm.n, S = mm.samples;
@@ -988,6 +1000,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
 
 void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     if (!active_ || !m.micro || grabMirrors_.empty()) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples;
@@ -1113,6 +1126,57 @@ void MicroStroke::endTiles(MicroUndo& u, const MicroTiles& tiles) {
     oldTiles_.clear();
 }
 
+namespace {
+
+// A stroke's undo journal, off the frame (MicroStroke::end): tile k's change (now[k] less was[from[k]]), each point
+// predicted from the one before it in its row (a row's first point: from the row below; the very first is kept
+// apart), so a smooth change needs few bits; packed. A change wider than 16 bits keeps the whole old tiles instead.
+void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, std::vector<int16_t>& was, std::vector<int16_t>& now,
+                      const std::vector<uint32_t>& from) {
+    const PoolInline alone; // (the frame's dabs keep the pool)
+    const LowerThreadPriority behind; // (and the cores: the frames after the release come first)
+    const size_t count = from.size();
+    // Each tile's change goes back over its `now` tile (through one tile's scratch): no third buffer the stroke's size, so
+    // the release peaks no higher than the step built in the frame did (artist-qa, 8 GB floor).
+    std::vector<int16_t> firsts(count), change(S);
+    bool fits = true;
+    for (size_t k = 0; k < count && fits; ++k) {
+        // (#184: run beside the next stroke's dabs, it slowed their slowest frames 12-23%; it waits for a pause, unless
+        // an undo or a dropped step waits for it)
+        if (k % 256 == 0)
+            while (microDabRecently() && !out.hurry.load(std::memory_order_relaxed)) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        int16_t* a = now.data() + k * S;
+        const int16_t* b = was.data() + size_t(from[k]) * S;
+        uint32_t p = 0;
+        for (uint32_t j = 0; j <= n; ++j)
+            for (uint32_t i = 0; i + j <= n; ++i, ++p) {
+                const int d = int(a[p]) - int(b[p]);
+                int pred = 0;
+                if (i > 0) pred = int(a[p - 1]) - int(b[p - 1]);
+                else if (j > 0) {
+                    const uint32_t q = MicroMesh::index(0, j - 1, n);
+                    pred = int(a[q]) - int(b[q]);
+                }
+                const int r = d - pred;
+                if (r < -32767 || r > 32767) fits = false;
+                if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
+                change[p] = p == 0 ? int16_t(0) : int16_t(r);
+            }
+        std::copy_n(change.data(), S, a);
+    }
+    if (fits) {
+        std::vector<int16_t>().swap(was); // (before the packed bytes are allocated)
+        microPackTiles(now.data(), count, uint32_t(S), out.packed);
+        out.firsts = std::move(firsts);
+        out.journal = true;
+    } else {
+        out.disp.resize(count * S);
+        for (size_t k = 0; k < count; ++k) std::copy_n(was.data() + size_t(from[k]) * S, S, out.disp.data() + k * S);
+    }
+}
+
+} // namespace
+
 std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
@@ -1165,68 +1229,43 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         order[i] = {spread(q.x) | spread(q.y) << 1 | spread(q.z) << 2, uint32_t(i)};
     }
     std::sort(order.begin(), order.end());
-    std::vector<int16_t> change(count * S), firsts(count);
-    std::atomic<bool> fits{true};
-    poolFor(count, [&](size_t b, size_t e) {
-        for (size_t k = b; k < e; ++k) {
-            const size_t i = order[k].second;
-            const int16_t* now = mm.disp.data() + size_t(tiles_[i]) * S;
-            const int16_t* was = oldDisp_.data() + i * S;
-            // The change, predicted from the point before it in its row (a row's first point: from the row below;
-            // the very first is kept apart), so a smooth change needs few bits.
-            const uint32_t n = mm.n;
-            uint32_t p = 0;
-            for (uint32_t j = 0; j <= n; ++j)
-                for (uint32_t i = 0; i + j <= n; ++i, ++p) {
-                    const int d = int(now[p]) - int(was[p]);
-                    int pred = 0;
-                    if (i > 0) pred = int(now[p - 1]) - int(was[p - 1]);
-                    else if (j > 0) {
-                        const uint32_t q = MicroMesh::index(0, j - 1, n);
-                        pred = int(now[q]) - int(was[q]);
-                    }
-                    const int r = d - pred;
-                    if (r < -32767 || r > 32767) fits = false;
-                    if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
-                    change[k * S + p] = p == 0 ? int16_t(0) : int16_t(r);
-                }
-        }
-    }, 256);
+    u->tris.resize(count);
+    u->keys.resize(count);
+    for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
     const bool masked = mm.hasMask() && oldMask_.size() == count * S;
-    std::vector<uint64_t> pre, post; // (Forge Ink: per entry of tiles_, put in the step's order below)
-    if (hashTiles) {
-        pre.resize(count), post.resize(count);
+    tilePre.clear(), tilePost.clear();
+    if (hashTiles) { // (Forge Ink: before the next edit can change the tiles)
+        tilePre.resize(count), tilePost.resize(count);
         poolFor(count, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) {
+            for (size_t k = b; k < e; ++k) {
+                const size_t i = order[k].second;
                 const uint32_t t = tiles_[i];
-                pre[i] = microTileHash(m, t, oldDisp_.data() + i * S, masked ? oldMask_.data() + i * S : nullptr);
-                post[i] = microTileHash(m, t, mm.tileDisp(t), mm.tileMask(t));
+                tilePre[k] = microTileHash(m, t, oldDisp_.data() + i * S, masked ? oldMask_.data() + i * S : nullptr);
+                tilePost[k] = microTileHash(m, t, mm.tileDisp(t), mm.tileMask(t));
             }
         }, 64);
     }
-    tilePre.clear(), tilePost.clear();
-    if (fits) {
-        u->journal = true;
-        u->tris.resize(count);
-        u->keys.resize(count);
-        for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
-        if (hashTiles) {
-            tilePre.resize(count), tilePost.resize(count);
-            for (size_t k = 0; k < count; ++k) tilePre[k] = pre[order[k].second], tilePost[k] = post[order[k].second];
-        }
-        microPackTiles(change.data(), count, mm.samples, u->packed);
-        u->firsts = std::move(firsts);
-        if (masked) {
-            u->mask.resize(count * S);
-            for (size_t k = 0; k < count; ++k)
-                std::copy_n(oldMask_.data() + size_t(order[k].second) * S, S, u->mask.data() + k * S);
-        }
-    } else { // (a change wider than 16 bits: whole old tiles)
-        u->tris = tiles_;
-        tilePre = std::move(pre), tilePost = std::move(post);
-        u->disp = std::move(oldDisp_);
-        if (masked) u->mask = std::move(oldMask_);
+    if (masked) {
+        u->mask.resize(count * S);
+        for (size_t k = 0; k < count; ++k) std::copy_n(oldMask_.data() + size_t(order[k].second) * S, S, u->mask.data() + k * S);
     }
+    // The tiles as the stroke left them (the next stroke, Focus Detail or a trim may change `disp` meanwhile), in the
+    // step's order; the change is worked out and packed on a background thread, not in the release's frame (#184).
+    std::vector<int16_t> now(count * S);
+    poolFor(count, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) std::copy_n(mm.disp.data() + size_t(tiles_[order[k].second]) * S, S, now.data() + k * S);
+    }, 256);
+    std::vector<uint32_t> from(count);
+    for (size_t k = 0; k < count; ++k) from[k] = order[k].second;
+    auto pack = std::make_shared<MicroUndo::Pack>();
+    pack->rawBytes = count * S * sizeof(int16_t);
+    pack->done = std::async(std::launch::async, [pack = pack.get(), was = std::move(oldDisp_), now = std::move(now),
+                                                 from = std::move(from), n = mm.n, S]() mutable {
+                     microPackJournal(*pack, n, S, was, now, from);
+                     // The async state keeps this lambda (and its captures) until the step settles: free the raw tiles now.
+                     std::vector<int16_t>().swap(was), std::vector<int16_t>().swap(now), decltype(from)().swap(from);
+                 }).share();
+    u->pending = std::move(pack);
     } // (count)
     u->maskAdded = maskAdded_;
     tiles_.clear();

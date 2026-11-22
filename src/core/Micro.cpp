@@ -1165,7 +1165,25 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
 // Undo
 // ---------------------------------------------------------------------------
 
+void MicroUndo::settle() {
+    if (!pending) return;
+    pending->hurry = true;
+    pending->done.get(); // (what the packing threw, e.g. out of memory, surfaces here as it did at the release)
+    journal = pending->journal;
+    if (pending.use_count() == 1) { // (a copy of this step still waiting would take it next: it copies)
+        packed = std::move(pending->packed);
+        firsts = std::move(pending->firsts);
+        disp = std::move(pending->disp);
+    } else {
+        packed = pending->packed;
+        firsts = pending->firsts;
+        disp = pending->disp;
+    }
+    pending.reset();
+}
+
 void MicroUndo::swapWith(Mesh& m) {
+    settle();
     if (swapWhole) {
         std::swap(m.micro, whole);
         if (m.micro) {
@@ -1311,7 +1329,7 @@ void MicroUndo::swapWith(Mesh& m) {
 }
 
 size_t MicroUndo::bytes() const {
-    return tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
+    return (pending ? pending->rawBytes : 0) + tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
            mask.size() + tileKeys.size() * (sizeof(uint64_t) + 1 + sizeof(int16_t)) + tilePacked.size() + (swapWhole && whole ? whole->bytes() : 0);
 }
 

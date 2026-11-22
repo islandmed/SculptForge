@@ -224,6 +224,7 @@ TEST(micro_tiles_small_dab_writes_tiles_not_root_and_undoes) {
     UndoRecord r = fineStroke(doc);
     CHECK(r.micro != nullptr);
     CHECK(!r.micro->tileKeys.empty());
+    r.micro->settle(); // (the journal is packed off the release: #184)
     CHECK(r.micro->tris.empty() || r.micro->journal || !r.micro->disp.empty()); // (root tiles were saved by touch; their change is zero)
     const MicroMesh& mm = *doc.mesh.micro;
     CHECK(mm.tiles != nullptr);
@@ -1158,6 +1159,8 @@ TEST(micro_undo_journal_is_small) {
     for (int i = 0; i < 10; ++i)
         doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::normalize(glm::vec3(0.03f * float(i), 0.1f, 1)), 0.15f), sym);
     UndoRecord r = doc.sculptor.endStroke();
+    CHECK(r.micro != nullptr);
+    if (r.micro) r.micro->settle(); // (the journal is packed off the release: #184)
     CHECK(r.micro && r.micro->journal);
     const size_t raw = r.micro->tris.size() * doc.mesh.micro->samples * 2;
     std::printf("  micro undo journal: %zu tiles, %.1f KB (whole tiles %.1f KB)\n", r.micro->tris.size(),
