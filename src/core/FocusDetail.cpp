@@ -723,6 +723,18 @@ void FocusDetail::fillCoarse(MicroMesh& mm, uint32_t t) const {
 
 void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, bool edit, bool sync) {
     const auto t0 = Clock::now();
+#if defined(_WIN32)
+    // The tiles' bytes read in one go before decoding: a mapped view's faults read little at a time on Windows (no
+    // readahead as on Linux), so an orbit's fresh tiles stalled the frame on the disk one page at a time.
+    if (map_ && tris.size() > 1) {
+        thread_local std::vector<WIN32_MEMORY_RANGE_ENTRY> ranges;
+        ranges.clear();
+        for (uint32_t t : tris)
+            if (parked_[t].empty() && dir_[t].bytes)
+                ranges.push_back({const_cast<uint8_t*>(map_ + dir_[t].offset), SIZE_T(dir_[t].bytes)});
+        if (!ranges.empty()) PrefetchVirtualMemory(GetCurrentProcess(), ranges.size(), ranges.data(), 0);
+    }
+#endif
     poolFor(tris.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) {
             const uint32_t t = tris[k];
