@@ -381,10 +381,6 @@ static int runMain(int argc, char** argv) {
         isolateSettings();
     }
     if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window
-#if defined(_WIN32)
-        std::fprintf(stderr, "standard-1b (experimental Focus Detail) needs Linux or macOS for now\n");
-        return 1;
-#endif
         std::string error;
         if (sf::focusStandard1bPath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }).empty()) {
             std::fprintf(stderr, "standard-1b: %s\n", error.c_str());

@@ -5098,8 +5098,6 @@ constexpr Entry kTraditionalChinese[] = {
      "已開啟："},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "這台電腦在基本功能之外還能負擔的東西：更大的 Focus Detail 快取、16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
-    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
-     "這台電腦在基本功能之外還能負擔的東西：16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
     {"What this turns on:",
      "這會開啟："},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",
