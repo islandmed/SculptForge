@@ -1201,9 +1201,14 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
 // its line is packed to a tenth of its spacing, and the packed vertices' normals lean toward each other, noisily: the
 // steps close the gap within a dab or two, the triangles between them flip, and stacked strokes tear needles and stretched
 // streaks into the surface. So a dab that reaches a packed grid (at least 32 vertices, and 0.2% of the dab's, whose shortest
-// edge is under 2/3 of the dab's typical shortest one; a lone odd vertex on a remeshed surface, or the one ring of a tube's round cap, is not one) moves all its vertices
-// along the brush's one area normal instead, which carries the whole groove alike; every other dab, the usual Inflate, is
-// unchanged. One choice for the whole dab, not a per-vertex mix: neighbours on different rules were what tore.
+// edge is under 2/3 of the dab's typical shortest one; a lone odd vertex on a remeshed surface, or the one ring of a tube's
+// round cap, is not one), and whose moves along the own normals would start to fold it (inflateWouldFold), moves all its
+// vertices along the brush's one area normal instead, which carries the whole groove alike; every other dab, the usual
+// Inflate, is unchanged. One choice for the whole dab, not a per-vertex mix: neighbours on different rules were what tore
+// (a ramp over rings tore the groove across a tube too). The fold test is what tells a groove from a thin tube beside a
+// bulb: the bulb's swollen cells make the tube's look packed, but the tube swells without folding (on 0.13.11 a brush wider
+// than the tube took the area normal there and carried the tube sideways). No measure of the shape told them apart: a
+// Crease across a coarse tube is the same shape as the neck at a bulb's end, only the outcome of the dab differs.
 //
 // The edge length an unpacked vertex of `verts` has, as its shortest edge (an even sample of 64: the upper quartile of
 // theirs, so a packed minority doesn't drag it down, and a grid that is long one way, the rings of a coarse tube, is
@@ -1338,8 +1343,9 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
-    // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
-    bool inflateAlongNormals = true;
+    // Inflate swells along each vertex's own normal, unless the dab reaches a packed grid and that would fold it (see
+    // inflateWouldFold).
+    bool inflateAlongNormals = true, inflatePacked = false;
     if (type == BrushType::Inflate) {
         const float typical = typicalEdge(mesh, verts_);
         // (an even sample of at most 4096 vertices: a packed cluster of 0.2% of a big dab still shows in it)
@@ -1351,7 +1357,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 if (unpackedShare(mesh, verts_[i * stride], typical) < 0.1f) ++n;
             bad.fetch_add(n, std::memory_order_relaxed);
         }, 512);
-        inflateAlongNormals = bad.load() * stride < std::max<size_t>(32, verts_.size() / 500);
+        inflatePacked = bad.load() * stride >= std::max<size_t>(32, verts_.size() / 500);
     }
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
@@ -1482,6 +1488,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);
         });
+        if (inflatePacked && inflateWouldFold(mesh, scratch_)) { // (a groove: the whole dab along the one area normal)
+            inflateAlongNormals = false;
+            poolFor(verts_.size(), [&](size_t begin, size_t end) {
+                for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);
+            });
+        }
     } else {
         // The new normal from the displaced tangents: t + (offset(x + h t) - offset(x)) / h along two directions
         // on the surface (first order in the brush's slope, exact for a plane); the cavity term each vertex had
@@ -1538,6 +1550,40 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         relaxDrag(mesh, w, kRelaxLambda * std::min(1.0f, strokeLen / (kRelaxStep * r)), kRelaxRounds);
     }
     finishDab(mesh, bvh, clock);
+}
+
+// Whether this Inflate dab, each vertex along its own normal by `d`, would start to fold the surface: turn a triangle more
+// than 30 degrees or squash it to under half its area in the one dab. A groove's packed rows do (their normals lean together
+// and the rows close up); a round form never does, nor the neck where a swollen part meets a thin one (it widens as it swells), however
+// packed its cells look beside the swollen ones. A ratio of lengths and angles: the same at any scale and mesh density.
+bool Sculptor::inflateWouldFold(const Mesh& mesh, const std::vector<glm::vec3>& d) {
+    const auto& pos = mesh.positions;
+    const size_t n = verts_.size();
+    if (foldSlot_.size() != mesh.vertexCount()) foldSlot_.assign(mesh.vertexCount(), ~0u);
+    for (size_t i = 0; i < n; ++i) foldSlot_[verts_[i]] = uint32_t(i);
+    std::atomic<bool> folds{false};
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e && !folds.load(std::memory_order_relaxed); ++i)
+            for (uint32_t t : mesh.vertexTriangles(verts_[i])) {
+                const glm::uvec3 tri = mesh.triangles[t];
+                if (std::min({tri.x, tri.y, tri.z}) != verts_[i] && foldSlot_[std::min({tri.x, tri.y, tri.z})] != ~0u) continue; // (once)
+                const auto moved = [&](uint32_t c) {
+                    const uint32_t slot = foldSlot_[c];
+                    return glm::dvec3(pos[c]) + (slot == ~0u ? glm::dvec3(0.0) : glm::dvec3(d[slot]));
+                };
+                const glm::dvec3 a0 = glm::cross(glm::dvec3(pos[tri.y]) - glm::dvec3(pos[tri.x]), glm::dvec3(pos[tri.z]) - glm::dvec3(pos[tri.x]));
+                const glm::dvec3 p0 = moved(tri.x);
+                const glm::dvec3 a1 = glm::cross(moved(tri.y) - p0, moved(tri.z) - p0);
+                const double l0 = glm::length(a0), l1 = glm::length(a1);
+                if (l0 < 1e-30) continue;
+                if (glm::dot(a0, a1) < 0.866 * l0 * l1 || l1 < 0.5 * l0) {
+                    folds.store(true, std::memory_order_relaxed);
+                    break;
+                }
+            }
+    }, 1024);
+    for (size_t i = 0; i < n; ++i) foldSlot_[verts_[i]] = ~0u;
+    return folds.load();
 }
 
 // A drag (Nudge, a recipe's Drag; Tendril too, but it is left alone, see dabSingle) pushes the surface ahead of the stroke
