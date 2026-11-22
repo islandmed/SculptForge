@@ -121,13 +121,32 @@ void forInterpolated(const T* coarse, uint32_t n, uint32_t stride, F&& each) {
     }
 }
 
-// Writes the change at every grid point from `coarse` changes on the points `stride` apart (forInterpolated):
-// apply(index, change) for the points whose change isn't 0.
+// Writes the change at every grid point from `coarse` changes on the points `stride` apart (the same values as
+// forInterpolated): apply(index, change) for the points whose change isn't 0. Coarse cell by cell, skipping the
+// cells whose corners are all 0 (#184: a big brush's triangles are mostly outside it, and visiting every fine
+// point of them was a tenth of a stroke frame at a high micro level).
 template <class F>
 void interpolateCoarse(const float* coarse, uint32_t n, uint32_t stride, F&& apply) {
-    forInterpolated(coarse, n, stride, [&](uint32_t idx, uint32_t, uint32_t, float d) {
-        if (d != 0.0f) apply(idx, d);
-    });
+    const uint32_t cm = n / stride;
+    const float inv = 1.0f / float(stride);
+    auto at = [&](uint32_t ci, uint32_t cj) { return ci + cj <= cm ? coarse[MicroMesh::index(ci, cj, cm)] : 0.0f; };
+    for (uint32_t cj = 0; cj <= cm; ++cj)
+        for (uint32_t ci = 0; ci + cj <= cm; ++ci) {
+            const float c00 = at(ci, cj), c10 = at(ci + 1, cj), c01 = at(ci, cj + 1), c11 = at(ci + 1, cj + 1);
+            if (c00 == 0.0f && c10 == 0.0f && c01 == 0.0f && c11 == 0.0f) continue;
+            for (uint32_t rj = 0, j = cj * stride; rj < stride && j <= n; ++rj, ++j) {
+                const float fj = float(rj) * inv;
+                const uint32_t row = MicroMesh::index(0, j, n);
+                for (uint32_t ri = 0, i = ci * stride; ri < stride && i + j <= n; ++ri, ++i) {
+                    const float fi = float(ri) * inv;
+                    float d;
+                    if (ri == 0 && rj == 0) d = c00;
+                    else if (fi + fj <= 1.0f) d = c00 * (1.0f - fi - fj) + c10 * fi + c01 * fj;
+                    else d = c10 * (1.0f - fj) + c11 * (fi + fj - 1.0f) + c01 * (1.0f - fi);
+                    if (d != 0.0f) apply(row + i, d);
+                }
+            }
+        }
 }
 
 // Rounds `units` (a displacement over its step) to the nearest storable value (no libm call: brushes write
