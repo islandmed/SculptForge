@@ -1064,7 +1064,9 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
-        ImGui::TextDisabled("%s %s", kFreeReleaseNote, tr("Members get betas early.")); // memberships (Support.h)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)); // wrapped: the sentence is long
+        ImGui::TextWrapped("%s %s", kFreeReleaseNote, tr("Members get early builds, like SculptForge for Android today.")); // memberships (Support.h)
+        ImGui::PopStyleColor();
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
@@ -1116,13 +1118,11 @@ void App::drawUpdatesSection() {
     ImGui::BeginDisabled(channelLocked);
     bool changed = ImGui::RadioButton((std::string(tr("Stable")) + "##prefs.update_stable").c_str(), &channel, 0);
     ImGui::SameLine();
-    changed |= ImGui::RadioButton((std::string(tr("Preview (betas)")) + "##prefs.update_preview").c_str(), &channel, 1);
+    changed |= ImGui::RadioButton((std::string(tr("Preview (early builds)")) + "##prefs.update_preview").c_str(), &channel, 1);
     ImGui::EndDisabled();
     if (channelLocked) ui::ManagedBadge();
     ui::HelpText("Update channel", nullptr,
-                 "Stable offers only finished releases. Preview also offers the betas the update feed names. Betas "
-                 "are a member perk: members get them from the private members' repository and the #members channel "
-                 "on Discord. When the stable release passes a beta, Preview offers that.",
+                 "Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
                  "Preferences > Updates");
     if (changed) {
         updateChannel_ = channel ? UpdateChannel::Preview : UpdateChannel::Stable;

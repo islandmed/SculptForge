@@ -44,7 +44,7 @@ are on the bottom shelf by default and in the brush picker.
 | **Pinch** | <kbd>8</kbd> | Pulls the surface toward the stroke to tighten edges. | Spreads it apart |
 | **Sharp Crease** | <kbd>9</kbd> | A narrow, deep V-shaped crease with the sides pinched in. | A sharp ridge |
 | **Clay Block** | <kbd>0</kbd> | Square, flat-topped clay strokes for blocking in forms. | Carves flat-bottomed |
-| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. | No change |
+| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. For long pulls, turn on **Dynamic** on the top shelf ([dynamic topology](dynamic-topology.md)) so the surface adds detail as it stretches. | No change |
 | **Trim** | | Trim: shaves away everything above a plane for hard surfaces. | Fills up to the plane |
 | **Layer** | | Raises the surface to one fixed height per stroke; overlapping passes never stack. | Lowers to a fixed depth |
 | **Nudge** | | Slides the surface sideways along the stroke without lifting it. | No change |
@@ -232,7 +232,7 @@ are saved with the preferences and the project (custom brushes can turn them on 
 | Option | What it does |
 |---|---|
 | **Connected only** | The brush only moves the surface joined to the point under the cursor, within the brush size. Inflate a finger and the next finger stays as it is; Move one leg and the other doesn't follow, however close they are. |
-| **View falloff** | The falloff is measured on screen, across the view: everything inside the brush circle is reached, through the model and out the back, as a cylinder along the view. Add **Connected only** to keep it to the piece under the cursor. The brushes that pull to a plane (Clay, Clay Block, Flatten, Trim) take the plane of the surface under the cursor and reach as deep behind it as the brush is wide: through an ear or a horn, not out the back of a head. |
+| **View falloff** | The falloff is measured on screen, across the view, as a cylinder along the view: Move and the grab brushes reach everything inside the brush circle, through the model and out the back. Add **Connected only** to keep it to the piece under the cursor. The brushes that pull to a plane (Clay, Clay Block, Flatten, Trim) take the plane of the surface under the cursor and reach as deep behind it as the brush is wide: through an ear or a horn, not out the back of a head. The brushes that build or cut along the surface (Standard, Inflate, Crease, Pinch, Sharp Crease) stop about 1.5 to 3 brush radii behind the surface under the cursor, so the far side of the model stays as it is. |
 
 Kelvinlet brushes keep their own elastic falloff, and the Gizmo's falloff eases in from the mask's edge rather
 than from a brush centre, so these options don't apply to them. On a 10-million-vertex Part a dab that moves half
@@ -429,10 +429,12 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, then 
 
 | Modifier | What it does | Instead of holding |
 |---|---|---|
-| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> |
+| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> (<kbd>Ctrl</kbd> in the Blender and Maya styles) |
 | **Smooth** | Strokes smooth. | <kbd>Shift</kbd> |
-| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
+| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> (<kbd>Alt</kbd> in the Blender style, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> in Maya) |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
+
+The keys are the ones your input style (**Edit > Preferences > Input > Style**) uses; each tile's corner shows them.
 
 **Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask**, **Rectangle Mask** and **Circle Mask** turn Mask on with that
 shape, **Cut Line**, **Cut Lasso**, **Cut Rect**, **Cut Circle** and **Cut Polyline** turn Select on with that Cut shape. A plain drag

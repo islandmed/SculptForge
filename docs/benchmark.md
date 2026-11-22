@@ -54,6 +54,10 @@ Per frame, at the moment the frame is handed to the display (just before `SDL_GL
 - `lag_ms`: from the time of the pointer sample the newest drawn dab belongs to (the nearest sample to it) to
   now. The display's scan-out and the compositor add to this on a real screen (about one refresh).
 - `lag_px`: the distance along the stroke path from that sample to the newest sample (where the pointer is).
+- `lag_on_model_ms` / `lag_on_model_px`: the same over the frames whose newest dab reached the surface, and
+  `dabs_off_model`: the dabs that found none. A dab off the model costs nothing, so the quick frames after it pull
+  `lag_ms` down; the stroke path is fitted to the model on screen (at most 2% of it off the model). The website lists
+  only the on-model columns, and no lag for results without `dabs_off_model` (builds before 0.13.11).
 
 Vertical sync is off unless `settings.vsync` is true. Recording the video (`settings.video`) reads every frame
 back through pixel buffers and encodes on another thread; it costs about 1 to 2 ms per frame. The machine is not

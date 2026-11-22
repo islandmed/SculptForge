@@ -2,7 +2,7 @@
 
 > **In short:**
 > - SculptForge is free for everyone, and nothing is ever paywalled.
-> - Members get betas early, vote on what gets built and are thanked by name.
+> - Members get early builds, like SculptForge for Android today, vote on what gets built and are thanked by name.
 > - The app has no payment code, no account and no licence check.
 > - **Help > Support SculptForge...** opens the membership page in your browser.
 
@@ -10,7 +10,7 @@
 
 Every release stays free for everyone. Bug-fix and security releases go out to everyone the same day.
 
-- **Betas and early builds**: starting with SculptForge 2027, each release about two weeks early.
+- **Early builds, like SculptForge for Android today**: Insiders will get each release about two weeks early, starting with SculptForge 2027.
 - **A vote** on what gets built next.
 - **Member Requests**: one request a month, built first and credited to you. Bugs are always free, and every idea
   goes in the public [feature queue](https://sculptforge.app/queue.html).

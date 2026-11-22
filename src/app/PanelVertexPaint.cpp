@@ -424,7 +424,8 @@ const BrushRecipe* App::strokeRecipe() const {
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
     if (strokeColourSmooth_) { // Smooth's own Intensity (dabAt put it in p.strength); the shape stays where it is
-        paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
+        if (texturePainter_.active()) texturePainter_.smoothDab(doc_.mesh, doc_.bvh, p, symmetry_);
+        else if (!paintsTexture(doc_.mesh)) paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
         return;
     }
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
@@ -441,8 +442,26 @@ void App::beginPaintStroke() {
     paintSnapshot_.reset();
     if (strokePaint_ && !strokeColourSmooth_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
     const Mesh& m = doc_.mesh;
+    if (swatchMemo_.active) { // a plain colour picked after a material swatch: the swatch's metal and roughness go
+        const BrushMaterial& now = doc_.paintMaterial;
+        const BrushMaterial& was = swatchMemo_.applied;
+        const bool untouched = now.channels == was.channels && now.roughness == was.roughness && now.metallic == was.metallic;
+        if (untouched && doc_.paintColor != swatchMemo_.color) {
+            doc_.paintMaterial.channels = swatchMemo_.before.channels;
+            doc_.paintMaterial.roughness = swatchMemo_.before.roughness;
+            doc_.paintMaterial.metallic = swatchMemo_.before.metallic;
+            swatchMemo_.active = false;
+        } else if (!untouched) {
+            swatchMemo_.active = false; // edited by hand since: the values are the artist's
+        }
+    }
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
-        if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {
+        // Alt on the Base erases every channel (texture_channels, no metal left under the white), not just the brush's.
+        const bool eraseAll = strokeInvert_ && !strokeSculpt_ && (doc_.paintMaterial.channels & 1u) && m.texture->layers.empty();
+        const uint32_t channels = strokeColourSmooth_ ? channelBit(Channel::BaseColor)
+                                  : eraseAll          ? ~0u
+                                                      : doc_.paintMaterial.channels;
+        if (!texturePainter_.begin(doc_.mesh, channels)) {
             const PaintTexture& t = *m.texture;
             if (!(doc_.paintMaterial.channels & enabledChannelMask(t)))
                 status_ = "The brush paints no channel this texture has (Color > Material)";

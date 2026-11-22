@@ -653,10 +653,13 @@ private:
     glm::mat4 frameView_{1.0f}, frameProj_{1.0f};
     glm::vec4 frameViewport_{0.0f};
     CullView frameCull_;
+    glm::mat3 frameNormalFix_{1.0f}; // see normalFixFor; identity but inside drawItem
+    static glm::mat3 normalFixFor(const glm::mat3& m);
     // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat, kPbr), compiled on first use.
     struct MeshProgram {
         GLuint id = 0;
         bool failed = false; // the driver rejected this variant (logged once): draws use a simpler one
+        GLint normalFix = -1;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,

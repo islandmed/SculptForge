@@ -64,7 +64,11 @@ size_t systemAvailable() {
     vm_statistics64_data_t vm{};
     mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
     if (host_statistics64(mach_host_self(), HOST_VM_INFO64, reinterpret_cast<host_info64_t>(&vm), &count) != KERN_SUCCESS) return 0;
-    return size_t(vm.free_count + vm.inactive_count + vm.purgeable_count) * size_t(vm_page_size);
+    // The host's page size, which host_statistics64 counts in: vm_page_size is 4 KiB for an x86_64 process under Rosetta
+    // while the host's pages are 16 KiB, so it under-reported the free memory 4x and refused a 256 Voxel Remesh.
+    vm_size_t hostPage = 0;
+    if (host_page_size(mach_host_self(), &hostPage) != KERN_SUCCESS || hostPage == 0) hostPage = vm_page_size;
+    return size_t(vm.free_count + vm.inactive_count + vm.purgeable_count) * size_t(hostPage);
 #else
     std::ifstream f("/proc/meminfo");
     std::string key, unit;

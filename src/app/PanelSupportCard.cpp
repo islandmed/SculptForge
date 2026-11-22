@@ -340,11 +340,12 @@ void App::drawSupportCard() {
     // The two memberships, with the perks worded as on website/support.html.
     const bool yearly = kSupportUrlMemberYearly[0] != '\0'; // (the yearly checkout, once it exists)
     const Tier kTiers[2] = {
-        {"Member", "$5", "/ month",
-         {"Betas and early builds of the next version", "The monthly feature vote: pick what we build next",
+        {"Member", yearly ? "$48" : "$5", yearly ? "/ year" : "/ month",
+         {"Early builds, like SculptForge for Android today", "The monthly feature vote: pick what we build next",
           "Member Requests: one a month, built first, credited to you", "The members' channel on Discord",
           "Your name in the credits, in the app and on the website"},
-         "Become a member", "Become a member##card.member", kSupportUrlMember, yearly ? "or $48 a year" : nullptr},
+         "Become a member", "Become a member##card.member", yearly ? kSupportUrlMemberYearly : kSupportUrlMember,
+         yearly ? "$4 a month, billed yearly" : nullptr},
         {"Studio", "Quote", "personalized",
          {"One quote for the whole studio: any number of artists, each with everything in Member",
           "Your studio's own build: brushes, alphas, Lit Spheres, keymaps, logo",
@@ -447,7 +448,7 @@ void App::drawSupportCard() {
                    tc(featured ? theme::textOnAccent : ink, appear), tier.cta);
     }
 
-    // Footer: Member yearly (once that checkout exists), the members' Discord, "I'm already a member" and "Not now".
+    // Footer: Member monthly (when yearly leads), the members' Discord, "I'm already a member" and "Not now".
     const float fy = b.y - footer * 0.5f;
     const float fa = easeOut((t - 0.1f) / 0.2f) * A;
     auto link = [&](const char* label, const char* id, ImVec2 at, const ImVec4& c, bool underline) {
@@ -473,14 +474,11 @@ void App::drawSupportCard() {
     {
         float x = a.x + pad;
         if (yearly) {
-            const char* lead = "Prefer yearly?";
-            const ImVec2 ls = paint.measure(bodyFont, 15.0f, lead);
-            const float ly = std::floor(fy - ls.y * 0.5f);
-            paint.text(bodyFont, 15.0f, ImVec2(x, ly), tc(dim, fa), lead);
-            const char* label = "Member, $48 a year";
-            if (link(label, "Member, $48 a year##card.member_yearly", ImVec2(x + ls.x + 8.0f * k, ly), accent, true))
-                clicked = kSupportUrlMemberYearly;
-            x = std::floor(x + ls.x + 8.0f * k + paint.measure(bodyFont, 15.0f, label).x + 28.0f * k);
+            const char* label = "or $5 a month";
+            const ImVec2 ls = paint.measure(bodyFont, 15.0f, label);
+            if (link(label, "or $5 a month##card.member_monthly", ImVec2(x, std::floor(fy - ls.y * 0.5f)), accent, true))
+                clicked = kSupportUrlMember;
+            x = std::floor(x + ls.x + 28.0f * k);
         }
         // The members' Discord: a pill with a drawn speech-bubble glyph (no logo asset). It opens the invite and leaves
         // the card open.
@@ -710,7 +708,7 @@ void App::drawMemberCard() {
             case MemberMoment::Sculpted: line = "Twenty minutes of sculpting. Members keep SculptForge free and moving."; break;
             case MemberMoment::SavedRender: line = "Nice render. Members keep SculptForge free and moving."; break;
             case MemberMoment::Updated:
-                line = std::string("SculptForge ") + appVersionLabel() + " is here. Members get new versions early, as betas.";
+                line = std::string("SculptForge ") + appVersionLabel() + " is here. Members get early builds, like SculptForge for Android today.";
                 break;
             case MemberMoment::Challenge:
                 line = challengeTitle_.empty() ? std::string("The monthly challenge results are in, on Discord.")
@@ -725,7 +723,7 @@ void App::drawMemberCard() {
             ImGui::TextWrapped("%s", line.c_str());
             if (bold) ImGui::PopFont();
             ImGui::PushStyleColor(ImGuiCol_Text, theme::textDim);
-            ImGui::TextWrapped("%s", "$5 a month or $48 a year: betas early, the feature vote, Member Requests and your "
+            ImGui::TextWrapped("%s", "$48 a year or $5 a month: early builds, the feature vote, Member Requests and your "
                                      "name in the credits. Nothing in the app is ever paywalled.");
             ImGui::PopStyleColor();
             // The feed's honest line in turn (latest.json's "support"), else the Founding Members' offer.

@@ -7,6 +7,8 @@
 > - **Tool > Bake** makes every map in one go, in the background.
 > - The normal map shows on the low-poly right away, to compare with the sculpt.
 > - A Part with levels can bake its own top level onto itself.
+> - **Holes or spots in the map?** The search distance was too short: use the distance the warning suggests and
+>   bake again.
 
 Game engines and renderers want light meshes. Baking captures the detail of your high-poly sculpt as images
 laid over the UVs of a low-poly version: a **normal map** makes the low-poly shade as if it had every crease and
@@ -99,7 +101,7 @@ Use it as the displacement strength in your renderer (with a midlevel of 0.5). W
 | **Source** | The high-poly: one Part, or every visible Part except the active one. Hidden faces of the source are ignored |
 | **Size** | 1K, 2K (default), 4K or 8K square |
 | **AA** | Anti-aliasing: 1 to 4 means 1, 4, 9 or 16 rays per texel, averaged. 2 (the default) gives clean edges |
-| **Auto distance** | Measure how far the high-poly lies in front of and behind the low-poly, and cast rays just that far. After a bake, **Front** and **Rear** show what it measured |
+| **Auto distance** | Measure how far the high-poly lies in front of and behind the low-poly, and cast rays just that far. After a bake, **Front** and **Rear** show what it measured, and the line under the Bake button repeats it |
 | **Front** / **Rear** | With Auto off: how far in front of the low-poly rays start, and how far behind it they look, as a percentage of the model's size (its bounding-box diagonal). Other bakers call these the max frontal and rear distances |
 | **Padding** | Texels around each UV island filled with the island's edge colours, so seams don't show once an engine mipmaps the map. 8 suits 2K; use 16 for 4K and 8K |
 | **OpenGL / DirectX** | The normal map's green channel convention (see above) |
@@ -114,8 +116,11 @@ along its smoothed normal, from **Front** outside the surface to **Rear** inside
 high-poly hit nearest to the low-poly. The normal, distance, occlusion and colour found there go into the maps.
 Rays follow the smoothed normals, so hard edges of the low-poly don't leave gaps.
 
-- **Missing detail** ("x% of texels found no surface" in red under the Bake button): rays didn't reach the
-  high-poly. Turn off Auto distance and raise **Front** and **Rear**.
+- **Holes or spots in the map** ("12% of the map found no surface: raise the search distance to Front 3.1%, Rear
+  1.2%" in red under the Bake button): rays stopped short of the high-poly, so those texels stayed empty. Click
+  **Bake Again with Suggested Distance**, which turns Auto distance off and sets **Front** and **Rear** to the
+  distances that reach the surface for the missed texels. The `bake` command prints the same warning with
+  `front=` and `rear=` values to pass back in.
 - **Detail from the wrong place** (for example the inside of an ear showing on its back): the rays reach too
   far. Lower **Rear** (or **Front**), or bake the parts from separate Parts with **Source**.
 - The bake works on copies, so you can keep sculpting meanwhile. If the low-poly's triangles or UVs change

@@ -615,11 +615,31 @@ void App::strokeEndedForRemesh(const UndoRecord& stroke) {
     if (!uiPrefs_.remeshAfterStroke || stroke.positions.empty() || stroke.layer >= 0 || stroke.topology || stroke.mesh ||
         stroke.micro || stroke.subdiv)
         return;
-    // Not where a remesh would throw work away unasked: subdivision levels, sculpt layers, a painted texture.
-    if (doc_.mesh.multires || !doc_.mesh.layers.empty() || (hasTexture(doc_.mesh) && keepTexture_)) return;
+    // Not where a remesh would throw work away unasked: subdivision levels, sculpt layers, a painted texture. A stroke that
+    // would have remeshed says so once per Part and reason, or the checkbox looks broken.
+    const int reason = doc_.mesh.multires ? 0 : !doc_.mesh.layers.empty() ? 1 : (hasTexture(doc_.mesh) && keepTexture_) ? 2 : -1;
     const StrokeStretch s = strokeStretch(doc_.mesh, stroke.positions.indices, stroke.positions.values);
+    if (reason >= 0) {
+        if (stretchWantsRemesh(s) && remeshSkipNoted_.insert({doc_.activePartInfo().id, reason}).second)
+            toastInViewport(remeshSkippedNote(reason)); // (also the status line, which elides a note this long)
+        return;
+    }
     lastStrokeStretched_ = s.stretched;
     if (stretchWantsRemesh(s)) autoRemeshDue_ = true; // pollVoxelRemesh starts it once nothing is in the way
+}
+
+// "Remesh after each stroke" passed over this Part: why, and the way out (Quick Remesh's key, else the Remesh button).
+std::string App::remeshSkippedNote(int reason) {
+    const char* const why[] = {
+        tr("Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s"),
+        tr("Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s"),
+        tr("Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s")};
+    const std::string key = uiPrefs_.quickRemesh ? actions_.shortcutText("geometry.quick_remesh") : std::string();
+    char way[160], line[512];
+    if (key.empty()) std::snprintf(way, sizeof way, "%s", tr("Tool > Remesh > Remesh remeshes it anyway."));
+    else std::snprintf(way, sizeof way, tr("%s remeshes it anyway."), key.c_str());
+    std::snprintf(line, sizeof line, why[reason], way);
+    return line;
 }
 
 void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {

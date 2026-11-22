@@ -283,6 +283,10 @@ struct Document {
     // `mesh` (not edited since: Forge Spheres drags put the old mesh back under the dragged one's tree). The step then
     // keeps that tree and undo / redo swap trees instead of building one (seconds at 10M triangles).
     void replaceMeshUndoable(Mesh m, std::string label, bool keepTree = false);
+    // The same, given a tree already fitted to `m` (a drag that refitted it as it went): no rebuild, so letting go of a
+    // drag on a big mesh doesn't stall a frame.
+    void replaceMeshUndoable(Mesh m, std::string label, BVH tree);
+    void replaceMeshUndoable(Mesh m, std::string label, bool keepTree, BVH* tree); // (both above)
 
     // A note for the status line from the last operation, e.g. that subdivision levels were removed.
     // CommandRegistry::execute adds it to the command's message; other callers take it with takeNotice().

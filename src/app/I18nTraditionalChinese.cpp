@@ -1319,12 +1319,8 @@ constexpr Entry kTraditionalChinese[] = {
      "向 SculptForge 網站確認是否有新版本。SculptForge 每天也會自動檢查一次（偏好設定 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、授權，以及 SculptForge 所使用的開放原始碼元件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge 免費且將一直免費。成為會員可獲得 Beta 版與搶先版本、Member Requests（每月一個請求，先為你開發並列出你的名字）、投票決定下"
-     "一步開發內容，以及名列致謝名單：會在瀏覽器中開啟 sculptforge.app/support.html。無論如何，應用程式本身都不會有任"
-     "何改變。"},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge 免費且將保持免費。加入會員可獲得搶先版本（如現在的 Android 版 SculptForge）、Member Requests（每月一次請求，先為你開發並列出你的名字）、投票決定接下來的開發內容，以及在製作名單中列入你的名字：會在瀏覽器中開啟 sculptforge.app/support.html。無論如何，應用程式都不會有任何改變。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "SculptForge 官方 Discord 社群：提問、技巧與進行中的作品。會在瀏覽器中開啟邀請連結。錯誤回報仍請使用「回報問題」"
@@ -2089,6 +2085,16 @@ constexpr Entry kTraditionalChinese[] = {
      "拖曳球體即可移動；連結會伸展跟隨。對稱時其鏡像也會一起移動。"},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "將球體向上或向右拖曳可放大，向下或向左拖曳可縮小。"},
+    {"Drag a sphere to move it; it stays under the pointer at its depth and the links stretch to follow. Hold Shift to swing it around the sphere it grows from (its link keeps its length). Symmetry moves its mirror twin too.",
+     "拖曳球體即可移動；它保持在指標下方的同一深度，連結會伸展跟隨。按住 Shift 可讓它繞著它所長出的球旋轉（連結長度不變）。對稱時其鏡像也會一起移動。"},
+    {"Snap to Surface",
+     "吸附到表面"},
+    {"Move Branch",
+     "連同子球移動"},
+    {"Moving a sphere puts its centre on the surface of the sphere under the pointer (off them, it moves at its depth as usual). Handy for seating a head or limb on the body.",
+     "移動球體時，其中心落在指標下方球體的表面上（不在球體上時，照常在原深度移動）。便於把頭部或四肢安放到身體上。"},
+    {"Moving a sphere carries everything that grows from it along, keeping its shape: drag a leg and the foot comes too, drag the body and the whole creature moves. Off, only the sphere moves and its links stretch.",
+     "移動球體時，從它長出的所有部分會一起移動並保持形狀：拖曳腿，腳也跟著走；拖曳身體，整個生物一起移動。關閉時只移動該球，連結會伸展。"},
     {"Drag places child", "拖曳放置子球"},
     {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
      "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
@@ -2314,7 +2320,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Pack on", "啟用套件"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "關閉：其項目會從清單中移除，直到你再次啟用（不會刪除任何內容）。"},
-    {"Free for everyone. Members get betas and a vote on what's next.", "人人免費使用。會員可搶先試用測試版，並投票決定接下來的開發方向。"},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "對所有人免費。會員可獲得搶先版本（如現在的 Android 版 SculptForge），並可投票決定接下來的內容。"},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "按住 Ctrl，將游標移至任何控制項上，即可查看其功能。Shift+F1 隨時開啟使用指南。"},
     {"Opens in your browser.", "在瀏覽器中開啟。"},
     {"Your art is never uploaded or used for training.", "你的作品絕不會被上傳或用於訓練。"},
@@ -2524,7 +2531,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Swap the left and right expressions (and the head's turn), if the character winks with the wrong eye.",
      "交換左右表情（與頭部轉向），用於角色眨錯眼睛時。"},
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
-    {"Members get betas early.", "會員可搶先取得 Beta 版。"},
+    {"Members get early builds, like SculptForge for Android today.",
+     "會員可獲得搶先版本，如現在的 Android 版 SculptForge。"},
     {"Become a member", "成為會員"},
     {"Featured creator", "精選創作者"},
     {"Hide this video.", "隱藏此影片。"},
@@ -2538,12 +2546,10 @@ constexpr Entry kTraditionalChinese[] = {
      "卡片也隨它而來（關閉此開關即可關閉）。不會傳送任何關於你或你電腦的資訊。"},
     {"Update channel", "更新頻道"},
     {"Stable", "穩定版"},
-    {"Preview (betas)", "預覽（Beta 版）"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "穩定版只提供正式發行版本。預覽另外也提供更新來源列出的 Beta 版。Beta 版是會員福利：會員可從私人會員儲存庫與 "
-     "Discord 的 #members 頻道取得。當穩定版超越某個 Beta 版時，預覽會改為提供穩定版。"},
+    {"Preview (early builds)",
+     "預覽（搶先版本）"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "當有搶先版本時，會員可在此取得。目前此頻道取得的版本與穩定版相同。"},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "自動四邊面重新拓樸：將部件重建為乾淨、全四邊面的拓樸，其邊環順著形體走，面數接近目標四邊面數。在背景中執行（「取消」可停止）；可復原。之後細分它，再用部件 > 投射 > Project Detail 找回細節。"},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
@@ -2562,6 +2568,16 @@ constexpr Entry kTraditionalChinese[] = {
      "型用法：對複本執行 Quad Remesh，細分幾次，顯示原始模型，再 Project Detail。"},
     {"Quick Remesh", "Quick Remesh"},
     {"Remesh after each stroke", "每筆畫後重新網格化"},
+    {"Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s",
+     "每筆畫後重新網格化：已略過，此部件有細分層級（重新網格化會移除它們）。%s"},
+    {"Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s",
+     "每筆畫後重新網格化：已略過，此部件有雕刻圖層（重新網格化會移除它們）。%s"},
+    {"Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s",
+     "每筆畫後重新網格化：已略過，此部件有繪製貼圖（轉移貼圖需要一些時間）。%s"},
+    {"%s remeshes it anyway.",
+     "按 %s 仍可重新網格化。"},
+    {"Tool > Remesh > Remesh remeshes it anyway.",
+     "按「工具 > 重新網格化 > 重新網格化」仍可重新網格化。"},
     {"After a stroke that stretched the surface (edges pulled to more than 1.6 times their length), the active Part "
      "is remeshed at the Resolution above in the background. Sculpting never waits: a stroke made meanwhile remeshes "
      "again. Each remesh is one undo step. Not on a Part with subdivision levels, sculpt layers or a painted texture.",
@@ -3198,10 +3214,11 @@ constexpr Entry kTraditionalChinese[] = {
      "next finger or a lip across a gap stay as they are. Saved with the preferences and "
      "the project.",
      "筆刷只影響與游標下的點相連、且在筆刷大小內的表面：另一條腿、旁邊的手指或隔著縫隙的嘴唇都保持不變。隨偏好設定與專案儲存。"},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "筆刷衰減以螢幕測量：筆刷圓圈內的一切都會受影響，會穿過模型到背面，如同沿視線方向的圓柱。"
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "筆刷衰減以螢幕測量，如同沿視線方向的圓柱。移動和抓取會影響筆刷圓圈內的一切，穿過模型直到背面；"
+     "其他筆刷止於游標下表面之後約 1.5 至 3 倍筆刷半徑處。"
      "同時開啟「僅限相連」即可限制在單一區塊。"},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+拖曳以筆刷繪製遮罩；Ctrl+Alt+拖曳擦除遮罩。在背景上 Ctrl+拖曳可清除遮罩。"},
@@ -3861,6 +3878,14 @@ constexpr Entry kTraditionalChinese[] = {
      "  正在設計筆刷%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "%.1f%% 的紋素找不到表面：請提高前方 / 後方"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "貼圖中有 %.1f%% 未找到表面:請將搜尋距離提高到 前方 %.1f%%、後方 %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "自動距離:前方 %.1f%%、後方 %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "以建議距離重新烘焙"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "上次烘焙中有部分像素因搜尋距離過短而未找到表面。請關閉自動距離,將前方和後方設為能夠到達高模的距離,然後重新烘焙。"},
     {"%d commands",
      "%d 個指令"},
     {"%d items",
@@ -3891,6 +3916,7 @@ constexpr Entry kTraditionalChinese[] = {
      "%s: %s，%s，%d%%\n點一下：開啟 / 關閉。按右鍵：混合與不透明度。"},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: 粗糙度 %.2f，金屬度 %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "金屬會反射周圍環境：在較暗的環境中會顯得偏暗。"},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu 個點，高度 %.3g，範圍 %.2f 倍半徑"},
     {"%zu result",
@@ -4434,8 +4460,6 @@ constexpr Entry kTraditionalChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 換了新外觀"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge 是免費的。會員可搶先取得測試版與早期版本、投票決定接下來開發什麼、提出會員請求（每月一個，先為你開發並列出你的名字），並列名於致謝名單。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜尋筆刷（鱗片、皮膚、石頭...）"},
     {"Selection brushes (Ctrl+Shift)",

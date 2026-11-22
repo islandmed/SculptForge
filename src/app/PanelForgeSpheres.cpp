@@ -6,14 +6,17 @@
 //   Draw  - one mode for building (#167): click a sphere to grow a new one from it, drag its body to move it, drag
 //           its outer band (the rim) to resize it; click a link to add a joint there and drag to place it. The
 //           cursor and a tag beside it say which a drag will do.
-//   Move  - drag a sphere to move it across the screen
+//   Move  - drag a sphere to move it across the screen at its depth (Shift: around its parent, its link keeping its
+//           length; Snap to Surface: onto the sphere under the pointer; Move Branch: what grows from it comes along)
 //   Scale - drag a sphere up/right to grow it, down/left to shrink it
 //   Alt+click a sphere deletes it with everything growing from it. Symmetry mirrors every edit.
 // Pointer only (#8): Drag places child makes a Draw drag grow a new sphere and move it away from its parent
 // (Ctrl+drag does it once), the last sphere clicked or added is selected (Delete Selected, Insert Between, Set as
 // Root), and a right click on a sphere opens a menu with the same three.
 // Dragging the background navigates as usual. Every drag is one undo step (the Part's mesh, which carries
-// the armature, is replaced once at release); the panel's buttons run the Forge Sphere_* commands.
+// the armature, is replaced once at release); the panel's buttons run the Forge Sphere_* commands. While dragging,
+// the pointer's moves are taken once a frame and only the moved spheres' vertices change, so a long chain follows
+// the pointer as smoothly as a short one.
 #include "app/App.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
@@ -42,6 +45,14 @@ glm::vec3 planeHit(const glm::vec3& o, const glm::vec3& d, const glm::vec3& p, c
     const float dn = glm::dot(d, n);
     const float t = std::abs(dn) > 1e-12f ? glm::dot(p - o, n) / dn : 0.0f;
     return o + d * std::max(t, 0.0f);
+}
+
+// The same spheres in the same places, sizes and tree.
+bool sameArmature(const std::vector<ForgeSphere>& a, const std::vector<ForgeSphere>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (a[i].center != b[i].center || a[i].radius != b[i].radius || a[i].parent != b[i].parent) return false;
+    return true;
 }
 
 } // namespace
@@ -90,13 +101,23 @@ void App::registerForgeSphereUiActions() {
         "near its edge to resize it (the cursor shows which). Click a link between two spheres to add a joint "
         "there, and drag to place it. Alt+click a sphere to delete it.");
     add("forgesphere.move", "Move", mode(ForgeSphereMode::Move), active, [this] { return forgesphereMode_ == ForgeSphereMode::Move; },
-        "Drag a sphere to move it; the links stretch to follow. Symmetry moves its mirror twin too.");
+        "Drag a sphere to move it; it stays under the pointer at its depth and the links stretch to follow. Hold "
+        "Shift to swing it around the sphere it grows from (its link keeps its length). Symmetry moves its mirror "
+        "twin too.");
     add("forgesphere.scale", "Scale", mode(ForgeSphereMode::Scale), active, [this] { return forgesphereMode_ == ForgeSphereMode::Scale; },
         "Drag a sphere up or right to make it bigger, down or left to make it smaller.");
     add("forgesphere.place_child", "Drag places child", [this] { forgespherePlaceChild_ = !forgespherePlaceChild_; }, active,
         [this] { return forgespherePlaceChild_; },
         "Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
         "instead of moving the sphere. Off, hold Ctrl while you drag for the same.");
+    add("forgesphere.snap", "Snap to Surface", [this] { forgesphereSnap_ = !forgesphereSnap_; }, active,
+        [this] { return forgesphereSnap_; },
+        "Moving a sphere puts its centre on the surface of the sphere under the pointer (off them, it moves at its "
+        "depth as usual). Handy for seating a head or limb on the body.");
+    add("forgesphere.branch", "Move Branch", [this] { forgesphereBranch_ = !forgesphereBranch_; }, active,
+        [this] { return forgesphereBranch_; },
+        "Moving a sphere carries everything that grows from it along, keeping its shape: drag a leg and the foot "
+        "comes too, drag the body and the whole creature moves. Off, only the sphere moves and its links stretch.");
     const auto selected = [this] { return forgesphereActive() && forgesphereSelection() > 0; };
     add("forgesphere.delete_selected", "Delete Selected", [this] { forgesphereEdit(ForgeSphereEdit::Delete, forgesphereSelection()); },
         selected, nullptr,
@@ -140,7 +161,10 @@ void App::drawForgeSpheresContents() {
     ui::ActionButton(*this, "forgesphere.move", ImVec2(third, 0));
     ImGui::SameLine();
     ui::ActionButton(*this, "forgesphere.scale", ImVec2(-1, 0));
-    ui::ActionButton(*this, "forgesphere.place_child", ImVec2(full, 0));
+    ui::ActionButton(*this, "forgesphere.place_child", ImVec2(half, 0));
+    ImGui::SameLine();
+    ui::ActionButton(*this, "forgesphere.snap", ImVec2(-1, 0));
+    ui::ActionButton(*this, "forgesphere.branch", ImVec2(full, 0));
     ui::ActionButton(*this, "forgesphere.delete_selected", ImVec2(full, 0));
     ui::ActionButton(*this, "forgesphere.insert_selected", ImVec2(half, 0));
     ImGui::SameLine();
@@ -195,7 +219,9 @@ bool App::forgesphereNearRim(int i, float x, float y) const {
     const float wpp = worldPerPixel(z.center);
     if (!partProject(z.center, c) || wpp <= 0.0f) return false;
     const float r = z.radius / wpp; // the outline the overlay draws
-    const float band = std::min(0.3f * r, 14.0f * uiScale_); // a small sphere keeps most of its body for moving
+    // A thin band, none on a sphere drawn small: most of a sphere moves it, so a resize never takes a move.
+    if (r < 16.0f * uiScale_) return false;
+    const float band = std::min(0.15f * r, 8.0f * uiScale_);
     return std::hypot(x - c.x, y - c.y) >= r - band;
 }
 
@@ -252,12 +278,7 @@ bool App::forgesphereMouseDown(float x, float y, SDL_Keymod mod) {
     } else {
         d.label = d.op == ForgeSphereMode::Move ? "Forge Sphere move" : "Forge Sphere scale";
     }
-    if (d.op == ForgeSphereMode::Move) {
-        glm::vec3 o, dir;
-        partRay(x, y, o, dir);
-        const glm::vec3 c = d.start[size_t(d.sphere)].center;
-        d.grab = c - planeHit(o, dir, c, glm::normalize(dir));
-    }
+    if (d.op == ForgeSphereMode::Move) d.grab = forgesphereGrab(x, y, d.start[size_t(d.sphere)].center);
     if (d.op == ForgeSphereMode::Draw && !d.pending) forgesphereDragTo(x, y); // the new sphere appears at once
     drag_ = Drag::ForgeSphere;
     return true;
@@ -272,13 +293,10 @@ void App::forgesphereDragTo(float x, float y) {
         d.pending = false;
         d.op = d.rim ? ForgeSphereMode::Scale : ForgeSphereMode::Move;
         d.label = d.rim ? "Forge Sphere scale" : "Forge Sphere move";
-        if (!d.rim) {
-            glm::vec3 o, dir;
-            partRay(d.x, d.y, o, dir);
-            const glm::vec3 c = d.start[size_t(d.sphere)].center;
-            d.grab = c - planeHit(o, dir, c, glm::normalize(dir));
-        }
+        if (!d.rim) d.grab = forgesphereGrab(d.x, d.y, d.start[size_t(d.sphere)].center);
     }
+    // Move and Scale: nothing until the pointer leaves the press (a click only selects).
+    if (!d.changed && d.op != ForgeSphereMode::Draw && moved <= 0.0f) return;
     std::vector<ForgeSphere> s = d.start;
     const ForgeSphere& z = s[size_t(d.sphere)];
     switch (d.op) {
@@ -298,7 +316,7 @@ void App::forgesphereDragTo(float x, float y) {
             // that point facing the camera.
             glm::vec3 o2, dir2;
             partRay(x, y, o2, dir2);
-            const glm::vec3 at = planeHit(o2, dir2, c, glm::normalize(dir));
+            const glm::vec3 at = planeHit(o2, dir2, c, glm::normalize(partCamera().forward()));
             forgesphereAdd(s, d.sphere, at, 0.5f * z.radius, symmetry_, &d.added);
             status_ = "Forge Spheres: new sphere, " + std::to_string(glm::distance(at, z.center) / z.radius).substr(0, 4) +
                       " parent radii out";
@@ -313,8 +331,27 @@ void App::forgesphereDragTo(float x, float y) {
     case ForgeSphereMode::Move: {
         glm::vec3 o, dir;
         partRay(x, y, o, dir);
-        const glm::vec3 c = planeHit(o, dir, z.center, glm::normalize(dir)) + d.grab;
-        forgesphereSet(s, d.sphere, c, z.radius, symmetry_);
+        const bool shift = (inputMods() & SDL_KMOD_SHIFT) != 0;
+        if (shift != d.keepLength && d.changed) {
+            // Shift pressed or let go mid-move: go on from where the sphere is now, so it doesn't jump (KeepLength
+            // keeps the link as long as it is now; View, the depth it is at now).
+            d.start = doc_.mesh.forgespheres;
+            d.grab = forgesphereGrab(x, y, d.start[size_t(d.sphere)].center);
+        }
+        d.keepLength = shift;
+        std::vector<ForgeSphere> m = d.start;
+        const ForgeSphereDepth depth = shift ? ForgeSphereDepth::KeepLength
+                                       : forgesphereSnap_ ? ForgeSphereDepth::Surface
+                                                          : ForgeSphereDepth::View;
+        const glm::vec3 c = forgesphereMoveTarget(d.start, d.sphere, d.grab, o, glm::normalize(dir),
+                                                  glm::normalize(partCamera().forward()), depth, symmetry_);
+        if (forgesphereBranch_) forgesphereMoveBranch(m, d.sphere, c, symmetry_);
+        else forgesphereSet(m, d.sphere, c, m[size_t(d.sphere)].radius, symmetry_);
+        if (const int parent = m[size_t(d.sphere)].parent; shift && parent >= 0)
+            status_ = "Forge Spheres: around its parent, link " +
+                      std::to_string(glm::distance(m[size_t(d.sphere)].center, m[size_t(parent)].center)).substr(0, 5) +
+                      " long";
+        s = std::move(m);
         break;
     }
     case ForgeSphereMode::Scale: {
@@ -329,22 +366,59 @@ void App::forgesphereDragTo(float x, float y) {
         break;
     }
     }
-    doc_.mesh = forgesphereMesh(s, false);
+    forgesphereShow(s);
+    d.changed = true;
+}
+
+glm::vec3 App::forgesphereGrab(float x, float y, const glm::vec3& center) const {
+    glm::vec3 o, dir;
+    partRay(x, y, o, dir);
+    return center - planeHit(o, glm::normalize(dir), center, glm::normalize(partCamera().forward()));
+}
+
+void App::forgesphereShow(const std::vector<ForgeSphere>& s) {
+    std::vector<uint32_t> moved;
+    if (forgesphereDisplayUpdate(doc_.mesh, s, &moved)) { // the moved spheres only
+        doc_.bvh.refit(doc_.mesh, moved);
+        return;
+    }
+    doc_.mesh = forgesphereMesh(s, false); // a sphere added or a link drawn or gone: the whole armature
     doc_.mesh.topologyDirty = true;
     doc_.bvh.build(doc_.mesh);
-    d.changed = true;
+}
+
+void App::flushForgeSphereDrag() {
+    ForgeSphereDrag& d = zsDrag_;
+    if (drag_ != Drag::ForgeSphere) return;
+    // Shift pressed or let go mid-move takes effect without waiting for the pointer to move.
+    const bool shiftChanged = d.op == ForgeSphereMode::Move && !d.pending && d.changed &&
+                              ((inputMods() & SDL_KMOD_SHIFT) != 0) != d.keepLength;
+    if (!d.pendingMove && !shiftChanged) return;
+    if (!d.pendingMove) d.atX = mouseX_, d.atY = mouseY_;
+    d.pendingMove = false;
+    forgesphereDragTo(d.atX, d.atY);
 }
 
 void App::forgesphereRelease() {
     ForgeSphereDrag& d = zsDrag_;
+    if (d.pendingMove) { // (where the pointer was let go)
+        d.pendingMove = false;
+        forgesphereDragTo(d.atX, d.atY);
+    }
     if (d.pending) { // Draw: a click on a sphere grows a new one there, half its size
         d.pending = false;
         forgesphereDragTo(d.x, d.y);
     }
+    // A click that sent pointer moves without moving anything (Move or Scale, the pointer still) is no edit: no undo
+    // step, or the next Ctrl+Z would take back nothing.
+    if (d.changed && sameArmature(doc_.mesh.forgespheres, d.before.forgespheres)) d.changed = false;
     if (d.changed) {
         Mesh after = std::move(doc_.mesh);
+        // The tree the drag kept fitted, tightened (a few ms) rather than built again (tens of ms on a long chain).
+        doc_.bvh.refitAll(after);
+        BVH tree = std::move(doc_.bvh);
         doc_.mesh = std::move(d.before);
-        doc_.replaceMeshUndoable(std::move(after), d.label);
+        doc_.replaceMeshUndoable(std::move(after), d.label, std::move(tree));
         status_ = std::string("Forge Spheres: ") + d.label + "; " + std::to_string(doc_.mesh.forgespheres.size()) + " spheres";
         if (d.added >= 0) forgesphereSelected_ = d.added; // the new sphere
         else if (d.op != ForgeSphereMode::Draw) forgesphereSelected_ = d.sphere; // moved or resized (an inserted joint, too)

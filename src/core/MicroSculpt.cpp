@@ -243,6 +243,7 @@ void MicroStroke::begin(Mesh& m) {
     if (mm.tiles && mm.tiles->maxDepth.size() != mm.baseTriangles) mm.tiles->resize(mm.baseTriangles);
     strokeStamp_ = mm.tiles ? mm.tiles->useStamp + 1 : 0;
     mm.stroking = true;
+    mm.grabbing = false;
     active_ = true;
 }
 
@@ -934,6 +935,7 @@ void MicroStroke::widen(MicroMesh& mm, float need) {
 void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror) {
     if (!active_ || !m.micro) return;
     MicroMesh& mm = *m.micro;
+    mm.grabbing = true;
     const uint32_t n = mm.n;
     widen(mm, float(mm.rangeMax) * mm.step + radius); // room to move a radius either way
     // Scale-adaptive like dab(): the weights on grid points `stride` apart, interpolated in between when moving.
@@ -1115,6 +1117,7 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
         m.micro->stroking = false;
+        if (m.micro->grabbing) m.micro->grabbing = false, m.micro->shadeNow = true; // (a Move's last frame shows whole)
         if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }
     grabMirrors_.clear();

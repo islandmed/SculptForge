@@ -2,10 +2,10 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.12.0's five cards (SF_WHATS_NEW_VERSION; the chapter starts at 0.11.0), so this stays valid
-# after each release; the guide chapter below is pinned to 0.13.10 (SF_GUIDE_VERSION), so it checks 0.13.10's section
+# after each release; the guide chapter below is pinned to 0.13.11 (SF_GUIDE_VERSION), so it checks 0.13.11's section
 # before and after the release.
 env SF_WHATS_NEW_VERSION 0.12.0
-env SF_GUIDE_VERSION 0.13.10
+env SF_GUIDE_VERSION 0.13.11
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -55,12 +55,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.13.11"
+expect_text "Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again."
 expect_text "Version 0.13.10"
-expect_text "Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes keep up on dense Micro levels, and 16 new Creature Skin brushes arrive."
+expect_text "Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes respond faster on dense Micro levels, and 16 new Creature Skin brushes arrive."
 expect_text "Version 0.13.9"
 expect_text "The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes."
-expect_text "Version 0.13.8"
-expect_text "805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour."
 expect_value whats_new_contents == 6   # 3 versions in full, then the groups of older versions (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide

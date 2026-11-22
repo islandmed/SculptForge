@@ -624,6 +624,16 @@ constexpr Entry kSpanish[] = {
     {"Resolution", "Resolución"},
     {"Remeshing", "Remallando"},
     {"Remesh after each stroke", "Remallar tras cada trazo"},
+    {"Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s",
+     "Remallar tras cada trazo: omitido, esta pieza tiene niveles de subdivisión (un remallado los eliminaría). %s"},
+    {"Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s",
+     "Remallar tras cada trazo: omitido, esta pieza tiene capas de escultura (un remallado las eliminaría). %s"},
+    {"Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s",
+     "Remallar tras cada trazo: omitido, esta pieza tiene una textura pintada (trasladarla tarda un poco). %s"},
+    {"%s remeshes it anyway.",
+     "Con %s se remalla de todos modos."},
+    {"Tool > Remesh > Remesh remeshes it anyway.",
+     "Con Herramienta > Remallado > Remallado se remalla de todos modos."},
     {"Cancel", "Cancelar"},
     {"Stop the remesh; the Part stays as it is.", "Detén el remallado; la pieza se queda como está."},
     {"Remesh for sculpting", "Remallar para esculpir"},
@@ -1081,7 +1091,8 @@ constexpr Entry kSpanish[] = {
     {"Later", "Más tarde"},
     {"Skip this version", "Omitir esta versión"},
     {"Become a member", "Hazte miembro"},
-    {"Members get betas early.", "Los miembros reciben las betas antes."},
+    {"Members get early builds, like SculptForge for Android today.",
+     "Los miembros obtienen versiones anticipadas, como hoy SculptForge para Android."},
     {"Checking", "Comprobando"},
     {"This build gets its updates from your package manager.",
      "Esta compilación se actualiza desde tu gestor de paquetes."},
@@ -1536,12 +1547,8 @@ constexpr Entry kSpanish[] = {
      "al día (Preferencias > Actualizaciones)."},
     {"Version, licence and the open-source components SculptForge is built with.",
      "Versión, licencia y los componentes de código abierto con los que está hecho SculptForge."},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge es gratis y seguirá siéndolo. Ser miembro suma betas y versiones anticipadas, Member Requests "
-     "(una petición al mes, la hacemos primero y con tu nombre), voto sobre lo próximo que hacemos y tu nombre en los créditos: abre "
-     "sculptforge.app/support.html en tu navegador. En la app no cambia nada en ningún caso."},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge es gratis y seguirá siéndolo. Una membresía añade versiones anticipadas, como hoy SculptForge para Android, Member Requests (una petición al mes, desarrollada primero y acreditada a ti), un voto sobre lo próximo que desarrollemos y tu nombre en los créditos: abre sculptforge.app/support.html en tu navegador. Nada cambia en la app en ningún caso."},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "La comunidad oficial de SculptForge en Discord: preguntas, consejos y trabajos en curso. Abre la invitación en "
@@ -2371,6 +2378,16 @@ constexpr Entry kSpanish[] = {
      "reflejada."},
     {"Drag a sphere up or right to make it bigger, down or left to make it smaller.",
      "Arrastra una esfera hacia arriba o la derecha para agrandarla, hacia abajo o la izquierda para achicarla."},
+    {"Drag a sphere to move it; it stays under the pointer at its depth and the links stretch to follow. Hold Shift to swing it around the sphere it grows from (its link keeps its length). Symmetry moves its mirror twin too.",
+     "Arrastra una esfera para moverla; se queda bajo el puntero a su profundidad y los enlaces se estiran para seguirla. Mantén Shift para girarla alrededor de la esfera de la que crece (su enlace conserva la longitud). La simetría mueve también su gemela."},
+    {"Snap to Surface",
+     "Ajustar a superficie"},
+    {"Move Branch",
+     "Mover rama"},
+    {"Moving a sphere puts its centre on the surface of the sphere under the pointer (off them, it moves at its depth as usual). Handy for seating a head or limb on the body.",
+     "Al mover una esfera, su centro se coloca sobre la superficie de la esfera bajo el puntero (fuera de ellas, se mueve a su profundidad como siempre). Útil para asentar una cabeza o una extremidad en el cuerpo."},
+    {"Moving a sphere carries everything that grows from it along, keeping its shape: drag a leg and the foot comes too, drag the body and the whole creature moves. Off, only the sphere moves and its links stretch.",
+     "Al mover una esfera, todo lo que crece de ella la acompaña y conserva su forma: arrastra una pierna y el pie la sigue; arrastra el cuerpo y se mueve toda la criatura. Desactivado, solo se mueve la esfera y sus enlaces se estiran."},
     {"Drag places child", "Arrastrar coloca hija"},
     {"Draw: dragging on a sphere grows a new sphere and moves it away from it (one drag places a limb joint) "
      "instead of moving the sphere. Off, hold Ctrl while you drag for the same.",
@@ -2579,7 +2596,8 @@ constexpr Entry kSpanish[] = {
     {"Pack on", "Paquete activo"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "Desactivado: sus elementos salen de las listas hasta que lo vuelvas a activar (no se borra nada)."},
-    {"Free for everyone. Members get betas and a vote on what's next.", "Gratis para todos. Los miembros reciben betas y votan qué se construye a continuación."},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "Gratis para todos. Los miembros obtienen versiones anticipadas, como hoy SculptForge para Android, y un voto sobre lo próximo."},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "Mantén Ctrl sobre cualquier control para ver qué hace. Shift+F1 abre la guía en cualquier momento."},
     {"Opens in your browser.", "Se abre en tu navegador."},
     {"Your art is never uploaded or used for training.", "Tu arte nunca se sube ni se usa para entrenar."},
@@ -2837,13 +2855,10 @@ constexpr Entry kSpanish[] = {
      "llega con él (se apaga con este interruptor). No se envía nada sobre ti ni sobre tu equipo."},
     {"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
-    {"Preview (betas)", "Vista previa (betas)"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "Estable ofrece solo versiones terminadas. Vista previa ofrece también las betas que nombra el feed de "
-     "actualizaciones. Las betas son una ventaja para miembros: las reciben del repositorio privado de miembros y "
-     "del canal #members de Discord. Cuando la versión estable supera a una beta, Vista previa ofrece esa."},
+    {"Preview (early builds)",
+     "Vista previa (versiones anticipadas)"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "Los miembros reciben versiones anticipadas aquí cuando las hay. Ahora mismo este canal recibe las mismas versiones que Estable."},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "Retopología automática en quads: reconstruye la Pieza como topología limpia, toda de quads, cuyos bucles de aristas siguen las formas, cerca de Quads objetivo. Se ejecuta en segundo plano (Cancelar la detiene); se puede deshacer. Luego divídela y usa Pieza > Proyectar > Project Detail para recuperar el detalle."},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
@@ -3606,11 +3621,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles solo llegan a la superficie unida al punto bajo el cursor, dentro del tamaño del pincel: la otra "
      "pierna, el dedo de al lado o un labio al otro lado de un hueco no cambian. Se "
      "guarda con las preferencias y el proyecto."},
-    {"The brush falloff is measured on screen: everything inside the brush circle is reached, through the model and "
-     "out the back, as a cylinder along the view. Turn on Connected only too to keep "
-     "it to one piece.",
-     "La atenuación del pincel se mide en pantalla: se alcanza todo lo que está dentro del círculo del pincel, a "
-     "través del modelo y por detrás, como un cilindro en la dirección de la vista. "
+    {"The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+     "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+     "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.",
+     "La atenuación del pincel se mide en pantalla, como un cilindro en la dirección de la vista. Mover y Agarrar "
+     "alcanzan todo lo que está dentro del círculo del pincel, a través del modelo y por detrás; los demás pinceles "
+     "se detienen entre 1,5 y 3 radios de pincel detrás de la superficie bajo el cursor. "
      "Activa también Solo conectado para limitarlo a una pieza."},
     {"Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.",
      "Ctrl+arrastrar pinta la máscara con el pincel; Ctrl+Alt+arrastrar la borra. Ctrl+arrastrar en el fondo la "
@@ -4304,6 +4320,14 @@ constexpr Entry kSpanish[] = {
      "  Diseñando el pincel%.*s"},
     {"%.1f%% of texels found no surface: raise Front / Rear",
      "El %.1f%% de los téxeles no encontró superficie: sube Delante / Detrás"},
+    {"%.1f%% of the map found no surface: raise the search distance to Front %.1f%%, Rear %.1f%%",
+     "El %.1f%% del mapa no encontró superficie: sube la distancia de búsqueda a Delante %.1f%%, Detrás %.1f%%"},
+    {"Auto distance: Front %.1f%%, Rear %.1f%%",
+     "Distancia automática: Delante %.1f%%, Detrás %.1f%%"},
+    {"Bake Again with Suggested Distance",
+     "Hacer bake de nuevo con la distancia sugerida"},
+    {"Some texels of the last bake found no surface because the search distance was too short. Turn Auto distance off, set Front and Rear to the distances that reach the high-poly for them, and bake again.",
+     "Algunos téxeles del último bake no encontraron superficie porque la distancia de búsqueda era demasiado corta. Desactiva la distancia automática, ajusta Delante y Detrás a las distancias que alcanzan la malla de alta resolución y haz bake de nuevo."},
     {"%d commands",
      "%d comandos"},
     {"%d items",
@@ -4334,6 +4358,7 @@ constexpr Entry kSpanish[] = {
      "%s: %s, %s, %d%%\nClic: activar / desactivar. Clic derecho: fusión y opacidad."},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: rugosidad %.2f, metálico %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "El metal refleja su entorno: se ve oscuro en un entorno oscuro."},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu puntos, altura %.3g, alcance %.2f radios"},
     {"%zu result",
@@ -4877,8 +4902,6 @@ constexpr Entry kSpanish[] = {
      "Esculpir sobre splats"},
     {"SculptForge has a new look",
      "SculptForge tiene un aspecto nuevo"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge es gratis. Una membresía añade betas y versiones anticipadas, voto sobre lo próximo que hacemos, Peticiones de miembros (una petición al mes, la hacemos primero y con tu nombre) y tu nombre en los créditos. %s"},
     {"Search brushes (scales, skin, stone...)",
      "Buscar pinceles (escamas, piel, piedra...)"},
     {"Selection brushes (Ctrl+Shift)",

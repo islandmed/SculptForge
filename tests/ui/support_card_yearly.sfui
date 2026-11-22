@@ -1,0 +1,33 @@
+# The membership card leads with Yearly (PanelSupportCard.cpp): Member $48 / year, "$4 a month, billed yearly", the button opens
+# the yearly checkout, and a small "or $5 a month" link opens the monthly one. Same in the Streamlined setup (sculptforge layout),
+# in both themes; support_card.sfui covers the rest of the card in Classic.
+run ui_look look=forge scheme=neutral layout=sculptforge
+run new_sphere subdivisions=3
+support_card first_run
+expect_value support_card_open == 1
+wait_idle
+wait 1.2
+expect_text $48
+expect_text / year
+expect_text $4 a month, billed yearly
+expect_no_text / month
+expect "or $5 a month##card.member_monthly"
+shot yearly_streamlined_dark
+ui_scale 200
+wait 0.5
+shot yearly_streamlined_dark-200
+ui_scale 100
+wait 0.5
+click "Become a member##card.member"
+expect_value support_requests == 1
+expect_status https://buy.stripe.com/aFa5kD4eHfhE2an6il4F206?client_reference_id=app-card
+wait 0.4
+expect_value support_card_open == 0
+
+# The monthly link opens the monthly checkout.
+support_card first_run
+expect_value support_card_open == 1
+wait 0.8
+click "or $5 a month##card.member_monthly"
+expect_value support_requests == 2
+expect_status https://buy.stripe.com/aFacN5h1t6L8cP14ad4F201?client_reference_id=app-card

@@ -418,6 +418,7 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     const float front = std::max(st.front, 0.0f) * diag, rear = std::max(st.rear, 0.0f) * diag;
     out.front = front;
     out.rear = rear;
+    out.autoDistance = st.autoDistance;
     if (front + rear <= 0.0f) {
         error = "Front and rear distances are both zero";
         return false;
@@ -487,6 +488,9 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     std::atomic<size_t> next{0}, done{0}, island{0}, missed{0};
     std::atomic<bool> cancel{false};
     std::mutex rangeMutex;
+    struct MissSample { glm::vec3 p, n; };
+    constexpr size_t kMissKeep = 2048; // per worker: a random sample of the missed texels
+    std::vector<MissSample> missSamples;
     float dMin = std::numeric_limits<float>::max(), dMax = std::numeric_limits<float>::lowest();
     const int aoPerSample = std::max(1, (st.aoRays + S * S - 1) / (S * S));
     const int thickPerSample = std::max(1, (st.thicknessRays + S * S - 1) / (S * S));
@@ -494,12 +498,14 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     runWorkers(threads, [&](int worker) {
         struct Acc {
             glm::vec3 ts{0}, os{0}, color{0}, lowN{0}, pos{0}, id{0};
+            glm::vec3 lastP{0}, lastN{0, 1, 0}; // the last low-poly sample (where a missed texel looks again)
             float disp = 0, ao = 0, cav = 0, curv = 0, thick = 0;
             uint16_t hits = 0, samples = 0;
         };
         std::vector<Acc> acc(size_t(kTile) * kTile);
         float localMin = std::numeric_limits<float>::max(), localMax = std::numeric_limits<float>::lowest();
         size_t localIsland = 0, localMissed = 0;
+        std::vector<MissSample> localMiss;
         for (;;) {
             if (cancel.load(std::memory_order_relaxed)) break;
             const size_t wi = next.fetch_add(1);
@@ -536,6 +542,8 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                         glm::vec3 p, n;
                         lowPoint(t, b, p, n);
                         a.lowN += n;
+                        a.lastP = p;
+                        a.lastN = n;
                         RayHitInfo h;
                         if (!bvh.nearest(p + n * front, -n, 0.0f, front + rear, front, h)) continue;
                         a.hits = uint16_t(std::min(a.hits + 1, 65535));
@@ -651,6 +659,10 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
                     ++localIsland;
                     if (!a.hits) {
                         ++localMissed;
+                        // Reservoir sample of the misses (slot chosen by a hash of the texel).
+                        if (localMiss.size() < kMissKeep) localMiss.push_back({a.lastP, a.lastN});
+                        else if (const size_t k = hash32(uint32_t(i) * 2654435761u + uint32_t(localMissed)) % localMissed; k < kMissKeep)
+                            localMiss[k] = {a.lastP, a.lastN};
                         if (wantNormal) out.normal[i * 3] = out.normal[i * 3 + 1] = 128, out.normal[i * 3 + 2] = 255;
                         if (wantObject) { // the low-poly's own normal
                             const glm::vec3 on = safeNormalize(a.lowN, glm::vec3(0, 1, 0));
@@ -689,6 +701,7 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
         island += localIsland;
         missed += localMissed;
         std::lock_guard lock(rangeMutex);
+        missSamples.insert(missSamples.end(), localMiss.begin(), localMiss.end());
         dMin = std::min(dMin, localMin);
         dMax = std::max(dMax, localMax);
     });
@@ -701,6 +714,45 @@ bool bakeMaps(const Mesh& low, const std::vector<const Mesh*>& sources, const Ba
     }
     out.islandTexels = island;
     out.missedTexels = missed;
+    if (out.missRatio() >= BakeResult::kMissWarn && !missSamples.empty()) {
+        // Where would a longer range have found the high-poly for the missed texels? Long rays both ways from a
+        // sample of them (up to a fifth of the model's size; a bake that far reaches other parts of the model).
+        const float reach = diag * 0.2f;
+        std::vector<float> needOut, needIn; // how far outside / inside the low-poly the hit lies
+        std::vector<char> found(missSamples.size(), 0);
+        std::vector<float> dist(missSamples.size(), 0.0f);
+        std::atomic<size_t> idx{0};
+        runWorkers(threads, [&](int) {
+            for (;;) {
+                const size_t i = idx.fetch_add(1);
+                if (i >= missSamples.size()) break;
+                RayHitInfo h;
+                if (!bvh.nearest(missSamples[i].p + missSamples[i].n * reach, -missSamples[i].n, 0.0f, 2.0f * reach, reach, h)) continue;
+                found[i] = 1;
+                dist[i] = reach - h.t; // > 0: outside the low-poly
+            }
+        });
+        size_t resolved = 0;
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (!found[i]) continue;
+            ++resolved;
+            (dist[i] >= 0 ? needOut : needIn).push_back(std::abs(dist[i]));
+        }
+        // Only a distance problem when most of the misses have a surface in reach.
+        if (resolved * 2 >= missSamples.size()) {
+            auto cover = [&](std::vector<float>& v, float used) { // the 99.5th percentile + 20%, never below the range used
+                if (v.empty()) return used;
+                std::sort(v.begin(), v.end());
+                const float q = v[std::min(v.size() - 1, size_t(float(v.size()) * 0.995f))];
+                return std::min(reach, std::max(used, q * 1.2f));
+            };
+            const float f = cover(needOut, front), r = cover(needIn, rear);
+            if (f > front * 1.01f || r > rear * 1.01f) {
+                out.suggestFront = f;
+                out.suggestRear = r;
+            }
+        }
+    }
     if (wantDisp && dMin <= dMax) {
         out.displacementMin = dMin;
         out.displacementMax = dMax;
@@ -1002,9 +1054,15 @@ std::string bakeSummary(const BakeResult& r) {
     if (r.has(BakeMap::Displacement))
         s << "; displacement " << r.displacementMin << " to " << r.displacementMax << ", PNG mid-grey = 0, white = +"
           << r.displacementScale << ", black = -" << r.displacementScale;
-    if (r.missRatio() >= 0.0005f) {
+    if (r.missRatio() >= BakeResult::kMissWarn) {
         s.precision(1);
-        s << "; " << 100.0f * r.missRatio() << "% of texels found no surface (raise Front / Rear)";
+        s << "; WARNING " << 100.0f * r.missRatio() << "% of texels found no surface (the search distance is too short)";
+        if (r.hasSuggestion() && r.diagonal > 0.0f) {
+            s.precision(3);
+            s << ": bake again with front=" << r.suggestFront / r.diagonal << " rear=" << r.suggestRear / r.diagonal;
+        } else {
+            s << " (raise Front / Rear)";
+        }
     }
     return s.str();
 }
