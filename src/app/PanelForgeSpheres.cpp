@@ -47,6 +47,14 @@ glm::vec3 planeHit(const glm::vec3& o, const glm::vec3& d, const glm::vec3& p, c
     return o + d * std::max(t, 0.0f);
 }
 
+// The same spheres in the same places, sizes and tree.
+bool sameArmature(const std::vector<ForgeSphere>& a, const std::vector<ForgeSphere>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (a[i].center != b[i].center || a[i].radius != b[i].radius || a[i].parent != b[i].parent) return false;
+    return true;
+}
+
 } // namespace
 
 void App::registerForgeSphereUiActions() {
@@ -287,6 +295,8 @@ void App::forgesphereDragTo(float x, float y) {
         d.label = d.rim ? "Forge Sphere scale" : "Forge Sphere move";
         if (!d.rim) d.grab = forgesphereGrab(d.x, d.y, d.start[size_t(d.sphere)].center);
     }
+    // Move and Scale: nothing until the pointer leaves the press (a click only selects).
+    if (!d.changed && d.op != ForgeSphereMode::Draw && moved <= 0.0f) return;
     std::vector<ForgeSphere> s = d.start;
     const ForgeSphere& z = s[size_t(d.sphere)];
     switch (d.op) {
@@ -399,6 +409,9 @@ void App::forgesphereRelease() {
         d.pending = false;
         forgesphereDragTo(d.x, d.y);
     }
+    // A click that sent pointer moves without moving anything (Move or Scale, the pointer still) is no edit: no undo
+    // step, or the next Ctrl+Z would take back nothing.
+    if (d.changed && sameArmature(doc_.mesh.forgespheres, d.before.forgespheres)) d.changed = false;
     if (d.changed) {
         Mesh after = std::move(doc_.mesh);
         // The tree the drag kept fitted, tightened (a few ms) rather than built again (tens of ms on a long chain).

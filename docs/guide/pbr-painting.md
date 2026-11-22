@@ -55,8 +55,11 @@ Open the **Paint** menu. With a material texture, a **Material** section appears
 
 Untick Base Color to paint only roughness (a wet patch, a polished edge) without touching the colour. Every
 stroke is one undo step for all the channels it painted. The brush's falloff, alpha, pen pressure, symmetry and
-mask apply to every channel alike; erasing (<kbd>Alt</kbd>) paints Base back to each channel's default and makes
-layers transparent.
+mask apply to every channel alike; erasing (<kbd>Alt</kbd>, <kbd>Option</kbd> on a Mac) paints Base back to white and every channel back to its
+default, whichever channels the brush paints, and makes layers transparent. A material swatch (Gold, Bare metal...)
+sets the brush's metallic and roughness; picking a plain colour afterwards gives them back, so red after Gold is
+red paint, not red metal (click Metallic's 100% square or a swatch again for a red metal). Metal reflects its surroundings, so
+in the PBR view it looks dark in a dark environment.
 
 **C over the model picks the whole material**: the colour and every channel under the cursor become the brush
 material, and the brush then paints all of the texture's channels.

@@ -78,7 +78,7 @@ the texture in the viewport without deleting it.
   light even on an 8K texture. Layer edits (new layer, fill, clear, merge, flatten, delete) also keep only the
   tiles they changed, and an empty or single-colour tile costs almost nothing. Only an edit that changes a whole
   painted layer at once, like clearing a fully painted Base, stores the full layer.
-- <kbd>Alt</kbd> paints back towards white on Base, and erases on a paint layer, as with vertex paint.
+- <kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac) paints back towards white on Base, with every material channel back to its default, and erases on a paint layer, as with vertex paint.
 - <kbd>C</kbd> over the model picks the texture's colour under the cursor.
 
 > **Tip:** Painting stays fast with big textures on big meshes: only the triangles under the brush are visited,
