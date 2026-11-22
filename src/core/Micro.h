@@ -359,8 +359,12 @@ public:
     // stride of the micro grid) and interpolated in between, so its evaluation cost doesn't grow with the micro
     // level. Off: every grid point (tests compare).
     static constexpr int kBrushSamples = 48;
+    // The brush plane samples coarser than every second grid point only while the brush still covers this many
+    // (tests set it huge: every second point).
+    float planeSamples = 7000.0f;
     bool adaptive = true;
     uint32_t lastStride = 1; // the stride the last dab used
+    uint32_t lastPlaneStride = 1; // ... and its brush plane
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
