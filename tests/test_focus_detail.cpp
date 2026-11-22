@@ -854,8 +854,6 @@ TEST(focus_detail_every_micro_brush_matches_in_memory) {
     CHECK(edgesShared(streamed.mesh));
 }
 
-#endif
-
 // #184: a long stroke leaves thousands of edited tiles full, far over the budget; each demotion compresses one. The
 // demotions go within the frame's budget (a batch at least), over the following frames, never all in one (1.6-2.8 s on
 // the floor tier), and no edit is lost on the way.
@@ -892,3 +890,5 @@ TEST(focus_detail_demotions_over_budget_spread_over_frames) {
     for (uint32_t t = 0; t < mm.baseTriangles; ++t) kept = kept && mm.disp[size_t(t) * mm.samples + inner] == int16_t(t % 97 + 1);
     CHECK(kept);
 }
+
+#endif
