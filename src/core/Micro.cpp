@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -63,6 +64,7 @@ void MicroMesh::clearDirty() {
     allDirty = false;
     maskDirty = false;
     rescaled = false;
+    resendLater = false;
     shadeNow = false;
 }
 
@@ -71,6 +73,7 @@ int MicroMesh::widen(float need) {
     int doublings = 2;
     while (need > 32767.0f * step * float(1 << doublings) && doublings < 12) ++doublings;
     const int div = 1 << doublings;
+    const auto start = std::chrono::steady_clock::now();
     poolFor(disp.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) disp[i] = int16_t(int(disp[i]) / div);
     }, 1 << 16);
@@ -81,6 +84,7 @@ int MicroMesh::widen(float need) {
     reach.all = true;
     if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
     if (tiles) tiles->rescale(div); // (Adaptive Detail tiles hold deltas in the same units)
+    widenMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
     ++revision;
     return div;
 }

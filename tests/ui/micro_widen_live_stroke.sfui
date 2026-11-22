@@ -2,6 +2,7 @@
 # frames: the widen's own frame keeps the old heights and step on the GPU (the same surface), the next re-sends them and
 # places no dabs (App::drainStrokeDabs, MicroRenderer::sync). Both in one frame were 0.7-1 s on a 2.6M base. The view must
 # end up as the same mesh sent up whole and shaded again (view_stale, mean pixel difference 0-255): no cracks, nothing stale.
+# A widen splits only when it takes its frame's budget; ctest sets SF_WIDEN_SPLIT_MS=0 so every widen splits on any computer.
 # Not on Windows: no Focus Detail there (CMakeLists.txt).
 # cold: SF_FOCUS_DETAIL is set here, and a warm server doesn't keep it between scripts.
 run ui_look look=classic layout=classic
