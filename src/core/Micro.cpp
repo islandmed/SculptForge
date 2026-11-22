@@ -66,6 +66,7 @@ void MicroMesh::clearDirty() {
     rescaled = false;
     resendLater = false;
     shadeNow = false;
+    strokeEnded = false;
 }
 
 int MicroMesh::widen(float need) {

@@ -122,6 +122,7 @@ struct MicroMesh {
     bool stroking = false;  // a stroke is running (TierConfig draft normals: the renderer shades less meanwhile)
     bool grabbing = false;  // the running stroke is a Move (MicroStroke::beginGrab): its shading shows on each frame, never budgeted
     bool shadeNow = false;  // an edit whose shading must show on the next frame in full (undo, redo, a Move's end; #184)
+    bool strokeEnded = false; // a stroke ended since the renderer last looked: the base its last dabs moved is the stroke's (budgeted)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
     bool resendLater = false; // a stroke's widen took its frame's budget: the renderer re-sends on the next frame (App, #184)
     float widenMs = 0.0f;   // what the last widen took

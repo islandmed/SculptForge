@@ -1224,6 +1224,9 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
         m.micro->stroking = false;
+        // (the stroke's last queued dabs moved the base before this: not a base moved by anything but a stroke, which
+        // the renderer shades whole at once; core-800m: ~500k triangles of backlog in one 2-3 s frame, +1.9 GB)
+        m.micro->strokeEnded = true;
         if (m.micro->grabbing) m.micro->grabbing = false, m.micro->shadeNow = true; // (a Move's last frame shows whole)
         if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }
