@@ -2443,9 +2443,7 @@ private:
     float sdivSlider_ = 1.0f;   // the Level slider while dragged (1-based)
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Add Micro makes
     bool sdivHeld_ = false;
-    bool sdivPending_ = false;   // a click on the Level slider waiting out the double-click time before it switches
     bool sdivTyping_ = false;    // its number was being typed last frame
-    double sdivPendingAt_ = 0.0;
     int sdivSwitches_ = 0;       // level switches the Level slider has made (UI tests)
     void drawPartsContents();
     // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
