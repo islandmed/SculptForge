@@ -44,7 +44,7 @@ are on the bottom shelf by default and in the brush picker.
 | **Pinch** | <kbd>8</kbd> | Pulls the surface toward the stroke to tighten edges. | Spreads it apart |
 | **Sharp Crease** | <kbd>9</kbd> | A narrow, deep V-shaped crease with the sides pinched in. | A sharp ridge |
 | **Clay Block** | <kbd>0</kbd> | Square, flat-topped clay strokes for blocking in forms. | Carves flat-bottomed |
-| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. | No change |
+| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. For long pulls, turn on **Dynamic** on the top shelf ([dynamic topology](dynamic-topology.md)) so the surface adds detail as it stretches. | No change |
 | **Trim** | | Trim: shaves away everything above a plane for hard surfaces. | Fills up to the plane |
 | **Layer** | | Raises the surface to one fixed height per stroke; overlapping passes never stack. | Lowers to a fixed depth |
 | **Nudge** | | Slides the surface sideways along the stroke without lifting it. | No change |
