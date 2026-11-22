@@ -145,6 +145,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
 //                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
@@ -207,13 +208,13 @@
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
 //                            material_channels (material channels on the texture, base colour not counted),
 //                            channel_view (0 = colour, else the solo channel: 1 roughness ... 7 opacity),
-//                            brush_channels (bit mask of what the brush paints), roughness_painted (texels whose
+//                            brush_channels (bit mask of what the brush paints), roughness_painted / metallic_painted (texels whose
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
-//                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
+//                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched, remesh_skip_notes,
 //                            guide_strength (Guide Strength), retopo_target (Target Quads), guide_strength_on_shelves / target_quads_on_shelves / level_on_shelves, voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
 //                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
@@ -739,6 +740,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
     if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
+    if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
@@ -814,6 +816,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
+    if (name == "remesh_skip_notes") return double(app_.remeshSkipNoted_.size()); // Remesh after each stroke told why (once per Part and reason)
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
     if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
     if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;

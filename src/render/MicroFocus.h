@@ -37,6 +37,10 @@ public:
     uint32_t shadePoints() const { return coarseSamples_; }
     // Everything from scratch (opening, a new level): records, coarse shading, no pages.
     void syncAll(Mesh& mesh, MicroRenderer& r);
+    // The height step grew (MicroMesh::widen: every value divided, the same surface): records, coarse grids and the
+    // pages' heights at once; the shading (off by the rounding only) follows tile by tile when the frames have room
+    // (#184: a Draw stroke's first widen re-shaded every tile in one frame, 1-2 s on a 2.6M base).
+    void resendHeights(const Mesh& mesh, MicroRenderer& r);
     // A sync: `dirty` base triangles whose heights changed, `moved` (bitset or empty) those whose base moved.
     // Updates their records and shading, frees the pages of tiles that went coarse, gives pages to the tiles the
     // last draw wanted finer than the coarse level and shades pages within the budget.
@@ -51,7 +55,7 @@ public:
     size_t pagesShaded() const { return shadedPages_; }
     size_t pendingPages() const { return pendingShade_.size(); }
     // Base triangles whose coarse shading waits for a frame's budget (a stroke re-shades its tiles over several frames).
-    size_t pendingCoarse() const { return pendingCoarse_.size() - coarseHead_; }
+    size_t pendingCoarse() const { return queuedCoarse() + (sweepEnd_ - sweepNext_); }
 
     // Main-thread ms since the last takeSplit(), by part (the benchmark's focus_split_ms): coarse grids, records,
     // coarse shading, page heights, page shading, whole rebuilds (syncAll).
@@ -59,6 +63,9 @@ public:
     void takeSplit(double* out) { for (int k = 0; k < kParts; ++k) out[k] += splitMs_[k], splitMs_[k] = 0; }
 
     bool cameraMoving = false; // set before sync: the camera moved since the last frame (the coarse shading queue drains slowly)
+    // Set before sync: this frame shades every tile waiting, outside the budget (undo, redo, Move, a moved base at rest:
+    // only a Clay-type stroke's own tiles catch up over frames; #184 0.13.10 showed undo's stale shading for seconds).
+    bool shadeAll = false;
     size_t poolBudgetBytes = size_t(384) << 20; // the pool's most (full grid + full shading: 6 bytes a point)
 
 private:
@@ -93,6 +100,10 @@ private:
     std::vector<uint32_t> pendingCoarse_;
     std::vector<uint8_t> coarseQueued_;
     size_t coarseHead_ = 0;
+    size_t queuedCoarse() const { return pendingCoarse_.size() - coarseHead_; }
+    // After resendHeights: every tile's coarse shading again, base triangles sweepNext_ .. sweepEnd_ still to go, at
+    // the queue's rest budget once the queue is empty and no stroke runs (never all at once).
+    uint32_t sweepNext_ = 0, sweepEnd_ = 0;
     double coarseNsPerTile_ = 0.0; // measured: a tile handed to shadeCoarse, its ring of neighbours included
     size_t bytes_ = 0;
     std::vector<int16_t> staging_;

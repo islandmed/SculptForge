@@ -771,6 +771,7 @@ bool savable(const UndoRecord& r) {
 void writeMicro(Writer& w, const MicroUndo* u) {
     w.pod(uint8_t(u != nullptr));
     if (!u) return;
+    const_cast<MicroUndo*>(u)->settle(); // (a stroke's journal still packing: waited for; the step itself doesn't change)
     w.pod(u->step);
     w.pod(u->samples);
     w.pod(uint8_t(u->journal));

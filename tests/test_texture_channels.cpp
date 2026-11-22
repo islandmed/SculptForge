@@ -756,3 +756,130 @@ TEST(texture_edits_replace_the_texture_object) {
     CHECK(old.expired());
     CHECK(channelEnabled(*doc.mesh.texture, Channel::Roughness));
 }
+
+// Member bug (macOS, Option-paint): after painting metal, Alt with a colour brush put white over it but left the metal
+// under it. A true erase on Base clears every channel; on a layer it goes back to transparent.
+TEST(alt_erase_on_base_clears_every_channel_even_with_a_colour_only_brush) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Roughness, true);
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    doc.syncBvh();
+    paintCentre(m, doc.bvh, rustyMetal(), 0.4f);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+    CHECK(m.texture->pixels[(size_t(256) * 512 + 256) * 4 + 2] < 100); // rust: not white
+
+    // The App begins an erase stroke with every enabled channel; the brush itself only paints colour.
+    BrushMaterial colourOnly;
+    colourOnly.color = glm::vec3(1, 0, 0);
+    colourOnly.channels = channelBit(Channel::BaseColor);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f);
+    d.invert = true;
+    CHECK(p.dab(m, doc.bvh, d, colourOnly, Symmetry{}) > 0);
+    UndoRecord e;
+    p.end(e);
+    CHECK(centreValue(*m.texture, Channel::Metallic) < 0.02f);
+    CHECK(std::abs(centreValue(*m.texture, Channel::Roughness) - 0.65f) < 0.02f);
+    CHECK(m.texture->pixels[(size_t(256) * 512 + 256) * 4 + 2] > 250); // back to white
+    doc.undo.push(std::move(e));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh)); // one undo step brings the metal back
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+
+    // A brush that paints only roughness still erases only roughness (no colour in it).
+    BrushMaterial roughOnly;
+    roughOnly.channels = channelBit(Channel::Roughness);
+    TexturePainter q;
+    CHECK(q.begin(m, roughOnly.channels));
+    q.dab(m, doc.bvh, d, roughOnly, Symmetry{});
+    UndoRecord e2;
+    q.end(e2);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+}
+
+TEST(alt_erase_on_a_texture_layer_goes_back_to_transparent) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    const int li = addTextureLayer(*m.texture, "Gold");
+    CHECK(li == 0);
+    doc.syncBvh();
+    BrushMaterial gold = rustyMetal();
+    gold.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Metallic);
+    paintCentre(m, doc.bvh, gold, 0.4f);
+    const PaintTexture& t = *m.texture;
+    const size_t px = (size_t(256) * 512 + 256) * 4;
+    CHECK(t.layers[0].rgba[px + 3] > 250);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f);
+    d.invert = true;
+    p.dab(m, doc.bvh, d, gold, Symmetry{});
+    UndoRecord e;
+    p.end(e);
+    CHECK(t.layers[0].rgba[px + 3] < 3);                          // colour coverage gone
+    CHECK(centreValue(t, Channel::Metallic) < 0.02f);                // the composite shows no metal
+    CHECK(t.pixels[px + 2] > 250 || t.base[px + 2] > 250);           // what shows is the Base below
+}
+
+// A light erase fades the paint softly (member check: one Alt stroke at Intensity 20 must not snap to flat white with a
+// stepped edge): the weight is the plain brush weight, so the texels run through every value between painted and erased.
+TEST(alt_erase_at_low_intensity_fades_softly) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    doc.syncBvh();
+    BrushMaterial metal;
+    metal.color = glm::vec3(0.4f, 0.05f, 0.6f);
+    metal.metallic = 1.0f;
+    metal.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Metallic);
+    paintCentre(m, doc.bvh, metal, 0.4f);
+    const std::vector<uint8_t> painted = m.texture->pixels;
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f, 0.2f); // Intensity 20
+    d.invert = true;
+    p.dab(m, doc.bvh, d, metal, Symmetry{});
+    UndoRecord e;
+    p.end(e);
+    const TileImage& mi = channelImage(*m.texture, Channel::Metallic);
+    size_t between = 0, flatWhite = 0, touched = 0;
+    for (int y = 0; y < m.texture->height; ++y)
+        for (int x = 0; x < m.texture->width; ++x) {
+            const size_t i = (size_t(y) * size_t(m.texture->width) + size_t(x)) * 4;
+            if (m.texture->pixels[i + 1] == painted[i + 1]) continue; // (green: purple is 0.05 there)
+            ++touched;
+            const float v = mi.value(x, y);
+            between += v > 0.05f && v < 0.95f;
+            flatWhite += m.texture->pixels[i + 1] == 255;
+        }
+    CHECK(touched > 2000);
+    CHECK(between * 10 > touched * 6);   // most touched texels sit between painted and erased
+    CHECK(flatWhite * 10 < touched);     // a light stroke does not whiten anything flat
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.3f);
+
+    // Three overlapping light strokes (Intensity 25, a little apart): still no flat white band and no stepped contour, and
+    // colour and metal go together (no texel that is white but still metal).
+    for (int k = 0; k < 3; ++k) {
+        TexturePainter q;
+        CHECK(q.begin(m, ~0u));
+        DabParams d2 = dab(glm::vec3(0.03f * float(k), 0, 0), 0.4f, 0.25f);
+        d2.invert = true;
+        q.dab(m, doc.bvh, d2, metal, Symmetry{});
+        UndoRecord e2;
+        q.end(e2);
+    }
+    size_t whiteButMetal = 0, near = 0, tinted = 0;
+    for (int y = 0; y < m.texture->height; ++y)
+        for (int x = 0; x < m.texture->width; ++x) {
+            const size_t i = (size_t(y) * size_t(m.texture->width) + size_t(x)) * 4;
+            if (painted[i + 1] == m.texture->pixels[i + 1]) continue;
+            ++tinted;
+            const float v = mi.value(x, y);
+            whiteButMetal += m.texture->pixels[i + 1] == 255 && v > 0.05f;
+            near += m.texture->pixels[i + 1] >= 230 && m.texture->pixels[i + 1] < 250; // 0.90 .. 0.98 of the way to white
+        }
+    CHECK(whiteButMetal == 0);
+    CHECK(near * 100 > tinted); // the near-white range is populated (a snap leaves it empty)
+}

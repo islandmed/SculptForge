@@ -31,6 +31,13 @@ constexpr float kTabs = 1.44f;                      // the even-scale tabs' radi
 constexpr float kTabHalf = 0.21f;                   // radians each side of a diagonal
 constexpr float kCentrePx = 12.0f;                  // the free-move centre
 constexpr float kPickPx = 8.0f;
+// Pick clarity: a ring seen (nearly) edge-on is a bar across the centre that the arrows, balls and squares lie over,
+// and an arrow pointing (nearly) at the viewer is a stub on the centre. Neither is a good target, so they step back:
+// the ring fades and cannot be picked within kRingFadeDeg of edge-on, picks only by its rim (beyond the arrow heads
+// and their pick distance) up to kRingRimDeg, and the arrow fades within kArrowFadeDeg of the view direction. (Rotate
+// about a faded ring's axis with the Rotate tool, or turn the view a little.)
+constexpr float kRingFadeDeg = 15.0f, kRingRimDeg = 35.0f, kArrowFadeDeg = 12.0f;
+constexpr float kRimMin = 0.9f; // the rim: ring points this far (in rings' radii) from the centre on screen; the heads end at ~0.8
 
 // The handles, numbered as App::GizmoHandle.
 enum Handle {
@@ -44,7 +51,8 @@ struct Screen {
     float unit = 105.0f; // one arrow length on screen, face-on (the rings' radius)
     float scale = 1.0f;  // the UI scale
     struct Axis {
-        bool arrow = false; // false: pointing at the viewer
+        bool arrow = false;      // false: too short on screen, or faded
+        bool arrowFaded = false; // pointing (nearly) at the viewer: drawn faint, never picked (its ball goes with it)
         glm::vec2 from{0.0f}, tip{0.0f};
         float depth = 0.0f;      // toward the viewer: the arrow (and ball) in front draws over the others
         float planeDepth = 0.0f; // the same for the plane square
@@ -54,8 +62,21 @@ struct Screen {
         glm::vec2 quad[4];
         std::vector<glm::vec2> ring; // the ring about this axis, closed
         std::vector<bool> ringFront; // per point: on the half facing the viewer
+        enum RingPick { RingFull, RingRim, RingFaded } ringPick = RingFull; // by how edge-on it is
     } axis[3];
 };
+
+// How a ring about an axis is seen: sinEdge = |axis . toEye| is the sine of its angle from edge-on.
+inline Screen::Axis::RingPick ringPickFor(float sinEdge) {
+    const float deg = std::asin(std::clamp(sinEdge, 0.0f, 1.0f)) * 57.29578f;
+    return deg < kRingFadeDeg ? Screen::Axis::RingFaded : deg < kRingRimDeg ? Screen::Axis::RingRim : Screen::Axis::RingFull;
+}
+
+// Whether the ring point at screen position p can be picked (the rim only, while the ring is rather edge-on).
+inline bool ringPointPicks(const Screen& s, const Screen::Axis& a, glm::vec2 p) {
+    if (a.ringPick == Screen::Axis::RingFull) return true;
+    return a.ringPick == Screen::Axis::RingRim && glm::length(p - s.centre) >= kRimMin * s.unit;
+}
 
 inline float segmentDistance(glm::vec2 p, glm::vec2 a, glm::vec2 b) {
     const glm::vec2 v = b - a;
@@ -93,11 +114,15 @@ Screen layout(Project project, const glm::vec3& c, const glm::mat3& f, float L, 
         a.depth = glm::dot(f[i], toEye);
         a.planeDepth = glm::dot(f[(i + 1) % 3] + f[(i + 2) % 3], toEye);
         glm::vec2 hi, end;
+        const bool faded = std::abs(a.depth) > std::cos(kArrowFadeDeg * 0.01745329f);
         if (project(c + f[i] * (kShaftLo * L), a.from) && project(c + f[i] * (kShaftHi * L), hi)) {
             const float len = glm::length(hi - a.from);
-            a.arrow = len >= 10.0f * scale;
+            a.arrow = !faded && len >= 10.0f * scale;
+            a.arrowFaded = faded;
             if (a.arrow) a.tip = hi + (hi - a.from) / len * (kHeadPx * scale);
+            else if (faded) a.tip = hi; // (no head: it may point exactly at the viewer, with no direction on screen)
         }
+        a.ringPick = ringPickFor(std::abs(a.depth));
         a.ball = a.arrow && project(c + f[i] * L, end) && glm::length(end - out.centre) >= kBallMin * unit &&
                  project(c + f[i] * (kBall * L), a.ballAt);
         const glm::vec3 u = f[(i + 1) % 3], v = f[(i + 2) % 3];
@@ -164,7 +189,8 @@ inline Handle pick(const Screen& s, glm::vec2 p) {
     for (int i = 0; i < 3; ++i) {
         const Screen::Axis& a = s.axis[i];
         for (size_t k = 1; k < a.ring.size(); ++k)
-            consider(Handle(RotateX + i), segmentDistance(p, a.ring[k - 1], a.ring[k]) + (a.ringFront[k] ? 0.0f : pickPx * 0.6f));
+            if (ringPointPicks(s, a, a.ring[k]) && ringPointPicks(s, a, a.ring[k - 1]))
+                consider(Handle(RotateX + i), segmentDistance(p, a.ring[k - 1], a.ring[k]) + (a.ringFront[k] ? 0.0f : pickPx * 0.6f));
     }
     consider(RotateView, std::abs(r - kViewRing * s.unit));
     return best;

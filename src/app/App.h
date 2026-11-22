@@ -536,6 +536,13 @@ private:
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
+    // The brush material before a swatch set it, and what the swatch set: a plain colour picked afterwards gives the
+    // roughness / metallic / channels back, so red after Gold is red paint, not red metal (beginPaintStroke).
+    struct MaterialSwatchMemo {
+        bool active = false;
+        BrushMaterial before, applied;
+        glm::vec3 color{1.0f};
+    } swatchMemo_;
     glm::vec3 grabLast_{0.0f};
     // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
     // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the
@@ -1652,12 +1659,14 @@ private:
     void pollVoxelRemesh();
     void quickRemesh(RemeshTrigger trigger); // Quick Remesh / Remesh after each stroke: checks, then startVoxelRemesh
     void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
+    std::string remeshSkippedNote(int reason);           // why Remesh after each stroke passed over this Part (0 levels, 1 layers, 2 texture)
     void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
     bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
     void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
     SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
+    std::set<std::pair<uint32_t, int>> remeshSkipNoted_; // (Part id, reason) already told why a remesh was skipped
     struct VoxelRemeshJob {
         RemeshTrigger trigger = RemeshTrigger::Button;
         uint64_t revision = 0; // doc_.undo.revision() when it began (the quick ones land only on that state)
@@ -2915,6 +2924,7 @@ private:
         // the transform into the vertices, as the per-frame path would have. Parallel to sessions.
         std::vector<uint8_t> gpu;
         glm::mat4 gpuModel{1.0f}; // the drag's world matrix (MeshTransform::matrix)
+        float gridSize = 0.0f;    // the size of what moves, for Shift snapping (read once per drag)
         // In the app's loop the pointer's samples only note where it is; the drag follows the newest once a frame
         // (every apply starts from the originals, so the skipped ones changed nothing).
         bool pending = false;
