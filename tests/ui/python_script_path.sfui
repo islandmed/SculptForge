@@ -2,7 +2,7 @@
 # with their folder, and run only by a click. The Scripts folder wins a name both hold, a missing or repeated folder is
 # skipped, sub-folders, hidden files and _helpers aren't listed, none can run at start-up, and a studio policy that says
 # never hides them.
-run ui_look look=classic layout=classic
+run ui_look look=classic layout=classic newer_rows=true
 run new_sphere subdivisions=2
 expect_value triangles == 320
 click "Preferences##palette.preferences"

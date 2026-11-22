@@ -2,7 +2,7 @@
 # render helper first; a helper chosen in the file dialog lists its renderers; Render runs it as its own program and
 # shows the still, kept in the Renders folder; a renderer that fails shows why; a studio policy hides it all and the
 # command refuses. The helper is tests/data/render_bridge/fake_usdrecord (a Python stand-in for OpenUSD's usdrecord).
-run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run ui_look look=classic layout=classic newer_rows=true        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 env SF_RENDER_BRIDGE_DIR sf_ui_render_jobs
 

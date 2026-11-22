@@ -842,7 +842,8 @@ void App::registerShellActions() {
                     {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
                     {"popup_colors", ParamSpec::Type::String, "Pop-up colours: role (the default) or plain.", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or classic (default: the look's, else unchanged).", false},
-                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
+                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false},
+                    {"newer_rows", ParamSpec::Type::Bool, "Show the menu rows added after 0.13.0 (default: by layout).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        theme::LookSettings& l = uiPrefs_.look;
                        int layoutKind = uiPrefs_.shellLayout;
@@ -878,6 +879,7 @@ void App::registerShellActions() {
                            if (k != "sculptforge" && k != "classic") return {false, "layout must be sculptforge or classic"};
                            layoutKind = k == "sculptforge" ? 1 : 0;
                        }
+                       if (a.contains("newer_rows")) uiPrefs_.newerMenuRows = argBool(a, "newer_rows", false) ? 1 : 0;
                        setShellLayout(layoutKind);
                        lookDirty_ = true;
                        if (a.contains("card")) newLookCard_ = argBool(a, "card", false);

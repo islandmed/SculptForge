@@ -103,7 +103,7 @@
 //                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
 //                            (3 = a triple-click; 0 = only point at it, e.g. for a key that acts under the cursor)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
-//                            can_undo, level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
+//                            can_undo, newer_menu_rows (1 while the menu rows added after 0.13.0 show), level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
 //                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
@@ -281,6 +281,10 @@
 //                            maybe_action, click_exit, snapshot_start, undo_all, expect_restored, expect_mesh_valid,
 //                            mode_matrix [known=FILE] [ID...], monkey SEED STEPS [COUNT]
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
+//   dump_ui NAME [GOLDEN]    write the interface as JSON to --ui-out/NAME: the palette bar and each palette's menu rows in drawing
+//                            order (the label##id of each), the shelves, the trays with their panels open or collapsed, the colour
+//                            cells, and the Preferences > Interface values. With GOLDEN (relative to the script) the dump must equal
+//                            that file: a Classic default that moved fails; SF_UI_GOLDEN_UPDATE=1 rewrites it (on purpose, reviewed)
 //   action ID                run a registry action as its key, shelf tile or the command palette would
 //   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
 //                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
@@ -1202,6 +1206,7 @@ double Demo::query(const std::string& name, bool& known) const {
                : name == "timeline_cursor" ? double(t->cursor())
                                            : double(t->branches().size());
     }
+    if (name == "newer_menu_rows") return app_.newerMenuRows() ? 1.0 : 0.0; // File > Render with... and the two Preferences rows shown
     if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
     if (name == "undo_steps") return double(app_.doc_.undo.undoCount());
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
@@ -2097,7 +2102,7 @@ enum class StepVerb { None,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
-    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
+    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
@@ -2194,6 +2199,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"wait_value", StepVerb::WaitValue},
         {"expect_guide", StepVerb::ExpectGuide},
         {"dump_shortcuts", StepVerb::DumpShortcuts},
+        {"dump_ui", StepVerb::DumpUi},
         {"snapshot", StepVerb::Snapshot},
         {"interactive_strokes", StepVerb::InteractiveStrokes},
         {"mark_view", StepVerb::MarkView},
@@ -4208,6 +4214,130 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::DumpUi: {
+        if (!need(1)) return false;
+        const std::string name = w[1], golden = w.size() > 2 ? w[2] : std::string();
+        // One palette's drop-down per two frames, then the shelves and preferences as they are.
+        auto st = std::make_shared<std::pair<size_t, int>>(0, 0);
+        auto order = std::make_shared<std::vector<std::string>>();
+        auto menus = std::make_shared<Json>(Json::object());
+        steps_.push_back([this, line, name, golden, st, order, menus](float t) {
+            if (order->empty()) {
+                int count = 0;
+                const PaletteDef* list = palettes(count);
+                std::vector<std::string> first, rest, last;
+                for (int i = 0; i < count; ++i) { // the bar's order (Shell.cpp drawPaletteBar)
+                    const std::string id = list[i].id;
+                    if (id == "mypanel" && app_.layout_.myPanel.empty()) continue;
+                    if (app_.uiPrefs_.alphabeticalPalettes) rest.push_back(id);
+                    else if (id == "file" || id == "edit") first.insert(first.begin() + (id == "file" ? 0 : first.size()), id); // File, then Edit
+                    else if (id == "help") last.push_back(id);
+                    else rest.push_back(id);
+                }
+                for (const auto* v : {&first, &rest, &last}) order->insert(order->end(), v->begin(), v->end());
+                st->second = -1;
+            }
+            if (st->first < order->size()) {
+                const std::string& id = (*order)[st->first];
+                if (st->second < 0) { // open its drop-down
+                    app_.dropdown_ = id;
+                    app_.openDropdown_ = true;
+                    st->second = 0;
+                    return false;
+                }
+                if (++st->second < 3) return false;
+                const PaletteDef* def = findPalette(id);
+                // The menu-like palettes only (the brush, alpha and material lists change with every pack and brush): rows in drawing
+                // order without the drop-down's own buttons; a count in a label ("Undo Level 2") is not pinned.
+                if (id == "file" || id == "edit" || id == "preferences" || id == "script") {
+                    Json rows = Json::array();
+                    for (std::string item : Demo::scopeItemsInOrder(def->name)) {
+                        if (item.empty() || item.rfind("##", 0) == 0 || item == "Integrations##preferences.integrations") continue; // (chrome; a platform's)
+                        for (size_t at = item.find("Level "); at != std::string::npos; at = item.find("Level ", at + 1)) {
+                            size_t end = at + 6;
+                            while (end < item.size() && std::isdigit(static_cast<unsigned char>(item[end]))) ++end;
+                            if (end > at + 6) item.replace(at + 6, end - at - 6, "N");
+                        }
+                        rows.push(Json(item));
+                    }
+                    menus->set(id, std::move(rows));
+                }
+                app_.dropdown_.clear();
+                st->first++;
+                st->second = -1;
+                return false;
+            }
+            Json out = Json::object();
+            out.set("layout", std::string(app_.sculptForgeLayout() ? "sculptforge" : "classic"));
+            Json bar = Json::array();
+            for (const std::string& id : *order) bar.push(Json(id));
+            out.set("palette_bar", std::move(bar));
+            out.set("menus", *menus);
+            auto strings = [](const std::vector<std::string>& v) {
+                Json a = Json::array();
+                for (const std::string& s : v) a.push(Json(s));
+                return a;
+            };
+            const UiLayout& l = app_.layout_;
+            Json shelves = Json::object();
+            shelves.set("top", strings(l.topShelf));
+            shelves.set("left", strings(l.leftShelf));
+            shelves.set("right", strings(l.rightShelf));
+            shelves.set("bottom", strings(l.bottomShelf));
+            shelves.set("left_width", double(std::round(app_.shell_.leftShelf.w / app_.uiScale_)));
+            out.set("shelves", std::move(shelves));
+            Json trays = Json::object();
+            trays.set("left", strings(l.leftTray));
+            trays.set("right", strings(l.rightTray));
+            trays.set("left_open", l.leftTrayOpen);
+            trays.set("right_open", l.rightTrayOpen);
+            trays.set("open_subpalettes", strings(l.openSubpalettes));
+            trays.set("collapsed", strings(app_.collapsedPalettes_));
+            out.set("trays", std::move(trays));
+            Json cells = Json::object();
+            cells.set("colour_cell_min", double(std::floor(double(app_.colourCellMin_) + 0.5)));
+            out.set("colour_cells", std::move(cells));
+            out.set("preferences", toJson(app_.uiPrefs_));
+            const std::string text = out.dump(true) + "\n";
+            const std::filesystem::path dir(std::u8string(shotDir_.begin(), shotDir_.end()));
+            std::filesystem::create_directories(dir);
+            std::ofstream f(dir / name, std::ios::binary);
+            f << text;
+            f.close();
+            if (!f) fail(line, "can't write " + name + " in " + shotDir_);
+            if (golden.empty()) return true;
+            std::filesystem::path file(std::u8string(golden.begin(), golden.end()));
+            if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            if (const char* update = std::getenv("SF_UI_GOLDEN_UPDATE"); update && *update == '1') {
+                std::filesystem::create_directories(file.parent_path());
+                std::ofstream g(file, std::ios::binary);
+                g << text;
+                return true;
+            }
+            std::ifstream in(file, std::ios::binary);
+            const std::string want((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (!in.is_open()) {
+                fail(line, "no golden " + file.string() + " (SF_UI_GOLDEN_UPDATE=1 writes it)");
+            } else if (want != text) {
+                // The first differing line, so the report says what moved.
+                std::istringstream a(want), b(text);
+                std::string la, lb;
+                int n = 0;
+                while (true) {
+                    const bool ga = bool(std::getline(a, la)), gb = bool(std::getline(b, lb));
+                    ++n;
+                    if (!ga && !gb) break;
+                    if (!ga || !gb || la != lb) {
+                        fail(line, "the interface differs from " + file.filename().string() + " at line " + std::to_string(n) + ": wanted `" +
+                                       (ga ? la : "(end)") + "`, have `" + (gb ? lb : "(end)") + "` (a Classic default moved; if on purpose: SF_UI_GOLDEN_UPDATE=1, review the diff)");
+                        break;
+                    }
+                }
+            }
+            return true;
+        });
+        break;
+    }
     case StepVerb::Snapshot: {
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
@@ -5237,7 +5367,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         lineText_ = line;
         if (take_) { // a benchmark take: only what a person does in real time
             const std::string& verb = words[0];
-            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts"};
+            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts", "dump_ui"};
             if (skipped.count(verb) || verb.rfind("expect", 0) == 0) {
                 SDL_Log("%s:%d: '%s' skipped (a take checks and shoots nothing)", scriptName_.c_str(), n, verb.c_str());
                 continue;

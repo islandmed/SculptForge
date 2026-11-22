@@ -212,6 +212,15 @@ std::vector<std::string> Demo::scopeItems(const std::string& scope) {
     return {out.begin(), out.end()};
 }
 
+std::vector<std::string> Demo::scopeItemsInOrder(const std::string& scope) {
+    std::vector<std::string> out;
+    for (const auto& item : items().labelled)
+        if (std::find(item.scopes.begin(), item.scopes.end(), scope) != item.scopes.end() &&
+            std::find(out.begin(), out.end(), item.text) == out.end())
+            out.push_back(item.text);
+    return out;
+}
+
 void Demo::noteClippedLabel(const std::string& label) { items().clipped.push_back({label.substr(0, label.find("##")), items().scopes}); }
 
 std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
