@@ -894,7 +894,7 @@ float viewDepthFade(const glm::vec3& x, const glm::vec3& center, const glm::vec3
     const float depth = std::abs(glm::dot(x - center, viewDir)) / l;
     return std::clamp((1.0f - depth / radius) * 4.0f, 0.0f, 1.0f);
 }
-// The brushes that add or cut along the normal (Standard, Inflate, Crease, Pinch, Sharp Crease) under View falloff leave what
+// The brushes that add, cut or smear the surface (Standard, Inflate, Crease, Pinch, Sharp Crease, Layer, Nudge) under View falloff leave what
 // lies deeper along the view than 3 radii from the cursor (the far side of a head or a sphere, seen after orbiting; gh#229
 // follow-up), full strength to 1.5 radii. A function of the place alone, so neighbouring points keep neighbouring weights, and
 // a wide, smooth band: a gate on which way a vertex faces, or a steep one, tore underhangs (nose, lips, jaw over the neck) from
@@ -1371,7 +1371,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool planeReach = p.viewFalloff && (type == BrushType::Clay || type == BrushType::ClayBlock ||
                                               type == BrushType::Flatten || type == BrushType::Trim);
     const bool depthReach = p.viewFalloff && (type == BrushType::Standard || type == BrushType::Inflate || type == BrushType::Crease ||
-                                               type == BrushType::Pinch || type == BrushType::SharpCrease);
+                                               type == BrushType::Pinch || type == BrushType::SharpCrease || type == BrushType::Layer ||
+                                               type == BrushType::Nudge); // (Nudge smears the surface; it is not a grab)
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
         float reachFade = 1.0f;
         if (depthReach) {
@@ -1467,11 +1468,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 layerDone_[v] = 0.0f;
                 layerDir_[v] = areaNormal;
             }
-            const float target = sign * layerHeight_ * std::clamp(p.pressure, 0.0f, 1.0f) * f;
+            // (View falloff's far-side fade is part of the height, not a factor on the step: a vertex that stood in the fade early
+            // in the stroke would be marked done at its full height and never catch up, and neighbours would end at uneven heights.)
+            const float target = sign * layerHeight_ * std::clamp(p.pressure, 0.0f, 1.0f) * f * reachFade;
             if (std::abs(target) > std::abs(layerDone_[v])) {
                 d = layerDir_[v] * (target - layerDone_[v]);
                 layerDone_[v] = target;
             }
+            reachFade = 1.0f;
             break;
         }
         case BrushType::Nudge:
