@@ -352,9 +352,10 @@ Profile oneDab(BrushType t, float radius, float& peak) {
 // the four fixtures one after the other on one sphere, each step's folds counted against the mesh the step before left
 // (what the artist's report lists; X symmetry, a second stroke crossing a dragged area, a long pull). 0.12.7 folded
 // 186 / 4572 / 1381 / 5347 triangles over their neighbours in these steps (the app's own close-up: 0 / 3269 / 1444 / 4972).
-// Tendril is left as 0.12.7 had it (its pulled horn folds into its own pinch, smooth to the eye; the app's own close-up
-// shows 0 folds on its crossing): its steps only guard against getting worse. Palette Knife (relaxed, no flip limiter: that costs
-// too much a dab) still leaves about 600 of its 1381; Nudge (limiter for a small brush) a few dozen.
+// Tendril is left as 0.12.7 had it (#204: its folds sit on the crossing's ridge lips and shade smooth; relaxing them there
+// took the count down but scratched the ridge tops, and a flip limiter stops the pull short; with dynamic topology on it folds
+// none, tendril_dynamic_topology_session): its steps only guard against getting worse. Palette Knife (relaxed, no flip
+// limiter: that costs too much a dab) still leaves about 600 of its 1381; Nudge (limiter for a small brush) a few dozen.
 void checkReplaySession() {
     BrushRecipe knife;
     for (const BrushRecipe& r : builtinBrushRecipes())
@@ -378,6 +379,55 @@ void checkReplaySession() {
 
 [[maybe_unused]] const bool kReplayRegistered = [] {
     addTest("drag_brushes_replay_session", [] { checkReplaySession(); });
+    return true;
+}();
+
+// Folded pairs of neighbouring triangles anywhere on a mesh (after dynamic topology, whose triangles are not the ones before).
+size_t foldedPairs(const Mesh& m) {
+    std::unordered_map<uint64_t, uint32_t> first;
+    std::vector<glm::vec3> nrm(m.triangleCount());
+    size_t n = 0;
+    for (uint32_t i = 0; i < m.triangleCount(); ++i) {
+        const glm::uvec3 f = m.triangles[i];
+        const glm::vec3 a = glm::cross(m.positions[f.y] - m.positions[f.x], m.positions[f.z] - m.positions[f.x]);
+        const float l = glm::length(a);
+        nrm[i] = l > 0.0f ? a / l : glm::vec3(0.0f);
+        const uint32_t c[3] = {f.x, f.y, f.z};
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t lo = std::min(c[k], c[(k + 1) % 3]), hi = std::max(c[k], c[(k + 1) % 3]);
+            const auto [it, added] = first.emplace((uint64_t(lo) << 32) | hi, i);
+            if (!added && nrm[i] != glm::vec3(0.0f) && nrm[it->second] != glm::vec3(0.0f) && glm::dot(nrm[i], nrm[it->second]) < -0.5f) ++n;
+        }
+    }
+    return n;
+}
+
+// Tendril (#204): the session's crossing and long pull with dynamic topology on fold nothing (the remesher keeps the stretched
+// walls sound), and at Size 200 (radius 0.95, artist-qa's) neither stroke folds on a fixed mesh.
+[[maybe_unused]] const bool kTendrilRegistered = [] {
+    addTest("tendril_dynamic_topology_session", [] {
+        Document d = denseSphere();
+        d.sculptor.dyntopo.enabled = true, d.sculptor.dyntopo.constantDetail = true, d.sculptor.dyntopo.detail = 0.5f;
+        for (const char* fx : {"tendril_cross", "tendril_long"}) {
+            replayStrokes(d, nullptr, BrushType::SnakeHook, loadStrokeFixture(fx));
+            const size_t folded = foldedPairs(d.mesh);
+            std::printf("  dynamic topology %s: %zu triangles, %zu folded pairs\n", fx, d.mesh.triangleCount(), folded);
+            expect(nonFinite(d.mesh) == 0, "Tendril: NaN in %s", fx);
+            expect(folded == 0, "Tendril: %zu folded pairs with dynamic topology on after %s", folded, fx);
+        }
+    });
+    addTest("tendril_big_brush", [] {
+        for (const char* fx : {"tendril_cross", "tendril_long"}) {
+            StrokeFixture f = loadStrokeFixture(fx);
+            f.radius = 0.95f;
+            Document d = denseSphere();
+            const std::vector<glm::vec3> start = d.mesh.positions;
+            replayStrokes(d, nullptr, BrushType::SnakeHook, f);
+            const size_t folded = foldedFaces(start, d.mesh);
+            std::printf("  Size 200 %s: moved %.4f, %zu triangles folded\n", fx, maxMove(start, d.mesh), folded);
+            expect(folded == 0, "Tendril: %zu triangles folded at radius 0.95 in %s", folded, fx);
+        }
+    });
     return true;
 }();
 
