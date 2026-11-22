@@ -38,6 +38,7 @@
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <future>
@@ -457,7 +458,9 @@ struct MicroUndo {
 // MicroUndo::pending: what the background packing hands over (MicroUndo::settle).
 struct MicroUndo::Pack {
     std::shared_future<void> done;
+    std::atomic<bool> hurry{false}; // (someone waits: no more pauses for strokes)
     ~Pack() {
+        hurry = true;
         if (done.valid()) done.wait(); // (the work writes into this: never freed under it)
     }
     bool journal = false;

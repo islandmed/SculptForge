@@ -25,9 +25,20 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <cmath>
 
 namespace sf {
+
+namespace {
+// When the last dab on a micro level was placed (steady clock, ns): a stroke's undo packing on its own thread pauses while
+// the next stroke's dabs run (MicroStroke::end, #184). A time, not a count: nothing can leave it stuck.
+std::atomic<int64_t> gLastMicroDabNs{0};
+int64_t steadyNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+void noteMicroDab() { gLastMicroDabNs.store(steadyNs(), std::memory_order_relaxed); }
+bool microDabRecently() { return steadyNs() - gLastMicroDabNs.load(std::memory_order_relaxed) < 50'000'000; } // (50 ms)
+} // namespace
 
 int microBrushSupport(BrushType type) {
     switch (type) {
@@ -396,6 +407,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                       const glm::vec3& strokeDir, float pxPerUnit) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro; // (made unique by begin)
     const uint32_t n = mm.n, S = mm.samples;
@@ -986,6 +998,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
 
 void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     if (!active_ || !m.micro || grabMirrors_.empty()) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples;
@@ -1119,10 +1132,15 @@ namespace {
 void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, const std::vector<int16_t>& was, const std::vector<int16_t>& now,
                       const std::vector<uint32_t>& from) {
     const PoolInline alone; // (the frame's dabs keep the pool)
+    const LowerThreadPriority behind; // (and the cores: the frames after the release come first)
     const size_t count = from.size();
     std::vector<int16_t> change(count * S), firsts(count);
     bool fits = true;
     for (size_t k = 0; k < count && fits; ++k) {
+        // (#184: run beside the next stroke's dabs, it slowed their slowest frames 12-23%; it waits for a pause, unless
+        // an undo or a dropped step waits for it)
+        if (k % 256 == 0)
+            while (microDabRecently() && !out.hurry.load(std::memory_order_relaxed)) std::this_thread::sleep_for(std::chrono::milliseconds(2));
         const int16_t* a = now.data() + k * S;
         const int16_t* b = was.data() + size_t(from[k]) * S;
         uint32_t p = 0;

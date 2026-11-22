@@ -1166,6 +1166,7 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
 
 void MicroUndo::settle() {
     if (!pending) return;
+    pending->hurry = true;
     pending->done.get(); // (what the packing threw, e.g. out of memory, surfaces here as it did at the release)
     journal = pending->journal;
     if (pending.use_count() == 1) { // (a copy of this step still waiting would take it next: it copies)

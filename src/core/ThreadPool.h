@@ -87,6 +87,20 @@ struct PoolInline {
     }
 };
 
+// While one is alive, the calling thread runs at a lower priority than the frame's (a stroke's undo packing after the
+// release, #184: at the same priority it slowed the next frames' pool work up to 5x on the floor tier); the old
+// priority comes back after (std::async may run on a pooled thread). Best effort: nothing if the system refuses.
+class LowerThreadPriority {
+public:
+    LowerThreadPriority();
+    ~LowerThreadPriority();
+    LowerThreadPriority(const LowerThreadPriority&) = delete;
+    LowerThreadPriority& operator=(const LowerThreadPriority&) = delete;
+private:
+    int old_ = 0;
+    bool set_ = false;
+};
+
 // Calls fn(begin, end) for the blocks [b * block, min(n, (b + 1) * block)) of [0, n) on the shared pool.
 // Each block is one call, so per-block partial results indexed by begin / block are deterministic. Fewer than
 // `minBlocks` blocks run inline, in order (waking threads would cost more than the work).
