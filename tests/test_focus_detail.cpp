@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 #include <filesystem>
@@ -32,6 +33,15 @@ using namespace sf;
 #endif
 
 namespace {
+
+void setEnv(const char* name, const char* value) {
+#if defined(_WIN32)
+    _putenv_s(name, value ? value : "");
+#else
+    if (value) setenv(name, value, 1);
+    else unsetenv(name);
+#endif
+}
 
 std::string focusTempPath(const char* name) {
     const auto dir = std::filesystem::temp_directory_path() / "sf-focus-detail-test";
@@ -815,8 +825,8 @@ TEST(focus_detail_project_detail_names_are_confined) {
 
 // Divide to Micro past the memory budget streams the new level; undo and redo swap it whole.
 TEST(focus_detail_divide_to_micro_switches_when_large) {
-    setenv("SF_FOCUS_DETAIL", "1", 1); // (the budget is hundreds of millions of micro triangles)
-    setenv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str(), 1);
+    setEnv("SF_FOCUS_DETAIL", "1"); // (the budget is hundreds of millions of micro triangles)
+    setEnv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str());
     Mesh base;
     {
         Mesh head;
@@ -830,8 +840,8 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
     Document doc = makeDoc(std::move(base));
     std::string msg;
     CHECK(microDivideUndoable(doc, 5, msg));
-    unsetenv("SF_FOCUS_DETAIL");
-    unsetenv("SF_MICRO_SWAP_DIR");
+    setEnv("SF_FOCUS_DETAIL", nullptr);
+    setEnv("SF_MICRO_SWAP_DIR", nullptr);
     CHECK(doc.mesh.micro && doc.mesh.micro->focus);
     CHECK(msg.find("Focus Detail") != std::string::npos);
     if (!doc.mesh.micro || !doc.mesh.micro->focus) return;
@@ -851,7 +861,7 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
 // A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 9 is written
 // only when a level streams, so builds before 0.11.12 keep opening these projects.
 TEST(focus_detail_in_memory_micro_project_stays_format_7) {
-    setenv("SF_FOCUS_DETAIL", "0", 1);
+    setEnv("SF_FOCUS_DETAIL", "0");
     Mesh base;
     {
         Mesh head;
@@ -865,7 +875,7 @@ TEST(focus_detail_in_memory_micro_project_stays_format_7) {
     Document doc = makeDoc(std::move(base));
     std::string msg, err;
     CHECK(microDivideUndoable(doc, 5, msg));
-    unsetenv("SF_FOCUS_DETAIL");
+    setEnv("SF_FOCUS_DETAIL", nullptr);
     CHECK(doc.mesh.micro && !doc.mesh.micro->focus);
     if (!doc.mesh.micro) return;
     dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
