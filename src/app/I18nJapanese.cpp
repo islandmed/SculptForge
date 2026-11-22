@@ -6154,6 +6154,8 @@ constexpr Entry kJapanese[] = {
      "有効:"},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "このコンピューターが基本機能を超えて処理できる項目: より大きなFocus Detailキャッシュ、16Kテクスチャ、および今後追加されるレベルが、適切な場合に自動で有効化され、不適切な場合は有効化されません。どのティアでもスムーズにスカルプトでき、データが外部へ送信されることはありません。"},
+    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
+     "このコンピューターが基本機能を超えて処理できる項目: 16Kテクスチャ、および今後追加されるレベルが、適切な場合に自動で有効化され、不適切な場合は有効化されません。どのティアでもスムーズにスカルプトでき、データが外部へ送信されることはありません。"},
     {"What this turns on:",
      "有効になる機能:"},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",

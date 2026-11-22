@@ -5087,6 +5087,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "已开启："},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "这台电脑在基本功能之外还能负担的东西：更大的 Focus Detail 缓存、16K 纹理以及之后的等级，会在容纳得下的地方自动开启，容纳不下就不开。每个等级都能流畅雕刻；不会发送任何数据。"},
+    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
+     "这台电脑在基本功能之外还能负担的东西：16K 纹理以及之后的等级，会在容纳得下的地方自动开启，容纳不下就不开。每个等级都能流畅雕刻；不会发送任何数据。"},
     {"What this turns on:",
      "这会开启："},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",
