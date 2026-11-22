@@ -1865,7 +1865,7 @@ All notable changes to SculptForge are listed here. The format follows
   Retina screens; it was a font glyph that sat off centre (#150, thanks @tristratos).
 - SpaceMouse beside a pen (Discord, @fenixpoints, the first report from a real SpaceMouse): while the cap is pushed,
   the pointer motion and wheel a SpaceMouse driver sends for programs it doesn't know (3DxWare's defaults) no longer
-  move the cursor off the pen or zoom toward it; with Hold during strokes off, a Move, Tendril or KelvinGrab drag
+  move the cursor off the pen or zoom toward it; with Hold during strokes off, a Move, Snake Hook or KelvinGrab drag
   no longer pulls the grabbed part across the view when the view turns under a still pen; gizmo, selection and stamp
   drags hold the view whatever the setting. Guide: Navigation > SpaceMouse troubleshooting.
 
