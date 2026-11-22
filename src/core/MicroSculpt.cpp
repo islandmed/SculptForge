@@ -1131,19 +1131,21 @@ namespace {
 // A stroke's undo journal, off the frame (MicroStroke::end): tile k's change (now[k] less was[from[k]]), each point
 // predicted from the one before it in its row (a row's first point: from the row below; the very first is kept
 // apart), so a smooth change needs few bits; packed. A change wider than 16 bits keeps the whole old tiles instead.
-void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, const std::vector<int16_t>& was, const std::vector<int16_t>& now,
+void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, std::vector<int16_t>& was, std::vector<int16_t>& now,
                       const std::vector<uint32_t>& from) {
     const PoolInline alone; // (the frame's dabs keep the pool)
     const LowerThreadPriority behind; // (and the cores: the frames after the release come first)
     const size_t count = from.size();
-    std::vector<int16_t> change(count * S), firsts(count);
+    // Each tile's change goes back over its `now` tile (through one tile's scratch): no third buffer the stroke's size, so
+    // the release peaks no higher than the step built in the frame did (artist-qa, 8 GB floor).
+    std::vector<int16_t> firsts(count), change(S);
     bool fits = true;
     for (size_t k = 0; k < count && fits; ++k) {
         // (#184: run beside the next stroke's dabs, it slowed their slowest frames 12-23%; it waits for a pause, unless
         // an undo or a dropped step waits for it)
         if (k % 256 == 0)
             while (microDabRecently() && !out.hurry.load(std::memory_order_relaxed)) std::this_thread::sleep_for(std::chrono::milliseconds(2));
-        const int16_t* a = now.data() + k * S;
+        int16_t* a = now.data() + k * S;
         const int16_t* b = was.data() + size_t(from[k]) * S;
         uint32_t p = 0;
         for (uint32_t j = 0; j <= n; ++j)
@@ -1158,11 +1160,13 @@ void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, const std::vec
                 const int r = d - pred;
                 if (r < -32767 || r > 32767) fits = false;
                 if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
-                change[k * S + p] = p == 0 ? int16_t(0) : int16_t(r);
+                change[p] = p == 0 ? int16_t(0) : int16_t(r);
             }
+        std::copy_n(change.data(), S, a);
     }
     if (fits) {
-        microPackTiles(change.data(), count, uint32_t(S), out.packed);
+        std::vector<int16_t>().swap(was); // (before the packed bytes are allocated)
+        microPackTiles(now.data(), count, uint32_t(S), out.packed);
         out.firsts = std::move(firsts);
         out.journal = true;
     } else {
@@ -1258,6 +1262,8 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     pack->done = std::async(std::launch::async, [pack = pack.get(), was = std::move(oldDisp_), now = std::move(now),
                                                  from = std::move(from), n = mm.n, S]() mutable {
                      microPackJournal(*pack, n, S, was, now, from);
+                     // The async state keeps this lambda (and its captures) until the step settles: free the raw tiles now.
+                     std::vector<int16_t>().swap(was), std::vector<int16_t>().swap(now), decltype(from)().swap(from);
                  }).share();
     u->pending = std::move(pack);
     } // (count)
