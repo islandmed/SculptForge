@@ -37,6 +37,17 @@ action: guide:gizmo.md
 - **Remesh after each stroke** says why it skipped a Part and names the key that remeshes it anyway.
 - **Texture painting**: Alt-erase on the Base also clears metal; **Forge Spheres**: a selecting click adds no
   empty undo step.
+- "**Clearer gizmo (All mode)**: a ring seen edge-on fades and is not pressed by mistake, a ring turned a little picks
+  out at its rim past the arrows, and an arrow pointing at you fades. Idea by Fenix on Discord."
+- **Classic menus keep their old rows**: File > Render with..., Preferences > Scripts and > Render bridge show in the
+  SculptForge layout; in Classic, turn them on with **Preferences > Interface > Show newer menu rows**.
+- **Palette Knife no longer creases where strokes overlap**: crossing and stacked strokes, big brushes and mirrored
+  strokes too, stay clean.
+- **Gizmo on heavy Parts**: pressing and dragging a handle (arrows, balls, rings, squares) stays as smooth as turning
+  the view, also on multi-million triangle Parts.
+- **Nudge and Layer with View falloff** only work the surface facing you: the far side of a thick part no longer moves
+  with it. Move and Grab still carry everything inside the circle.
+- **Tendril tip**: for long pulls, turn on **Dynamic** on the top shelf so the surface adds detail as it stretches.
 
 ## Version 0.13.11
 
