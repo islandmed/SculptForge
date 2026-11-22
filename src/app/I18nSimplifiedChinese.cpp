@@ -3918,6 +3918,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "%s: %s，%s，%d%%\n单击：开启 / 关闭。右键：混合和不透明度。"},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: 粗糙度 %.2f，金属度 %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "金属会反射周围环境：在较暗的环境中会显得偏暗。"},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu 个点，高度 %.3g，范围 %.2f 倍半径"},
     {"%zu result",

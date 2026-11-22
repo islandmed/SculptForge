@@ -208,7 +208,7 @@
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
 //                            material_channels (material channels on the texture, base colour not counted),
 //                            channel_view (0 = colour, else the solo channel: 1 roughness ... 7 opacity),
-//                            brush_channels (bit mask of what the brush paints), roughness_painted (texels whose
+//                            brush_channels (bit mask of what the brush paints), roughness_painted / metallic_painted (texels whose
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),

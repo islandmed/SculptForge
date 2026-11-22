@@ -3916,6 +3916,7 @@ constexpr Entry kTraditionalChinese[] = {
      "%s: %s，%s，%d%%\n點一下：開啟 / 關閉。按右鍵：混合與不透明度。"},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: 粗糙度 %.2f，金屬度 %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "金屬會反射周圍環境：在較暗的環境中會顯得偏暗。"},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu 個點，高度 %.3g，範圍 %.2f 倍半徑"},
     {"%zu result",
