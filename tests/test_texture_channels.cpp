@@ -862,3 +862,29 @@ TEST(alt_erase_over_the_same_soft_stroke_leaves_no_ghost_rim) {
     CHECK(metal == 0);      // no metal left at the rim
     CHECK(notOpaque == 0);  // Opacity is among the channels Alt resets
 }
+
+// A low Intensity erases gently: the middle of the stroke erases exactly as fast as before the rim was cleaned up
+// (the rim boost never goes above the stroke's own strength).
+TEST(alt_erase_at_low_intensity_stays_gentle) {
+    Document doc = makeDoc(texturedPlane(32, 512));
+    Mesh& m = doc.mesh;
+    setChannelEnabled(*m.texture, Channel::Metallic, true);
+    doc.syncBvh();
+    BrushMaterial metal;
+    metal.color = glm::vec3(0.5f, 0.1f, 0.1f);
+    metal.metallic = 1.0f;
+    metal.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Metallic);
+    paintCentre(m, doc.bvh, metal, 0.4f);
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+    TexturePainter p;
+    CHECK(p.begin(m, ~0u));
+    DabParams d = dab(glm::vec3(0), 0.4f, 0.3f); // Intensity 30
+    d.invert = true;
+    p.dab(m, doc.bvh, d, metal, Symmetry{});
+    UndoRecord e;
+    p.end(e);
+    const float left = centreValue(*m.texture, Channel::Metallic);
+    // Plain paint at Intensity 30 reaches 0.51 at the plane's centre (the centre texel gets two writes);
+    // erasing goes the same 0.51 back. With the weight tripled everywhere it would be gone (left 0).
+    CHECK(left > 0.45f && left < 0.55f);
+}
