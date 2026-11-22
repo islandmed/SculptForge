@@ -322,7 +322,7 @@ if(SF_ZSTD_FOUND AND SF_SYSTEM_ZSTD) # (the found result is cached: turning the 
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
 else()
-  # Elsewhere the release's decoder (third_party/zstd/README.md): zstd tiles written on Linux open everywhere; these
+  # Elsewhere the release's decoder (third_party/zstd/VENDORED.md): zstd tiles written on Linux open everywhere; these
   # builds write their own codec, which every build reads.
   target_sources(sculptforge_core PRIVATE third_party/zstd/lib/zstddeclib.c)
   target_include_directories(sculptforge_core PRIVATE third_party/zstd/lib)
