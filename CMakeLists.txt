@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.13.10 LANGUAGES C CXX)
+project(SculptForge VERSION 0.13.11 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -1119,6 +1119,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
     # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
     add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
+    # Member betas are paused: no member-facing copy (app strings, guide, README, site) promises them; exceptions in
+    # tools/ci/betas_allow.txt, each with a reason.
+    add_test(NAME betas_paused COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py)
+    add_test(NAME betas_paused_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py --self-test)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # Our email address stays off everything public (website/, docs/, README*): hello@ is a private support inbox.
     add_test(NAME public_email COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py
@@ -1309,6 +1313,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
+    sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
     sculptforge_ui_test(guide_window_look_2880 guide_window_look --size 2880x1800)
     sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
@@ -1597,6 +1603,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
     sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
+    # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
+    sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
+    sculptforge_ui_test(betas_wording_2880 betas_wording --size 2880x1620)
+    sculptforge_ui_test(member_card_1440 member_card --size 1440x900) # the Updated member card's wording (shot "updated")
+    sculptforge_ui_test(member_card_2880 member_card --size 2880x1620)
     sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
     sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
     sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)

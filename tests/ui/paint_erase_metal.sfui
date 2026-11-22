@@ -1,0 +1,89 @@
+# Member bug (macOS, Option-paint + Metallic): a material swatch (Gold) stayed on every later colour, so red over gold was
+# red METAL, and Alt put white over it but left the metal under the white (dark patches, hard to paint over). Now: a plain colour
+# picked after a swatch gives the swatch's metal back, and Alt on the Base erases every channel.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+click "Texture Image##tool.texture"
+click "Texture Image/Roughness##texchan"
+click "Texture Image/Metallic##texchan"
+action draw.paint
+click "Color##palette.color"
+wait 0.3
+expect_value brush_channels == 1
+
+# Gold: the swatch makes the brush paint colour + roughness + metallic.
+click "Vertex Paint & Materials/##matswatch.Gold"
+wait 0.2
+expect_value brush_channels == 7
+key escape
+stroke 0.2 0.35 0.8 0.35
+expect_value metallic_painted > 3000
+remember metallic_painted gold
+
+# A plain colour after the swatch is paint, not metal: no new metal under the red stroke.
+run set_color color=ff0000
+stroke 0.2 0.6 0.8 0.6
+expect_value brush_channels == 1
+expect_value metallic_painted == $gold
+wait 0.3
+shot after-red-not-metal
+
+# Alt over the gold erases the metal as well as the colour.
+hold alt
+stroke 0.15 0.35 0.85 0.35
+hold none
+# (the feathered rim keeps a little of what a soft stroke put there; before the fix all of it stayed: 47793 texels)
+expect_value metallic_painted < 24000
+wait 0.3
+shot after-alt-erase
+key ctrl+z
+expect_value metallic_painted == $gold
+
+# A red metal chosen on purpose BEFORE the swatch survives it: picking a plain colour after the swatch gives back what the brush
+# had (metal, roughness), not the defaults.
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+run texture_channels enable=roughness,metallic
+run set_color color=ff0000
+run paint_material color=ff0000 roughness=0.2 metallic=1
+expect_value brush_channels == 7
+click "Color##palette.color"
+wait 0.2
+click "Vertex Paint & Materials/##matswatch.Rust"
+wait 0.2
+key escape
+run set_color color=ff0000
+stroke 0.2 0.5 0.8 0.5
+expect_value brush_channels == 7
+expect_value metallic_painted > 3000
+wait 0.3
+shot red-metal-kept
+
+# Alt on a paint layer is a true erase: the layer's coverage goes back toward transparent (the Base below shows through).
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+run texture_channels enable=roughness,metallic
+click "Paint Layers##tool.paint_layers"
+click "Paint Layers/New"
+expect_value texture_layers == 1
+run paint_material color=ffdb91 roughness=0.25 metallic=1
+stroke 0.2 0.5 0.8 0.5
+expect_value texture_painted > 3000
+expect_value metallic_painted > 3000
+remember texture_painted layer_painted
+remember metallic_painted layer_metal
+wait 0.3
+shot layer-painted
+hold alt
+stroke 0.1 0.5 0.9 0.5
+stroke 0.1 0.5 0.9 0.5
+hold none
+wait 0.3
+# (what is left is the feathered rim of a soft stroke, a few percent tint: well under a third of what was painted)
+expect_value texture_painted < 20000
+expect_value metallic_painted < 20000
+shot layer-erased

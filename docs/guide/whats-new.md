@@ -8,7 +8,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 ## Version 0.13.11
 
 ```features
-date: unreleased
+date: 2026-11-21
 tagline: Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again.
 highlight: Forge Sphere chains stay smooth while you drag, even with hundreds of spheres
 highlight: Shift with the Paint brush blends colour on textured Parts and never moves the shape
@@ -38,6 +38,23 @@ action: guide:sculpting.md
 - **Inflate** swells evenly at the ends of tubes; **Save Visible Parts As** keeps PBR, environment and exposure.
 - **Parts**: a press that lands on a Part in front of the one you're sculpting says so in the status line.
 - **macOS**: Voxel Remesh no longer refuses modest jobs on Macs running the Intel build.
+- **Forge Spheres move smoothly**: a dragged sphere stays under the pointer at its depth, even on long chains; hold
+  **Shift** to swing it around the sphere it grows from (its link keeps its length), **Tool > Forge Spheres > Snap to
+  Surface** seats it on the sphere under the pointer, and **Move Branch** brings what grows from it along.
+- **Membership card, yearly first**: the Member plan shows $48 a year ($4 a month, billed yearly); $5 a month is one
+  small link away.
+- **Bake search distance**: a bake whose search distance was too short now says how much of the map found no surface
+  and which distance fixes it, with a **Bake Again with Suggested Distance** button.
+- **Inflate and deflate on thin tubes**: a big brush over a coarse tube or limb now thickens (Inflate) or thins (Sub,
+  or Alt) it evenly, each point along its own normal, instead of moving the area as one lump.
+- **A Part inside another Part** (an eye in its socket): the brush says why when the pointer is over the Part in front
+  ("Head is in front: Alt+Q selects it"), and **Frame Part** says when the view ended up inside another Part.
+- **Shift with the Paint brush** never changes the shape any more, on any Part. On a Part that paints into a texture
+  it smooths the colour in the texture (it used to smooth the shape and dent it).
+- The **stroke popup** shows the keys of your input style: with the Blender style Sub reads Ctrl and Mask reads Alt,
+  with Maya Mask reads Ctrl+Alt.
+- **Save Visible Parts As** keeps your material look: the copy opens with the same shading (PBR, environment,
+  exposure, Lit Sphere), view and settings as a normal Save As.
 
 ## Version 0.13.10
 

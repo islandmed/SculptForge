@@ -6,6 +6,74 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.11] - 2026-11-21
+
+### Added
+- **Forge Spheres**: hold **Shift** while moving a sphere to swing it around its parent with the link keeping its
+  length; **Snap to Surface** (Tool > Forge Spheres) puts a moved sphere's centre on the surface of the sphere under
+  the pointer; **Move Branch** (Tool > Forge Spheres) carries everything growing from a moved sphere along, keeping
+  its shape.
+- **Membership card, yearly first**: the Member plan on the membership card now opens on $48 / year ("$4 a month,
+  billed yearly") and its button opens the yearly checkout; "or $5 a month" below it opens the monthly one. Same in
+  the Classic and Streamlined setups.
+
+### Changed
+- Release tooling: every release now updates the winget package (installer link, checksum, release date) for the
+  Windows Package Manager; the manifests live in `packaging/winget/`.
+- **Forge Spheres**: moving a sphere follows the pointer smoothly on any armature size (the pointer's moves are taken
+  once a frame and only the moved spheres and their links are redrawn, instead of the whole armature on every move); a
+  moved sphere keeps its depth in the view; Draw's resize band is a thin rim (none on spheres drawn small), so most of
+  a sphere moves it. Reported in a public review.
+- **Bake** (Tool > Bake, `bake`): when more than 0.5% of the texels found no surface because the search distance was
+  too short, the panel, the status line and the command's output say how much of the map missed and which Front / Rear
+  reach the high-poly for those texels, and **Bake Again with Suggested Distance** bakes again with them. The panel
+  shows the distance Auto measured, and the guide's Baking chapter names the trap.
+- Release tooling: the ci-status and winget self-tests no longer flake when a pipe closes early.
+- The Python wheel builds stop at about twice their normal time instead of two hours, and their tests print where a
+  test hangs.
+- **Membership card**: the Member card's first perk now reads "Early builds, like SculptForge for Android today".
+- Release tooling: the release-script self-tests run on Linux only.
+- Help > Benchmark: stroke phases also report `lag_on_model_ms` / `lag_on_model_px` (the lag over frames whose newest
+  dab reached the surface) and `dabs_off_model`; the stroke path is fitted to the model on screen (at most 2% of it
+  off the model, at the same pointer speed), and each dab's lag is matched to its own lap of the path. Small-brush lag
+  is now measured on the surface; earlier results read low where the path left the model (#184).
+- The benchmark results list shows only on-model lag, and none for results from builds without the off-model count
+  (#184).
+
+### Fixed
+- With **View falloff** on (Brush palette), Standard, Inflate, Crease, Pinch, Sharp Crease and Brush Lab recipes that
+  build along the surface also dented the far side of the model, which showed after orbiting round it. These brushes
+  now leave what lies far behind the surface under the cursor (more than three brush widths, fading out smoothly), so
+  the far side stays; Move and the grab brushes still carry everything inside the brush circle, through the model,
+  which is what View falloff is for; its tooltip says so in every language (Fixes #229).
+- **Inflate and deflate (Sub or Alt) on coarse, long-quad meshes** (a thin Tube): the check for a packed grid took a
+  tube's end cap ring and its long quads for one, so a brush wider than the tube moved the whole area along one normal
+  (bulbs when inflating, barely any thinning when deflating); it now needs a real packed cluster (at least 32 vertices
+  well under the surface's own edge length).
+- Sculpting a Part that sits inside another (an eyeball inside a head): a press that lands on the Part around it only
+  turned the view, with no word why, so the pen seemed unable to sculpt. The status line now names the Part in front
+  (Alt+Q selects it; Solo or X-Ray shows the active one). Frame Part also says when the camera is inside another Part,
+  whose inner wall then fills the view.
+- **View skipped while rotating or panning with the pen's side buttons** (#216): on a compositor that turns the pen's
+  side buttons into right / middle clicks (KDE on Wayland), the view moved only when the compositor's pointer
+  reported, so it waited and then jumped. A side-button drag begun while the pen is sending samples now follows the
+  pen alone for its whole length.
+- **Voxel Remesh and other memory checks on a Mac under Rosetta**: the free memory was counted in 4 KiB pages instead
+  of the host's 16 KiB, so it read four times too low and a modest Voxel Remesh was refused as "needs swap". The
+  Python package's macOS test no longer waits for ever when a remesh is refused.
+- Holding Shift with the Paint brush (Sculpt off) on a Part that paints into a texture smoothed the shape and dented
+  it. Shift now only ever smooths colour with the Paint brush, on every Part; on a texture Part it blends the texels
+  under the brush toward the texels around them (about a mesh triangle's width, so a stroke smears as far as it does
+  on vertex colours, and across UV seams as if the surface were one piece), with Smooth's Intensity, mask, symmetry,
+  falloff and the active layer, one undo step per stroke. With a sculpt brush (Paint off) Shift still smooths the
+  shape. Reported by a member.
+- The stroke popup's Sub / Smooth / Mask / Select tiles showed the default style's keys (Alt, Shift, Ctrl, Ctrl+Shift)
+  in every input style; they now show the keys of the style set in Preferences > Input (Fixes #233). Reported by
+  @Velisariy.
+- **File > Save Visible Parts As...** no longer drops the scene's view and material settings (PBR or Lit Sphere
+  shading, environment, exposure, the Lit Sphere in use, colour tinting, camera and saved views); the copy opened with
+  the ones from the last full save, so shiny and metal materials looked plain.
+
 ## [0.13.10] - 2026-11-20
 
 ### Added

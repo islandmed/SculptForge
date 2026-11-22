@@ -1489,7 +1489,10 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     std::vector<uint8_t>& target = tex.target(layer_);
     const bool onLayer = layer_ >= 0;
     const glm::vec3 color = material.color;
-    const uint32_t painted = channels_ & material.channels;
+    // Erasing the Base with a brush that paints colour clears every channel the stroke began with (the App begins an
+    // erase stroke with all enabled channels): a true erase leaves no metal or roughness under the white.
+    const bool eraseBase = p.invert && layer_ < 0 && (material.channels & 1u);
+    const uint32_t painted = eraseBase ? channels_ : channels_ & material.channels;
     const bool paintColor = painted & 1u;
     // The material channels this dab writes, with the brush's value and the channel's default (for erasing).
     struct ChanJob {

@@ -64,6 +64,7 @@
 #include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "render/MicroFocus.h"
 #include "core/Utf8Path.h"
 
 #include <imgui.h>
@@ -1612,10 +1613,24 @@ int App::run() {
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
-        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
-            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
-                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
-                    phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && frameLogMs >= 0.0) {
+            // A streamed Micro level (Focus Detail) adds its main-thread parts and the coarse shading still waiting (#184's
+            // freeze: SF_FRAME_LOG=100 for the reporter's log). (Taken every frame, so a slow frame shows its own; not while
+            // Help > Benchmark runs, which takes them itself.)
+            double f[MicroFocus::kParts] = {};
+            const bool focus = !proof_ && doc_.mesh.micro && doc_.mesh.micro->focus;
+            if (focus) renderer_.takeFocusSplit(f);
+            if (phase[6] - phase[0] > frameLogMs) {
+                SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                        phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                        phase[5] - phase[4], phase[6] - phase[5]);
+                if (focus)
+                    SDL_Log("frame micro: promote %.1f, coarse %.1f, records %.1f, shade coarse %.1f, pages %.1f, shade pages %.1f, "
+                            "whole %.1f ms; %zu tiles waiting for shading%s",
+                            doc_.mesh.micro->focus->lastUpdateMs(), f[0], f[1], f[2], f[3], f[4], f[5], renderer_.microPendingCoarse(),
+                            doc_.sculptor.strokeActive() ? ", stroking" : "");
+            }
+        }
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;

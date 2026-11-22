@@ -1,7 +1,7 @@
 # A Gizmo drag of a whole Part (no mask, nothing hidden) is drawn by one matrix: the vertices stay and nothing is sent to
 # the graphics card until the release, which moves them once (dense meshes: a 7M Voxel Remesh dragged at a few frames a
 # second). The released surface is the one the per-frame path leaves (SF_GIZMO_GPU=0), for a move, a turn and an even
-# scale; an axis scale or a masked Part moves the vertices each frame as before.
+# scale or an axis scale; a masked Part moves the vertices each frame as before.
 run new_sphere subdivisions=5 ; transform scale=3,0.7,0.7 pivot=origin
 key f
 orbit -70 -45
@@ -41,11 +41,20 @@ gizmo_drag scale_uniform 40 -40 0.5
 expect_status Gizmo Scale
 remember moved_sum gpuScaleSum
 key ctrl+z
-# An axis scale is no similarity: the vertices move each frame.
+# An axis scale too (the renderer corrects the shading of the stretched normals): one matrix, no vertex sends, and
+# the release bakes the same surface the per-frame path leaves.
 gizmo_drag scale_x 60 0 0.5 keep
-expect_value gizmo_gpu == 0
-expect_value moved > 1000
+expect_value gizmo_gpu == 1
+expect_value moved == 0
+remember part_vertex_syncs axisSyncs
+wait 0.2
+expect_value part_vertex_syncs == $axisSyncs
 release
+expect_value gizmo_gpu == 0
+expect_status Gizmo Scale
+remember moved_sum gpuAxisSum
+remember moved_max gpuAxisMax
+expect_value moved_max > 0.1
 key ctrl+z
 expect_value moved == 0
 
@@ -71,6 +80,13 @@ key e
 snapshot
 gizmo_drag scale_uniform 40 -40 0.5
 expect_value moved_sum == $gpuScaleSum
+key ctrl+z
+gizmo_drag scale_x 60 0 0.5 keep
+expect_value gizmo_gpu == 0
+expect_value moved > 1000
+release
+expect_value moved_sum == $gpuAxisSum
+expect_value moved_max == $gpuAxisMax
 key ctrl+z
 env SF_GIZMO_GPU 1
 

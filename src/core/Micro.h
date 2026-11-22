@@ -120,6 +120,8 @@ struct MicroMesh {
     bool allDirty = true;
     bool maskDirty = false; // the mask was added or removed (the renderer's shading changes everywhere)
     bool stroking = false;  // a stroke is running (TierConfig draft normals: the renderer shades less meanwhile)
+    bool grabbing = false;  // the running stroke is a Move (MicroStroke::beginGrab): its shading shows on each frame, never budgeted
+    bool shadeNow = false;  // an edit whose shading must show on the next frame in full (undo, redo, a Move's end; #184)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
     uint64_t revision = 0;  // bumped by every edit
     // Which level this is (new on Divide / load; kept by copies, which hold the same values): the renderer keeps

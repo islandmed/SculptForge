@@ -1,13 +1,13 @@
 {
-  "version": "0.13.10",
+  "version": "0.13.11",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Sculpt layers travel to Blender and back as shape keys, with names and order kept",
-    "Hold Shift with the Paint brush to blend colours smoothly",
-    "Long Clay strokes on dense Micro levels respond faster",
-    "Voxel Remesh lets you proceed when memory is tight, and timelapses keep your Micro level strokes",
-    "16 new Creature Skin brushes for scales, hide and pores, made by request"
+    "Forge Sphere chains stay smooth while you drag, even with hundreds of spheres",
+    "Shift with the Paint brush blends colour on textured Parts and never moves the shape",
+    "View falloff keeps Standard, Inflate and Crease off the far side of your model",
+    "Pen side-button orbit and pan move steadily again, and Inflate swells evenly at tube ends",
+    "Bakes tell you when the search distance is too short, with one click to bake again"
   ],
   "support": {
     "founding": {
