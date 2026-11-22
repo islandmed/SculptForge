@@ -100,8 +100,9 @@ elsewhere.
 Another app's brush names are not ours to use either, even where that app's own name is not a registered mark. Ours:
 Tendril (not the name another sculpting program gave the same kind of brush). The one exception is interop: Blender's
 own brush identifier appears where the Blender add-on, the Blender keymap reader and its test export must name what
-Blender calls its tool (`BORROWED_ALLOWED` in `tools/check_marks.py` lists those files). Saved files from older
-versions are read through the whole-name table below, which does not spell it.
+Blender calls its tool (`BORROWED_ALLOWED` in `tools/check_marks.py` lists those files). Saved brush
+settings, layouts, scripts and ids from older versions are read through the old-words table below (W14), which
+does not spell it.
 
 <!-- borrowed:begin -->
     snake ?hook
@@ -209,6 +210,7 @@ FNV-1a 64 of the lower-case word. `tests/test_legacy_names.cpp` checks `LegacyNa
 | W11 | `zsub` | `lower` | `0xDE377B61A12DA42D` |
 | W12 | `goz` | `bridge` | `0xD4F75918FABCC503` |
 | W13 | `polyf` | `wire` | `0x90F1043555FF3A33` |
+| W14 | `snakehook` | `tendril` | `0x4F15F83B81B2B924` |
 
 Whole names, matched only as the entire string (the word alone is an everyday one a user's own brush may hold):
 

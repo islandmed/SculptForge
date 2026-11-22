@@ -32,7 +32,7 @@ const char* brushName(BrushType type) {
     case BrushType::Pinch: return "Pinch";
     case BrushType::SharpCrease: return "SharpCrease";
     case BrushType::ClayBlock: return "ClayBlock";
-    case BrushType::SnakeHook: return "Tendril";
+    case BrushType::Tendril: return "Tendril";
     case BrushType::Trim: return "Trim";
     case BrushType::Layer: return "Layer";
     case BrushType::Nudge: return "Nudge";
@@ -54,7 +54,7 @@ const char* brushLabel(BrushType type) {
     case BrushType::SharpCrease: return "Sharp Crease";
     case BrushType::SmoothPeaks: return "Smooth Peaks";
     case BrushType::ClayBlock: return "Clay Block";
-    case BrushType::SnakeHook: return "Tendril";
+    case BrushType::Tendril: return "Tendril";
     case BrushType::KelvinSnake: return "Elastic Tendril";
     default: return brushName(type);
     }
@@ -70,8 +70,6 @@ bool brushFromName(std::string_view name, BrushType& out) {
     std::string want = squash(name);
     if (want.empty()) return false;
     want = legacy::modernize(want);
-    for (const legacy::Rename& r : legacy::kBrushNames)
-        if (r.old == want) want = squash(r.now);
     for (int i = 0; i < int(BrushType::Count); ++i)
         if (squash(brushName(BrushType(i))) == want || squash(brushLabel(BrushType(i))) == want) {
             out = BrushType(i);
@@ -1376,12 +1374,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                                                type == BrushType::Pinch || type == BrushType::SharpCrease || type == BrushType::Layer ||
                                                type == BrushType::Nudge); // (Nudge smears the surface; it is not a grab)
     // Tendril under View falloff: the far side of a thick part stays put, so a pull does not drag front and back into a sheet.
-    const bool tendrilReach = p.viewFalloff && type == BrushType::SnakeHook;
+    const bool tendrilReach = p.viewFalloff && type == BrushType::Tendril;
     // With Dynamic on, the horn's pinch stops at a radius its triangles can still round (about 2 edges; at 0 it thinned to a
     // thread under the remesher's edge length and folded into a flat sheet): the horn tapers, never to less than a ring of vertices.
-    if (type == BrushType::SnakeHook && dyntopo.enabled && dyntopo.constantDetail && strokeDiagonal_ <= 0.0f)
+    if (type == BrushType::Tendril && dyntopo.enabled && dyntopo.constantDetail && strokeDiagonal_ <= 0.0f)
         strokeDiagonal_ = glm::length(mesh.bounds().extent());
-    const float tendrilRadius = type == BrushType::SnakeHook && dyntopo.enabled && !topologyHeld_
+    const float tendrilRadius = type == BrushType::Tendril && dyntopo.enabled && !topologyHeld_
                                     ? kTendrilRingEdges * dyntopoEdgeLength(dyntopo, p.radius, strokeDiagonal_)
                                     : 0.0f;
     const auto offset = [&](size_t i, uint32_t v, const glm::vec3& x) -> glm::vec3 {
@@ -1463,7 +1461,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             if (sign * h < 0.0f) d = -areaNormal * (h * w * clayPull(s));
             break;
         }
-        case BrushType::SnakeHook: {
+        case BrushType::Tendril: {
             // Drag the region along with the stroke; the sides pinch in, so pulled shapes taper.
             d = p.strokeDelta * f;
             glm::vec3 side = p.center - x;

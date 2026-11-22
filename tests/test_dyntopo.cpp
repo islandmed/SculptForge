@@ -233,7 +233,7 @@ TEST(nightly_dyntopo_random_strokes_stay_valid) {
         rng ^= rng << 5;
         return float(rng & 0xffff) / 65535.0f;
     };
-    const BrushType types[] = {BrushType::Standard, BrushType::SnakeHook, BrushType::Smooth, BrushType::Clay,
+    const BrushType types[] = {BrushType::Standard, BrushType::Tendril, BrushType::Smooth, BrushType::Clay,
                                BrushType::Pinch, BrushType::Inflate, BrushType::Crease, BrushType::Flatten};
     bool allValid = true, bvhOk = true;
     std::string why;
@@ -304,9 +304,9 @@ TEST(dyntopo_x_symmetry_makes_mirrored_topology) {
     Document d = sphereDoc(3);
     d.sculptor.dyntopo.detail = 0.75f;
     const Symmetry sym{true, false, false};
-    // Strokes on one side, across the middle and pulling with Snake Hook.
+    // Strokes on one side, across the middle and pulling with Tendril.
     for (int s = 0; s < 3; ++s) {
-        const BrushType type = s == 2 ? BrushType::SnakeHook : BrushType::Standard;
+        const BrushType type = s == 2 ? BrushType::Tendril : BrushType::Standard;
         CHECK(d.sculptor.beginStroke(d.mesh, brushName(type)));
         for (int i = 0; i < 8; ++i) {
             const glm::vec3 from = s == 0 ? glm::vec3(0.5f, 0.1f * float(i) - 0.3f, 1.0f)
@@ -390,7 +390,7 @@ TEST(dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh) {
         rng ^= rng << 5;
         return float(rng & 0xffff) / 65535.0f;
     };
-    const BrushType types[] = {BrushType::Standard, BrushType::SnakeHook, BrushType::Smooth, BrushType::Clay, BrushType::Pinch};
+    const BrushType types[] = {BrushType::Standard, BrushType::Tendril, BrushType::Smooth, BrushType::Clay, BrushType::Pinch};
     bool valid = true;
     for (int stroke = 0; stroke < 10 && valid; ++stroke) {
         const BrushType type = types[stroke % 5];
@@ -650,7 +650,7 @@ TEST(dyntopo_stress_random_sessions) {
             rng ^= rng << 5;
             return float(rng & 0xffff) / 65535.0f;
         };
-        const BrushType types[] = {BrushType::Standard, BrushType::SnakeHook, BrushType::Smooth, BrushType::Clay,
+        const BrushType types[] = {BrushType::Standard, BrushType::Tendril, BrushType::Smooth, BrushType::Clay,
                                    BrushType::Pinch,    BrushType::Inflate,   BrushType::Crease, BrushType::Flatten,
                                    BrushType::SharpCrease, BrushType::ClayBlock, BrushType::Layer, BrushType::Nudge,
                                    BrushType::Trim};

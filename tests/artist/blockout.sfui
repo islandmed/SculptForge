@@ -26,7 +26,7 @@ hover_window 0.97 0.5
 wait 0.3
 shot b02-move
 
-# Dynamic topology: pull horns out of the top with Snake Hook-style long pulls; detail follows the brush.
+# Dynamic topology: pull horns out of the top with Tendril-style long pulls; detail follows the brush.
 run dyntopo enabled=true detail=50
 remember triangles t_before_dyn
 click "Tendril##brush.tendril"

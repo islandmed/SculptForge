@@ -7,6 +7,7 @@
 
 #include "app/UiLayout.h"
 #include "core/BrushLibrary.h"
+#include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/LegacyNames.h"
 #include "core/Sculpt.h"
@@ -104,6 +105,36 @@ TEST(legacy_names_read_old_files_and_scripts) {
     const std::string path = "/no/such/" + capitalised(old.at("classic")) + "/model.obj";
     const CommandResult missing = reg.execute(doc, "open", {{"path", path}});
     CHECK(!missing.ok && missing.message.find(capitalised(old.at("classic"))) != std::string::npos);
+}
+
+// Tendril's old name: the brush by name, its command id and radial/shelf ids, and the built-in brush's saved settings
+// (the file older versions wrote) all still load.
+TEST(legacy_tendril_old_name_still_loads) {
+    const auto words = oldWords();
+    const auto it = words.find("tendril");
+    CHECK(it != words.end());
+    if (it == words.end()) return;
+    const std::string old = it->second;
+    BrushType t = BrushType::Standard;
+    CHECK(brushFromName(old, t) && t == BrushType::Tendril);
+    t = BrushType::Standard;
+    CHECK(brushFromName(capitalised(old), t) && t == BrushType::Tendril);
+    CHECK(legacy::modernizeId("brush." + old) == "brush.tendril");
+    CHECK(legacy::modernize("builtin:" + capitalised(old)) == "builtin:Tendril");
+    // A custom brush called after the old name keeps its name and key.
+    CHECK(legacy::modernizeId("brush.recipe." + capitalised(old)) == "brush.recipe." + capitalised(old));
+
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"brushes":{"builtin:)" + capitalised(old) + R"(":{"draw_size":77},"custom:)" + capitalised(old) +
+                          R"(":{"draw_size":55}}})",
+                      j, err));
+    BrushSettingsStore store;
+    store.applyJson(j);
+    BrushToolSettings s;
+    CHECK(store.savedFor("builtin:Tendril", s) && s.radiusPx == 77.0f);
+    CHECK(store.savedFor("custom:" + capitalised(old), s) && s.radiusPx == 55.0f);
+    CHECK(!store.savedFor("builtin:" + capitalised(old), s));
 }
 
 // Whole names (kNames): the old name, in any case, is today's; the word alone, or inside another name (a user's own

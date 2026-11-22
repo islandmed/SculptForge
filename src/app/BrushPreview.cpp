@@ -182,7 +182,7 @@ bool makeAlphaLook(const BrushToolSettings& s, AlphaLook& out) {
 bool brushTakesAlpha(BrushType type) {
     switch (type) {
     case BrushType::Move:
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
     case BrushType::KelvinGrab:
     case BrushType::KelvinTwist:
     case BrushType::KelvinScale:
@@ -263,7 +263,7 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type, co
     case BrushType::Move: // the silhouette pulled out into a broad soft lobe on the upper left
         stroke(d, nullptr, bt, line({-0.5f, 0.45f, 2.0f}, {-0.78f, 0.72f, 2.0f}), 0.5f, 1.0f, false);
         break;
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
         // A curling horn pulled out of the front into the tile's top right corner (the only room past the ball's
         // silhouette; the ball fills the tile's height). It drags in the view plane, as in the viewport.
         stroke(d, nullptr, bt, line({0.3f, 0.3f, 2.0f}, {0.86f, 0.86f, 2.0f}), 0.26f, 1.0f, false);

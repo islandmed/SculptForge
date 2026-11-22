@@ -34,7 +34,7 @@ enum class BrushType {
     Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch,
     SharpCrease, // sharp V-crease with the sides pinched toward the stroke
     ClayBlock, // square-ish, flat-topped clay
-    SnakeHook,   // pulls the region along the stroke (strokeDelta), tapering
+    Tendril,     // pulls the region along the stroke (strokeDelta), tapering
     Trim,        // Plane Trim: a plane cuts away everything above it
     Layer,       // raises to one fixed height per stroke (overlaps never stack)
     Nudge,       // slides the surface sideways along the stroke
@@ -43,7 +43,7 @@ enum class BrushType {
     KelvinGrab,  // elastic move: drags the surface like clay, bulging with Squash (Poisson's ratio)
     KelvinTwist, // turns the surface around the view axis, fading smoothly
     KelvinScale, // pinches (or swells) the surface toward the centre
-    KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
+    KelvinSnake, // multi-scale elastic Tendril: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
@@ -73,7 +73,7 @@ struct DabParams {
     float pressure = 1.0f;              // tablet pressure, 0..1
     bool invert = false;
     bool frontFacesOnly = false;
-    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, SnakeHook, Nudge, Sharp Crease)
+    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, Tendril, Nudge, Sharp Crease)
     const BrushAlpha* alpha = nullptr;   // stamp shaping the falloff (null/empty = round)
     glm::vec3 alphaUp{0.0f, 1.0f, 0.0f}; // world direction of the alpha's top edge (screen up, or rotated)
     float focal = 0.0f;                  // classic Falloff, -1..1 (brushFalloff; alphaFalloff with an alpha)
@@ -468,7 +468,7 @@ private:
     // A micro level's mask as the base cage sees it. Moving a base vertex shifts the grid points of the triangles
     // around it (their corners) and, through the corners' normals, those of the ring beyond; so a base vertex is as
     // free as the freest grid point within two rings leaves it: 1 - the largest mask in the triangles touching it or
-    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Snake Hook, Vdm...) goes through
+    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Tendril, Vdm...) goes through
     // displaceAll, which scales by it: a fully masked grid point holds still, bit for bit. Computed on demand, kept
     // for the stroke (no stroke that moves vertices edits the mask).
     void cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts);

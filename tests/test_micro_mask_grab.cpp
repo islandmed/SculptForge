@@ -88,7 +88,7 @@ std::vector<BrushType> allBrushes() {
 
 TEST(micro_mask_every_brush_holds_masked_samples) {
     // The sweep: every brush in the table, whatever path it takes (the grid, the base cage below it, a Kelvinlet), at
-    // micro levels 1..3. Grab-type brushes (Move, Snake Hook, Nudge, the Kelvinlets, Detail Clone, Vdm) and the rest alike.
+    // micro levels 1..3. Grab-type brushes (Move, Tendril, Nudge, the Kelvinlets, Detail Clone, Vdm) and the rest alike.
     for (int level : {1, 2, 3}) {
         for (BrushType type : allBrushes()) {
             Document doc = microDoc(level);

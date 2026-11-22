@@ -28,6 +28,8 @@ BRUSHES = [
     ("Pinch", "PI", "Pinch/Magnify", "PINCH", "builtin_brush.Pinch"),
     ("Move", "MV", "Grab", "GRAB", "builtin_brush.Grab"),
     ("Move Elastic", "", "Elastic Grab", "ELASTIC_DEFORM", "builtin_brush.Elastic Deform"),
+    # Blender's own brush name and tool id for this brush: its API needs them spelled here (interop), so this file,
+    # the keymap reader (BlenderKeymap.cpp) and its test export are the only ones tools/check_marks.py lets use them.
     ("Tendril", "SH", "Snake Hook", "SNAKE_HOOK", "builtin_brush.Snake Hook"),
     ("Nudge", "NU", "Nudge", "NUDGE", "builtin_brush.Nudge"),
     ("MaskPen", "", "Mask", "MASK", "builtin_brush.Mask"),

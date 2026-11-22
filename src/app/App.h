@@ -544,12 +544,12 @@ private:
         glm::vec3 color{1.0f};
     } swatchMemo_;
     glm::vec3 grabLast_{0.0f};
-    // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
+    // A grab (Move, Tendril, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
     // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the
     // world and the pen carries on from it (fenix, Discord 11-06: the model flew off as the cap turned).
     // grabScreen_: the pen's last position the grab used; grabScreenOffset_: from it to the grabbed point on screen.
     glm::vec2 grabScreen_{0.0f}, grabScreenOffset_{0.0f};
-    bool grabStroke() const;     // a Move / Snake Hook / KelvinGrab stroke under way
+    bool grabStroke() const;     // a Move / Tendril / KelvinGrab stroke under way
     void regrabAfterViewMove();  // the view moved mid-grab: the grabbed point stays put (grabScreenOffset_)
     // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
     // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
@@ -1016,7 +1016,7 @@ private:
     size_t visibleGroups_ = 0;
     std::array<uint64_t, 6> visibleGroupsKey_{};
     // Stroke types, alphas and the extra brushes (PanelBrushes.cpp).
-    void snakeHookTo(float x, float y);
+    void tendrilTo(float x, float y);
     void dragRectTo(float x, float y, bool commit = false); // commit: the release's final stamp (the footprint)
     glm::vec3 screenUpVector(float angle) const; // camera up rotated by `angle` around the view axis
     static void SDLCALL onAlphaChosen(void* userdata, const char* const* files, int filter);

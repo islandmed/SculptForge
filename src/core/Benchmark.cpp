@@ -508,7 +508,7 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     const std::vector<Row> rows = {
         {{"Standard, Detail 50%", Kind::Brush, BrushType::Standard}, 0.5f},
         {{"Standard, Detail 100%", Kind::Brush, BrushType::Standard}, 1.0f},
-        {{"Tendril, Detail 50%", Kind::Brush, BrushType::SnakeHook}, 0.5f},
+        {{"Tendril, Detail 50%", Kind::Brush, BrushType::Tendril}, 0.5f},
         {{"Clay Block, Detail 75%", Kind::Brush, BrushType::ClayBlock}, 0.75f},
         {{"Smooth (simplifies), Detail 50%", Kind::Brush, BrushType::Smooth}, 0.5f},
         {{"Standard (large, r 0.4), Detail 50%", Kind::Brush, BrushType::Standard, 0.4f}, 0.5f},
