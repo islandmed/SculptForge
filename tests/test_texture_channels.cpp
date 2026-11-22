@@ -823,68 +823,63 @@ TEST(alt_erase_on_a_texture_layer_goes_back_to_transparent) {
     CHECK(t.pixels[px + 2] > 250 || t.base[px + 2] > 250);           // what shows is the Base below
 }
 
-// The soft rim of a stroke is faint paint; erasing with the same brush must not leave a ghost outline of it (member
-// bug: a jagged grey/white outline where the paint was).
-TEST(alt_erase_over_the_same_soft_stroke_leaves_no_ghost_rim) {
-    Document doc = makeDoc(texturedPlane(32, 512));
-    Mesh& m = doc.mesh;
-    setChannelEnabled(*m.texture, Channel::Roughness, true);
-    setChannelEnabled(*m.texture, Channel::Metallic, true);
-    setChannelEnabled(*m.texture, Channel::Opacity, true);
-    doc.syncBvh();
-    BrushMaterial purple = rustyMetal();
-    purple.color = glm::vec3(0.3f, 0.05f, 0.6f);
-    purple.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic) |
-                      channelBit(Channel::Opacity);
-    purple.opacity = 0.5f;
-    paintCentre(m, doc.bvh, purple, 0.4f);
-    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
-    size_t tinted = 0;
-    for (size_t i = 0; i < m.texture->pixels.size(); i += 4) tinted += m.texture->pixels[i + 1] < 255;
-    CHECK(tinted > 1000);
-    TexturePainter p;
-    CHECK(p.begin(m, ~0u));
-    DabParams d = dab(glm::vec3(0), 0.4f);
-    d.invert = true;
-    p.dab(m, doc.bvh, d, purple, Symmetry{});
-    UndoRecord e;
-    p.end(e);
-    size_t left = 0, metal = 0, notOpaque = 0;
-    for (size_t i = 0; i < m.texture->pixels.size(); i += 4) left += m.texture->pixels[i + 1] < 255;
-    const TileImage& mi = channelImage(*m.texture, Channel::Metallic);
-    const TileImage& oi = channelImage(*m.texture, Channel::Opacity);
-    for (int y = 0; y < m.texture->height; ++y)
-        for (int x = 0; x < m.texture->width; ++x) {
-            metal += mi.value(x, y) > 0.0f;
-            notOpaque += oi.value(x, y) < 1.0f;
-        }
-    CHECK(left == 0);       // every texel white again, rim included
-    CHECK(metal == 0);      // no metal left at the rim
-    CHECK(notOpaque == 0);  // Opacity is among the channels Alt resets
-}
-
-// A low Intensity erases gently: the middle of the stroke erases exactly as fast as before the rim was cleaned up
-// (the rim boost never goes above the stroke's own strength).
-TEST(alt_erase_at_low_intensity_stays_gentle) {
+// A light erase fades the paint softly (member check: one Alt stroke at Intensity 20 must not snap to flat white with a
+// stepped edge): the weight is the plain brush weight, so the texels run through every value between painted and erased.
+TEST(alt_erase_at_low_intensity_fades_softly) {
     Document doc = makeDoc(texturedPlane(32, 512));
     Mesh& m = doc.mesh;
     setChannelEnabled(*m.texture, Channel::Metallic, true);
     doc.syncBvh();
     BrushMaterial metal;
-    metal.color = glm::vec3(0.5f, 0.1f, 0.1f);
+    metal.color = glm::vec3(0.4f, 0.05f, 0.6f);
     metal.metallic = 1.0f;
     metal.channels = channelBit(Channel::BaseColor) | channelBit(Channel::Metallic);
     paintCentre(m, doc.bvh, metal, 0.4f);
-    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.95f);
+    const std::vector<uint8_t> painted = m.texture->pixels;
     TexturePainter p;
     CHECK(p.begin(m, ~0u));
-    DabParams d = dab(glm::vec3(0), 0.4f, 0.3f); // Intensity 30
+    DabParams d = dab(glm::vec3(0), 0.4f, 0.2f); // Intensity 20
     d.invert = true;
     p.dab(m, doc.bvh, d, metal, Symmetry{});
     UndoRecord e;
     p.end(e);
-    const float left = centreValue(*m.texture, Channel::Metallic);
-    // Plain paint at Intensity 30 reaches 0.51 at the plane's centre (the centre texel gets two writes);
-    // erasing goes the same 0.51 back. With the weight tripled everywhere it would be gone (left 0).
-    CHECK(left > 0.45f && left < 0.55f);
+    const TileImage& mi = channelImage(*m.texture, Channel::Metallic);
+    size_t between = 0, flatWhite = 0, touched = 0;
+    for (int y = 0; y < m.texture->height; ++y)
+        for (int x = 0; x < m.texture->width; ++x) {
+            const size_t i = (size_t(y) * size_t(m.texture->width) + size_t(x)) * 4;
+            if (m.texture->pixels[i + 1] == painted[i + 1]) continue; // (green: purple is 0.05 there)
+            ++touched;
+            const float v = mi.value(x, y);
+            between += v > 0.05f && v < 0.95f;
+            flatWhite += m.texture->pixels[i + 1] == 255;
+        }
+    CHECK(touched > 2000);
+    CHECK(between * 10 > touched * 6);   // most touched texels sit between painted and erased
+    CHECK(flatWhite * 10 < touched);     // a light stroke does not whiten anything flat
+    CHECK(centreValue(*m.texture, Channel::Metallic) > 0.3f);
+
+    // Three overlapping light strokes (Intensity 25, a little apart): still no flat white band and no stepped contour, and
+    // colour and metal go together (no texel that is white but still metal).
+    for (int k = 0; k < 3; ++k) {
+        TexturePainter q;
+        CHECK(q.begin(m, ~0u));
+        DabParams d2 = dab(glm::vec3(0.03f * float(k), 0, 0), 0.4f, 0.25f);
+        d2.invert = true;
+        q.dab(m, doc.bvh, d2, metal, Symmetry{});
+        UndoRecord e2;
+        q.end(e2);
+    }
+    size_t whiteButMetal = 0, near = 0, tinted = 0;
+    for (int y = 0; y < m.texture->height; ++y)
+        for (int x = 0; x < m.texture->width; ++x) {
+            const size_t i = (size_t(y) * size_t(m.texture->width) + size_t(x)) * 4;
+            if (painted[i + 1] == m.texture->pixels[i + 1]) continue;
+            ++tinted;
+            const float v = mi.value(x, y);
+            whiteButMetal += m.texture->pixels[i + 1] == 255 && v > 0.05f;
+            near += m.texture->pixels[i + 1] >= 230 && m.texture->pixels[i + 1] < 250; // 0.90 .. 0.98 of the way to white
+        }
+    CHECK(whiteButMetal == 0);
+    CHECK(near * 100 > tinted); // the near-white range is populated (a snap leaves it empty)
 }

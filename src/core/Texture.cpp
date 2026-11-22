@@ -237,19 +237,11 @@ void dropStackIfEmpty(PaintTexture& t) {
 
 static_assert(kTileImageTile == kTextureTile, "material channel tiles line up with the texture's undo tiles");
 
-// Erasing (Alt) works a little harder than painting at the soft rim of a stroke (a stroke's rim is faint paint, and the
-// same falloff erasing it would leave a ghost outline): the weight there is tripled, but never above the stroke's own
-// strength `cap` (Intensity x pressure), so the middle of a stroke erases exactly as fast as before and a low Intensity
-// stays gentle. What is left within kEraseSnap of the default (white, transparent, the channel default) becomes the default.
-constexpr float kEraseSnap = 0.1f;
-constexpr int kEraseSnapBytes = 25; // (0.1 of 255, in the stored sRGB colour)
-inline float eraseWeight(float w, float cap) { return std::max(w, std::min(w * 3.0f, cap)); }
-
 // Writes paint of weight `w` into one texel of a material channel (n components of `bits`), starting from
 // `orig`: Base mixes towards `val` (erase: towards the channel's default); a layer paints "source over" onto its
 // coverage (component n), erase lowers the coverage. Normals are renormalised.
 inline void paintChannelTexel(uint8_t* dst, const uint8_t* orig, int n, int bits, bool layer, const float* val,
-                              const float* def, float w, bool erase, bool normal, float cap = 1.0f) {
+                              const float* def, float w, bool erase, bool normal) {
     const int m = layer ? n + 1 : n;
     float o[5], v[5];
     if (bits == 16) {
@@ -261,20 +253,12 @@ inline void paintChannelTexel(uint8_t* dst, const uint8_t* orig, int n, int bits
     } else {
         for (int k = 0; k < m; ++k) o[k] = float(orig[k]) * (1.0f / 255.0f);
     }
-    if (erase) w = eraseWeight(w, cap);
     if (!layer) {
         const float* to = erase ? def : val;
         for (int k = 0; k < n; ++k) v[k] = o[k] + (to[k] - o[k]) * w;
-        if (erase) { // the faint ghost of a soft stroke's rim goes: within kEraseSnap of the default is the default
-            float far = 0.0f;
-            for (int k = 0; k < n; ++k) far = std::max(far, std::abs(v[k] - def[k]));
-            if (far < kEraseSnap)
-                for (int k = 0; k < n; ++k) v[k] = def[k];
-        }
     } else if (erase) {
         for (int k = 0; k < n; ++k) v[k] = o[k];
         v[n] = o[n] * (1.0f - w);
-        if (v[n] < kEraseSnap) v[n] = 0.0f;
     } else {
         const float a = o[n], na = a + w * (1.0f - a);
         for (int k = 0; k < n; ++k) v[k] = na > 0.0f ? (o[k] * (a * (1.0f - w)) + val[k] * w) / na : val[k];
@@ -419,20 +403,16 @@ inline void compositeTexel(const PaintTexture& t, size_t i, uint8_t* out) {
 }
 
 // Writes paint of weight `w` into texel `px` of the target (Base / plain when `layer` < 0), starting from `orig`.
-inline void paintTexel(uint8_t* px, const uint8_t* orig, bool layer, const glm::vec3& color, float w, bool erase,
-                       float cap = 1.0f) {
-    if (erase) w = eraseWeight(w, cap);
+inline void paintTexel(uint8_t* px, const uint8_t* orig, bool layer, const glm::vec3& color, float w, bool erase) {
     if (!layer) {
         putLinear(px, glm::mix(linearRgb(orig), erase ? glm::vec3(1.0f) : color, w));
-        if (erase && px[0] >= 255 - kEraseSnapBytes && px[1] >= 255 - kEraseSnapBytes && px[2] >= 255 - kEraseSnapBytes)
-            px[0] = px[1] = px[2] = 255;
         px[3] = 255;
         return;
     }
     const float a = float(orig[3]) / 255.0f;
     if (erase) {
         std::memcpy(px, orig, 3);
-        px[3] = a * (1.0f - w) < kEraseSnap ? 0 : unit8(a * (1.0f - w));
+        px[3] = unit8(a * (1.0f - w));
         return;
     }
     // "Source over" onto the layer's own coverage (as paintVertex).
@@ -1559,11 +1539,11 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
         std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
         const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc, float) {
             if (paintColor)
-                paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert, s);
+                paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
             for (const ChanJob& j : jobs) {
                 const ChannelTile& ct = t.channels[size_t(j.c)];
                 paintChannelTexel(ct.texels + li * size_t(j.tb), ct.origTexels + li * size_t(ct.origStride), j.n, j.bits,
-                                  onLayer, j.val, j.def, acc, p.invert, j.normal, s);
+                                  onLayer, j.val, j.def, acc, p.invert, j.normal);
             }
         }, paintColor, rects);
         for (const auto& [lo, hi] : rects) {
@@ -1677,11 +1657,11 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
                 float& acc = t.coverage[li];
                 acc += std::min(wgt, 1.0f) * (1.0f - acc);
                 if (paintColor)
-                    paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert, s);
+                    paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
                 for (const ChanJob& j : jobs) {
                     const ChannelTile& ct = t.channels[size_t(j.c)];
                     paintChannelTexel(ct.texels + li * size_t(j.tb), ct.origTexels + li * size_t(ct.origStride), j.n, j.bits,
-                                      onLayer, j.val, j.def, acc, p.invert, j.normal, s);
+                                      onLayer, j.val, j.def, acc, p.invert, j.normal);
                 }
                 res.lo = glm::min(res.lo, glm::ivec2(x, y));
                 res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
