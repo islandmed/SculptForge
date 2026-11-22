@@ -122,6 +122,12 @@ chmod +x "$S/bin/"*
 # The public gallery as published (no GitHub API call: shared CI runners hit its rate limit): this tree's own files.
 python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import check_published as c; print(json.dumps(c.local_tree()))' \
     "$ROOT/tools/brush-gallery" > "$S/gallery.json"
+# A machine-wide push guard (global hooks) finds its script under $HOME; the sandbox's HOME is empty, so the guard
+# failed and refused the sandbox pushes. Where the real one exists, link it in: it still runs on every sandbox push.
+# Without one (CI) nothing changes.
+if [ -f "$HOME/Work/.sf/pre-push-guard.py" ]; then
+    mkdir -p "$S/home/Work/.sf" && ln -s "$HOME/Work/.sf/pre-push-guard.py" "$S/home/Work/.sf/pre-push-guard.py"
+fi
 export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1 SF_GALLERY_PUBLIC="$S/gallery.json"
 unset HIGHLIGHTS
 
