@@ -101,3 +101,71 @@ TEST(nudge_view_falloff_still_reaches_through_a_thin_part) {
         CHECK(r.back > 0.005f);
     }
 }
+
+#include "GeomInvariants.h"
+#include "core/StarterMeshes.h"
+
+TEST(layer_view_falloff_ear_with_x_symmetry_lifts_both_ears_alike_and_tears_nothing) {
+    // artist-qa (36e3c6f4): Layer from the side on a head's ear, X symmetry, View falloff. The far-side fade is part of Layer's height
+    // (its "done" height is kept per vertex), so a vertex that stood in the fade early in a stroke still reaches its full height, and the
+    // mirrored ear comes out as the stroked one: the same vertices, the same heights, no flipped triangle or fold on either.
+    const StarterMesh* head = findStarterMesh("human-head");
+    CHECK(head != nullptr);
+    if (!head) return;
+    for (float rad : {0.04f, 0.06f})
+    for (float eyeDist : {1e6f, 3.0f})
+    for (BrushType t : {BrushType::Layer})
+        for (bool vf : {false, true}) {
+            Document d;
+            std::string error;
+            CHECK(loadStarterMesh(*head, d, 2, error));
+            glm::vec3 lo(1e9f), hi(-1e9f);
+            for (const glm::vec3& q : d.mesh.positions) lo = glm::min(lo, q), hi = glm::max(hi, q);
+            const float height = hi.y - lo.y;
+            glm::vec3 ear(-1e9f);
+            for (int iy = 0; iy < 40; ++iy)
+                for (int iz = 0; iz < 40; ++iz) {
+                    const glm::vec3 from(hi.x + 1.0f, lo.y + height * (0.4f + 0.3f * float(iy) / 39.0f), lo.z + (hi.z - lo.z) * float(iz) / 39.0f);
+                    RayHit hit;
+                    if (d.bvh.raycast(d.mesh, from, glm::vec3(-1.0f, 0.0f, 0.0f), hit) && hit.position.x > ear.x) ear = hit.position;
+                }
+            const glm::vec3 eye(ear.x + eyeDist * height, 0.5f * (lo.y + hi.y), 0.5f * (lo.z + hi.z));
+            const std::vector<glm::vec3> start = d.mesh.positions;
+            d.sculptor.beginStroke(d.mesh, "Test");
+            glm::vec3 last(0.0f);
+            for (int i = 0; i <= 40; ++i) {
+                const float u = i <= 20 ? float(i) / 20.0f : float(40 - i) / 20.0f; // there and back
+                const glm::vec3 target(ear.x, ear.y + 0.08f * height * (u - 0.5f), ear.z);
+                const glm::vec3 dir = glm::normalize(target - eye);
+                RayHit hit;
+                if (!d.bvh.raycast(d.mesh, eye, dir, hit)) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.pickNormal = glm::normalize(hit.normal);
+                p.viewDir = dir;
+                p.radius = rad * height;
+                p.strength = 0.6f;
+                p.viewFalloff = vf;
+                p.strokeDelta = i ? hit.position - last : glm::vec3(0.0f);
+                last = hit.position;
+                d.sculptor.dab(d.mesh, d.bvh, t, p, Symmetry{true, false, false});
+            }
+            d.undo.push(d.sculptor.endStroke());
+            size_t near = 0, far = 0;
+            float nearMax = 0.0f, farMax = 0.0f;
+            for (size_t v = 0; v < start.size(); ++v) {
+                const float mv = glm::distance(start[v], d.mesh.positions[v]);
+                if (mv > 0.0f) (start[v].x > 0.0f ? near : far) += 1;
+                float& m = start[v].x > 0.0f ? nearMax : farMax;
+                m = std::max(m, mv);
+            }
+            std::printf("  r %.2f eye %.0f %-5s vf %d: moved near %zu (max %.4f), mirrored %zu (max %.4f); flipped %zu, folds %zu\n",
+                        double(rad), double(eyeDist), t == BrushType::Layer ? "Layer" : "Nudge", int(vf), near, double(nearMax), far,
+                        double(farMax), geom::flippedFaces(start, d.mesh), geom::foldedFaces(start, d.mesh));
+            CHECK(near > 0);
+            CHECK(far + 8 >= near && near + 8 >= far);
+            CHECK(std::abs(nearMax - farMax) < 0.002f);
+            CHECK(geom::flippedFaces(start, d.mesh) == 0);
+            CHECK(geom::foldedFaces(start, d.mesh) == 0);
+        }
+}

@@ -1459,11 +1459,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                 layerDone_[v] = 0.0f;
                 layerDir_[v] = areaNormal;
             }
-            const float target = sign * layerHeight_ * std::clamp(p.pressure, 0.0f, 1.0f) * f;
+            // (View falloff's far-side fade is part of the height, not a factor on the step: a vertex that stood in the fade early
+            // in the stroke would be marked done at its full height and never catch up, and neighbours would end at uneven heights.)
+            const float target = sign * layerHeight_ * std::clamp(p.pressure, 0.0f, 1.0f) * f * reachFade;
             if (std::abs(target) > std::abs(layerDone_[v])) {
                 d = layerDir_[v] * (target - layerDone_[v]);
                 layerDone_[v] = target;
             }
+            reachFade = 1.0f;
             break;
         }
         case BrushType::Nudge:
