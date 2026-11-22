@@ -162,7 +162,6 @@ void UndoStack::push(UndoRecord record) {
     if (record.empty()) return;
     record.seq = nextUndoSeq();
     record.batch = gBatch.load();
-    microRevisions_ += record.microOnly();
     undo_.push_back(std::move(record));
     if (listener) listener->undoPushed(undo_.back(), redo_);
     redo_.clear();
@@ -311,7 +310,6 @@ bool UndoStack::undo(Mesh& mesh, BVH& bvh) {
     redo_.push_back(std::move(r));
     if (listener) listener->undoApplied(redo_.back(), mesh, true);
     ++revision_;
-    microRevisions_ += redo_.back().microOnly();
     return true;
 }
 
@@ -324,7 +322,6 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
     undo_.push_back(std::move(r));
     if (listener) listener->undoApplied(undo_.back(), mesh, false);
     ++revision_;
-    microRevisions_ += undo_.back().microOnly();
     return true;
 }
 

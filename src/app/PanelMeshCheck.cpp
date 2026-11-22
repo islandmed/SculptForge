@@ -30,7 +30,7 @@ constexpr double kWeldPreviewHold = 0.1, kWeldPreviewFade = 0.3;
 
 uint64_t App::meshCheckKey() const {
     const Mesh& m = doc_.mesh;
-    return (uint64_t(doc_.activePartInfo().id) << 48) ^ (doc_.undo.baseRevision() * 0x9E3779B97F4A7C15ull) ^
+    return (uint64_t(doc_.activePartInfo().id) << 48) ^ (doc_.undo.revision() * 0x9E3779B97F4A7C15ull) ^
            (uint64_t(m.triangleCount()) << 20) ^ uint64_t(m.vertexCount()) ^ uint64_t(reinterpret_cast<uintptr_t>(m.positions.data()));
 }
 
