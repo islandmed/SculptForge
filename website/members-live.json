@@ -1,6 +1,6 @@
 {
   "limit": 100,
-  "taken": 16,
+  "taken": 17,
   "names": [
     "Richard Throgmorton (MakIt3D)",
     "Hameron",
@@ -9,7 +9,8 @@
     "Artizmo",
     "ebarranco",
     "Rand_gogh",
-    "TETSUYA"
+    "TETSUYA",
+    "fxrtst"
   ],
   "members": [
     "Richard Throgmorton (MakIt3D)",
@@ -22,9 +23,10 @@
     "Hong's Art Lab (hmh426)",
     "ebarranco",
     "Rand_gogh",
-    "TETSUYA"
+    "TETSUYA",
+    "fxrtst"
   ],
-  "active": 16,
+  "active": 17,
   "studios": 0,
-  "updated": "2026-11-21T05:14"
+  "updated": "2026-11-22T12:10"
 }
