@@ -175,15 +175,9 @@ void App::drawHardwareTierSection() {
     const TierConfig& tc = hw.tier;
     ImGui::TextUnformatted(tr("Tier"));
     ui::HelpText("Tier", nullptr,
-#if defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
-                 "What this computer can carry beyond the essentials: 16K textures and the levels to come switch on "
-                 "by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent "
-                 "anywhere.",
-#else
                  "What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and "
                  "the levels to come switch on by themselves where they fit, never where they don't. Every tier "
                  "sculpts smoothly; nothing is sent anywhere.",
-#endif
                  kPath);
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextWrapped("%s", tierSummary(p.detected, tc.hwTier).c_str());

@@ -392,11 +392,9 @@ std::vector<std::string> tierTurnsOn(HwTier tier, const TierBudgets& b) {
     std::vector<std::string> out;
     if (tier == HwTier::Floor) {
         out.push_back("Settings tuned for this machine, so sculpting stays smooth");
-#if !defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
         out.push_back("Focus Detail keeps " + formatMegabytes(b.focusResidentMB) + " of full-resolution detail close by");
     } else {
         out.push_back("Focus Detail keeps " + formatMegabytes(b.focusResidentMB) + " of full-resolution detail close by, and streams it in faster");
-#endif
     }
     if (b.maxTextureSize >= 16384) out.push_back("16K paint and bake textures");
     out.push_back("Free memory is watched: if it gets tight, the tier steps down instead of running out");

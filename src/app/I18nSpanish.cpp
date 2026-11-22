@@ -5572,8 +5572,6 @@ constexpr Entry kSpanish[] = {
      "Activado:"},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "Lo que este equipo puede llevar más allá de lo esencial: cachés de Focus Detail más grandes, texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
-    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
-     "Lo que este equipo puede llevar más allá de lo esencial: texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
     {"What this turns on:",
      "Qué activa:"},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",

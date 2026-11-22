@@ -312,13 +312,23 @@ endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 # Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
+# SF_SYSTEM_ZSTD=OFF: the vendored decoder alone, as Windows and macOS build (tests the reader everywhere).
+option(SF_SYSTEM_ZSTD "Use the system libzstd for Focus Detail tiles when it is found" ON)
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID AND SF_SYSTEM_ZSTD)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
-if(SF_ZSTD_FOUND)
+if(SF_ZSTD_FOUND AND SF_SYSTEM_ZSTD) # (the found result is cached: turning the option off later still takes effect)
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
+else()
+  # Elsewhere the release's decoder (third_party/zstd/README.md): zstd tiles written on Linux open everywhere; these
+  # builds write their own codec, which every build reads.
+  target_sources(sculptforge_core PRIVATE third_party/zstd/lib/zstddeclib.c)
+  target_include_directories(sculptforge_core PRIVATE third_party/zstd/lib)
+  target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD_DECODER)
+  set_source_files_properties(third_party/zstd/lib/zstddeclib.c PROPERTIES COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>"
+                              SKIP_PRECOMPILE_HEADERS ON)
 endif()
 target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY)
 target_compile_definitions(sculptforge_core PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}") # written into projects
