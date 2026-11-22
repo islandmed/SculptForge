@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.13.12"
-expect_text "Tendril pulls round horns, Palette Knife strokes cross without creasing, dense Micro levels stall far less, and the Gizmo stays smooth on heavy Parts."
+expect_text "Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, Undo and Move shade at once on dense Micro levels, and the Gizmo stays smooth on heavy Parts."
 expect_text "Version 0.13.11"
 expect_text "Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again."
 expect_text "Version 0.13.10"

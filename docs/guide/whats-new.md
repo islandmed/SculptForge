@@ -9,10 +9,10 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-22
-tagline: Tendril pulls round horns, Palette Knife strokes cross without creasing, dense Micro levels stall far less, and the Gizmo stays smooth on heavy Parts.
+tagline: Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, Undo and Move shade at once on dense Micro levels, and the Gizmo stays smooth on heavy Parts.
 highlight: Tendril pulls round, tapering horns, even with Dynamic on
 highlight: Palette Knife strokes cross and stack without creasing
-highlight: Dense Micro levels: Undo, Redo and Move shade at once, and strokes stall far less when they start and end
+highlight: On dense Micro levels, Undo, Redo and Move show their new shading at once
 highlight: The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode
 highlight: Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once
 title: Round Tendril horns
@@ -21,16 +21,16 @@ action: guide:sculpting.md
 title: Clean Palette Knife
 line: Crossing and stacked knife strokes, big brushes and mirrored strokes leave the surface smooth, with no dark creases.
 action: guide:sculpting.md
-title: Smoother dense Micro levels
-line: Undo, Redo and Move show their new shading on the next frame, and letting go of a stroke holds the window far less.
+title: Instant shading on Micro levels
+line: Undo, Redo and Move on a dense Micro level show their new shading on the next frame, with no stale patches.
 action: guide:micro-levels.md
 ```
 
 - **Tendril**: with Dynamic on, long pulls stay round tubes; with **View falloff** on, the far side stays put.
   Reported by @Tpqz_.
 - **Palette Knife** no longer creases where strokes overlap, with big brushes and mirrored strokes too (#198).
-- **Dense Micro levels**: Undo, Redo and Move show the new shading at once, the first stroke on a new level
-  pauses far less, and letting go of a stroke packs its undo step in the background (#184). Reported by @HG4Science.
+- **Dense Micro levels**: Undo, Redo and Move show the new shading at once instead of stale patches (#184).
+  Reported by @HG4Science.
 - **Gizmo**: dragging a handle on a multi-million triangle Part stays as smooth as turning the view; in **All** mode
   a ring seen edge-on fades and can't be pressed by mistake. Idea by Fenix on Discord.
 - **Nudge and Layer** with **View falloff** work only the surface facing you; Move and Grab still reach through.
