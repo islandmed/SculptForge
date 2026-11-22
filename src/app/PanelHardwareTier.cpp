@@ -298,9 +298,6 @@ void App::drawHardwareTierSection() {
         if (tc.compute != saved) dimWrapped(std::string("SF_COMPUTE=") + computeChoiceName(tc.compute) + " (set for this run)");
         for (int i = 0; i < kComputeTaskCount; ++i) {
             const ComputeTaskInfo& info = computeTaskInfo(ComputeTask(i));
-#if defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
-            if (info.task == ComputeTask::FocusDecode) continue;
-#endif
             const ComputePath path = resolveCompute(info.task, tc.compute, tc.hwTier, 0.0, 0.0);
             const std::string line = std::string(info.name) + ": " + (path == ComputePath::Gpu ? "GPU" : "CPU") +
                                      (!info.gpuPath ? "  (CPU only for now)" : gpuComputeFailed(info.task) ? "  (GPU failed: CPU)" : "");
