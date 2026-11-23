@@ -577,6 +577,38 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
     CHECK(fullValues(path) == expected);
 }
 
+// After strokes a new view demotes every edited tile at once: a frame compresses at most a batch of them past its
+// time budget (one batch at budget 0), the rest on the next frames, and no edit is lost.
+TEST(focus_detail_demotions_spread_over_frames) {
+    const std::string path = writeSmall("spread.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t T = mm.baseTriangles;
+    fd->ensureFull(mm, allTiles(m), true);
+    for (uint32_t t = 0; t < T; ++t) mm.disp[size_t(t) * mm.samples + 3] = int16_t(mm.disp[size_t(t) * mm.samples + 3] + 1 + int(t % 50));
+    const std::vector<int16_t> edited = mm.disp.toVector();
+    fd->budgetBytes = 0;
+    size_t parked = 0;
+    int frames = 0;
+    for (; frames < 200 && parked + 1 < T; ++frames) { // (a budget of 0 keeps one tile)
+        fd->update(m, FocusView{}, FocusBrush{}, 0.0);
+        const size_t now = fd->stats().parkedTiles;
+        CHECK(now - parked <= 64);
+        if (parked > 0) CHECK(now > parked); // (once lingering is over: progress every frame)
+        parked = now;
+    }
+    CHECK(parked + 1 == T);
+    CHECK(frames > int(T / 64));
+    CHECK(fd->stats().fullTiles == 1);
+    CHECK(edgesShared(m));
+    fd->budgetBytes = size_t(1) << 30;
+    CHECK(streamedFull(m) == edited);
+}
+
 // Divide to Micro beyond the budget: create() writes the live level to a detail file and streams it; Save As writes
 // a compact copy and continues there; saves past half garbage compact; attach() opens a file for a project's Part.
 TEST(focus_detail_create_save_as_compaction_and_attach) {

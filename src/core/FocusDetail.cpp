@@ -952,17 +952,24 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         }
         // The tiles to demote first, then their edits compressed in parallel (after strokes a new view demotes
         // hundreds of dirty tiles at once: one by one that was a 389 ms frame on Windows), then demoted in order.
+        // At most kDirtyBatch edited tiles a batch, more batches while the frame's budget lasts: the rest on the
+        // next frames (promotions wait while over the budget; one batch was still a 214 ms frame).
+        constexpr size_t kDirtyBatch = 64;
         std::vector<uint32_t>& victims = victims_;
-        victims.clear();
-        for (size_t full = fullTiles_; full + room > maxFull && !lru.empty();) { // (back = oldest)
-            const uint32_t t = lru.back();
-            lru.pop_back();
-            if (t < T && state_[t] != kCoarse) victims.push_back(t), --full;
-        }
-        poolFor(victims.size(), [&](size_t b, size_t e) {
-            for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
-        }, 8);
-        for (uint32_t t : victims) demoteLocked(mm, t, false);
+        do {
+            victims.clear();
+            size_t dirty = 0;
+            for (size_t full = fullTiles_; full + room > maxFull && !lru.empty();) { // (back = oldest)
+                const uint32_t t = lru.back();
+                if (t < T && state_[t] == kDirty && dirty == kDirtyBatch) break;
+                lru.pop_back();
+                if (t < T && state_[t] != kCoarse) victims.push_back(t), --full, dirty += state_[t] == kDirty;
+            }
+            poolFor(victims.size(), [&](size_t b, size_t e) {
+                for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
+            }, 8);
+            for (uint32_t t : victims) demoteLocked(mm, t, false);
+        } while (fullTiles_ + room > maxFull && !victims.empty() && !lru.empty() && msSince(t0) <= budgetMs);
         return fullTiles_ + room <= maxFull;
     };
     size_t done = 0;
