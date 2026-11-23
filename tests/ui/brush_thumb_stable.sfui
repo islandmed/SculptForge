@@ -7,6 +7,7 @@ key f
 click "Standard##brush.standard"
 wait_idle 60
 expect_value brush_builtin_looks == 0
+expect_value brush_looks == 0
 
 # A brush with its own alpha, then each built-in brush in turn (first use of each), then the library brushes the reporter
 # named, then the built-ins again.
@@ -38,6 +39,12 @@ click "Standard##brush.standard"
 wait 0.2
 run brush_use name="Flat Plane"
 wait 0.2
+run brush_use name="Clay Strip"
+wait 0.2
+click "Standard##brush.standard"
+wait 0.2
+run brush_use name="Clay Strip"
+wait 0.2
 click "Clay##brush.clay"
 wait 0.2
 click "Standard##brush.standard"
@@ -48,3 +55,4 @@ wait_idle 60
 wait 0.5
 shot brush-thumbs-stable
 expect_value brush_builtin_looks == 0
+expect_value brush_looks == 0
