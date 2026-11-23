@@ -289,6 +289,10 @@ float samplePattern(BrushRecipe::Pattern pattern, const glm::vec3& p) {
 // a half it squeezes the triangles at the steepest part of the falloff to a quarter of their area or less, the slivers the
 // next dab turns over.
 constexpr float kMaxDragSqueeze = 0.35f;
+// A pinching recipe pulls the surface toward its stroke while it cuts; over one stroke a vertex may slide this many times the
+// recipe's Pinch (in brush radii) from where the stroke found it. Laps over one line (the pen never lifted) deepen the groove, but
+// don't keep squeezing its walls together until they cross (a ruffled, sawtooth wall); a lap or two is far inside it.
+constexpr float kPinchReach = 0.15f;
 constexpr float kTendrilRingEdges = 2.0f; // Tendril with Dynamic on: its horn never pinches thinner than this many edges of radius
 constexpr float kTendrilDepth = 0.5f;     // Tendril under View falloff: full strength to 0.75 radii of depth from the tip, none beyond 1.5
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
@@ -2252,6 +2256,12 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         return true;
     };
     const uint32_t stamp = uint32_t(strokeId_);
+    const bool pinchBound = r.pinch != 0.0f && !crispMax && !dynTopo_.active();
+    if (pinchBound && pinchStamp_.size() != mesh.vertexCount()) {
+        pinchStamp_.resize(mesh.vertexCount(), 0);
+        pinchStart_.resize(mesh.vertexCount(), glm::vec3(0.0f));
+    }
+    const float pinchCap = kPinchReach * rad;
     if (crispMax && crispStamp_.size() != mesh.vertexCount()) {
         crispStamp_.resize(mesh.vertexCount(), 0);
         crispDone_.resize(mesh.vertexCount(), 0.0f);
@@ -2410,7 +2420,18 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             break;
         default: break;
         }
-        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
+        if (r.pinch != 0.0f) {
+            glm::vec3 pull = projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
+            if (pinchBound && f > 0.0f) { // (the pull from where the stroke found the vertex stays within pinchCap)
+                if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = x;
+                const glm::vec3 slid = projectOnPlane(x - pinchStart_[v], areaNormal);
+                // (the pull tapers off smoothly between the bound and twice it: a hard stop would leave a vertex at the bound among
+                // neighbours still sliding, and they would cross it)
+                const float t = std::clamp(2.0f - glm::length(slid) / pinchCap, 0.0f, 1.0f); // (all of it to the bound, none at twice it)
+                pull *= t * t * (3.0f - 2.0f * t);
+            }
+            d += pull;
+        }
         if (r.drag > 0.0f) {
             glm::vec3 drag = p.strokeDelta * (dragScale * r.drag * f);
             if (slide && crispCopyCenters_.size() > 1 && copy < crispCopyCenters_.size()) {

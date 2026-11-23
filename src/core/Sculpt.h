@@ -410,6 +410,10 @@ private:
     std::vector<uint32_t> crispStamp_; // (the stroke id's low 32 bits, as layerStamp_: 12 bytes a vertex in all)
     std::vector<float> crispDone_;
     std::vector<float> crispFacing_; // (the vertex normal's dot with the plane's, when the stroke found it)
+    // A pinching recipe: where each vertex stood when this stroke first reached it (pinchStamp_ = the stroke that wrote it), so the
+    // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
+    std::vector<uint32_t> pinchStamp_;
+    std::vector<glm::vec3> pinchStart_;
     std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
     std::vector<glm::vec3> crispMoved_;
     std::vector<uint32_t> crispSlideVerts_; // (its relax's)
