@@ -271,6 +271,7 @@ test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
 test_ink                    sculpt
+test_carve_pinch            sculpt
 test_micro                  mesh
 test_micro_history          sculpt
 test_micro_mask_grab        mesh

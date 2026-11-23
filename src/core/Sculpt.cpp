@@ -342,6 +342,10 @@ float samplePattern(BrushRecipe::Pattern pattern, const glm::vec3& p) {
 // a half it squeezes the triangles at the steepest part of the falloff to a quarter of their area or less, the slivers the
 // next dab turns over.
 constexpr float kMaxDragSqueeze = 0.35f;
+// A pinching recipe pulls the surface toward its stroke while it cuts; over one stroke a vertex may slide this many times the
+// recipe's Pinch (in brush radii) from where the stroke found it. Laps over one line (the pen never lifted) deepen the groove, but
+// don't keep squeezing its walls together until they cross (a ruffled, sawtooth wall); a lap or two is far inside it.
+constexpr float kPinchReach = 0.15f;
 constexpr float kTendrilRingEdges = 2.0f; // Tendril with Dynamic on: its horn never pinches thinner than this many edges of radius
 constexpr float kTendrilDepth = 0.5f;     // Tendril under View falloff: full strength to 0.75 radii of depth from the tip, none beyond 1.5
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
@@ -2210,6 +2214,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     for (const SymCopy& m : all) crispCopyCenters_.push_back(m.point(base.center));
     slideVerts_.clear();
     slideTo_.clear();
+    ++pinchDab_;
     for (size_t k = 0; k < all.size(); ++k) {
         const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
@@ -2402,6 +2407,14 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         return true;
     };
     const uint32_t stamp = uint32_t(strokeId_);
+    const bool pinchBound = r.pinch != 0.0f && !crispMax && !dynTopo_.active();
+    if (pinchBound && pinchStamp_.size() != mesh.vertexCount()) {
+        pinchStamp_.resize(mesh.vertexCount(), 0);
+        pinchStart_.resize(mesh.vertexCount(), glm::vec3(0.0f));
+        pinchDabStamp_.resize(mesh.vertexCount(), 0);
+        pinchTaper_.resize(mesh.vertexCount(), 1.0f);
+    }
+    const float pinchCap = kPinchReach * rad;
     if (crispMax && crispStamp_.size() != mesh.vertexCount()) {
         crispStamp_.resize(mesh.vertexCount(), 0);
         crispDone_.resize(mesh.vertexCount(), 0.0f);
@@ -2560,7 +2573,26 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
             break;
         default: break;
         }
-        if (r.pinch != 0.0f) d += projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
+        if (r.pinch != 0.0f) {
+            glm::vec3 pull = projectOnPlane(p.center - x, areaNormal);
+            pull -= strokeDir * glm::dot(pull, strokeDir); // (across the stroke only, as Sharp Crease's: along it a lap's turn pulled the surface into the end's point)
+            pull *= r.pinch * 0.25f * s * f;
+            if (pinchBound && f > 0.0f) { // (the pull from where the stroke found the vertex stays within pinchCap)
+                if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = x;
+                // (the taper is worked out once a dab, from where the dab found the vertex: the copies of a symmetry reach it one
+                // after the other, and one that found it already pulled by another would taper differently: a serrated seam)
+                if (pinchDabStamp_[v] != pinchDab_) {
+                    pinchDabStamp_[v] = pinchDab_;
+                    const glm::vec3 slid = projectOnPlane(x - pinchStart_[v], areaNormal);
+                    // (it tapers off smoothly between the bound and twice it: a hard stop would leave a vertex at the bound among
+                    // neighbours still sliding, and they would cross it)
+                    const float t = std::clamp(2.0f - glm::length(slid) / pinchCap, 0.0f, 1.0f); // (all of it to the bound, none at twice it)
+                    pinchTaper_[v] = t * t * (3.0f - 2.0f * t);
+                }
+                pull *= pinchTaper_[v];
+            }
+            d += pull;
+        }
         if (r.drag > 0.0f) {
             glm::vec3 drag = p.strokeDelta * (dragScale * r.drag * f);
             if (slide && crispCopyCenters_.size() > 1 && copy < crispCopyCenters_.size()) {
