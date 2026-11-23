@@ -772,9 +772,9 @@ void FocusDetail::parkLocked(MicroMesh& mm, uint32_t t) {
     compressTile(writeCodec_, g, n_, samples_, parked_[t]);
 }
 
-void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park) {
+void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park, bool fill) {
     if (park) parkLocked(mm, t);
-    fillCoarse(mm, t);
+    if (fill) fillCoarse(mm, t);
     state_[t] = kCoarse;
     --fullTiles_;
     mm.markDirty(t);
@@ -989,9 +989,13 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
             const double left = budgetMs - msSince(t0);
             const size_t maxDirty = parkMs_[busy] > 0.0 ? size_t(std::clamp(left / parkMs_[busy], 1.0, double(kDirtyBatch)))
                                                         : (busy ? 1 : 16);
+            // (an unedited tile costs its coarse grid's upsampling into the full grid: 10-135 ms frames under a 120 px
+            // stroke when every victim went in one batch)
+            const size_t maxVictims = demoteMs_[busy] > 0.0 ? size_t(std::clamp(left / demoteMs_[busy], 1.0, 4096.0))
+                                                            : (busy ? 4 : 64);
             victims.clear();
             size_t dirty = 0;
-            for (size_t full = fullTiles_; full + room > maxFull && !lru.empty();) { // (back = oldest)
+            for (size_t full = fullTiles_; full + room > maxFull && !lru.empty() && victims.size() < maxVictims;) { // (back = oldest)
                 const uint32_t t = lru.back();
                 if (t < T && state_[t] == kDirty && dirty == maxDirty) break;
                 lru.pop_back();
@@ -1006,7 +1010,15 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
                 const double per = msSince(p0) / double(dirty);
                 parkMs_[busy] = parkMs_[busy] > 0.0 ? 0.7 * parkMs_[busy] + 0.3 * per : per;
             }
-            for (uint32_t t : victims) demoteLocked(mm, t, false);
+            const auto f0 = Clock::now();
+            poolFor(victims.size(), [&](size_t b, size_t e) { // (each tile's own grid: in parallel; edges after, in order)
+                for (size_t k = b; k < e; ++k) fillCoarse(mm, victims[k]);
+            }, 1, 2);
+            for (uint32_t t : victims) demoteLocked(mm, t, false, false);
+            if (!victims.empty()) {
+                const double per = msSince(f0) / double(victims.size());
+                demoteMs_[busy] = demoteMs_[busy] > 0.0 ? 0.7 * demoteMs_[busy] + 0.3 * per : per;
+            }
             demoteMs += msSince(p0);
         } while (fullTiles_ + room > maxFull && !victims.empty() && !lru.empty() && msSince(t0) <= budgetMs);
         return fullTiles_ + room <= maxFull;
