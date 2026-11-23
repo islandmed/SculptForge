@@ -97,6 +97,8 @@ void ThreadPool::run(size_t count, const std::function<void(size_t)>& job) {
         for (size_t i = 0; i < count; ++i) job(i);
         return;
     }
+    running_.store(true, std::memory_order_relaxed);
+    struct Clear { std::atomic<bool>& b; ~Clear() { b.store(false, std::memory_order_relaxed); } } clear{running_};
     Run run;
     run.job = &job;
     run.count = count;

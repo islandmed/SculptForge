@@ -194,7 +194,9 @@ private:
     std::atomic<size_t> lastPending_{0};
     std::atomic<int> brushWaiting_{0}; // ensureFull callers waiting for the lock: update() gives way to them
     int gaveWay_ = 0;      // (update, main thread: frames in a row it gave way to a brush)
-    double tileMs_ = 0.0; // (update: a promoted tile's recent cost, sizing a frame's batches to its budget)
+    // (update: a promoted / an edited demoted tile's recent cost, [1] while another thread has the pool and batches
+    // run on this thread alone; sizing a frame's batches to its budget)
+    double tileMs_[2] = {0.0, 0.0}, parkMs_[2] = {0.0, 0.0};
     // The mapped file
 #if defined(_WIN32)
     void* fd_ = nullptr; // the file's HANDLE (open while mapped)

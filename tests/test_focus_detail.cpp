@@ -581,7 +581,7 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
 }
 
 // After strokes a new view demotes every edited tile at once: a frame compresses at most a batch of them past its
-// time budget (one batch at budget 0), the rest on the next frames, and no edit is lost.
+// time budget (one tile at budget 0), the rest on the next frames, and no edit is lost.
 TEST(focus_detail_demotions_spread_over_frames) {
     const std::string path = writeSmall("spread.sfdetail");
     Mesh m;
@@ -597,7 +597,7 @@ TEST(focus_detail_demotions_spread_over_frames) {
     fd->budgetBytes = 0;
     size_t parked = 0;
     int frames = 0;
-    for (; frames < 200 && parked + 1 < T; ++frames) { // (a budget of 0 keeps one tile)
+    for (; frames < 5000 && parked + 1 < T; ++frames) { // (a budget of 0 keeps one tile)
         fd->update(m, FocusView{}, FocusBrush{}, 0.0);
         const size_t now = fd->stats().parkedTiles;
         CHECK(now - parked <= 64);

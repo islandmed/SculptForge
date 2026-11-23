@@ -49,6 +49,8 @@ public:
     // count <= 1. A job that throws stops the jobs not yet started; run() rethrows the first exception once every
     // worker has left (the pool stays usable).
     void run(size_t count, const std::function<void(size_t)>& job);
+    // Another thread's run() has the pool right now (a run() from here would go inline): a hint, for sizing work.
+    bool busy() const { return running_.load(std::memory_order_relaxed); }
 
 private:
     // One run(): workers join it under mutex_ while it is current, and run() waits until every job is done and
@@ -72,6 +74,7 @@ private:
     std::atomic<uint64_t> generation_{0};
     bool stop_ = false;
     std::atomic<bool> serial_{false};
+    std::atomic<bool> running_{false}; // (runMutex_ held: busy())
 };
 
 // Calls fn(begin, end) for the blocks [b * block, min(n, (b + 1) * block)) of [0, n) on the shared pool.
