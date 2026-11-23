@@ -275,6 +275,7 @@ test_carve_pinch            sculpt
 test_micro                  mesh
 test_micro_history          sculpt
 test_micro_mask_grab        mesh
+test_move_front_faces       mesh
 test_micro_move_folds       mesh
 test_multires*              mesh
 test_part*                  mesh

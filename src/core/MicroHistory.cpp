@@ -115,7 +115,7 @@ void MicroHistory::run(Mesh& m, const BVH& bvh, MicroRecord& rec) {
                    d.maskStrength, alpha, texture, d.strokeDir, d.pxPerUnit); // (the same tile depth cap as when placed)
             break;
         }
-        case MicroDab::Op::GrabBegin: st.beginGrab(m, bvh, d.center, d.radius, d.focal, d.copy.m); break;
+        case MicroDab::Op::GrabBegin: st.beginGrab(m, bvh, d.center, d.radius, d.focal, d.copy.m, d.viewDir, d.frontFaces); break;
         case MicroDab::Op::Grab: st.grab(m, d.delta); break;
         case MicroDab::Op::Restore: st.restore(m); break;
         }

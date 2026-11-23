@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <limits>
+#include <queue>
 #include <unordered_map>
 
 #include "core/LegacyNames.h"
@@ -2694,6 +2695,41 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     finishDab(mesh, bvh, clock, crispMax && !lazyNormals ? &crispMovedVerts_ : nullptr, fewMoved ? &crispRefit_ : nullptr);
 }
 
+std::unordered_map<uint32_t, float> grabFrontField(const Mesh& mesh, std::span<const uint32_t> region, const glm::vec3& view,
+                                                   float reach) {
+    std::unordered_map<uint32_t, float> keep; // (the weight of each vertex that keeps less than all)
+    const float len = std::max(glm::length(view), 1e-12f);
+    using Item = std::pair<float, uint32_t>;
+    std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
+    std::unordered_map<uint32_t, float> dist;
+    for (uint32_t v : region) {
+        const float facing = -glm::dot(mesh.normals[v], view) / len;
+        const float k = grabFrontWeight(facing);
+        if (k < 1.0f) keep[v] = k;
+        if (facing <= 0.0f) dist[v] = 0.0f, open.push({0.0f, v}); // (facing away: where the distance is measured from)
+    }
+    // Along the edges, out to `reach` from the nearest vertex facing away (each vertex settles once, the nearest first).
+    while (!open.empty()) {
+        const auto [d, v] = open.top();
+        open.pop();
+        if (d > dist[v]) continue;
+        for (uint32_t w : mesh.neighbors(v)) {
+            const float nd = d + glm::distance(mesh.positions[v], mesh.positions[w]);
+            if (nd >= reach) continue;
+            auto [it, fresh] = dist.try_emplace(w, nd);
+            if (!fresh && it->second <= nd) continue;
+            it->second = nd;
+            open.push({nd, w});
+        }
+    }
+    for (const auto& [v, d] : dist) {
+        const float t = std::clamp(d / reach, 0.0f, 1.0f), k = t * t * (3.0f - 2.0f * t);
+        auto [it, fresh] = keep.try_emplace(v, k);
+        if (!fresh) it->second = std::min(it->second, k);
+    }
+    return keep;
+}
+
 void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym) {
     grabVerts_.clear();
     grabWeights_.clear();
@@ -2714,7 +2750,8 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
             MicroDab d;
             d.op = MicroDab::Op::GrabBegin, d.type = BrushType::Move, d.center = m.point(p.center), d.radius = p.radius, d.focal = p.focal;
             d.copy = m, d.pxPerUnit = p.pxPerUnit;
-            micro_.beginGrab(mesh, bvh, d.center, d.radius, d.focal, m.m);
+            d.viewDir = m.dir(p.viewDir), d.frontFaces = p.frontFacesOnly;
+            micro_.beginGrab(mesh, bvh, d.center, d.radius, d.focal, m.m, d.viewDir, d.frontFaces);
             inkHeader(false, nullptr, 0, 0.0f, 0.0f);
             inkDab(d);
         }
@@ -2723,9 +2760,19 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     for (const SymCopy& m : copies(sym)) {
         const glm::vec3 c = m.point(p.center), view = m.dir(p.viewDir);
         brushRegion(mesh, bvh, c, view, p.radius, p.connectedOnly, p.viewFalloff, verts_, connected_);
+        // Front faces only: what faces away stays, and the surface towards it eases in (a hard cut tore it, on a thin part
+        // such as an ear the facing alone still did): by its facing and by its distance from what faces away.
+        std::unordered_map<uint32_t, float> front;
+        if (p.frontFacesOnly) front = grabFrontField(mesh, verts_, view, kGrabFrontReach * p.radius);
         for (uint32_t v : verts_) {
+            float k = 1.0f;
+            if (p.frontFacesOnly) {
+                const auto it = front.find(v);
+                if (it != front.end()) k = it->second;
+                if (k <= 0.0f) continue;
+            }
             float w = brushFalloff(brushDistance(mesh.positions[v], c, view, p.viewFalloff), p.radius, p.focal) *
-                      std::clamp(p.strength * 2.0f, 0.0f, 1.0f);
+                      std::clamp(p.strength * 2.0f, 0.0f, 1.0f) * k;
             if (w <= 0.0f) continue;
             grabVerts_.push_back(v);
             grabWeights_.push_back(w);
