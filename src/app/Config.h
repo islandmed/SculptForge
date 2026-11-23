@@ -88,6 +88,9 @@ struct UiPrefs {
     // Brush falloff options (from the discussions): Connected only, View falloff (App::connectedOnly_ / viewFalloff_).
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Contact facing (DabParams::contactFacing): the surface under the cursor decides what moves; the angle, degrees.
+    bool contactFacing = false;
+    float facingAngle = 180.0f;
     // Dynamic topology: how much Smooth remeshes, 0-1 (DyntopoSettings::smoothRemesh; 1 as before).
     float dyntopoSmoothRemesh = 1.0f;
     int slideRotateKey = 0;   // Slide Stamp (#175): the key that turns the alpha toward the cursor while sliding: 0 Shift, 1 Ctrl, 2 Alt, 3 off

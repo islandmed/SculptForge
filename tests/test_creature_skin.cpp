@@ -281,7 +281,8 @@ TEST(creature_skin_pack_micro_level_invariants) {
         Document d;
         BVH b = bvh;
         d.setMesh(std::move(m), "Sculpt", &b);
-        CHECK(BrushAlpha::builtin(r.alpha, d.brushAlpha));
+        CHECK(BrushAlpha::builtinAt(r.alpha, 512, d.brushAlpha)); // (512 px: the direction of the moves is the point, and the 2048 px
+                                                                // ones took 1.8 s each to make: 28 s for the sixteen)
         const MicroSnapshot start = microSnapshot(d.mesh, glm::vec3(0, 0, 1), 0.6f);
         for (int k = 0; k < 2; ++k) {
             PathStroke s;

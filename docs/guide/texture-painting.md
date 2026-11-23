@@ -61,8 +61,9 @@ sharp as the texture: a hard alpha gives the same texels on a two-triangle plane
 Each Part keeps its own choice, saved in the project. **Show texture** (Texture Image, or the **Paint** menu) hides
 the texture in the viewport without deleting it.
 
-> **Smoothing colour:** holding <kbd>Shift</kbd> with the Paint brush blends [vertex paint](vertex-paint.md#paint-with-the-paint-brush)
-> toward the neighbouring colours. On a Part that paints into a texture, <kbd>Shift</kbd> still smooths the shape.
+> **Smoothing:** holding <kbd>Shift</kbd> with the Paint brush blends [vertex paint](vertex-paint.md#paint-with-the-paint-brush)
+> toward the neighbouring colours. On a Part that paints into a texture it blends the texels the same way, across UV seams, in
+> every channel the brush paints (Base Color and the material channels ticked under **Paint > Material**), and never moves the shape.
 
 ## How texture painting works
 

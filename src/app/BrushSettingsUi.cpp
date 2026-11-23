@@ -71,9 +71,18 @@ ImTextureID App::brushThumbnail(int brushType) {
     return thumbs_.brush(brushType, has ? &look : nullptr);
 }
 
+// True when `s` is just the look the recipe itself has (its own alpha and turn, the Dots stroke, no tiling): its thumbnail
+// is then the recipe's own preview, the same before and after the brush is picked.
+static bool recipesOwnLook(const BrushRecipe& r, const BrushToolSettings& s) {
+    const AlphaOptions& o = s.alphaOptions;
+    return s.alphaPath.empty() && !s.alphaInvert && s.stroke == StrokeType::Dots &&
+           lower(s.alphaName) == lower(r.alpha.empty() ? std::string("Round") : r.alpha) && o.followStroke == r.alphaFollow &&
+           o.angle == r.alphaAngle && o.tileX == 1 && o.tileY == 1;
+}
+
 ImTextureID App::recipeThumbnail(const BrushRecipe& recipe) {
     BrushToolSettings look;
-    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
     return thumbs_.recipe(recipe, has ? &look : nullptr);
 }
 
@@ -86,7 +95,7 @@ void App::regenerateBrushThumbnail(int brushType) {
 
 void App::regenerateRecipeThumbnail(const BrushRecipe& recipe) {
     BrushToolSettings look;
-    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
     thumbs_.regenerateRecipe(recipe, has ? &look : nullptr);
 }
 
@@ -145,12 +154,33 @@ void App::syncBrushSettings() {
         return;
     }
     const bool firstUse = !brushSettings_.known(key);
-    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings());
+    const BrushToolSettings live = liveBrushSettings();
+    const bool leavingOwnAlpha = firstUse && alphaIsBrushsOwn(brushSettingsKey_, live);
+    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, live);
+    if (leavingOwnAlpha) { // a brush's own alpha stays with it: the next brush starts plain, thumbnail and strokes alike
+        const BrushToolSettings plain = BrushSettingsStore::shipped(key);
+        next.alphaName = plain.alphaName;
+        next.alphaPath = plain.alphaPath;
+        next.alphaInvert = plain.alphaInvert;
+        next.alphaOptions = plain.alphaOptions;
+    }
     if (firstUse) recipeAlpha(next); // a brush-pack brush starts with its own alpha (or none), not the last brush's
     if (firstUse) recipePenPressure(next);
     applyBrushSettings(next);
     brushSettingsKey_ = key;
     syncAlphaTile();
+}
+
+// True when `s`'s alpha is the one the custom brush under `key` brought with it (a library or pack brush's own), not one
+// picked for the session: that one must not spread to the next brush clicked.
+bool App::alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const {
+    if (key.rfind("custom:", 0) != 0 || !s.alphaPath.empty()) return false;
+    for (const BrushRecipe& r : doc_.brushes) {
+        if (brushSettingsKey("", r.name) != key) continue;
+        const bool own = !r.alpha.empty() ? lower(s.alphaName) == lower(r.alpha) : !r.origin.pack.empty();
+        return own && hasAlphaLook(s);
+    }
+    return false;
 }
 
 void App::recipeAlpha(BrushToolSettings& s) const {

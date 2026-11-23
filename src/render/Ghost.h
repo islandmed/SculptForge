@@ -24,7 +24,7 @@
 
 namespace sf {
 
-// The brush kernels the preview can draw (the rest show no ghost: Smooth, Layer, Nudge, Move, Snake Hook,
+// The brush kernels the preview can draw (the rest show no ghost: Smooth, Layer, Nudge, Move, Tendril,
 // VDM, recipes, masking, painting).
 enum class GhostKind : int32_t { None = 0, Standard, Inflate, Clay, ClayBlock, Flatten, Crease, Pinch, SharpCrease, Trim,
     // Live Move (SF_LIVE_MOVE=1, app/App.cpp): the Move brush's whole drag. Each dab is one mirror's grab: `normal`

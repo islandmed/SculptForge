@@ -110,11 +110,12 @@ void MicroHistory::run(Mesh& m, const BVH& bvh, MicroRecord& rec) {
         case MicroDab::Op::Dab: {
             std::function<float(const glm::vec3&)> texture;
             if (patterned) texture = microPatternTexture(rec.ink.pattern, rec.ink.patternScale, rec.ink.patternAmount, d.radius, d.copy);
+            st.facingNormal = d.facingNormal, st.facingAngle = d.facingAngle;
             st.dab(m, bvh, d.type, d.center, d.viewDir, d.radius, d.strength, d.invert, d.focal, d.alphaUp, rec.ink.maskBrush,
                    d.maskStrength, alpha, texture, d.strokeDir, d.pxPerUnit); // (the same tile depth cap as when placed)
             break;
         }
-        case MicroDab::Op::GrabBegin: st.beginGrab(m, bvh, d.center, d.radius, d.focal, d.copy.m); break;
+        case MicroDab::Op::GrabBegin: st.beginGrab(m, bvh, d.center, d.radius, d.focal, d.copy.m, d.viewDir, d.frontFaces); break;
         case MicroDab::Op::Grab: st.grab(m, d.delta); break;
         case MicroDab::Op::Restore: st.restore(m); break;
         }

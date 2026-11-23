@@ -1,0 +1,15 @@
+# cold
+# Focus Detail files (streamed micro level): Save As makes a folder that doesn't exist yet and writes the detail file in
+# it, the script command `open` takes a .sfdetail (it said "No faces found"), and a shot waits for the detail's shading pages.
+env SF_FOCUS_DETAIL 1
+run ui_look look=classic layout=classic
+run new_starter_mesh name=human-head
+run micro_divide level=5
+wait_idle 300
+run save_project path=sf_ui_focus_open/not_yet/head.sfproj
+run new_sphere
+wait_idle 30
+run open path=sf_ui_focus_open/not_yet/head.sfdetail
+wait_idle 120
+expect_status "Focus Detail"
+shot focus_open

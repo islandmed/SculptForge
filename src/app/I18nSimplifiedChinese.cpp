@@ -1799,6 +1799,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Keep the plane the stroke starts on for the whole stroke.", "整个笔触都保持笔触起点的平面。"},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而干净的笔尖边缘并完全压平，用于硬表面平面。"},
     {"View falloff", "视图衰减"},
+    {"Contact facing", "接触面朝向"},
+    {"Facing angle %.0f", "朝向角度 %.0f"},
+    {"The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.",
+     "光标下的表面决定移动的部分：衰减沿着表面测量，因此细槽的对面墙壁或折痕的另一侧保持不动，而光标下的边缘跟着移动。朝向角度（默认 180）也会降低朝向其他方向的表面：角度一半以内为全强度，超过则无作用。平滑的形体移动方式与未开启时相同。移动与抓取仍可触及所有部分。随偏好设置与项目一并保存。"},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
      "smooth for the rest of the stroke.",
@@ -4286,6 +4290,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "下一步"},
     {"No UVs: Auto UV makes them",
      "没有 UV：Auto UV 会生成"},
+    {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
+     "此显卡无法在如此高密度的模型上显示纹理。绘制仍会写入纹理（可在 UV 视图中查看或导出）；降低三角面数即可在模型上看到。"},
     {"No UVs: Tool > Texture Image > Auto UV",
      "没有 UV：工具 > 纹理图像 > Auto UV"},
     {"No alpha matches \"%s\"",
@@ -5095,6 +5101,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "已开启："},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "这台电脑在基本功能之外还能负担的东西：更大的 Focus Detail 缓存、16K 纹理以及之后的等级，会在容纳得下的地方自动开启，容纳不下就不开。每个等级都能流畅雕刻；不会发送任何数据。"},
+    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
+     "这台电脑在基本功能之外还能负担的东西：16K 纹理以及之后的等级，会在容纳得下的地方自动开启，容纳不下就不开。每个等级都能流畅雕刻；不会发送任何数据。"},
     {"What this turns on:",
      "这会开启："},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",

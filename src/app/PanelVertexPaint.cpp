@@ -457,10 +457,10 @@ void App::beginPaintStroke() {
     }
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
         // Alt on the Base erases every channel (texture_channels, no metal left under the white), not just the brush's.
-        const bool eraseAll = strokeInvert_ && !strokeSculpt_ && (doc_.paintMaterial.channels & 1u) && m.texture->layers.empty();
-        const uint32_t channels = strokeColourSmooth_ ? channelBit(Channel::BaseColor)
-                                  : eraseAll          ? ~0u
-                                                      : doc_.paintMaterial.channels;
+        // Shift smooths every channel the brush paints, not only the colour.
+        const bool eraseAll = strokeInvert_ && !strokeSculpt_ && !strokeColourSmooth_ && (doc_.paintMaterial.channels & 1u) &&
+                              m.texture->layers.empty();
+        const uint32_t channels = eraseAll ? ~0u : doc_.paintMaterial.channels;
         if (!texturePainter_.begin(doc_.mesh, channels)) {
             const PaintTexture& t = *m.texture;
             if (!(doc_.paintMaterial.channels & enabledChannelMask(t)))

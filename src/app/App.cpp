@@ -64,6 +64,7 @@
 #include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "render/MicroFocus.h"
 #include "core/Utf8Path.h"
 
 #include <imgui.h>
@@ -114,7 +115,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;sfdetail;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -781,6 +782,11 @@ int App::runUiTest(int w, int h, int fps) {
             return 1;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
+        for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
+            syncScene();
+            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        }
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
@@ -1083,7 +1089,9 @@ bool App::wantsFrames(double now) const {
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
            renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
            renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
-           renderer_.microPendingCoarse() > 0; // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microPendingCoarse() > 0 || // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microShadingWantsFrame() || // ... and without Focus Detail its patches' shading (a big stroke's backlog, #184)
+           renderer_.microPendingPages() > 0; // a streamed level's pages still wait to be shaded (the fine detail on open)
 }
 
 uint64_t App::frameKey() const {
@@ -1439,7 +1447,7 @@ int App::run() {
         // for a limited time, then look at the pointer again.
         // Continuous (#31): a pointer held still keeps dabbing where it is, 30 times a second.
         if (strokeContinuous_ && drag_ == Drag::Stroke && !firstDabPending_ && dabQueue_.empty() &&
-            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook && strokeType_ != StrokeType::DragRect &&
+            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril && strokeType_ != StrokeType::DragRect &&
             strokeType_ != StrokeType::DragDot) {
             const double nowS = double(SDL_GetTicksNS()) * 1e-9;
             if (nowS - strokeMovedAt_ > 0.05 && nowS - continuousDabAt_ > 1.0 / 30.0) {
@@ -1612,10 +1620,24 @@ int App::run() {
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
-        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
-            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
-                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
-                    phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && frameLogMs >= 0.0) {
+            // A streamed Micro level (Focus Detail) adds its main-thread parts and the coarse shading still waiting (#184's
+            // freeze: SF_FRAME_LOG=100 for the reporter's log). (Taken every frame, so a slow frame shows its own; not while
+            // Help > Benchmark runs, which takes them itself.)
+            double f[MicroFocus::kParts] = {};
+            const bool focus = !proof_ && doc_.mesh.micro && doc_.mesh.micro->focus;
+            if (focus) renderer_.takeFocusSplit(f);
+            if (phase[6] - phase[0] > frameLogMs) {
+                SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                        phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                        phase[5] - phase[4], phase[6] - phase[5]);
+                if (focus)
+                    SDL_Log("frame micro: promote %.1f, coarse %.1f, records %.1f, shade coarse %.1f, pages %.1f, shade pages %.1f, "
+                            "whole %.1f ms; %zu tiles waiting for shading%s",
+                            doc_.mesh.micro->focus->lastUpdateMs(), f[0], f[1], f[2], f[3], f[4], f[5], renderer_.microPendingCoarse(),
+                            doc_.sculptor.strokeActive() ? ", stroking" : "");
+            }
+        }
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
@@ -2810,7 +2832,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
 // ---------------------------------------------------------------------------
 
 bool App::alongNormalBrush(BrushType t) const {
-    return t == BrushType::Move || t == BrushType::SnakeHook || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
+    return t == BrushType::Move || t == BrushType::Tendril || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
 }
 
 // Along the normal (from the discussions): with the invert key held as the stroke begins (Preferences > Input >
@@ -2940,11 +2962,12 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.focal = focalShift_;
         p.connectedOnly = uiPrefs_.connectedOnly;
         p.viewFalloff = uiPrefs_.viewFalloff;
+        p.frontFacesOnly = frontFacesOnly_;
         grabPending_ = false;
         grabQueued_.clear();
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
         liveMove_ = {};
-        if (liveMoveEnabled(doc_.sculptor.grabVertices()) && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+        if (liveMoveEnabled(doc_.sculptor.grabVertices()) && !p.connectedOnly && !p.viewFalloff && !p.frontFacesOnly && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
             !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
             &displayedMesh() == &doc_.mesh && Sculptor::copies(symmetry_).size() <= GhostStroke::kMaxMirrors) // (radial: the preview draws 8)
             liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
@@ -2958,8 +2981,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     lazyMouse_.reset(glm::vec2(x, y));
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        grabLast_ = hit.position; // the pulled tip (see tendrilTo)
         beginAlongNormal(hit, radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight()));
         return;
     }
@@ -3037,8 +3060,8 @@ void App::strokeTo(float x, float y) {
         kelvinTo(x, y);
         return;
     }
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        snakeHookTo(x, y);
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        tendrilTo(x, y);
         return;
     }
     if (steadyOn()) { // Steady Stroke, with every stroke type: the brush trails the pointer on a string
@@ -3115,7 +3138,27 @@ void App::strokeTo(float x, float y) {
 
 void App::drainStrokeDabs(double budgetSeconds) {
     if (dabQueue_.empty()) return;
+    // A widen of a Micro level's range (MicroMesh::widen) that takes the frame's budget ends its frame's dabs, and the
+    // next frame places none while the renderer re-sends the heights (resendLater, MicroRenderer::sync): the work spread
+    // over two frames, not one (#184: 0.7-1 s mid-stroke on a 2.6M base). A quick widen re-sends in its own frame and the
+    // dabs go on (holding them two frames was lag on a billion-triangle level). (Unbudgeted calls place every dab.)
+    // A widen due within two dabs happens first, at the frame's start (MicroStroke::widenAhead).
+    MicroMesh* const live = budgetSeconds > 0.0 && doc_.mesh.micro && doc_.mesh.micro->stroking ? doc_.mesh.micro.get() : nullptr;
+    if (live && live->rescaled && live->resendLater) return;
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
+    // (SF_WIDEN_SPLIT_MS: the widen time from which it splits; tests set 0 to see the split on any computer)
+    static const double splitMs = [] {
+        const char* v = std::getenv("SF_WIDEN_SPLIT_MS");
+        return v && *v ? std::max(0.0, std::strtod(v, nullptr)) : -1.0;
+    }();
+    auto slowWiden = [&] {
+        if (log) SDL_Log("stroke: widen %.1f ms", double(live->widenMs));
+        return double(live->widenMs) >= (splitMs >= 0.0 ? splitMs : budgetSeconds * 1000.0);
+    };
+    if (live && doc_.sculptor.microStroke().widenAhead(*live) && slowWiden()) {
+        live->resendLater = true;
+        return;
+    }
     const auto start = std::chrono::steady_clock::now();
     const size_t waiting = dabQueue_.size();
     const SculptTimings before = doc_.sculptor.timings;
@@ -3124,8 +3167,13 @@ void App::drainStrokeDabs(double budgetSeconds) {
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
         const auto dabStart = std::chrono::steady_clock::now();
+        const bool wasRescaled = live && live->rescaled;
         dabAt(d.x, d.y, d.pressure, d.stamp);
         ++placed;
+        if (live && !wasRescaled && live->rescaled && slowWiden()) {
+            live->resendLater = true;
+            break;
+        }
         if (doc_.sculptor.batchWaiting() > 0) continue; // (its cost shows when the batch is placed, below)
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();
@@ -3254,6 +3302,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     p.frontFacesOnly = st.frontFacesOnly;
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
+    p.contactFacing = st.contactFacing;
+    p.facingAngle = st.facingAngle;
     p.stampFootprint = stamp || benchStampFootprint_;
     p.focal = st.focal;
     if (!dabView_) { // (the solver's: when its batch is committed)
@@ -3378,6 +3428,15 @@ void App::runCommand(const std::string& name, const Args& args) {
         reviewPackFile(argString(args, "path"));
         lastCommandOk_ = packs_.review != nullptr;
         return;
+    }
+    if (name == "open") { // a Focus Detail file is the app's (a streamed level), not the core command's
+        const std::string path = argString(args, "path");
+        std::string ext = extensionUtf8(path);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".sfdetail") {
+            lastCommandOk_ = openFocusDetail(path);
+            return;
+        }
     }
     // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
     // A running macro and the "keep original" / preview forms don't touch the levels.
@@ -3730,6 +3789,14 @@ void App::syncScene() {
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
                          splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
+    // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
+    // that paints nothing and no word why.
+    {
+        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
+        if (notShown && !textureNoticeShown_)
+            status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
+        textureNoticeShown_ = notShown;
+    }
     updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;

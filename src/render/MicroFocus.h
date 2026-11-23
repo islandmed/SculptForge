@@ -37,6 +37,10 @@ public:
     uint32_t shadePoints() const { return coarseSamples_; }
     // Everything from scratch (opening, a new level): records, coarse shading, no pages.
     void syncAll(Mesh& mesh, MicroRenderer& r);
+    // The height step grew (MicroMesh::widen: every value divided, the same surface): records, coarse grids and the
+    // pages' heights at once; the shading (off by the rounding only) follows tile by tile when the frames have room
+    // (#184: a Draw stroke's first widen re-shaded every tile in one frame, 1-2 s on a 2.6M base).
+    void resendHeights(const Mesh& mesh, MicroRenderer& r);
     // A sync: `dirty` base triangles whose heights changed, `moved` (bitset or empty) those whose base moved.
     // Updates their records and shading, frees the pages of tiles that went coarse, gives pages to the tiles the
     // last draw wanted finer than the coarse level and shades pages within the budget.
@@ -49,9 +53,10 @@ public:
     size_t gpuBytes() const { return bytes_; }
     size_t pages() const { return pageCount_; }
     size_t pagesShaded() const { return shadedPages_; }
-    size_t pendingPages() const { return pendingShade_.size(); }
+    // Work for the next frames: pages shading, pages the frame's budget left, tiles the last draw drew finer than their page.
+    size_t pendingPages() const { return pendingShade_.size() + unpaged_ + (levelsChanged_ ? 1 : 0); }
     // Base triangles whose coarse shading waits for a frame's budget (a stroke re-shades its tiles over several frames).
-    size_t pendingCoarse() const { return pendingCoarse_.size() - coarseHead_; }
+    size_t pendingCoarse() const { return queuedCoarse() + (sweepEnd_ - sweepNext_); }
 
     // Main-thread ms since the last takeSplit(), by part (the benchmark's focus_split_ms): coarse grids, records,
     // coarse shading, page heights, page shading, whole rebuilds (syncAll).
@@ -59,6 +64,9 @@ public:
     void takeSplit(double* out) { for (int k = 0; k < kParts; ++k) out[k] += splitMs_[k], splitMs_[k] = 0; }
 
     bool cameraMoving = false; // set before sync: the camera moved since the last frame (the coarse shading queue drains slowly)
+    // Set before sync: this frame shades every tile waiting, outside the budget (undo, redo, Move, a moved base at rest:
+    // only a Clay-type stroke's own tiles catch up over frames; #184 0.13.10 showed undo's stale shading for seconds).
+    bool shadeAll = false;
     size_t poolBudgetBytes = size_t(384) << 20; // the pool's most (full grid + full shading: 6 bytes a point)
 
 private:
@@ -68,8 +76,11 @@ private:
     bool growPool(uint32_t pages);
     void sendPages(const MicroMesh& mm, MicroRenderer& r, const std::vector<uint32_t>& slots);
     void shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoints);
+    void trimScratch(size_t slice); // (after a big batch: staging and the coarse shader's scratch back to a few slices)
     void freePage(uint32_t slot);
 
+    size_t unpaged_ = 0; // wanted pages beyond the last frame's upload budget
+    bool levelsChanged_ = false; // a draw drew some cluster finer than the coarse level since the last sync
     double splitMs_[kParts] = {};
     uint32_t n_ = 1, samples_ = 3, coarseN_ = 1, coarseSamples_ = 3, shift_ = 0, record_ = 0, slots_ = 0;
     MicroMesh coarse_;               // the coarse level: every tile's coarse grid (shading only)
@@ -93,10 +104,14 @@ private:
     std::vector<uint32_t> pendingCoarse_;
     std::vector<uint8_t> coarseQueued_;
     size_t coarseHead_ = 0;
+    size_t queuedCoarse() const { return pendingCoarse_.size() - coarseHead_; }
+    // After resendHeights: every tile's coarse shading again, base triangles sweepNext_ .. sweepEnd_ still to go, at
+    // the queue's rest budget once the queue is empty and no stroke runs (never all at once).
+    uint32_t sweepNext_ = 0, sweepEnd_ = 0;
     double coarseNsPerTile_ = 0.0; // measured: a tile handed to shadeCoarse, its ring of neighbours included
     size_t bytes_ = 0;
     std::vector<int16_t> staging_;
-    std::vector<uint32_t> shadeStaging_, written_, coarseShade_;
+    std::vector<uint32_t> shadeStaging_, written_;
     struct Uniforms {
         GLuint program = 0;
         GLint cn = -1, cSamples = -1, record = -1, shift = -1;

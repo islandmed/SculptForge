@@ -553,6 +553,8 @@ void App::storeProjectSettings() {
     brush.set("front_faces_only", frontFacesOnly_);
     brush.set("connected_only", uiPrefs_.connectedOnly);
     brush.set("view_falloff", uiPrefs_.viewFalloff);
+    brush.set("contact_facing", uiPrefs_.contactFacing);
+    brush.set("facing_angle", double(uiPrefs_.facingAngle));
     brush.set("pressure_strength", pressureStrength_);
     brush.set("pressure_size", pressureSize_);
     brush.set("paint_color", vec3Json(doc_.paintColor));
@@ -726,6 +728,9 @@ void App::applyProjectSettings() {
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "connected_only", uiPrefs_.connectedOnly);
         readBool(b, "view_falloff", uiPrefs_.viewFalloff);
+        readBool(b, "contact_facing", uiPrefs_.contactFacing);
+        readFloat(b, "facing_angle", uiPrefs_.facingAngle);
+        uiPrefs_.facingAngle = std::clamp(uiPrefs_.facingAngle, 30.0f, 180.0f);
         readBool(b, "pressure_strength", pressureStrength_);
         readVec3(b["paint_color"], doc_.paintColor);
         readBool(b, "pressure_size", pressureSize_);

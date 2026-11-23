@@ -458,7 +458,7 @@ const char* brushTypeDescription(int type) {
         return "A sharp V-shaped crease with the sides pinched in, for wrinkles and folds.";
     case BrushType::ClayBlock:
         return "Square, flat-topped clay strokes that stack up quickly, for bold blocking.";
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
         return "Pulls the surface out along the stroke into horns, tentacles and spikes.";
     case BrushType::Trim:
         return "Trim: cuts away everything above a plane, for hard planar surfaces.";

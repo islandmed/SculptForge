@@ -1,0 +1,42 @@
+# Shift with the Paint brush smooths every channel the brush paints, not only the colour (member report: strokes painted with
+# Base Color, Roughness and Metallic ticked kept hard, streaky edges after Shift, because only the colour blended). On a texture
+# Part with Roughness and Metallic on: after Shift over the strokes' edges the roughness spreads past them (more texels differ
+# from the default) while the shape never moves; one undo step per stroke brings it all back.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+run uv_auto resolution=1024
+run texture_create size=1024
+run texture_channels enable=roughness,metallic
+run paint_material color=ff0000 roughness=0.95 metallic=0.6
+action draw.paint
+expect_value paint_mode == 1
+expect_value brush_channels == 7
+stroke 0.3 0.4 0.7 0.4
+stroke 0.3 0.5 0.7 0.5
+run paint_material color=0000ff roughness=0.2 metallic=0.1
+stroke 0.35 0.45 0.65 0.45
+stroke 0.3 0.55 0.7 0.55
+wait 5
+snapshot
+remember roughness_painted rough_before
+remember texture_painted colour_before
+expect_value roughness_painted > 1000
+shot channels-before
+
+hold shift
+stroke 0.28 0.4 0.72 0.6
+stroke 0.28 0.6 0.72 0.4
+hold none
+wait 5
+expect_value moved_exact == 0
+expect_value texture_changed > 500
+expect_value roughness_painted > $rough_before
+shot channels-after
+
+# One undo step per stroke (two above): the roughness is back exactly, the shape never moved.
+key ctrl+z
+key ctrl+z
+expect_value roughness_painted == $rough_before
+expect_value texture_changed == 0
+expect_value moved_exact == 0
