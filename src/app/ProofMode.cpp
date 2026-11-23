@@ -106,6 +106,12 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                         std::fprintf(stderr, "standard-1b: %s\n", err.c_str());
                                         return makeBenchHead(size_t(1) << 20);
                                     }
+                                    // SF_BENCH_FOCUS_IN_MEMORY=1: the same level whole in memory, no stream (the like for
+                                    // like "off" row: same base mesh, same level)
+                                    if (const char* e = std::getenv("SF_BENCH_FOCUS_IN_MEMORY"); e && e[0] == '1' && m.micro && m.micro->focus) {
+                                        m.micro->focus->ensureAllFull(*m.micro, false);
+                                        m.micro->focus.reset();
+                                    }
                                     return m;
                                 }, 2}; // (heights 1 GB + per-tile GPU levels, render/MicroFocus.h: ~2 bytes a micro triangle)
         return {s1b};
