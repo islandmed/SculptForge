@@ -1,0 +1,38 @@
+# Member bug (Discord #member-bug-reports, Android, Mali-G72, 0.13.11): Paint > Texture Image > New Texture and the model went
+# dark, strokes left no paint. A phone's texture buffers hold 65536 texels (a 22k-triangle mesh's UVs: 3 per triangle); the 82k
+# triangle sphere here is past it, as on the member's 70k one. The UVs now go in a 2D texture there, so the texture shows and
+# takes paint, with no GL error (render_cell fails on one), and a mesh past even that says so instead of drawing nothing.
+run ui_look look=classic layout=classic
+gl_limits texels=65536
+run new_sphere subdivisions=6
+run uv_auto resolution=2048
+run texture_create size=2048
+wait 0.5
+expect_value texture_uv_width > 0
+expect_value texture_not_shown == 0
+render_cell "textured x small GPU limits (UVs in a 2D texture)" mode=lit
+action draw.paint
+run set_color color=ff0000
+stroke 0.2 0.5 0.8 0.5
+wait 0.5
+expect_value texture_painted > 3000
+expect_value texture_uv_width > 0
+render_cell "textured, painted x small GPU limits" mode=lit
+shot texture_small_gpu
+# a GPU with nothing to hold the UVs in (texels=256 or less, tests only): the status bar and the panel say the texture is not shown
+gl_limits texels=256
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.5
+expect_value texture_not_shown == 1
+expect_value texture_uv_width == 0
+render_cell "textured x no UV storage (drawn without the texture)" mode=lit
+# a big limit again: the buffer
+gl_limits texels=0
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.5
+expect_value texture_uv_width == 0
+expect_value texture_not_shown == 0

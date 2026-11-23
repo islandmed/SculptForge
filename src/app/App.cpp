@@ -3745,6 +3745,14 @@ void App::syncScene() {
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
                          splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
+    // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
+    // that paints nothing and no word why.
+    {
+        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
+        if (notShown && !textureNoticeShown_)
+            status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
+        textureNoticeShown_ = notShown;
+    }
     updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;

@@ -29,6 +29,25 @@ run facegroup_from_mask
 run mask_clear
 render_cell "face groups x small" mode=groups
 
+# --- textured (a painted texture, core/Texture.h): UVs in a texture buffer, and in a 2D texture past a small GPU's buffer limit
+run new_sphere subdivisions=4
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.3
+render_cell "Lit Sphere x textured" mode=lit
+render_cell "PBR x textured" mode=pbr
+gl_limits texels=1024
+run new_sphere subdivisions=4
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.3
+expect_value texture_uv_width > 0
+render_cell "Lit Sphere x textured, UVs past the buffer limit" mode=lit
+render_cell "PBR x textured, UVs past the buffer limit" mode=pbr
+gl_limits texels=0
+run viewport_shading mode=lit
+run new_sphere subdivisions=4
+
 # --- Gaussian splats: plain colour (SH 0), then view-dependent colour (SH 3; drawn again without it, the box must change)
 run splat_test_capture kind=object count=20000 floaters=0
 wait 0.3
