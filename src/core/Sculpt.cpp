@@ -1168,6 +1168,9 @@ UndoRecord Sculptor::endStroke() {
     }
     microMesh_ = nullptr;
     inkMesh_ = nullptr;
+    // A pinching recipe's per-stroke state (24 bytes a vertex: 120 MB on a 5M mesh) goes with the stroke, not with the mesh.
+    std::vector<uint32_t>().swap(pinchStamp_), std::vector<glm::vec3>().swap(pinchStart_);
+    std::vector<uint32_t>().swap(pinchDabStamp_), std::vector<float>().swap(pinchTaper_);
     clearRecorded();
     active_ = false;
     grabVerts_.clear();

@@ -159,6 +159,40 @@ TEST(pinching_recipes_keep_the_mirror_seam_clean) {
     }
 }
 
+// The per-stroke state of a pinching recipe (24 bytes a vertex) is the stroke's, not the mesh's: held while the stroke runs, gone
+// when it ends (120 MB on a 5M-vertex mesh would otherwise stay as long as the mesh does).
+TEST(pinching_recipe_frees_its_stroke_memory_when_the_stroke_ends) {
+    BrushRecipe engrave;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Engrave") engrave = r;
+    CHECK(engrave.name == "Engrave");
+    Document doc = makeDoc(makeBenchSphere(81920));
+    const size_t verts = doc.mesh.vertexCount();
+    CHECK(doc.sculptor.pinchStateBytes() == 0);
+    Symmetry sym{false, false, false};
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Engrave"));
+    for (int i = 0; i < 6; ++i) {
+        DabParams p;
+        p.center = glm::normalize(glm::vec3(0.0f, -0.1f + 0.04f * float(i), 1.0f));
+        p.radius = 0.2f;
+        p.strength = 0.5f;
+        p.viewDir = glm::vec3(0, 0, -1);
+        doc.sculptor.dabRecipe(doc.mesh, doc.bvh, engrave, p, sym);
+    }
+    CHECK(doc.sculptor.pinchStateBytes() >= verts * 24); // (held while the stroke runs)
+    doc.undo.push(doc.sculptor.endStroke());
+    CHECK(doc.sculptor.pinchStateBytes() == 0);          // (and returned when it ends)
+    // The next stroke finds it again, from its own start.
+    std::string err;
+    PathStroke s;
+    for (int i = 0; i <= 4; ++i) s.points.push_back(glm::normalize(glm::vec3(0.0f, -0.2f + 0.1f * float(i), 1.0f)) * 1.2f);
+    s.view = glm::vec3(0, 0, -1);
+    s.radius = 0.2f;
+    s.strength = 0.5f;
+    CHECK(strokePath(doc, &engrave, BrushType::Standard, s, err) > 0);
+    CHECK(doc.sculptor.pinchStateBytes() == 0);
+}
+
 // A micro level takes the recipe as a grid dab (a height field: nothing slides): Engrave's groove stays clean there too.
 TEST(engrave_cuts_a_clean_groove_on_a_micro_level) {
     Document doc = makeDoc(makeBenchSphere(size_t(envNumber("SF_CARVE_TRIS", 81920))));

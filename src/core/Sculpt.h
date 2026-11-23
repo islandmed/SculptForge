@@ -491,6 +491,14 @@ private:
     std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
     std::vector<float> pinchTaper_;
     uint32_t pinchDab_ = 0;
+public:
+    // The bytes a pinching recipe's stroke holds (0 between strokes: endStroke frees them).
+    size_t pinchStateBytes() const {
+        return pinchStamp_.capacity() * sizeof(uint32_t) + pinchStart_.capacity() * sizeof(glm::vec3) + pinchDabStamp_.capacity() * sizeof(uint32_t) +
+               pinchTaper_.capacity() * sizeof(float);
+    }
+
+private:
     std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
     std::vector<glm::vec3> crispMoved_;
     std::vector<uint32_t> crispSlideVerts_; // (its relax's)
