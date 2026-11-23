@@ -542,8 +542,9 @@ private:
     // A bit per vertex: recorded in record_'s positions / mask / colours (cleared from those lists).
     std::vector<uint64_t> touched_, masked_, colored_;
     uint64_t strokeId_ = 0;
-    // Trim on a thin Part (shell, wing, Extract sheet; Sculpt.cpp partThinness): decided once per stroke and mesh.
-    uint64_t thinStroke_ = ~uint64_t(0);
+    // Trim on a thin Part (shell, wing, Extract sheet; Sculpt.cpp partThinness): decided once per Part (this mesh, this many
+    // triangles), not per stroke: a solid form folded by rough strokes (a huge brush with Front faces only) reads thin by volume.
+    size_t thinTris_ = 0;
     const Mesh* thinMesh_ = nullptr;
     bool thinPart_ = false;
     void clearRecorded();

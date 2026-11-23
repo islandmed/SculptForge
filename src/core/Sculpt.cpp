@@ -1289,8 +1289,8 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
 }
 
 // Is this Part a thin sheet (a shell, a wing, an Extract, a cloth-thin Part)? Its mean wall thickness, 2 x volume / area, is a
-// few percent of its size or less; a head's is a third of it. A Part-wide fact, decided once per stroke, so the dabs of a
-// stroke never change their mind: what a local test (a wall behind the skin, air behind the wall) could not give, as the lids
+// few percent of its size or less; a head's is a third of it. A Part-wide fact, decided once per Part (its mesh and triangle count), so neither the dabs of a
+// stroke nor rough strokes that fold a solid form change the answer: what a local test (a wall behind the skin, air behind the wall) could not give, as the lids
 // and lips of a head are thin walls too, and a closed shell has surface behind its far wall.
 float partThinness(const Mesh& mesh) {
     const size_t tris = mesh.triangles.size();
@@ -1341,9 +1341,9 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // Trim on a thin Part: the wall behind the skin is protected (keepTrimWalls); on anything else it is the plane it always was.
     bool trimSheet = false;
     if (type == BrushType::Trim && !p.invert) {
-        if (thinStroke_ != strokeId_ || thinMesh_ != &mesh) {
+        if (thinMesh_ != &mesh || thinTris_ != mesh.triangles.size()) {
             thinPart_ = partThinness(mesh) < kTrimThinPart;
-            thinStroke_ = strokeId_, thinMesh_ = &mesh;
+            thinMesh_ = &mesh, thinTris_ = mesh.triangles.size();
         }
         trimSheet = thinPart_;
     }
