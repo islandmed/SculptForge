@@ -1289,9 +1289,11 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
 }
 
 // Is the region under a Trim dab a thin sheet (a shell, a wing, a cloth-thin Part): most of what faces the viewer has a wall
-// behind it, parallel to it, within `kTrimSheet` of the brush radius? Sampled, a few rays. A solid form with pockets (the
-// nostrils and lips of a head) is not: Trim there stays what it was, a plane that takes everything above it.
-static constexpr float kTrimSheet = 1.5f; // (a wing 0.12 thick at its middle under a brush of radius 0.1 is a sheet)
+// behind it, parallel to it, within `kTrimSheet` of the brush radius, and nothing within `kTrimClear` radii beyond that wall?
+// Sampled, a few rays. A solid form with pockets (the eyelids, nostrils and lips of a head) is not: Trim there stays what it
+// was, a plane that takes everything above it.
+static constexpr float kTrimSheet = 2.0f; // (a wing 0.12 thick at its middle under a brush of radius 0.1 is a sheet)
+static constexpr float kTrimClear = 4.0f; // radii of open air behind a sheet's far wall
 static bool trimRegionIsSheet(const Mesh& mesh, const BVH& bvh, std::span<const uint32_t> verts, const glm::vec3& center,
                               const glm::vec3& viewDir, float r) {
     constexpr size_t kSamples = 400; // (half of a thin Part's region is its far side, and the pen's disc is a part of the rest: ~60 rays)
@@ -1311,8 +1313,12 @@ static bool trimRegionIsSheet(const Mesh& mesh, const BVH& bvh, std::span<const 
         for (const float sgn : {1.0f, -1.0f}) {
             if (!bvh.raycast(mesh, mesh.positions[v] - n * eps + side * sgn, -n, hit)) continue;
             if (glm::dot(hit.normal, -n) > 0.7f && hit.t + eps < kTrimSheet * r) {
-                ++thin;
-                break;
+                // (and open air behind it: the lid of an eye, the lips, a pocket in a solid have more surface within a few radii)
+                RayHit behind;
+                if (!bvh.raycast(mesh, hit.position - n * (4.0f * eps), -n, behind) || behind.t > kTrimClear * r) {
+                    ++thin;
+                    break;
+                }
             }
         }
     }
