@@ -89,40 +89,49 @@ float axisDrift(const Mesh& start, const Mesh& m, float radius) {
 }
 } // namespace
 
+namespace {
+// Mouse or pen, X symmetry, the wide circle's offset (tube radii x 10) and the intensity: five of the sixteen
+// combinations, every pair of the four values met (the full grid took 22 s on the PC, over the 20 s budget).
+struct Input {
+    bool pen, sym;
+    float off, strength;
+};
+const Input kInputs[] = {
+    {false, false, 0.0f, 0.25f}, {false, true, 0.6f, 0.5f}, {true, false, 0.6f, 0.5f}, {true, true, 0.0f, 0.5f}, {true, true, 0.6f, 0.25f},
+};
+} // namespace
+
 TEST(inflate_wide_brush_thin_tube_invariant_along_own_normals) {
     // The member's clip: a bulb with a brush 2.7 tube radii wide, stacked strokes of the same size beside it, then a circle
     // about 10 radii wide across the bulb and the tube, centred on the tube and a little off it. The scene at 1/100, 1 and
     // 100 times the size, the tube 40 and 160 cells round, mouse and pen (pressure 0.3 to 1), X symmetry off and on, the
-    // member's intensity (25) and the default (50).
+    // member's intensity (25) and the default (50), in the combinations of kInputs.
     for (const float scale : {0.01f, 1.0f, 100.0f})
         for (const int round : {40, 160}) {
             const float R = 0.1f * scale;
             const Mesh start = thinTube(40.0f * R, R, round);
-            for (const bool pen : {false, true}) // (the wide share: printed only, see the top)
-                for (const bool sym : {false, true})
-                    for (const float off : {0.0f, 0.6f})
-                        for (const float strength : {0.25f, 0.5f}) {
-                            Document d = makeDoc(start);
-                            Tally bulb, stacked, wide;
-                            const float x = 6.0f * R;
-                            for (int i = 0; i < 2; ++i)
-                                inflateStroke(d, vec3(x - 0.2f * R, 0, 0), vec3(x + 0.2f * R, 0, 0), 2.7f * R, strength, sym, bulb, pen);
-                            for (int i = 0; i < 3; ++i)
-                                inflateStroke(d, vec3(x + 1.5f * R, 0, 0), vec3(x + 4.0f * R, 0, 0), 2.7f * R, strength, sym, stacked, pen);
-                            const float driftStacked = axisDrift(start, d.mesh, R);
-                            for (int i = 0; i < 3; ++i)
-                                inflateStroke(d, vec3(x - 4.0f * R, off * 10.0f * R, 0), vec3(x + 6.0f * R, off * 10.0f * R, 0), 10.0f * R,
-                                              strength, sym, wide, pen);
-                            const float drift = axisDrift(start, d.mesh, R);
-                            const size_t flipped = geom::flippedFaces(start.positions, d.mesh);
-                            std::printf("  scale %g, %d round, %s, strength %.2f, X symmetry %d, wide circle %.1f off: along the own normals "
-                                        "bulb %.3f, stacked %.3f, wide %.3f; axis drift %.3f R stacked, %.3f R wide; %zu flipped\n",
-                                        scale, round, pen ? "pen" : "mouse", strength, int(sym), off, bulb.share(), stacked.share(),
-                                        wide.share(), driftStacked, drift, flipped);
-                            CHECK(bulb.share() >= 0.95f);
-                            CHECK(stacked.share() >= 0.95f);
-                            CHECK(flipped == 0);
-                        }
+            for (const Input& in : kInputs) { // (the wide share: printed only, see the top)
+                Document d = makeDoc(start);
+                Tally bulb, stacked, wide;
+                const float x = 6.0f * R;
+                for (int i = 0; i < 2; ++i)
+                    inflateStroke(d, vec3(x - 0.2f * R, 0, 0), vec3(x + 0.2f * R, 0, 0), 2.7f * R, in.strength, in.sym, bulb, in.pen);
+                for (int i = 0; i < 3; ++i)
+                    inflateStroke(d, vec3(x + 1.5f * R, 0, 0), vec3(x + 4.0f * R, 0, 0), 2.7f * R, in.strength, in.sym, stacked, in.pen);
+                const float driftStacked = axisDrift(start, d.mesh, R);
+                for (int i = 0; i < 3; ++i)
+                    inflateStroke(d, vec3(x - 4.0f * R, in.off * 10.0f * R, 0), vec3(x + 6.0f * R, in.off * 10.0f * R, 0), 10.0f * R,
+                                  in.strength, in.sym, wide, in.pen);
+                const float drift = axisDrift(start, d.mesh, R);
+                const size_t flipped = geom::flippedFaces(start.positions, d.mesh);
+                std::printf("  scale %g, %d round, %s, strength %.2f, X symmetry %d, wide circle %.1f off: along the own normals "
+                            "bulb %.3f, stacked %.3f, wide %.3f; axis drift %.3f R stacked, %.3f R wide; %zu flipped\n",
+                            scale, round, in.pen ? "pen" : "mouse", in.strength, int(in.sym), in.off, bulb.share(), stacked.share(),
+                            wide.share(), driftStacked, drift, flipped);
+                CHECK(bulb.share() >= 0.95f);
+                CHECK(stacked.share() >= 0.95f);
+                CHECK(flipped == 0);
+            }
         }
 }
 
