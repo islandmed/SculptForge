@@ -942,6 +942,12 @@ void App::drawPalette_Tool() {
         drawTubeContents(); // PanelTube.cpp
         Demo::popScope();
     }
+    if (subpalette("tool.scatter", "Scatter")) {
+        tray::Section section;
+        Demo::pushScope("Scatter");
+        drawScatterContents(); // PanelScatter.cpp
+        Demo::popScope();
+    }
     if (subpalette("tool.geometry", "Geometry")) {
         tray::Section section;
         Demo::pushScope("Geometry");

@@ -197,6 +197,7 @@ add_library(sculptforge_core STATIC
   src/core/QuadQuality.cpp
   src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
+  src/core/Scatter.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -543,6 +544,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelGenerate3D.cpp
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
+    src/app/PanelScatter.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelRenderBridge.cpp
     src/app/PanelSculptable.cpp

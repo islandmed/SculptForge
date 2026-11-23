@@ -1,0 +1,67 @@
+# Scatter (Tool > Scatter, PanelScatter.cpp; core/Scatter.h): pebbles over a sphere, kept apart; a changed setting scatters
+# again in place (still one undo step); Keep it; only the masked area; separate Parts. The shots feed the guide's
+# Scatter chapter. Scatter runs inside the command (no background job), so frame waits are enough.
+run ui_look look=classic layout=classic
+wait 0.3
+run new_sphere subdivisions=5
+wait 0.3
+click "Scatter##tool.scatter"
+wait 0.3
+expect "Scatter/Scatter"
+expect_value parts == 1
+click "Scatter/Scatter"
+wait 0.3
+expect_status "Scattered 200 copies"
+expect_status "kept apart"
+expect_value parts == 2
+expect_value active_part == 0
+expect "Scatter/Keep it"
+shot scatter
+# A changed setting scatters again in its place: still two Parts, still one undo step.
+click "Scatter/Lie flat"
+wait 0.3
+expect_status "Scattered 200 copies"
+expect_value parts == 2
+click "Scatter/Tight fit"
+wait 0.3
+expect_value parts == 2
+click "Scatter/Tight fit"
+wait 0.3
+ui_scale 200
+wait 0.3
+shot scatter-200
+ui_scale 100
+wait 0.3
+key ctrl+z
+wait 0.3
+expect_value parts == 1
+expect_not "Scatter/Keep it"
+# Scatter, Keep it, Scatter again: two scatters side by side.
+click "Scatter/Scatter"
+wait 0.3
+click "Scatter/Keep it"
+wait 0.2
+expect_not "Scatter/Keep it"
+click "Scatter/Scatter"
+wait 0.3
+expect_value parts == 3
+key ctrl+z
+wait 0.2
+key ctrl+z
+wait 0.2
+expect_value parts == 1
+# Only the masked area: the top of the sphere masked (what faces up), every copy goes there.
+run mask_by_facing x=0 y=1 z=0 angle=50
+run scatter shape=pebble count=25 masked=true keep_apart=true seed=3
+wait 0.3
+expect_status "Scattered 25 copies"
+expect_value parts == 2
+key ctrl+z
+wait 0.2
+# Separate Parts: one Part per copy, one undo takes them all.
+run scatter shape=cube count=20 separate=true keep_apart=true
+wait 0.3
+expect_value parts == 21
+key ctrl+z
+wait 0.3
+expect_value parts == 1
