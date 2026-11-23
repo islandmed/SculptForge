@@ -344,7 +344,9 @@ public:
     // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
     // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
-    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
+    // `frontOnly`: grid points whose surface normal faces away from `view` (into the scene) keep weight 0 (Front faces only).
+    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror,
+                   const glm::vec3& view = glm::vec3(0.0f, 0.0f, -1.0f), bool frontOnly = false);
     void grab(Mesh& m, const glm::vec3& delta);
     // Puts every grid point the stroke changed back (the stroke stays open).
     void restore(Mesh& m);

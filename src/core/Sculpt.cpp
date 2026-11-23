@@ -2714,7 +2714,8 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
             MicroDab d;
             d.op = MicroDab::Op::GrabBegin, d.type = BrushType::Move, d.center = m.point(p.center), d.radius = p.radius, d.focal = p.focal;
             d.copy = m, d.pxPerUnit = p.pxPerUnit;
-            micro_.beginGrab(mesh, bvh, d.center, d.radius, d.focal, m.m);
+            d.viewDir = m.dir(p.viewDir), d.frontFaces = p.frontFacesOnly;
+            micro_.beginGrab(mesh, bvh, d.center, d.radius, d.focal, m.m, d.viewDir, d.frontFaces);
             inkHeader(false, nullptr, 0, 0.0f, 0.0f);
             inkDab(d);
         }
@@ -2723,7 +2724,9 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
     for (const SymCopy& m : copies(sym)) {
         const glm::vec3 c = m.point(p.center), view = m.dir(p.viewDir);
         brushRegion(mesh, bvh, c, view, p.radius, p.connectedOnly, p.viewFalloff, verts_, connected_);
+        const std::span<const glm::vec3> nrm = mesh.normals;
         for (uint32_t v : verts_) {
+            if (p.frontFacesOnly && glm::dot(nrm[v], view) > 0.0f) continue; // (facing away: as dabSingle skips it)
             float w = brushFalloff(brushDistance(mesh.positions[v], c, view, p.viewFalloff), p.radius, p.focal) *
                       std::clamp(p.strength * 2.0f, 0.0f, 1.0f);
             if (w <= 0.0f) continue;

@@ -1056,7 +1056,8 @@ void MicroStroke::widen(MicroMesh& mm, float need) {
     strokeStep_ = mm.step;
 }
 
-void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror) {
+void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror,
+                            const glm::vec3& view, bool frontOnly) {
     if (!active_ || !m.micro) return;
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n;
@@ -1098,6 +1099,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
                     const glm::vec3 p = sp + nn * (float(g[MicroMesh::index(i, j, n)]) * mm.step);
                     const float d = glm::distance(p, center);
                     if (d >= radius) continue;
+                    if (frontOnly && glm::dot(nn, view) > 0.0f) continue; // (facing away: stays, as dabSingle skips it)
                     w[c] = brushFalloff(d, radius, focal);
                     nrm[c] = nn;
                     used[k] = 1;
