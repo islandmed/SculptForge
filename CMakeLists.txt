@@ -1368,6 +1368,12 @@ if(SCULPTFORGE_BUILD_TESTS)
       sculptforge_ui_test(e2e_${name} ../e2e/${name})
       set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
     endforeach()
+    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
+    foreach(size 1440x900 2880x1800)
+      string(REGEX REPLACE "x.*" "" w ${size})
+      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
+      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
+    endforeach()
     if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
       # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
       add_test(NAME e2e_quit_clean COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/quit_clean.py
