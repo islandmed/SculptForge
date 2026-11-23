@@ -865,7 +865,7 @@ void flatDab(Document& d, float x, float z, float radius) {
 
 } // namespace
 
-TEST(dyntopo_keeps_uvs_and_texture_across_a_seam) {
+TEST(dyntopo_uv_invariants_paint_untouched_and_no_stretch_across_a_seam) {
     Document d = seamPlane(16);
     Mesh& m = d.mesh;
     const Mesh before = m;
@@ -916,7 +916,7 @@ TEST(dyntopo_keeps_uvs_and_texture_across_a_seam) {
     CHECK(m.texture->pixels == texels);
 }
 
-TEST(dyntopo_never_collapses_a_seam_vertex) {
+TEST(dyntopo_uv_invariants_seam_vertices_are_never_collapsed) {
     Document d = seamPlane(16);
     d.sculptor.dyntopo.detail = 0.0f; // coarse: the brush wants to collapse what is under it
     Mesh& m = d.mesh;
@@ -939,7 +939,7 @@ TEST(dyntopo_never_collapses_a_seam_vertex) {
             CHECK(glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[m.triangles[t][c]], rightIsland(m, t))) < 2e-3f);
 }
 
-TEST(dyntopo_keeps_uvs_on_a_curved_part_with_symmetry_and_undo) {
+TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
     Document d = sphereDoc(3);
     Mesh& m = d.mesh;
     // Two islands (upper and lower half, planar maps), so the equator is a seam all the way round.
