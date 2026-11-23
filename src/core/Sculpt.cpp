@@ -1240,6 +1240,53 @@ static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
     return std::clamp((shortest / typical - 0.65f) / 0.25f, 0.0f, 1.0f);
 }
 
+// Trim on a thin wall (members session 2026-11, phoenix: "Trim tears holes in thin walls"). A Trim dab cuts the skin the
+// viewer sees down to its plane; it never reaches the wall behind it. Two things went wrong on a shell or a thin wing:
+// the far wall, inside the brush's ball, fed the plane (the area normal and centre averaged both walls, so the plane
+// ran through the middle of the wall or faced backwards) and took the cut itself, and dab after dab the skin sank past
+// the far wall (no hole is left to see until it has crossed). Now only what faces the cut (the skin; the far wall and
+// an underside face away and keep still, over a short ramp so no edge forms where the facing turns) is trimmed, and
+// each vertex stops `kTrimKeep` of the brush radius short of the first surface below it along the cut: a wall thinner
+// than that is left as it is. The BVH is the one the previous dab refit, so the walls are where they were before this dab.
+static constexpr float kTrimKeep = 0.02f; // of the brush radius (Trim's own plane stands this far below the surface at full strength)
+// `normals[i]`: verts[i]'s normal, read before the dab (the adaptive path rewrites the normals as it goes).
+// The wall below a vertex is found along its own normal (a sheet's rim, whose edge runs along the wall, still finds the
+// underside), and the room is the distance to that wall's plane along the cut.
+static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& areaNormal, float r, std::span<const uint32_t> verts,
+                          std::span<const glm::vec3> normals, std::vector<glm::vec3>& d) {
+    const float keep = kTrimKeep * r, eps = 1e-3f * r, shift = 2e-3f * r;
+    poolFor(verts.size(), [&](size_t b, size_t e) {
+        RayHit hit;
+        for (size_t i = b; i < e; ++i) {
+            const float len = glm::length(d[i]);
+            if (len <= 0.0f) continue;
+            const uint32_t v = verts[i];
+            const glm::vec3 n = normals[i];
+            const float w = std::clamp((glm::dot(n, areaNormal) + 0.1f) / 0.15f, 0.0f, 1.0f);
+            if (w <= 0.0f) {
+                d[i] = glm::vec3(0.0f);
+                continue;
+            }
+            float allowed = len * w;
+            // (a shell made by offsetting a surface has its vertices straight below its skin's: the ray starts a hair to either side,
+            // so it lands inside a triangle, not on the shared vertex where a miss is possible; a sheet's rim, which a ray
+            // to one side misses, is found from the other)
+            glm::vec3 side = glm::cross(n, glm::vec3(0.267f, 0.534f, 0.802f));
+            const float sideLen = glm::length(side);
+            side = sideLen > 1e-6f ? side * (shift / sideLen) : glm::vec3(0.0f);
+            for (const float sgn : {1.0f, -1.0f}) {
+                if (!bvh.raycast(mesh, mesh.positions[v] - n * eps + side * sgn, -n, hit)) continue;
+                // (only a wall the cut runs into, facing away down the cut: not a ridge's side, nor another surface's top)
+                const float across = glm::dot(-areaNormal, hit.normal);
+                if (across <= 0.3f) continue;
+                const float room = glm::dot(hit.position - mesh.positions[v], hit.normal) / across;
+                allowed = std::min(allowed, std::max(0.0f, room - keep));
+            }
+            d[i] *= allowed / len;
+        }
+    }, 256);
+}
+
 void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p) {
     auto clock = std::chrono::steady_clock::now();
     // Alphas and the square Clay Block tip reach into the corners of their square.
@@ -1266,6 +1313,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
                    type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
+                   type != BrushType::Trim && // (its wall clamp, keepTrimWalls, is a ray per vertex: the carried normals can't follow it)
                    !p.stencil.active() && // (the stencil's detail, as an alpha's)
                    mesh.normals.size() == mesh.vertexCount();
     if (adaptiveDab_ && (mesh.mask.size() == mesh.vertexCount() || mesh.hasHidden())) {
@@ -1280,7 +1328,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     }
     // The normals a later mirror copy of this dab reads, carried now (earlyNormals_); not where the exact path's rings
     // matter (masks, an alpha, dynamic topology, the draft) or the brush isn't a plane brush.
-    const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !p.viewFalloff && !useAlpha && !useStencil &&
+    const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && type != BrushType::Trim && !p.viewFalloff && !useAlpha && !useStencil &&
                                !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
     earlyNormals_ = false;
@@ -1289,10 +1337,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // Weighted area normal and centre of the brush region. View falloff reaches through the model as a cylinder, but the
     // plane is the surface's under the cursor (the ball around it): across the cylinder it was the mean of the front
     // and the back, inside the model, and Clay / Clay Block pulled the far side through to it in shards (gh#229).
+    bool skinOnly = type == BrushType::Trim; // (Trim: the plane is the skin's, not the mean of the walls of a thin Part)
     const auto sumsWithin = [&](bool ball) {
         return areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
             const uint32_t v = verts_[i * stride];
             float w = brushFalloff(ball ? glm::distance(pos[v], p.center) : brushDistance(p, pos[v]), p.radius, p.focal);
+            if (skinOnly && glm::dot(nrm[v], p.viewDir) > 0.0f) w = 0.0f; // (the far wall of a thin Part, inside the ball)
             acc.normal += glm::dvec3(nrm[v]) * double(w);
             acc.center += glm::dvec3(pos[v]) * double(w);
             acc.weight += w;
@@ -1300,6 +1350,11 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     };
     AreaSums sums = sumsWithin(p.viewFalloff);
     if (p.viewFalloff && sums.weight <= 0.0) sums = sumsWithin(false); // (no vertex near the cursor: big faces)
+    if (skinOnly && sums.weight <= 0.0) { // (nothing faces the viewer here: the whole region, as before)
+        skinOnly = false;
+        sums = sumsWithin(p.viewFalloff);
+        if (p.viewFalloff && sums.weight <= 0.0) sums = sumsWithin(false);
+    }
     glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
     const float wsum = float(sums.weight);
     if (wsum <= 0.0f) return;
@@ -1363,6 +1418,11 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             bad.fetch_add(n, std::memory_order_relaxed);
         }, 512);
         inflateAlongNormals = bad.load() * stride < std::max<size_t>(32, verts_.size() / 500);
+    }
+    std::vector<glm::vec3> trimNormals;
+    if (type == BrushType::Trim && !p.invert) {
+        trimNormals.resize(verts_.size());
+        for (size_t i = 0; i < verts_.size(); ++i) trimNormals[i] = nrm[verts_[i]];
     }
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
@@ -1556,6 +1616,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         });
     }
 
+    if (type == BrushType::Trim && !p.invert) keepTrimWalls(mesh, bvh, areaNormal, r, verts_, trimNormals, scratch_);
     // (Tendril is left as it was: the app pulls its tip under the cursor in many tiny steps, and a pulled horn folds into its own
     // pinch, smooth to the eye; relaxing it there made a crossing fold where it did not.)
     if (type == BrushType::Nudge && verts_.size() <= kLimitVerts) limitFolds(mesh, scratch_);
