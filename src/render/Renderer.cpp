@@ -1496,6 +1496,13 @@ size_t Renderer::microPendingCoarse() const {
     return total;
 }
 
+size_t Renderer::microWidenDeferrals() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->widenDeferrals();
+    return total;
+}
+
 size_t Renderer::microPendingPages() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
@@ -1508,6 +1515,14 @@ size_t Renderer::microTilePages() const {
     for (const MeshSlot& s : slots_)
         if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->pages();
     return total;
+}
+
+bool Renderer::microShadingWantsFrame() const { // (the Parts drawn last sync only: a hidden one's waits until it's shown)
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->pendingShading() &&
+            std::any_of(drawList_.begin(), drawList_.end(), [&](const DrawItem& d) { return d.id == s.id; }))
+            return true;
+    return false;
 }
 
 bool Renderer::microTilePagesWantFrame() const {

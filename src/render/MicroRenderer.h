@@ -57,6 +57,8 @@ public:
     size_t pendingShading() const { return pendingCount_ + staleCount_; }
     // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
     size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
+    // Strokes' range widens shown a frame late (sync), for tests.
+    size_t widenDeferrals() const { return widenDeferrals_; }
     // Pages (full grid and shading) of full tiles that wait for a frame's budget to be shaded (MicroFocus: pores come in with them).
     size_t pendingPages() const { return focus_ ? focus_->pendingPages() : 0; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
@@ -110,6 +112,8 @@ private:
     int level_ = 0;
     uint32_t n_ = 1, samples_ = 3;
     float step_ = 0.0f;
+    bool rescaleDeferred_ = false; // a stroke's range widen waits one frame (sync)
+    size_t widenDeferrals_ = 0;
     bool closed_ = false;
     std::vector<uint32_t> order_;   // slot -> base triangle
     std::vector<uint32_t> slotOf_;  // base triangle -> slot

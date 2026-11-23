@@ -711,8 +711,11 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     }
     const auto started = std::chrono::steady_clock::now();
     size_t shaded = 0;
-    if (!seeds.empty()) {
-        shaded += shadeSeeds(mesh, seeds, &outer_);
+    // In slices: an unbudgeted sync (undo of a huge stroke, a transform) staged every pending patch at once, ~1 GB at
+    // core-800m plus the shader's own buffers, and the staging stayed (kShadeSlice patches: ~36 MB at level 5).
+    constexpr size_t kShadeSlice = 16384;
+    for (size_t at = 0; at < seeds.size(); at += kShadeSlice) {
+        shaded += shadeSeeds(mesh, std::span<const uint32_t>(seeds).subspan(at, std::min(kShadeSlice, seeds.size() - at)), &outer_);
         for (uint32_t t : outer_) {
             uint64_t& w = stale_[t >> 6];
             const uint64_t bit = uint64_t(1) << (t & 63);
@@ -724,8 +727,14 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         for (size_t w = 0; w < stale_.size() && seeds.size() < room; ++w)
             for (uint64_t bits = stale_[w] & ~pending_[w]; bits && seeds.size() < room; bits &= bits - 1)
                 seeds.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
-        if (!seeds.empty()) shaded += shadeSeeds(mesh, seeds, nullptr);
+        for (size_t at = 0; at < seeds.size(); at += kShadeSlice)
+            shaded += shadeSeeds(mesh, std::span<const uint32_t>(seeds).subspan(at, std::min(kShadeSlice, seeds.size() - at)), nullptr);
     }
+    // No whole-level staging kept, but held through a budgeted catch-up: freed once the backlog is empty or after an
+    // unbudgeted sync (freed on every frame of a drain, it was allocated again by the next: drain frames 60-90 ms vs 45-70
+    // in 0.13.12 on a 112M level, Windows' path).
+    if ((!shadeBudget || (!pendingCount_ && !staleCount_)) && staging_.capacity() > kShadeSlice * S * 4 * 2)
+        std::vector<uint8_t>().swap(staging_);
     if (shaded) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(shaded * S);
@@ -776,6 +785,15 @@ bool MicroRenderer::sync(Mesh& mesh) {
                       level_ != mm.level || mesh.topologyDirty;
     for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
     }
+    // A stroke's range widen that took its frame's budget (MicroMesh::resendLater, App::drainStrokeDabs) shows one frame
+    // later: this frame the GPU keeps the old heights and step (the same surface), and the next re-sends them, placing no
+    // dabs. #184: both in one frame were 0.7-1 s on a 2.6M base on the floor tier.
+    if (!full && focus_ && mm.rescaled && mm.resendLater && !rescaleDeferred_) {
+        rescaleDeferred_ = true;
+        ++widenDeferrals_;
+        return true;
+    }
+    rescaleDeferred_ = false;
     if (full) {
         serial_ = mm.serial;
         baseTriangles_ = mm.baseTriangles;
@@ -854,8 +872,14 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
         if (focus_) {
             static const std::vector<uint64_t> none;
-            if (mm.allDirty || mm.rescaled) focus_->syncAll(mesh, *this);
-            else focus_->cameraMoving = cameraMoving, focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            if (mm.allDirty) focus_->syncAll(mesh, *this);
+            else {
+                if (mm.rescaled) focus_->resendHeights(mesh, *this); // (the same surface: then this sync's tiles as usual)
+                focus_->cameraMoving = cameraMoving;
+                // Undo, redo, a Move and a base moved by anything but a stroke (a transform, its undo) show whole on this frame.
+                focus_->shadeAll = mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking && !mm.strokeEnded);
+                focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
+            }
         } else if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
@@ -906,6 +930,9 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             deferStale = mm.stroking;
+            // Undo, redo, a Move and a base moved by anything but a stroke show whole on this frame (#184; the same as
+            // MicroFocus's shadeAll: a level without Focus Detail, Windows and macOS among them, caught up over frames).
+            if (mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking && !mm.strokeEnded)) shadeBudget = 0, deferStale = false;
             if (pendingCount_ || staleCount_) shadePending(mesh, false);
         }
     }

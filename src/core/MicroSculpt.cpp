@@ -25,11 +25,19 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <cmath>
 
 namespace sf {
 
 namespace {
+// When the last dab on a micro level was placed (steady clock, ns): a stroke's undo packing on its own thread pauses while
+// the next stroke's dabs run (MicroStroke::end, #184). A time, not a count: nothing can leave it stuck.
+std::atomic<int64_t> gLastMicroDabNs{0};
+int64_t steadyNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+void noteMicroDab() { gLastMicroDabNs.store(steadyNs(), std::memory_order_relaxed); }
+bool microDabRecently() { return steadyNs() - gLastMicroDabNs.load(std::memory_order_relaxed) < 50'000'000; } // (50 ms)
 
 // Contact facing on a micro level: the micro surface's own normals over one base triangle's grid at a stride `h`, as a mesh
 // vertex's: the sum of the grid triangles around a point (those inside the base triangle), so the points along a slot
@@ -150,13 +158,32 @@ void forInterpolated(const T* coarse, uint32_t n, uint32_t stride, F&& each) {
     }
 }
 
-// Writes the change at every grid point from `coarse` changes on the points `stride` apart (forInterpolated):
-// apply(index, change) for the points whose change isn't 0.
+// Writes the change at every grid point from `coarse` changes on the points `stride` apart (the same values as
+// forInterpolated): apply(index, change) for the points whose change isn't 0. Coarse cell by cell, skipping the
+// cells whose corners are all 0 (#184: a big brush's triangles are mostly outside it, and visiting every fine
+// point of them was a tenth of a stroke frame at a high micro level).
 template <class F>
 void interpolateCoarse(const float* coarse, uint32_t n, uint32_t stride, F&& apply) {
-    forInterpolated(coarse, n, stride, [&](uint32_t idx, uint32_t, uint32_t, float d) {
-        if (d != 0.0f) apply(idx, d);
-    });
+    const uint32_t cm = n / stride;
+    const float inv = 1.0f / float(stride);
+    auto at = [&](uint32_t ci, uint32_t cj) { return ci + cj <= cm ? coarse[MicroMesh::index(ci, cj, cm)] : 0.0f; };
+    for (uint32_t cj = 0; cj <= cm; ++cj)
+        for (uint32_t ci = 0; ci + cj <= cm; ++ci) {
+            const float c00 = at(ci, cj), c10 = at(ci + 1, cj), c01 = at(ci, cj + 1), c11 = at(ci + 1, cj + 1);
+            if (c00 == 0.0f && c10 == 0.0f && c01 == 0.0f && c11 == 0.0f) continue;
+            for (uint32_t rj = 0, j = cj * stride; rj < stride && j <= n; ++rj, ++j) {
+                const float fj = float(rj) * inv;
+                const uint32_t row = MicroMesh::index(0, j, n);
+                for (uint32_t ri = 0, i = ci * stride; ri < stride && i + j <= n; ++ri, ++i) {
+                    const float fi = float(ri) * inv;
+                    float d;
+                    if (ri == 0 && rj == 0) d = c00;
+                    else if (fi + fj <= 1.0f) d = c00 * (1.0f - fi - fj) + c10 * fi + c01 * fj;
+                    else d = c10 * (1.0f - fj) + c11 * (fi + fj - 1.0f) + c01 * (1.0f - fi);
+                    if (d != 0.0f) apply(row + i, d);
+                }
+            }
+        }
 }
 
 // Rounds `units` (a displacement over its step) to the nearest storable value (no libm call: brushes write
@@ -266,6 +293,7 @@ void MicroStroke::begin(Mesh& m) {
     }
     if (vertStamp_.size() != m.vertexCount()) vertStamp_.assign(m.vertexCount(), 0);
     strokeStep_ = mm.step;
+    lastAdd_ = 0.0f;
     grabMirrors_.clear();
     grabTris_.clear();
     grabWeight_.clear();
@@ -283,6 +311,7 @@ void MicroStroke::begin(Mesh& m) {
     if (mm.tiles && mm.tiles->maxDepth.size() != mm.baseTriangles) mm.tiles->resize(mm.baseTriangles);
     strokeStamp_ = mm.tiles ? mm.tiles->useStamp + 1 : 0;
     mm.stroking = true;
+    mm.grabbing = false;
     active_ = true;
 }
 
@@ -436,6 +465,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                       const glm::vec3& strokeDir, float pxPerUnit) {
     if (!active_ || !m.micro || radius <= 0.0f) return;
     if (!maskBrush && microBrushSupport(type) == 0) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro; // (made unique by begin)
     const uint32_t n = mm.n, S = mm.samples;
@@ -449,7 +479,10 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
 
     // The displacement range this dab may need: widened first (it costs precision) when what a dab adds could
     // pass it; a dab that still clips (planes far off) widens it for the next one.
-    if (!maskBrush) widen(mm, float(mm.rangeMax) * mm.step + 0.12f * r * s);
+    if (!maskBrush) {
+        lastAdd_ = 0.12f * r * s;
+        widen(mm, float(mm.rangeMax) * mm.step + lastAdd_);
+    }
 
     // 1. The base triangles within reach.
     if (++dabEpoch_ == 0) {
@@ -471,7 +504,16 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     touch(mm, cand_);
     findMs += lapMs(clock);
 
-    // 2. The brush plane: weighted area normal and centre over every second grid point under the brush.
+    // The kernel's stride (step 3).
+    const float microEdge = baseEdge_ / float(n);
+    uint32_t stride = 1;
+    if (adaptive && microEdge > 0.0f)
+        while (stride < n && microEdge * float(stride * 2) <= r / float(kBrushSamples)) stride *= 2;
+
+    // 2. The brush plane: weighted area normal and centre over every second grid point under the brush, coarser (up
+    // to the kernel's stride) only while the brush still covers planeSamples points (#184: every second fine point
+    // of every triangle a big brush reached was a fifth of a stroke frame at a high micro level). Small and detail
+    // brushes keep every second point.
     // Contact facing: the contact normal, the micro surface's normals within a quarter of the radius that face about the way
     // the hint (facingNormal: the picked normal) does (contactNormal's rule), at the kernel's stride.
     glm::vec3 contact(0.0f);
@@ -541,7 +583,11 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
     const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Inflate && type != BrushType::Pinch;
     if (needPlane) {
-        const uint32_t stride = n >= 4 ? 2 : 1;
+        uint32_t planeStride = n >= 4 ? 2 : 1;
+        // (grid points in the brush's disc at a spacing: one per 0.866 spacing^2)
+        auto covers = [&](uint32_t st) { const float e = microEdge * float(st); return 3.14159265f * r2 / (0.866f * e * e); };
+        while (planeStride * 2 <= stride && covers(planeStride * 2) >= planeSamples) planeStride *= 2;
+        lastPlaneStride = planeStride;
         struct Sum {
             glm::dvec3 nrm{0.0}, ctr{0.0};
             double w = 0.0;
@@ -557,16 +603,16 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                 T.set(m, t, n);
                 const int16_t* g = mm.disp.data() + size_t(t) * S;
                 float D[3];
-                if (facingOn) gn.fill(T, g, mm.step, n, stride), cornerSurface(t, D);
-                for (uint32_t j = 0; j <= n; j += stride)
-                    for (uint32_t i = 0; i + j <= n; i += stride) {
+                if (facingOn) gn.fill(T, g, mm.step, n, planeStride), cornerSurface(t, D);
+                for (uint32_t j = 0; j <= n; j += planeStride)
+                    for (uint32_t i = 0; i + j <= n; i += planeStride) {
                         glm::vec3 sp, nn;
                         T.eval(i, j, sp, nn);
                         const glm::vec3 p = sp + nn * (float(g[MicroMesh::index(i, j, n)]) * mm.step);
                         const float d2 = glm::dot(p - center, p - center);
                         if (d2 >= r2) continue;
                         const float w = brushFalloff(std::sqrt(d2), r, focal) *
-                                        (facingOn ? facingAt(gn.at(int(i / stride), int(j / stride), nn), surfaceShare(D, i, j)) : 1.0f);
+                                        (facingOn ? facingAt(gn.at(int(i / planeStride), int(j / planeStride), nn), surfaceShare(D, i, j)) : 1.0f);
                         acc.nrm += glm::dvec3(nn * w);
                         acc.ctr += glm::dvec3(p * w);
                         acc.w += w;
@@ -633,10 +679,6 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     // get the change interpolated over the coarse micro triangle holding them (a big brush moves big forms; the
     // finer displacement rides on top unchanged). Brush evaluation then costs the same at any micro level; what
     // grows with the level is only writing the interpolated values.
-    const float microEdge = baseEdge_ / float(n);
-    uint32_t stride = 1;
-    if (adaptive && microEdge > 0.0f)
-        while (stride < n && microEdge * float(stride * 2) <= r / float(kBrushSamples)) stride *= 2;
     lastStride = stride;
     const uint32_t cm = n / stride;
     std::vector<uint64_t> visited((cand_.size() + 7) / 8, 0);
@@ -1047,10 +1089,21 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
     return true;
 }
 
+bool MicroStroke::widenAhead(MicroMesh& mm) {
+    if (!active_ || lastAdd_ <= 0.0f) return false;
+    const float need = float(mm.rangeMax) * mm.step + 2.0f * lastAdd_;
+    if (!(need > mm.rangeWorld())) return false;
+    widen(mm, need);
+    return true;
+}
+
 void MicroStroke::widen(MicroMesh& mm, float need) {
     const int div = mm.widen(need);
     if (div == 1) return;
-    for (int16_t& v : oldDisp_) v = int16_t(int(v) / div);
+    // (the undo copies of the tiles touched so far: a long stroke's are a few hundred MB, #184)
+    poolFor(oldDisp_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) oldDisp_[i] = int16_t(int(oldDisp_[i]) / div);
+    }, 1 << 16);
     for (auto& [key, old] : oldTiles_)
         for (int16_t& v : old) v = int16_t(int(v) / div);
     strokeStep_ = mm.step;
@@ -1059,6 +1112,7 @@ void MicroStroke::widen(MicroMesh& mm, float need) {
 void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror) {
     if (!active_ || !m.micro) return;
     MicroMesh& mm = *m.micro;
+    mm.grabbing = true;
     const uint32_t n = mm.n;
     widen(mm, float(mm.rangeMax) * mm.step + radius); // room to move a radius either way
     // Scale-adaptive like dab(): the weights on grid points `stride` apart, interpolated in between when moving.
@@ -1111,6 +1165,7 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
 
 void MicroStroke::grab(Mesh& m, const glm::vec3& delta) {
     if (!active_ || !m.micro || grabMirrors_.empty()) return;
+    noteMicroDab();
     auto clock = std::chrono::steady_clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t n = mm.n, S = mm.samples;
@@ -1236,10 +1291,65 @@ void MicroStroke::endTiles(MicroUndo& u, const MicroTiles& tiles) {
     oldTiles_.clear();
 }
 
+namespace {
+
+// A stroke's undo journal, off the frame (MicroStroke::end): tile k's change (now[k] less was[from[k]]), each point
+// predicted from the one before it in its row (a row's first point: from the row below; the very first is kept
+// apart), so a smooth change needs few bits; packed. A change wider than 16 bits keeps the whole old tiles instead.
+void microPackJournal(MicroUndo::Pack& out, uint32_t n, size_t S, std::vector<int16_t>& was, std::vector<int16_t>& now,
+                      const std::vector<uint32_t>& from) {
+    const PoolInline alone; // (the frame's dabs keep the pool)
+    const LowerThreadPriority behind; // (and the cores: the frames after the release come first)
+    const size_t count = from.size();
+    // Each tile's change goes back over its `now` tile (through one tile's scratch): no third buffer the stroke's size, so
+    // the release peaks no higher than the step built in the frame did (artist-qa, 8 GB floor).
+    std::vector<int16_t> firsts(count), change(S);
+    bool fits = true;
+    for (size_t k = 0; k < count && fits; ++k) {
+        // (#184: run beside the next stroke's dabs, it slowed their slowest frames 12-23%; it waits for a pause, unless
+        // an undo or a dropped step waits for it)
+        if (k % 256 == 0)
+            while (microDabRecently() && !out.hurry.load(std::memory_order_relaxed)) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        int16_t* a = now.data() + k * S;
+        const int16_t* b = was.data() + size_t(from[k]) * S;
+        uint32_t p = 0;
+        for (uint32_t j = 0; j <= n; ++j)
+            for (uint32_t i = 0; i + j <= n; ++i, ++p) {
+                const int d = int(a[p]) - int(b[p]);
+                int pred = 0;
+                if (i > 0) pred = int(a[p - 1]) - int(b[p - 1]);
+                else if (j > 0) {
+                    const uint32_t q = MicroMesh::index(0, j - 1, n);
+                    pred = int(a[q]) - int(b[q]);
+                }
+                const int r = d - pred;
+                if (r < -32767 || r > 32767) fits = false;
+                if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
+                change[p] = p == 0 ? int16_t(0) : int16_t(r);
+            }
+        std::copy_n(change.data(), S, a);
+    }
+    if (fits) {
+        std::vector<int16_t>().swap(was); // (before the packed bytes are allocated)
+        microPackTiles(now.data(), count, uint32_t(S), out.packed);
+        out.firsts = std::move(firsts);
+        out.journal = true;
+    } else {
+        out.disp.resize(count * S);
+        for (size_t k = 0; k < count; ++k) std::copy_n(was.data() + size_t(from[k]) * S, S, out.disp.data() + k * S);
+    }
+}
+
+} // namespace
+
 std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
         m.micro->stroking = false;
+        // (the stroke's last queued dabs moved the base before this: not a base moved by anything but a stroke, which
+        // the renderer shades whole at once; core-800m: ~500k triangles of backlog in one 2-3 s frame, +1.9 GB)
+        m.micro->strokeEnded = true;
+        if (m.micro->grabbing) m.micro->grabbing = false, m.micro->shadeNow = true; // (a Move's last frame shows whole)
         if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }
     grabMirrors_.clear();
@@ -1287,68 +1397,43 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
         order[i] = {spread(q.x) | spread(q.y) << 1 | spread(q.z) << 2, uint32_t(i)};
     }
     std::sort(order.begin(), order.end());
-    std::vector<int16_t> change(count * S), firsts(count);
-    std::atomic<bool> fits{true};
-    poolFor(count, [&](size_t b, size_t e) {
-        for (size_t k = b; k < e; ++k) {
-            const size_t i = order[k].second;
-            const int16_t* now = mm.disp.data() + size_t(tiles_[i]) * S;
-            const int16_t* was = oldDisp_.data() + i * S;
-            // The change, predicted from the point before it in its row (a row's first point: from the row below;
-            // the very first is kept apart), so a smooth change needs few bits.
-            const uint32_t n = mm.n;
-            uint32_t p = 0;
-            for (uint32_t j = 0; j <= n; ++j)
-                for (uint32_t i = 0; i + j <= n; ++i, ++p) {
-                    const int d = int(now[p]) - int(was[p]);
-                    int pred = 0;
-                    if (i > 0) pred = int(now[p - 1]) - int(was[p - 1]);
-                    else if (j > 0) {
-                        const uint32_t q = MicroMesh::index(0, j - 1, n);
-                        pred = int(now[q]) - int(was[q]);
-                    }
-                    const int r = d - pred;
-                    if (r < -32767 || r > 32767) fits = false;
-                    if (p == 0) firsts[k] = int16_t(std::clamp(d, -32767, 32767)), fits = fits && d >= -32767 && d <= 32767;
-                    change[k * S + p] = p == 0 ? int16_t(0) : int16_t(r);
-                }
-        }
-    }, 256);
+    u->tris.resize(count);
+    u->keys.resize(count);
+    for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
     const bool masked = mm.hasMask() && oldMask_.size() == count * S;
-    std::vector<uint64_t> pre, post; // (Forge Ink: per entry of tiles_, put in the step's order below)
-    if (hashTiles) {
-        pre.resize(count), post.resize(count);
+    tilePre.clear(), tilePost.clear();
+    if (hashTiles) { // (Forge Ink: before the next edit can change the tiles)
+        tilePre.resize(count), tilePost.resize(count);
         poolFor(count, [&](size_t b, size_t e) {
-            for (size_t i = b; i < e; ++i) {
+            for (size_t k = b; k < e; ++k) {
+                const size_t i = order[k].second;
                 const uint32_t t = tiles_[i];
-                pre[i] = microTileHash(m, t, oldDisp_.data() + i * S, masked ? oldMask_.data() + i * S : nullptr);
-                post[i] = microTileHash(m, t, mm.tileDisp(t), mm.tileMask(t));
+                tilePre[k] = microTileHash(m, t, oldDisp_.data() + i * S, masked ? oldMask_.data() + i * S : nullptr);
+                tilePost[k] = microTileHash(m, t, mm.tileDisp(t), mm.tileMask(t));
             }
         }, 64);
     }
-    tilePre.clear(), tilePost.clear();
-    if (fits) {
-        u->journal = true;
-        u->tris.resize(count);
-        u->keys.resize(count);
-        for (size_t k = 0; k < count; ++k) u->tris[k] = tiles_[order[k].second], u->keys[k] = order[k].first;
-        if (hashTiles) {
-            tilePre.resize(count), tilePost.resize(count);
-            for (size_t k = 0; k < count; ++k) tilePre[k] = pre[order[k].second], tilePost[k] = post[order[k].second];
-        }
-        microPackTiles(change.data(), count, mm.samples, u->packed);
-        u->firsts = std::move(firsts);
-        if (masked) {
-            u->mask.resize(count * S);
-            for (size_t k = 0; k < count; ++k)
-                std::copy_n(oldMask_.data() + size_t(order[k].second) * S, S, u->mask.data() + k * S);
-        }
-    } else { // (a change wider than 16 bits: whole old tiles)
-        u->tris = tiles_;
-        tilePre = std::move(pre), tilePost = std::move(post);
-        u->disp = std::move(oldDisp_);
-        if (masked) u->mask = std::move(oldMask_);
+    if (masked) {
+        u->mask.resize(count * S);
+        for (size_t k = 0; k < count; ++k) std::copy_n(oldMask_.data() + size_t(order[k].second) * S, S, u->mask.data() + k * S);
     }
+    // The tiles as the stroke left them (the next stroke, Focus Detail or a trim may change `disp` meanwhile), in the
+    // step's order; the change is worked out and packed on a background thread, not in the release's frame (#184).
+    std::vector<int16_t> now(count * S);
+    poolFor(count, [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k) std::copy_n(mm.disp.data() + size_t(tiles_[order[k].second]) * S, S, now.data() + k * S);
+    }, 256);
+    std::vector<uint32_t> from(count);
+    for (size_t k = 0; k < count; ++k) from[k] = order[k].second;
+    auto pack = std::make_shared<MicroUndo::Pack>();
+    pack->rawBytes = count * S * sizeof(int16_t);
+    pack->done = std::async(std::launch::async, [pack = pack.get(), was = std::move(oldDisp_), now = std::move(now),
+                                                 from = std::move(from), n = mm.n, S]() mutable {
+                     microPackJournal(*pack, n, S, was, now, from);
+                     // The async state keeps this lambda (and its captures) until the step settles: free the raw tiles now.
+                     std::vector<int16_t>().swap(was), std::vector<int16_t>().swap(now), decltype(from)().swap(from);
+                 }).share();
+    u->pending = std::move(pack);
     } // (count)
     u->maskAdded = maskAdded_;
     tiles_.clear();
