@@ -1,0 +1,46 @@
+{
+ "note": "Community videos on the home page. Append an entry, then run: python3 tools/brand/community_videos.py (rewrites the row in index.html). id = YouTube video id; thumb = file in website/media (1280x720 copy of the video's own thumbnail, so nothing loads from YouTube before a click). caption = OUR one line (never the video's own title); by = the creator's channel name, channel = its link. check_marks.py must stay clean. Optional per entry: since_label + since [{text, href}] and still {text, href, link} add a short note under the card (what changed since the video, checked against CHANGELOG).",
+ "videos": [
+  {
+   "id": "hNL7kkXLaD4",
+   "by": "Alex Hitt",
+   "channel": "https://www.youtube.com/@alexander-hitt",
+   "thumb": "media/cv-hNL7kkXLaD4.jpg",
+   "caption": "An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.",
+   "since_label": "Since this video (16 Nov)",
+   "since": [
+    {
+     "text": "Sculpt layers go to Blender and back as shape keys (0.13.10).",
+     "href": "guide/blender.html"
+    },
+    {
+     "text": "Splats show their view-dependent colour in the viewport (0.13.8; not on the Essential tier). .splat files still have none.",
+     "href": "guide/scan-to-splat.html"
+    },
+    {
+     "text": "Windows code signing is in progress; builds stay unsigned until it is live.",
+     "href": "code-signing.html"
+    }
+   ],
+   "still": {
+    "text": "Still true: the benchmark figures are our own measurements. Raw outputs are on the benchmarks page.",
+    "href": "benchmarks/",
+    "link": "benchmarks page"
+   }
+  },
+  {
+   "id": "qiNPiWJ5PRM",
+   "by": "Alex Hitt",
+   "channel": "https://www.youtube.com/@alexander-hitt",
+   "thumb": "media/cv-qiNPiWJ5PRM.jpg",
+   "caption": "An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge."
+  },
+  {
+   "id": "AL5q4gKyiZc",
+   "by": "TPQZ",
+   "channel": "https://www.youtube.com/@tpqztpqz5738",
+   "thumb": "media/cv-AL5q4gKyiZc.jpg",
+   "caption": "A screen recording of the Blob-It Python script building a head in SculptForge."
+  }
+ ]
+}
