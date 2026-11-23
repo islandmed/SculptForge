@@ -904,3 +904,14 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
 .guide-page .pager .prev { box-shadow: inset 3px 0 0 var(--section, var(--accent)); }
 .guide-page .pager .next { box-shadow: inset -3px 0 0 var(--section, var(--accent)); }
 .guide-page .pager a span { color: var(--section-ink, var(--muted)); }
+
+/* Community videos row (home): thumbnails are local; the player loads on click (tools/brand/community_videos.py) */
+.cv { border-top: 1px solid var(--border); }
+.cv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 28px; }
+.cv-card { margin: 0; }
+.cv-card .hero-yt-box { box-shadow: none; }
+.cv-card figcaption { margin-top: 12px; display: grid; gap: 4px; }
+.cv-title { font-weight: 600; line-height: 1.35; }
+.cv-by { color: var(--muted); font-size: 0.92rem; }
+.cv-credit { margin: 8px 0 0; }
+.cv-card .hero-yt-play svg { width: 50px; height: 35px; }
