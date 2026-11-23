@@ -430,7 +430,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     for (size_t t = 0; t < got.size(); ++t)
         if (got[t]) CHECK(want[t]);
     CHECK(edgesShared(m));
-    // A list longer than a frame's budget (budget 0: one batch an update): the next updates promote the rest of it
+    // A list longer than a frame's budget (budget 0: one tile an update): the next updates promote the rest of it
     // without scoring again, and end where one unlimited update ends.
     Mesh m3, m4;
     auto fd3 = FocusDetail::open(path, m3, err), fd4 = FocusDetail::open(path, m4, err);
@@ -442,7 +442,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending > 0);
     const uint64_t s3 = fd3->stats().skippedUpdates;
-    for (int i = 0; i < 25 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
+    for (int i = 0; i < 20000 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending == 0);
     CHECK(fd3->stats().skippedUpdates > s3); // (drained from the list, not rescored)
     for (uint32_t t = 0; t < m3.micro->baseTriangles; ++t) CHECK(fd3->tileLevel(t) == fd4->tileLevel(t));

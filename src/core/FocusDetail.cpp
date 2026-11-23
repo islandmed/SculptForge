@@ -975,13 +975,20 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     size_t done = 0;
     constexpr size_t kBatch = 64;
     while (done < scratch_.size()) {
-        size_t count = std::min(kBatch, scratch_.size() - done);
+        // Batches sized to what is left of the budget at the recent cost a tile (64 big tiles were 50-180 ms frames
+        // at level 7 on Windows): at least one tile a frame.
+        const double left = budgetMs - msSince(t0);
+        const size_t fit = tileMs_ > 0.0 ? size_t(std::clamp(left / tileMs_, 1.0, double(kBatch))) : 8;
+        size_t count = std::min(fit, scratch_.size() - done);
         const bool mustHave = score_[scratch_[done]] >= 1e5f; // the brush's tiles go in over the budget
         if (!demoteFor(count) && !mustHave) {
             count = std::min(count, maxFull - std::min(maxFull, fullTiles_));
             if (count == 0) break;
         }
+        const auto b0 = Clock::now();
         promoteLocked(mm, std::span<const uint32_t>(scratch_.data() + done, count), false, false);
+        const double per = msSince(b0) / double(count);
+        tileMs_ = tileMs_ > 0.0 ? 0.7 * tileMs_ + 0.3 * per : per;
         done += count;
         if (msSince(t0) > budgetMs) break;
         lock.unlock(); // let a brush's ensureFull in between batches

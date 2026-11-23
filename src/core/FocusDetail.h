@@ -188,6 +188,7 @@ private:
     std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
     std::vector<uint32_t> victims_; // (update: one frame's demotions)
     bool lruValid_ = false;
+    double tileMs_ = 0.0; // (update: a promoted tile's recent cost, sizing a frame's batches to its budget)
     // The mapped file
 #if defined(_WIN32)
     void* fd_ = nullptr; // the file's HANDLE (open while mapped)
