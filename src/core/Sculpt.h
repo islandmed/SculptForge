@@ -162,6 +162,15 @@ struct ConnectedScratch {
 // reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
                    std::vector<float>* surface = nullptr);
+// Contact facing, right after keepConnected over `all` (its list before the call): stamps the vertices of `all` the
+// flood didn't reach that lie on a piece closed within `all` (none of its vertices has an edge leaving it: an eyeball
+// modelled on its own, inside the flood's sphere) with the returned value, which differs from `reached` (the flood's
+// stamp, returned too). The others it left (a piece running out of the sphere, maybe joined round a deep fold) keep
+// neither.
+struct PieceStamps {
+    uint32_t reached = 0, closed = 0;
+};
+PieceStamps markClosedPieces(const Mesh& mesh, std::span<const uint32_t> all, ConnectedScratch& scratch);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
 // (viewFalloff), then keepConnected from `center` (connectedOnly). `footprint` (an alpha stamp, #174): also the
 // surface facing the viewer under the stamp's footprint on the view plane, which a surface curving away reaches
@@ -186,12 +195,40 @@ inline glm::vec3 contactHint(const DabParams& p) {
 }
 // The weight of a vertex with normal `n` against the contact normal: 1 up to half of `angleDeg`, 0 from it on, a
 // smoothstep in the cosine between.
-// The distance a vertex `inSpace` from the dab's centre counts for, `along` the surface (the flood's edge paths, which can
-// run a third over the true surface distance on a triangle mesh, and an edge or two near the centre: `edge`, the mesh's
-// edge length there): only what lies beyond that (round a fold, the far wall of a slot) is pushed out, so smooth forms
-// keep their falloff.
-inline float surfaceReach(float inSpace, float along, float edge) {
-    return inSpace + std::max(0.0f, along - 1.5f * inSpace - 2.0f * edge);
+// Contact facing's cut by the depth of the fold (the far wall of a slot, down one wall, across the floor and up the other):
+// the share of the falloff in space a vertex keeps from its `detour`, how much longer the way along the surface (the
+// flood's edge paths, less an edge or two of their zigzag near the centre: `edge`) is than the straight line, in brush
+// radii. Up to kDetourKeep radii all of it, none from kDetourCut on, a smoothstep between: a slot deeper than the brush
+// (detours from about 3.2 radii) keeps its far wall, while an eyeball under its lids (joined to them round the lid's
+// margin, detours up to about 2 radii on the starter head) moves with them, as without the option. One rule for every
+// vertex, so the cut has no border of its own.
+constexpr float kDetourKeep = 2.3f, kDetourCut = 3.1f;
+// (the flood that measures it, past the brush: what it doesn't reach lies more than 2 (kDetourFlood - 1) radii round)
+constexpr float kDetourFlood = 2.6f;
+// The detour in brush radii (the way along the surface less the straight line and an edge or two of the flood's zigzag).
+inline float detourRadii(float inSpace, float along, float edge, float radius) {
+    return std::max(0.0f, along - inSpace - 2.0f * edge) / radius;
+}
+inline float detourShare(float detour) {
+    const float t = std::clamp((detour - kDetourKeep) / (kDetourCut - kDetourKeep), 0.0f, 1.0f);
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
+// How much of the Facing angle's fade (facingWeight) a vertex takes, by its detour: none up to kGateKeep radii round (a
+// lid's inner skin, just round its margin from the outer one: faded, the margin stretches into a bright sliver), all
+// from kGateFull on (the back of a thin part, round its edge). With no detour known (a region past the flood's cap), all.
+constexpr float kGateKeep = 0.75f, kGateFull = 1.5f;
+inline float facingGate(float detour) {
+    const float t = std::clamp((detour - kGateKeep) / (kGateFull - kGateKeep), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+// A vertex's Contact facing weight from its facingWeight, its detour and the cosine of its normal against the contact
+// normal. Past kGateKeep radii round, surface turned away from the contact (across or against it: the far wall of a slot
+// less deep than kDetourKeep) is cut as well, all of it from 60 degrees on, none within 30: an eyeball under its lids
+// faces as they do and moves with them.
+inline float contactWeight(float facing, float detour, float cosine) {
+    const float t = std::clamp((cosine - 0.5f) / 0.366f, 0.0f, 1.0f);
+    const float turned = 1.0f - t * t * (3.0f - 2.0f * t);
+    return (1.0f - (1.0f - facing) * facingGate(detour)) * (1.0f - turned * facingGate(detour)) * detourShare(detour);
 }
 inline float facingWeight(const glm::vec3& n, const glm::vec3& contact, float angleDeg) {
     const float a = glm::radians(std::clamp(angleDeg, 10.0f, 180.0f));
@@ -627,9 +664,9 @@ private:
     // Contact facing (DabParams::contactFacing): each of verts_'s weight (the angle gate times the falloff along the surface
     // over the one in space, `reach` radii); keepFacing fills it and drops the vertices at 0.
     std::vector<float> facing_, surface_;
-    std::vector<uint32_t> facingVerts_;
+    std::vector<uint32_t> facingVerts_, wideVerts_; // (the floods' vertices; the wide one's, before it)
     static constexpr size_t kSurfaceMax = size_t(1) << 21; // (the surface distance's flood: about 15 ms a dab there)
-    bool keepFacing(const Mesh& mesh, const DabParams& p, float reach);
+    bool keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, float reach);
     // ... on a micro level: copy `m`'s contact hint (contactHint) into `d` (kept for Forge Ink's replays) and the grid's stroke.
     void microFacing(const DabParams& p, const SymCopy& m, MicroDab& d);
     std::vector<uint8_t> firstTouch_;

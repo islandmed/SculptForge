@@ -411,10 +411,11 @@ private:
     std::vector<uint32_t> corners_;
     float baseEdge_ = 0.0f; // the base's average edge length
     // Contact facing: the base vertices' distance along the base surface from the dab's centre (keepConnected's flood:
-    // a slot in the base fades by the long way round), valid where floodStamp_ == floodEpoch_.
+    // a slot in the base fades by the long way round), valid where floodStamp_ == floodReached_.
     std::vector<uint32_t> floodVerts_, floodStamp_, floodQueue_;
     std::vector<float> floodDist_, floodSurface_;
-    uint32_t floodEpoch_ = 0;
+    uint32_t floodEpoch_ = 0, floodReached_ = 0, floodClosed_ = 0; // (markClosedPieces' stamps, the last dab's)
+    std::vector<uint32_t> floodWide_;
     // Move: per mirror its triangles and, per triangle, weight and direction of its coarse grid points.
     struct GrabMirror {
         glm::mat3 mirror{1.0f};

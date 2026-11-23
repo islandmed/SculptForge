@@ -499,29 +499,44 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         contact = l > 1e-20 ? glm::vec3(sum / l) : hint;
         // The falloff along the surface, on the base (as Sculptor::keepFacing does on a mesh): its vertices within reach
         // (and two edges, so the corners of the triangles reached are in), flooded from the centre.
-        brushVertices(m, bvh, center, r * reach + 2.0f * baseEdge_ + float(mm.rangeMax) * mm.step, floodVerts_);
+        // (a fold within the brush, some corner unreached: again kDetourFlood radii wide, how far round, keepFacing's)
+        const float pad = 2.0f * baseEdge_ + float(mm.rangeMax) * mm.step;
         ConnectedScratch flood;
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), flood.epoch = floodEpoch_;
+        brushVertices(m, bvh, center, r * reach + pad, floodVerts_);
+        const size_t within = floodVerts_.size();
         keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+        PieceStamps st{flood.epoch, 0};
+        if (floodVerts_.size() != within) {
+            brushVertices(m, bvh, center, r * reach * kDetourFlood + pad, floodWide_);
+            floodVerts_ = floodWide_;
+            keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+            st = markClosedPieces(m, floodWide_, flood);
+        }
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), floodEpoch_ = flood.epoch;
-        // Each base vertex's share of the falloff in space that the falloff along the surface leaves it (1 on a smooth
-        // form, 0 round a fold): the grid's points mix their corners' (a share is smooth across a triangle; a distance,
-        // a cone round the centre, is not, and its mix cut whole triangles near the centre).
+        floodReached_ = st.reached, floodClosed_ = st.closed;
+        // Each base vertex's detour (detourRadii): the grid's points mix their corners' (the detour changes smoothly along
+        // the surface; the distance along it, a cone round the centre, does not, and its mix cut whole triangles).
         for (size_t k = 0; k < floodVerts_.size(); ++k) {
             const uint32_t v = floodVerts_[k];
-            const float e = glm::distance(m.positions[v], center), along = surfaceReach(e, floodSurface_[k], baseEdge_);
-            const float fs = brushFalloff(e, r * reach);
-            floodDist_[v] = along <= e * 1.0001f ? 1.0f : fs > 1e-6f ? std::min(1.0f, brushFalloff(along, r * reach) / fs) : 0.0f;
+            floodDist_[v] = detourRadii(glm::distance(m.positions[v], center), floodSurface_[k], baseEdge_, r * reach);
         }
     }
-    // A point's share: its base triangle's corners' (`D`; a corner the flood didn't reach: none) mixed by where it lies.
+    // A point's detour: its base triangle's corners' (`D`; a corner the flood didn't reach: past the cut, unless on a
+    // piece of its own, markClosedPieces: none) mixed by where it lies.
     const auto cornerSurface = [&](uint32_t t, float D[3]) {
         const glm::uvec3 tr = m.triangles[t];
-        for (int k = 0; k < 3; ++k)
-            D[k] = !floodVerts_.empty() && tr[k] < floodStamp_.size() && floodStamp_[tr[k]] == floodEpoch_ ? floodDist_[tr[k]] : 0.0f;
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t at = !floodVerts_.empty() && tr[k] < floodStamp_.size() ? floodStamp_[tr[k]] : 0u;
+            D[k] = at != 0u && at == floodReached_ ? floodDist_[tr[k]] : at != 0u && at == floodClosed_ ? 0.0f : 2.0f * kDetourCut;
+        }
     };
     const auto surfaceShare = [&](const float D[3], uint32_t i, uint32_t j) {
         return (D[0] * float(n - i - j) + D[1] * float(i) + D[2] * float(j)) / float(n);
+    };
+    // A point's weight from its normal `sn` and its detour (contactWeight, Sculpt.h).
+    const auto facingAt = [&](const glm::vec3& sn, float detour) {
+        return contactWeight(facingWeight(sn, contact, facingAngle), detour, glm::dot(sn, contact));
     };
     glm::vec3 areaNormal(0.0f), areaCenter(0.0f);
     const bool needPlane = !maskBrush && type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Inflate && type != BrushType::Pinch;
@@ -551,9 +566,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         const float d2 = glm::dot(p - center, p - center);
                         if (d2 >= r2) continue;
                         const float w = brushFalloff(std::sqrt(d2), r, focal) *
-                                        (facingOn ? facingWeight(gn.at(int(i / stride), int(j / stride), nn), contact, facingAngle) *
-                                                      surfaceShare(D, i, j)
-                                                  : 1.0f);
+                                        (facingOn ? facingAt(gn.at(int(i / stride), int(j / stride), nn), surfaceShare(D, i, j)) : 1.0f);
                         acc.nrm += glm::dvec3(nn * w);
                         acc.ctr += glm::dvec3(p * w);
                         acc.w += w;
@@ -588,7 +601,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
             facingTile = [&](uint32_t t, const float* w, const glm::vec3& nn, float) {
                 float D[3];
                 cornerSurface(t, D);
-                return facingWeight(nn, contact, facingAngle) * (D[0] * w[0] + D[1] * w[1] + D[2] * w[2]);
+                return facingAt(nn, D[0] * w[0] + D[1] * w[1] + D[2] * w[2]);
             };
         if (depth > 0 && dabTiles(m, type, center, r, s, invert, focal, areaNormal, areaCenter, right, up, useAlpha ? alpha : nullptr, texture, depth,
                                   facingTile)) {
@@ -685,7 +698,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         f = edge * edge * (3.0f - 2.0f * edge) * corner;
                     }
                     if (texture) f *= texture(p);
-                    if (facingOn) f *= facingWeight(gn.at(int(cii), int(cj), nn), contact, facingAngle) * surfaceShare(D, i, j);
+                    if (facingOn) f *= facingAt(gn.at(int(cii), int(cj), nn), surfaceShare(D, i, j));
                     if (mk && stride == 1) f *= 1.0f - float(mk[idx]) / 255.0f; // (coarse: the fine points' mask, below)
                     if (bf && stride == 1) f *= bf[idx];
                     if (f <= 0.0f) continue;

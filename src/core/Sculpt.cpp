@@ -190,6 +190,28 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
     }
 }
 
+PieceStamps markClosedPieces(const Mesh& mesh, std::span<const uint32_t> all, ConnectedScratch& sc) {
+    PieceStamps out;
+    out.reached = sc.epoch;
+    const uint32_t inside = sc.epoch - 1, open = ++sc.epoch;
+    out.closed = ++sc.epoch;
+    std::vector<uint32_t>& group = sc.queue;
+    for (uint32_t s0 : all) {
+        if (sc.stamp[s0] != inside) continue;
+        group.assign(1, s0);
+        sc.stamp[s0] = open;
+        bool closed = true;
+        for (size_t h = 0; h < group.size(); ++h)
+            for (uint32_t w : mesh.neighbors(group[h])) {
+                if (sc.stamp[w] == inside) sc.stamp[w] = open, group.push_back(w);
+                else if (sc.stamp[w] != open) closed = false; // (outside `all`)
+            }
+        if (closed)
+            for (uint32_t v : group) sc.stamp[v] = out.closed;
+    }
+    return out;
+}
+
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
                  bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch,
                  bool footprint) {
@@ -573,18 +595,22 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
             const glm::vec3 contact = contactNormal(mesh, baseVerts_, c, r, contactHint(mp));
             facingVerts_ = baseVerts_;
             keepConnected(mesh, c, facingVerts_, connected_, &surface_);
-            const uint32_t reached = connected_.epoch;
+            PieceStamps st{connected_.epoch, 0};
+            if (facingVerts_.size() != baseVerts_.size()) { // (a fold within the brush: how far round, keepFacing's)
+                bvh.queryVertices(mesh, c, r * kDetourFlood + float(mm.rangeMax) * mm.step, wideVerts_);
+                facingVerts_ = wideVerts_;
+                keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+                st = markClosedPieces(mesh, wideVerts_, connected_);
+            }
             poolFor(nv, [&](size_t b, size_t e) {
                 for (size_t i = b; i < e; ++i) {
                     if (baseFall_[i] <= 0.0f) continue;
                     const uint32_t v = baseVerts_[i];
-                    if (connected_.stamp[v] != reached) {
-                        baseFall_[i] = 0.0f;
-                        continue;
-                    }
-                    const float d = glm::distance(baseCorner_[i], c);
-                    const float along = brushFalloff(surfaceReach(d, connected_.dist[v], mm.baseEdge), r, p.focal);
-                    baseFall_[i] = std::min(baseFall_[i], along) * facingWeight(baseNormal_[i], contact, p.facingAngle);
+                    const uint32_t k = connected_.stamp[v];
+                    const float fw = facingWeight(baseNormal_[i], contact, p.facingAngle), cosine = glm::dot(baseNormal_[i], contact);
+                    baseFall_[i] *= k == st.reached ? contactWeight(fw, detourRadii(glm::distance(baseCorner_[i], c), connected_.dist[v], mm.baseEdge, r), cosine)
+                                    : k == st.closed ? contactWeight(fw, 0.0f, cosine)
+                                                     : 0.0f;
                 }
             }, 4096);
         }
@@ -1305,32 +1331,48 @@ void Sculptor::microFacing(const DabParams& p, const SymCopy& m, MicroDab& d) {
     micro_.facingNormal = d.facingNormal, micro_.facingAngle = d.facingAngle;
 }
 
-bool Sculptor::keepFacing(const Mesh& mesh, const DabParams& p, float reach) {
+bool Sculptor::keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, float reach) {
     facing_.clear();
     if (verts_.empty() || mesh.normals.size() != mesh.vertexCount()) return false;
     const glm::vec3 contact = contactNormal(mesh, verts_, p.center, p.radius, contactHint(p));
-    // The falloff along the surface: what the brush reaches only round a fold (the far wall of a slot, down one wall,
-    // across the floor and up the other) fades by that longer way, so the surface follows the cursor's side smoothly,
-    // round its rim too. On the Connected only flood (which it implies); a region past kSurfaceMax vertices keeps the
-    // distance in space (its cost per dab).
+    // The cut by the depth of the fold (detourShare): the flood within the brush gives each vertex its way along the
+    // surface; only when it leaves some unreached (a fold within the brush) does a second flood, kDetourFlood radii
+    // wide, measure how far round they lie. On a region past kSurfaceMax vertices, none (its cost per dab).
+    const float R = p.radius * reach;
     const bool surface = verts_.size() <= kSurfaceMax;
-    if (surface) keepConnected(mesh, p.center, verts_, connected_, &surface_);
-    if (verts_.empty()) return true;
+    surface_.clear();
+    if (surface) {
+        facingVerts_ = verts_;
+        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_); // (fills connected_.dist)
+        PieceStamps st{connected_.epoch, 0};
+        if (facingVerts_.size() != verts_.size()) {
+            brushVertices(mesh, bvh, p.center, R * kDetourFlood, wideVerts_);
+            if (mesh.hasHidden()) std::erase_if(wideVerts_, [&](uint32_t v) { return mesh.vertexHidden(v); });
+            facingVerts_ = wideVerts_;
+            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_);
+            st = markClosedPieces(mesh, wideVerts_, connected_);
+        }
+        surface_.resize(verts_.size());
+        for (size_t i = 0; i < verts_.size(); ++i) { // (-1: further round than the flood went; -2: a piece of its own)
+            const uint32_t k = connected_.stamp[verts_[i]];
+            surface_[i] = k == st.reached ? connected_.dist[verts_[i]] : k == st.closed ? -2.0f : -1.0f;
+        }
+    }
     facing_.resize(verts_.size());
     const auto& nrm = mesh.normals;
     const auto& pos = mesh.positions;
     // (the edge length from the region's vertex count: about one vertex per 0.87 e^2 of surface over pi r^2, as crispEdge's)
-    const float edge = p.radius * reach * std::sqrt(3.14159f / (0.87f * float(std::max<size_t>(verts_.size(), 1))));
+    const float edge = R * std::sqrt(3.14159f / (0.87f * float(std::max<size_t>(verts_.size(), 1))));
     poolFor(verts_.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            float w = facingWeight(nrm[verts_[i]], contact, p.facingAngle);
-            if (surface && w > 0.0f) { // (as a share of the falloff in space, which the kernels apply)
-                const float e = glm::distance(pos[verts_[i]], p.center);
-                const float inSpace = brushFalloff(e, p.radius * reach, p.focal);
-                const float along = brushFalloff(surfaceReach(e, surface_[i], edge), p.radius * reach, p.focal);
-                w *= inSpace > 1e-6f ? std::min(1.0f, along / inSpace) : along > 0.0f ? 1.0f : 0.0f;
-            }
-            facing_[i] = w;
+            const glm::vec3& n = nrm[verts_[i]];
+            const float fw = facingWeight(n, contact, p.facingAngle), cosine = glm::dot(n, contact);
+            // (as a share of the falloff in space, which the kernels apply; a piece of its own: no detour)
+            facing_[i] = !surface ? fw
+                         : surface_[i] == -2.0f ? contactWeight(fw, 0.0f, cosine)
+                         : surface_[i] < 0.0f
+                             ? 0.0f
+                             : contactWeight(fw, detourRadii(glm::distance(pos[verts_[i]], p.center), surface_[i], edge, R), cosine);
         }
     }, 32768);
     size_t kept = 0;
@@ -1360,7 +1402,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         std::erase_if(verts_, [&](uint32_t v) { return glm::dot(nrm[v], p.viewDir) > 0.0f; });
         if (verts_.empty()) return;
     }
-    const bool facing = p.contactFacing && keepFacing(mesh, p, reach);
+    const bool facing = p.contactFacing && keepFacing(mesh, bvh, p, reach);
     if (p.contactFacing && verts_.empty()) return;
 
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
@@ -2226,7 +2268,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         verts_.resize(kept);
         if (verts_.empty()) return;
     }
-    const bool facing = p.contactFacing && keepFacing(mesh, p, useAlpha ? kAlphaReach : 1.0f);
+    const bool facing = p.contactFacing && keepFacing(mesh, bvh, p, useAlpha ? kAlphaReach : 1.0f);
     if (p.contactFacing && verts_.empty()) return;
 
     const float rad = p.radius;

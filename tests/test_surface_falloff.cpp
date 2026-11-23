@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "GeomInvariants.h"
+#include "core/Parts.h"
 
 #include <chrono>
 #include <cstdio>
@@ -182,6 +183,87 @@ TEST(surface_falloff_contact_facing_keeps_the_far_wall) {
                 if (k == 0) CHECK(a.shear <= std::max(1.2f * off.shear, off.shear + 0.15f));
             }
         }
+}
+
+// Contact facing cuts by the depth of the fold: a slot shallower than the brush (an eye's lids round the eyeball, a mouth)
+// moves as without the option, so Clay over it closes it as it always did, with no border where a cut would end.
+TEST(surface_falloff_contact_facing_shallow_fold_moves_as_off) {
+    const Mesh shallow = slotSphere(7, 0.04f, 0.06f);
+    for (BrushType t : {BrushType::Clay, BrushType::Standard}) {
+        for (bool rim : {false, true}) {
+            geom::Fixture f;
+            std::vector<glm::vec3> res[2], start;
+            for (int on = 0; on < 2; ++on) {
+                f.mesh = shallow;
+                f.bvh.build(f.mesh);
+                Document d = geom::docFrom(f);
+                start = d.mesh.positions;
+                const float y0 = rim ? 0.035f : 0.02f, rho = rim ? std::sqrt(1.0f - y0 * y0) : std::sqrt(1.0f - 0.0004f) - 0.03f;
+                CHECK(d.sculptor.beginStroke(d.mesh, brushName(t)));
+                for (int i = 0; i < 12; ++i) {
+                    const float a = (float(i) - 5.5f) * 0.02f;
+                    DabParams p;
+                    p.center = glm::vec3(std::sin(a) * rho, y0, std::cos(a) * rho);
+                    p.viewDir = glm::normalize(glm::vec3(0.0f, -0.35f, -1.0f)), p.radius = 0.2f, p.strength = 0.5f;
+                    p.pickNormal = rim ? glm::normalize(p.center) : glm::vec3(0, -1, 0);
+                    p.contactFacing = on == 1;
+                    d.sculptor.dab(d.mesh, d.bvh, t, p, Symmetry{false, false, false});
+                }
+                d.undo.push(d.sculptor.endStroke());
+                res[on] = d.mesh.positions;
+            }
+            float peak = 0.0f, worst = 0.0f;
+            for (size_t v = 0; v < start.size(); ++v) {
+                peak = std::max(peak, glm::distance(res[0][v], start[v]));
+                worst = std::max(worst, glm::distance(res[0][v], res[1][v]));
+            }
+            std::printf("shallow slot %-9s %s peak %.5f on differs by %.5f\n", brushName(t), rim ? "rim " : "wall", peak, worst);
+            CHECK(peak > 0.0f);
+            CHECK(worst < 0.05f * peak);
+        }
+    }
+}
+
+// A separate piece within the brush (an eyeball modelled on its own, inside the lids): never round a fold, so its side
+// facing as the lid does moves as without the option, or Clay over the eye lifts the lids off it.
+TEST(surface_falloff_contact_facing_separate_piece_follows) {
+    Mesh lid = makeIcosphere(6), eye = makeIcosphere(4);
+    for (glm::vec3& q : eye.positions) q = q * 0.12f + glm::vec3(0.0f, 0.0f, 0.95f);
+    eye.recomputeAllNormals();
+    const uint32_t eyeFirst = lid.vertexCount();
+    for (BrushType t : {BrushType::Clay, BrushType::Standard}) {
+        std::vector<glm::vec3> res[2], start;
+        for (int on = 0; on < 2; ++on) {
+            geom::Fixture f;
+            f.mesh = mergeMeshes({&lid, &eye});
+            f.mesh.recomputeAllNormals();
+            f.bvh.build(f.mesh);
+            Document d = geom::docFrom(f);
+            start = d.mesh.positions;
+            CHECK(d.sculptor.beginStroke(d.mesh, brushName(t)));
+            for (int i = 0; i < 12; ++i) {
+                const float a = 0.1f + 0.2f * float(i) / 11.0f;
+                DabParams p;
+                p.center = glm::vec3(std::sin(a), 0.0f, std::cos(a));
+                p.viewDir = glm::vec3(0, 0, -1), p.radius = 0.25f, p.strength = 0.5f, p.pickNormal = p.center;
+                p.contactFacing = on == 1;
+                d.sculptor.dab(d.mesh, d.bvh, t, p, Symmetry{false, false, false});
+            }
+            d.undo.push(d.sculptor.endStroke());
+            res[on] = d.mesh.positions;
+        }
+        float peak = 0.0f, worst = 0.0f;
+        for (uint32_t v = eyeFirst; v < res[0].size(); ++v) {
+            if (glm::normalize(start[v] - glm::vec3(0.0f, 0.0f, 0.95f)).z < 0.9f) continue; // (the eyeball's front)
+            peak = std::max(peak, glm::distance(res[0][v], start[v]));
+            worst = std::max(worst, glm::distance(res[0][v], res[1][v]));
+        }
+        std::printf("separate piece %-9s eyeball front moves %.5f off, on differs by %.5f\n", brushName(t), peak, worst);
+        CHECK(peak > 0.0f);
+        // (it keeps up with the lid: a cut piece differs by all of its move; the option's exact normals, not the
+        // stroke's deferred ones, account for the rest on so small a piece)
+        CHECK(worst < 0.15f * peak);
+    }
 }
 
 // Geometric invariants on the dense sphere (nothing turned away within the brush): Contact facing changes nothing an
