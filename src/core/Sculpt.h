@@ -414,6 +414,9 @@ private:
     // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
     std::vector<uint32_t> pinchStamp_;
     std::vector<glm::vec3> pinchStart_;
+    std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
+    std::vector<float> pinchTaper_;
+    uint32_t pinchDab_ = 0;
     std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
     std::vector<glm::vec3> crispMoved_;
     std::vector<uint32_t> crispSlideVerts_; // (its relax's)

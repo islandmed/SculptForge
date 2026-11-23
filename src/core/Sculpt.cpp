@@ -2067,6 +2067,7 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     for (const SymCopy& m : all) crispCopyCenters_.push_back(m.point(base.center));
     slideVerts_.clear();
     slideTo_.clear();
+    ++pinchDab_;
     for (size_t k = 0; k < all.size(); ++k) {
         const SymCopy& m = all[k];
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
@@ -2260,6 +2261,8 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     if (pinchBound && pinchStamp_.size() != mesh.vertexCount()) {
         pinchStamp_.resize(mesh.vertexCount(), 0);
         pinchStart_.resize(mesh.vertexCount(), glm::vec3(0.0f));
+        pinchDabStamp_.resize(mesh.vertexCount(), 0);
+        pinchTaper_.resize(mesh.vertexCount(), 1.0f);
     }
     const float pinchCap = kPinchReach * rad;
     if (crispMax && crispStamp_.size() != mesh.vertexCount()) {
@@ -2421,14 +2424,22 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         default: break;
         }
         if (r.pinch != 0.0f) {
-            glm::vec3 pull = projectOnPlane(p.center - x, areaNormal) * (r.pinch * 0.25f * s * f);
+            glm::vec3 pull = projectOnPlane(p.center - x, areaNormal);
+            pull -= strokeDir * glm::dot(pull, strokeDir); // (across the stroke only, as Sharp Crease's: along it a lap's turn pulled the surface into the end's point)
+            pull *= r.pinch * 0.25f * s * f;
             if (pinchBound && f > 0.0f) { // (the pull from where the stroke found the vertex stays within pinchCap)
                 if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = x;
-                const glm::vec3 slid = projectOnPlane(x - pinchStart_[v], areaNormal);
-                // (the pull tapers off smoothly between the bound and twice it: a hard stop would leave a vertex at the bound among
-                // neighbours still sliding, and they would cross it)
-                const float t = std::clamp(2.0f - glm::length(slid) / pinchCap, 0.0f, 1.0f); // (all of it to the bound, none at twice it)
-                pull *= t * t * (3.0f - 2.0f * t);
+                // (the taper is worked out once a dab, from where the dab found the vertex: the copies of a symmetry reach it one
+                // after the other, and one that found it already pulled by another would taper differently: a serrated seam)
+                if (pinchDabStamp_[v] != pinchDab_) {
+                    pinchDabStamp_[v] = pinchDab_;
+                    const glm::vec3 slid = projectOnPlane(x - pinchStart_[v], areaNormal);
+                    // (it tapers off smoothly between the bound and twice it: a hard stop would leave a vertex at the bound among
+                    // neighbours still sliding, and they would cross it)
+                    const float t = std::clamp(2.0f - glm::length(slid) / pinchCap, 0.0f, 1.0f); // (all of it to the bound, none at twice it)
+                    pinchTaper_[v] = t * t * (3.0f - 2.0f * t);
+                }
+                pull *= pinchTaper_[v];
             }
             d += pull;
         }
