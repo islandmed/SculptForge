@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -430,7 +431,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     for (size_t t = 0; t < got.size(); ++t)
         if (got[t]) CHECK(want[t]);
     CHECK(edgesShared(m));
-    // A list longer than a frame's budget (budget 0: one batch an update): the next updates promote the rest of it
+    // A list longer than a frame's budget (budget 0: one tile an update): the next updates promote the rest of it
     // without scoring again, and end where one unlimited update ends.
     Mesh m3, m4;
     auto fd3 = FocusDetail::open(path, m3, err), fd4 = FocusDetail::open(path, m4, err);
@@ -442,7 +443,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending > 0);
     const uint64_t s3 = fd3->stats().skippedUpdates;
-    for (int i = 0; i < 25 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
+    for (int i = 0; i < 20000 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending == 0);
     CHECK(fd3->stats().skippedUpdates > s3); // (drained from the list, not rescored)
     for (uint32_t t = 0; t < m3.micro->baseTriangles; ++t) CHECK(fd3->tileLevel(t) == fd4->tileLevel(t));
@@ -491,9 +492,11 @@ TEST(focus_detail_brush_thread_and_frames_together) {
             std::vector<uint32_t> tiles;
             for (int i = 0; i < 8; ++i) tiles.push_back((k = k * 1664525u + 1013904223u) % mm.baseTriangles);
             fd->ensureFull(mm, tiles, false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1)); // (the dab's own work)
         }
     });
-    for (int f = 0; f < 60; ++f) {
+    // (frames give way to the brush's promotions a few at a time: until the budget demotes, while the brush runs)
+    for (int f = 0; f < 2000 && (f < 60 || fd->stats().demoted == 0); ++f) {
         FocusBrush b;
         b.present = true;
         b.position = glm::vec3(std::sin(float(f) * 0.2f), 0.1f, 0.8f);
@@ -575,6 +578,38 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
     CHECK(fd->save(m, err));
     CHECK(!fd->unsaved());
     CHECK(fullValues(path) == expected);
+}
+
+// After strokes a new view demotes every edited tile at once: a frame compresses at most a batch of them past its
+// time budget (one tile at budget 0), the rest on the next frames, and no edit is lost.
+TEST(focus_detail_demotions_spread_over_frames) {
+    const std::string path = writeSmall("spread.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t T = mm.baseTriangles;
+    fd->ensureFull(mm, allTiles(m), true);
+    for (uint32_t t = 0; t < T; ++t) mm.disp[size_t(t) * mm.samples + 3] = int16_t(mm.disp[size_t(t) * mm.samples + 3] + 1 + int(t % 50));
+    const std::vector<int16_t> edited = mm.disp.toVector();
+    fd->budgetBytes = 0;
+    size_t parked = 0;
+    int frames = 0;
+    for (; frames < 5000 && parked + 1 < T; ++frames) { // (a budget of 0 keeps one tile)
+        fd->update(m, FocusView{}, FocusBrush{}, 0.0);
+        const size_t now = fd->stats().parkedTiles;
+        CHECK(now - parked <= 64);
+        if (parked > 0) CHECK(now > parked); // (once lingering is over: progress every frame)
+        parked = now;
+    }
+    CHECK(parked + 1 == T);
+    CHECK(frames > int(T / 64));
+    CHECK(fd->stats().fullTiles == 1);
+    CHECK(edgesShared(m));
+    fd->budgetBytes = size_t(1) << 30;
+    CHECK(streamedFull(m) == edited);
 }
 
 // Divide to Micro beyond the budget: create() writes the live level to a detail file and streams it; Save As writes
