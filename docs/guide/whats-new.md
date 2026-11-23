@@ -41,6 +41,18 @@ action: guide:micro-levels.md
 - **Chinese, Japanese and Korean** Part and layer names are readable in the title strip's info line.
 - **Move** honours **Front faces only**: with View falloff on, the far side of a one-piece model stays put.
 - **Tendril** is now its name everywhere, and old saved brushes still load.
+- **Plugin sandbox updated**: plugins now run on wasmtime 51.0.0. Nothing changes for plugins or their limits.
+- "**Contact facing**: a new brush falloff option. The surface under the cursor decides what moves, so the far wall of
+  a narrow slot or the other side of a fold stays put while you sculpt one side. Reported on Discord."
+- **Texture painting on Android**: a Part with many triangles can now show its texture on phones and tablets whose
+  graphics chips have small texture buffers (it went dark and strokes left nothing). Where a chip still cannot show
+  it, the status bar and the Texture Image panel say so.
+- **Chinese, Japanese and Korean names**: a Part or layer named in those scripts is readable in the title strip's info
+  line (it is drawn in the regular size, not the small one).
+- "**Move** honours **Front faces only**: with View falloff on, Move now leaves the far side of a one-piece model
+  alone when Front faces only is on."
+- **Shift smooths every channel you paint**: with the Paint brush, Shift now softens Roughness, Metallic, Normal and
+  Height strokes as well as the colour, across UV seams too.
 
 ## Version 0.13.12
 
