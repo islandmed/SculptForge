@@ -39,6 +39,7 @@ action: guide:micro-levels.md
 - **Brush thumbnails** stay put after you pick a brush that carries its own alpha (Hard Cut, Flat Plane, Engrave...).
 - **Focus Detail**: opening a detail file shows its fine detail at once, and **Open** lists .sfdetail files.
 - **Chinese, Japanese and Korean** Part and layer names are readable in the title strip's info line.
+- **Move** honours **Front faces only**: with View falloff on, the far side of a one-piece model stays put.
 - **Tendril** is now its name everywhere, and old saved brushes still load.
 
 ## Version 0.13.12
