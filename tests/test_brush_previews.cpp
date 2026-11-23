@@ -256,3 +256,47 @@ TEST(brush_preview_alpha_only_where_it_applies) {
         }
     }
 }
+
+// "Brush thumbnails break after selection": a preview is a pure function of its brush. Every shelf brush (built-in and
+// library recipe) rendered twice, with every other brush's preview (alpha looks included) rendered in between,
+// comes out vertex for vertex the same.
+TEST(brush_previews_do_not_change_after_other_brushes_render) {
+    std::vector<int> brushes;
+    for (int t = 0; t < int(BrushType::Count); ++t)
+        if (BrushType(t) != BrushType::Morph) brushes.push_back(t);
+    brushes.push_back(kPaintBrush);
+    BrushRecipe scales;
+    scales.name = "Scales Cut";
+    scales.alpha = "scales";
+    BrushRecipe plane;
+    plane.name = "Flat Plane";
+    plane.crispEdge = true;
+    plane.plane = BrushRecipe::Plane::Flatten;
+    const std::vector<const BrushRecipe*> recipes = {&scales, &plane};
+
+    std::vector<std::unique_ptr<Mesh>> before;
+    for (int t : brushes) before.push_back(sculptBrushPreview(nullptr, t));
+    for (const BrushRecipe* r : recipes) before.push_back(sculptBrushPreview(r, 0));
+
+    // Everything else a click can ask for in between: each brush with an alpha look, and the recipes with theirs.
+    for (const char* alpha : {"scales", "pores", "cracks"})
+        for (int t : brushes) {
+            if (t == kPaintBrush) continue;
+            AlphaLook look;
+            if (makeAlphaLook(settingsWith(alpha, StrokeType::DragRect), look))
+                sculptBrushPreview(nullptr, t, brushTakesAlpha(BrushType(t)) ? &look : nullptr);
+        }
+    for (const BrushRecipe* r : recipes) withLook(r, 0, settingsWith("rivets", StrokeType::Spray));
+
+    size_t i = 0;
+    for (int t : brushes) {
+        const auto again = sculptBrushPreview(nullptr, t);
+        CHECK(again && before[i] && apart(*again, *before[i]) == 0.0f);
+        ++i;
+    }
+    for (const BrushRecipe* r : recipes) {
+        const auto again = sculptBrushPreview(r, 0);
+        CHECK(again && before[i] && apart(*again, *before[i]) == 0.0f);
+        ++i;
+    }
+}

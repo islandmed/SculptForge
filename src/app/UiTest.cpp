@@ -1465,6 +1465,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return n;
     }
     if (name == "brush_looks") return double(app_.thumbs_.looksRequested()); // alpha looks the brush thumbnails were asked for (#208)
+    if (name == "brush_builtin_looks") return double(app_.thumbs_.builtinLooksRequested()); // (built-in brushes that show an alpha)
     if (name == "thumbnails_regenerated") return double(app_.thumbs_.regenerated());
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;

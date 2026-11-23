@@ -3090,6 +3090,7 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    bool alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const; // an alpha a custom brush brought with it
     void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
     void recipePenPressure(BrushToolSettings& s) const; // the active recipe's own pen pressure (#122) into `s`
     void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)

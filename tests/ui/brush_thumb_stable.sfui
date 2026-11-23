@@ -1,0 +1,50 @@
+# Discord "Brush thumbnails break after selection": clicking through the shelf (library brushes that carry their own
+# alpha, then every plain built-in brush) must not turn a built-in brush's thumbnail into an alpha preview.
+# brush_builtin_looks counts the built-in brushes that were asked to show an alpha (none, here).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=3
+key f
+click "Standard##brush.standard"
+wait_idle 60
+expect_value brush_builtin_looks == 0
+
+# A brush with its own alpha, then each built-in brush in turn (first use of each), then the library brushes the reporter
+# named, then the built-ins again.
+run brush_create name="Scales Cut" depth=0.3 alpha=scales
+wait 0.2
+click "Clay##brush.clay"
+wait 0.2
+click "Clay Block##brush.clayblock"
+wait 0.2
+click "Sharp Crease##brush.sharpcrease"
+wait 0.2
+click "Inflate##brush.inflate"
+wait 0.2
+click "Pinch##brush.pinch"
+wait 0.2
+click "Flatten##brush.flatten"
+wait 0.2
+click "Crease##brush.crease"
+wait 0.2
+click "Trim##brush.trim"
+wait 0.2
+click "Layer##brush.layer"
+wait 0.2
+click "Standard##brush.standard"
+wait 0.2
+run brush_use name="Hard Cut"
+wait 0.2
+click "Standard##brush.standard"
+wait 0.2
+run brush_use name="Flat Plane"
+wait 0.2
+click "Clay##brush.clay"
+wait 0.2
+click "Standard##brush.standard"
+wait_idle 60
+wait 0.5
+key escape
+wait_idle 60
+wait 0.5
+shot brush-thumbs-stable
+expect_value brush_builtin_looks == 0
