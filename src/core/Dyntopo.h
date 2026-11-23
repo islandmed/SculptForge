@@ -192,6 +192,7 @@ private:
     // seam or an open edge) that is merged along it replaces two outline segments by one chord, which lies outside the
     // chart where the outline bends in (the texture has nothing there). Refused when it moves the outline out.
     bool outlineStaysInChart(uint32_t keep, uint32_t drop) const;
+    bool openVertex(uint32_t v) const; // on an open edge of the mesh (its triangles don't close into a fan)
     void compact();
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4
@@ -265,6 +266,7 @@ private:
     mutable std::vector<std::pair<uint32_t, uint32_t>> orbitScratch_; // candidate()
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
+    mutable std::vector<uint32_t> openScratch_;
     mutable std::vector<std::pair<uint32_t, glm::vec2>> uvPlan_; // collapseUvPlan's result (triangle, UV of the merged vertex)
 };
 

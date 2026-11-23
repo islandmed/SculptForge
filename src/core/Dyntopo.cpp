@@ -397,6 +397,22 @@ bool DynamicTopology::collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_
     return true;
 }
 
+bool DynamicTopology::openVertex(uint32_t v) const {
+    const Mesh& m = *mesh_;
+    std::vector<uint32_t>& around = openScratch_;
+    around.clear();
+    size_t tris = 0;
+    for (uint32_t t : m.vertexTriangles(v)) {
+        const glm::uvec3& tri = m.triangles[t];
+        for (int c = 0; c < 3; ++c)
+            if (tri[c] != v) around.push_back(tri[c]);
+        ++tris;
+    }
+    std::sort(around.begin(), around.end());
+    const size_t distinct = size_t(std::unique(around.begin(), around.end()) - around.begin());
+    return distinct != tris; // (a closed fan has as many neighbours as triangles; an open one, one more)
+}
+
 bool DynamicTopology::outlineStaysInChart(uint32_t keep, uint32_t drop) const {
     const Mesh& m = *mesh_;
     if (m.uvs.empty()) return true;
@@ -1057,7 +1073,8 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
         drop = std::max(a, b);
         p = (pos[a] + pos[b]) * 0.5f;
         if (!mesh_->uvs.empty()) { // (with UVs one end stays where it is and the other merges into it: a seam vertex stays)
-            keep = seamVertex(keep) || !seamVertex(drop) ? keep : drop;
+            const bool seamKeep = seamVertex(keep), seamDrop = seamVertex(drop);
+            keep = seamKeep || !seamDrop ? keep : drop;
             drop = keep == a ? b : a;
             p = pos[keep];
         }
@@ -1090,7 +1107,10 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
     if (n < 1 || n > 2) return false;
     // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
     if (!m.uvs.empty() && p != m.positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
-    if (!m.uvs.empty() && p == m.positions[keep] && (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_))) return false;
+    // (Two vertices with one UV each, drop inside the mesh: nothing to judge. Most candidates are like that.)
+    if (!m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop)) &&
+        (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_)))
+        return false;
     uint32_t opposite[2] = {kNone, kNone};
     for (int i = 0; i < n; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
