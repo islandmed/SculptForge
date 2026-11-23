@@ -67,6 +67,8 @@ struct MicroDab {
     SymCopy copy;              // the mirror (a recipe's pattern reads at the source dab's point; Move's signs)
     glm::vec3 delta{0.0f};     // Grab: the drag since the grab began
     float pxPerUnit = 0.0f;    // screen pixels per world unit at the centre when placed (DabParams::pxPerUnit; 0 = unknown)
+    glm::vec3 facingNormal{0.0f}; // Contact facing: its hint when placed (MicroStroke::facingNormal; 0 = off)
+    float facingAngle = 180.0f;
 };
 
 struct MicroRecord {

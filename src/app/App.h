@@ -191,7 +191,7 @@ public:
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
-    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge): off in the Classic
+    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
     // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
     bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
     ThumbnailCache& thumbnails() { return thumbs_; }
@@ -460,7 +460,8 @@ private:
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
-        bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
+        bool connectedOnly = false, viewFalloff = false, contactFacing = false; // the falloff options (Brush palette)
+        float facingAngle = 180.0f;
         bool mask = false, paint = false, sculpt = true, visible = true;
         AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Scale / Position jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;

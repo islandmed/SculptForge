@@ -529,6 +529,8 @@ App::DabSettings App::dabSettings() const {
     st.frontFacesOnly = frontFacesOnly_;
     st.connectedOnly = uiPrefs_.connectedOnly;
     st.viewFalloff = uiPrefs_.viewFalloff;
+    st.contactFacing = uiPrefs_.contactFacing;
+    st.facingAngle = uiPrefs_.facingAngle;
     st.mask = strokeMask_;
     st.paint = strokePaint_;
     st.sculpt = strokeSculpt_;

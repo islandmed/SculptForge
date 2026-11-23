@@ -183,6 +183,8 @@ void App::tendrilTo(float x, float y) {
     p.focal = focalShift_;
     p.connectedOnly = uiPrefs_.connectedOnly;
     p.viewFalloff = uiPrefs_.viewFalloff;
+    p.contactFacing = uiPrefs_.contactFacing;
+    p.facingAngle = uiPrefs_.facingAngle;
     p.alpha = &doc_.brushAlpha;
     p.alphaUp = screenUpVector(0.0f);
     // Small steps keep the tip under the cursor and the pulled surface even.
@@ -216,6 +218,8 @@ void App::dragRectTo(float x, float y, bool commit) {
     p.frontFacesOnly = frontFacesOnly_;
     p.connectedOnly = uiPrefs_.connectedOnly;
     p.viewFalloff = uiPrefs_.viewFalloff;
+    p.contactFacing = uiPrefs_.contactFacing;
+    p.facingAngle = uiPrefs_.facingAngle;
     p.focal = focalShift_;
     p.alpha = stampAlpha_ ? stampAlpha_.get() : &doc_.brushAlpha;
     p.stampFootprint = commit; // (the moves before the release keep the sphere: the live preview stays cheap)

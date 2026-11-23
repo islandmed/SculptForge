@@ -3260,6 +3260,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     p.frontFacesOnly = st.frontFacesOnly;
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
+    p.contactFacing = st.contactFacing;
+    p.facingAngle = st.facingAngle;
     p.stampFootprint = stamp || benchStampFootprint_;
     p.focal = st.focal;
     if (!dabView_) { // (the solver's: when its batch is committed)

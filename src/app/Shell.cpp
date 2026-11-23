@@ -530,6 +530,11 @@ void App::registerShellActions() {
          "The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
          "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
          "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.");
+    flag("draw.contact_facing", "Contact facing", nullptr, "Brush", "", &uiPrefs_.contactFacing,
+         "The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall "
+         "of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing "
+         "angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. "
+         "Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.");
     add({"draw.dynamic", "Dynamic", nullptr,
          "Dynamic topology: brushes add triangles where they need detail and remove them "
          "where they don't, so you can pull out horns or fingers without stretching. Detail sets how small the "

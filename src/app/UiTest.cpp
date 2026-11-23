@@ -900,6 +900,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
+    if (name == "contact_facing") return app_.uiPrefs_.contactFacing ? 1.0 : 0.0;
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
     if (name == "invert_twist") return app_.uiPrefs_.invertTwist ? 1.0 : 0.0;
