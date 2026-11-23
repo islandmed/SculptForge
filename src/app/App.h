@@ -2988,7 +2988,7 @@ private:
     Uint64 lastFrameKeyNs_ = 0;
     void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
-    void openFocusDetail(const std::string& path);
+    bool openFocusDetail(const std::string& path); // false: refused (status_ says why)
     void updateFocusDetail(float heightPx = 0.0f); // (0: the canvas's)
     glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
     float focusBrushRadius_ = 0.0f;
