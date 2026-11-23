@@ -875,6 +875,72 @@ TEST(micro_raycast_hits_the_micro_surface) {
     CHECK(std::abs(micro.t - (5.0f - micro.position.z)) < 1e-4f);
 }
 
+// microRaycast tests only the grid window a ray can reach on each base triangle: on a coarse base at a high level
+// (64 x 64 cells a triangle, a bumpy surface) its nearest hit is the one testing every micro triangle of every base
+// triangle finds, for rays from every side and grazing ones (that hit the base).
+TEST(micro_raycast_window_matches_every_triangle) {
+    Document doc = microDoc(6, 400);
+    microNoise(doc.mesh, 0.03f, 9.0f, 5);
+    const Mesh& m = doc.mesh;
+    const MicroMesh& mm = *m.micro;
+    const uint32_t n = mm.n;
+    auto rayTri = [](const glm::vec3& o, const glm::vec3& d, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, float& t) {
+        const glm::vec3 e1 = b - a, e2 = c - a, p = glm::cross(d, e2);
+        const float det = glm::dot(e1, p);
+        if (std::abs(det) < 1e-12f) return false;
+        const float inv = 1.0f / det;
+        const glm::vec3 s = o - a;
+        const float u = glm::dot(s, p) * inv;
+        if (u < 0.0f || u > 1.0f) return false;
+        const glm::vec3 q = glm::cross(s, e1);
+        const float v = glm::dot(d, q) * inv;
+        if (v < 0.0f || u + v > 1.0f) return false;
+        t = glm::dot(e2, q) * inv;
+        return t > 0.0f;
+    };
+    std::vector<glm::vec3> all(size_t(mm.baseTriangles) * mm.samples);
+    for (uint32_t tri = 0; tri < mm.baseTriangles; ++tri)
+        for (uint32_t j = 0; j <= n; ++j)
+            for (uint32_t i = 0; i + j <= n; ++i) all[size_t(tri) * mm.samples + MicroMesh::index(i, j, n)] = microPoint(m, tri, i, j);
+    auto every = [&](const glm::vec3& o, const glm::vec3& d) {
+        float best = std::numeric_limits<float>::max();
+        for (uint32_t tri = 0; tri < mm.baseTriangles; ++tri) {
+            const glm::vec3* P = all.data() + size_t(tri) * mm.samples;
+            for (uint32_t j = 0; j < n; ++j)
+                for (uint32_t i = 0; i + j < n; ++i) {
+                    const glm::vec3 &a = P[MicroMesh::index(i, j, n)], &b = P[MicroMesh::index(i + 1, j, n)],
+                                    &c = P[MicroMesh::index(i, j + 1, n)];
+                    float t;
+                    if (rayTri(o, d, a, b, c, t)) best = std::min(best, t);
+                    if (i + j + 1 < n && rayTri(o, d, b, P[MicroMesh::index(i + 1, j + 1, n)], c, t)) best = std::min(best, t);
+                }
+        }
+        return best;
+    };
+    uint32_t seed = 12345;
+    auto rnd = [&] { seed = seed * 1664525u + 1013904223u; return float(seed >> 8) / float(1u << 24); };
+    int hits = 0, grazing = 0;
+    for (int k = 0; k < 160; ++k) {
+        // A point near the surface and a direction towards it from anywhere (every 4th nearly tangent to the sphere).
+        const glm::vec3 on = glm::normalize(glm::vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f));
+        glm::vec3 d = glm::normalize(glm::vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f) - on * 1.5f);
+        if (k % 4 == 3) {
+            d = glm::normalize(glm::cross(on, glm::vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f)) - on * 0.05f);
+            ++grazing;
+        }
+        const glm::vec3 o = on - d * 3.0f;
+        const float want = every(o, d);
+        RayHit hit;
+        // (a ray that grazes a bump beyond the base surface's outline misses the base: picks start from the base hit)
+        if (want == std::numeric_limits<float>::max() || !doc.bvh.raycast(m, o, d, hit)) continue;
+        CHECK(microRaycast(m, doc.bvh, o, d, hit));
+        CHECK(std::abs(hit.t - want) <= 1e-5f * want);
+        ++hits;
+    }
+    CHECK(hits > 100);
+    CHECK(grazing == 40);
+}
+
 TEST(micro_shading_partial_matches_full) {
     Document doc = microDoc(3, 5000);
     microNoise(doc.mesh, 0.01f, 10.0f);
