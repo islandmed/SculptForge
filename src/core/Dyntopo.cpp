@@ -405,7 +405,7 @@ bool DynamicTopology::collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_
         for (int k = 0; k < chartCount; ++k) {
             if (!same(charts[k].at, du)) continue;
             // (Past the padding around the chart the texture has nothing: only a short way out is safe.)
-            const float reach = 2.5f / float(std::max(m.texture ? m.texture->width : 1024, 256));
+            const float reach = 1.0f / float(std::max(m.texture ? m.texture->width : 1024, 256));
             if (glm::length(charts[k].shift) > reach) return false;
             out.emplace_back(t, charts[k].at + charts[k].shift);
         }
@@ -1012,7 +1012,7 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
         keep = std::min(a, b);
         drop = std::max(a, b);
         p = (pos[a] + pos[b]) * 0.5f;
-        if (!mesh_->uvs.empty() && (seamVertex(a) || seamVertex(b))) { // (a seam vertex stays where it is: the other merges into it)
+        if (!mesh_->uvs.empty()) { // (with UVs one end stays where it is and the other merges into it: a seam vertex stays)
             keep = seamVertex(keep) || !seamVertex(drop) ? keep : drop;
             drop = keep == a ? b : a;
             p = pos[keep];
@@ -1454,24 +1454,44 @@ bool DynamicTopology::chartShifts(uint32_t v, const glm::vec3& d, UvChart* chart
     return true;
 }
 
-// The vertex is about to slide along the surface to `to`: its UVs follow (chartShifts), so the seam stays a seam and
-// the paint stays on the surface.
+// The vertex is about to slide along the surface to `to`, which relaxing makes a fraction of the way to the middle of its
+// ring: its UV goes the same fraction of the way to the middle of the ring's UVs (in its chart: a seam vertex isn't relaxed).
+// A convex combination of the corners around it stays inside its chart, however many times it is relaxed; the affine
+// extension of each triangle's own map did not (its errors added up, a few texels out, where the paint ends).
 void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
     Mesh& m = *mesh_;
     if (m.uvs.empty()) return;
-    UvChart charts[4];
-    int count = 0;
-    if (!chartShifts(v, to - m.positions[v], charts, count)) return; // (more charts than a vertex has any use for: leave its UVs)
-    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
-    for (uint32_t t : m.vertexTriangles(v)) {
-        const glm::vec2 at = cornerUv(t, v);
-        for (int k = 0; k < count; ++k)
-            if (same(charts[k].at, at)) {
-                recordTriangle(t);
-                m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = at + charts[k].shift;
-                markTriangle(t);
-                break;
-            }
+    const IndexRing fan = m.vertexTriangles(v);
+    if (fan.begin() == fan.end()) return;
+    const glm::vec2 at = cornerUv(*fan.begin(), v);
+    glm::vec3 mean3(0.0f);
+    glm::vec2 mean2(0.0f);
+    int n = 0;
+    ring(v, scratch2_);
+    for (uint32_t u : scratch2_) {
+        bool found = false;
+        for (uint32_t t : fan) {
+            const glm::uvec3& tri = m.triangles[t];
+            if (tri.x != u && tri.y != u && tri.z != u) continue;
+            mean2 += cornerUv(t, u);
+            found = true;
+            break;
+        }
+        if (!found) return;
+        mean3 += m.positions[u];
+        ++n;
+    }
+    if (n == 0) return;
+    mean3 /= float(n);
+    mean2 /= float(n);
+    const float full = glm::length(mean3 - m.positions[v]);
+    if (!(full > 1e-12f)) return;
+    const float f = std::min(1.0f, glm::length(to - m.positions[v]) / full);
+    const glm::vec2 target = at + (mean2 - at) * f;
+    for (uint32_t t : fan) {
+        recordTriangle(t);
+        m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = target;
+        markTriangle(t);
     }
 }
 

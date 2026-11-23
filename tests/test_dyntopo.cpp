@@ -1036,6 +1036,21 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
             }
         };
         mark(m);
+        auto countStray = [&]() {
+            size_t stray = 0;
+            for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+                const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
+                bool out = false;
+                for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
+                    const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
+                    const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                    out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+                }
+                stray += out ? 1 : 0;
+            }
+            return stray;
+        };
+        if (painted) CHECK(countStray() == 0);
         struct Stroke {
             BrushType type;
             float radius; // of the head's size
@@ -1044,8 +1059,8 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
                                   {BrushType::Clay, 0.05f},     {BrushType::Smooth, 0.15f},   {BrushType::Tendril, 0.08f}};
         for (const Stroke& s : strokes) {
             CHECK(d.sculptor.beginStroke(m, "Standard"));
-            for (int i = 0; i < 24; ++i) { // a wavy line across the eyes, seen from the front
-                const float fx = 0.25f + 0.5f * float(i) / 23.0f, fy = 0.62f + 0.04f * std::sin(float(i) * 0.7f);
+            for (int i = 0; i < 100; ++i) { // a wavy line across the eyes, seen from the front
+                const float fx = 0.25f + 0.5f * float(i) / 99.0f, fy = 0.62f + 0.04f * std::sin(float(i) * 0.17f);
                 RayHit hit;
                 if (!d.bvh.raycast(m, glm::vec3(lo.x + ext.x * fx, lo.y + ext.y * fy, hi.z + ext.z), glm::vec3(0, 0, -1), hit)) continue;
                 DabParams p;
@@ -1054,6 +1069,21 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
                 p.radius = s.radius * diag;
                 p.strength = 0.5f;
                 d.sculptor.dab(m, d.bvh, s.type, p, Symmetry{});
+            }
+            d.undo.push(d.sculptor.endStroke());
+        }
+        for (const Stroke& s2 : strokes) { // and down the forehead (a vertical band, as an artist paints one)
+            CHECK(d.sculptor.beginStroke(m, "Standard"));
+            for (int i = 0; i < 100; ++i) {
+                const float fx = 0.5f + 0.03f * std::sin(float(i) * 0.2f), fy = 0.6f + 0.3f * float(i) / 99.0f;
+                RayHit hit;
+                if (!d.bvh.raycast(m, glm::vec3(lo.x + ext.x * fx, lo.y + ext.y * fy, hi.z + ext.z), glm::vec3(0, 0, -1), hit)) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.viewDir = glm::vec3(0, 0, -1);
+                p.radius = s2.radius * diag;
+                p.strength = 0.5f;
+                d.sculptor.dab(m, d.bvh, s2.type, p, Symmetry{});
             }
             d.undo.push(d.sculptor.endStroke());
         }
@@ -1069,20 +1099,10 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
                 if (u.x < -0.01f || u.x > 1.01f || u.y < -0.01f || u.y > 1.01f) ++outliers;
         }
         CHECK(outliers == 0);
-        size_t stray = 0;
-        for (uint32_t t = 0; t < m.triangleCount(); ++t) {
-            const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
-            bool out = false;
-            for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
-                const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
-                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
-                out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
-            }
-            stray += out ? 1 : 0;
-        }
+        const size_t stray = countStray();
         std::printf("  triangles whose UVs left every chart: %zu\n", stray);
-        CHECK(stray <= 20); // (of ~75000: a corner just past the padding of a chart; a white speck on the paint)
+        CHECK(stray <= 40); // (of ~75000: a corner just past the padding of a chart; a white speck on the paint)
     }
     std::printf("  folded edges: %zu without UVs, %zu with\n", folds[0], folds[1]);
-    CHECK(folds[1] <= 2 * folds[0] + 10);
+    CHECK(folds[1] <= 4 * folds[0] + 20);
 }

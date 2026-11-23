@@ -13,12 +13,13 @@
 // Masked and hidden parts are left alone. With symmetry on, every operation is done on its mirror images at the
 // same time, so mirrored dabs make mirrored topology.
 //
-// Quads under the brush become triangles. UVs (and so the painted texture) are kept: a split's new corners take
-// the midpoint of the UVs it splits, a collapse and a flip reuse the UVs of the corners they keep, and relaxing
-// slides a vertex's UVs with it, so the paint stays on the surface and the texture is never touched. A vertex on a
-// UV seam (its triangles have more than one UV for it) merges into a neighbour with the UV that neighbour has on each
-// side of the seam, stays where it is (never at a midpoint, never relaxed), and a seam edge is never flipped: those
-// would stretch the texture or take a corner out of its chart.
+// Quads under the brush become triangles. UVs (and so the painted texture) are kept, so the paint stays on the surface
+// and the texture is never touched: a split's new corners take the midpoint of the UVs it splits, a collapse merges
+// into the end that stays (the UV that end has) and a flip reuses the corners' UVs, and relaxing moves a vertex's UV
+// the same fraction of the way to the middle of its ring's UVs (a convex mix stays in its chart however often it is
+// relaxed). A vertex on a UV seam (its triangles have more than one UV for it) merges into a neighbour with the UV
+// that neighbour has on each side of the seam, is never relaxed, and a seam edge is never flipped: those would
+// stretch the texture or take a corner out of its chart.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -191,8 +192,8 @@ private:
     // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
     // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
     // A chart keep has no corner in (e.g. across a thin strip between two seams) gets drop's UV there moved to keep along
-    // that chart's surface (chartShifts), as relaxing would, if that stays within a couple of texels of the chart (the
-    // padding the texture has around it); else, or for a vertex of more than four charts, false.
+    // that chart's surface (chartShifts) if that stays within a texel (the texture is padded a few texels beyond a chart);
+    // else, or for a vertex of more than four charts, false.
     bool collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
                         std::vector<std::pair<uint32_t, glm::vec2>>& out) const;
     void compact();
