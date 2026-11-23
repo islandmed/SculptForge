@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Brush options panel (stroke type, lazy mouse, spray, alpha) and the
-// stroke handling of the SnakeHook brush and the DragRect stroke.
+// stroke handling of the Tendril brush and the DragRect stroke.
 #include "app/Theme.h"
 #include "app/App.h"
 #include "app/I18n.h"
@@ -161,9 +161,9 @@ void App::drawAlphaPool() {
                  "Alpha");
 }
 
-// SnakeHook: pull the region under the click along with the cursor, like Move,
+// Tendril: pull the region under the click along with the cursor, like Move,
 // but re-centred on the pulled tip every step so it can be dragged out into horns.
-void App::snakeHookTo(float x, float y) {
+void App::tendrilTo(float x, float y) {
     const float h = canvasHeight();
     glm::vec3 origin, dir;
     partRay(x, y, origin, dir);
@@ -191,7 +191,7 @@ void App::snakeHookTo(float x, float y) {
     p.strokeDelta = delta / float(steps);
     for (int i = 0; i < steps; ++i) {
         p.center = grabLast_;
-        doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_); // SnakeHook or KelvinSnake
+        doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_); // Tendril or KelvinSnake
         grabLast_ += p.strokeDelta;
     }
 }

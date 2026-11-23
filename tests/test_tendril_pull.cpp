@@ -116,7 +116,7 @@ void measure(const Mesh& m, glm::vec3 start, glm::vec3 axis, float radius, Resul
     out.meanRound = out.slices ? float(sum / out.slices) : 1.0f;
 }
 
-// The pull the app makes (App::snakeHookTo): the grabbed tip follows the cursor in the view plane in steps of 0.15 radius.
+// The pull the app makes (App::tendrilTo): the grabbed tip follows the cursor in the view plane in steps of 0.15 radius.
 Result pullOut(Mesh mesh, const Pull& pull) {
     mesh.recomputeAllNormals();
     const Mesh original = mesh;
@@ -141,7 +141,7 @@ Result pullOut(Mesh mesh, const Pull& pull) {
     Symmetry sym{pull.mirror, false, false};
     for (int i = 0; i < steps; ++i) {
         p.center = tip;
-        d.sculptor.dab(d.mesh, d.bvh, BrushType::SnakeHook, p, sym);
+        d.sculptor.dab(d.mesh, d.bvh, BrushType::Tendril, p, sym);
         tip += p.strokeDelta;
     }
     UndoRecord record = d.sculptor.endStroke();

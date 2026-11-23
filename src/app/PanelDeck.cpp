@@ -26,7 +26,7 @@ namespace {
 // The tiles the phone shows: 12 of the sculpting brushes, in shelf order. The phone sends the id back.
 constexpr BrushType kDeckBrushes[] = {BrushType::Clay,    BrushType::Standard,    BrushType::Smooth,  BrushType::Move,
                                       BrushType::Inflate, BrushType::Crease,      BrushType::Flatten, BrushType::Pinch,
-                                      BrushType::Layer,   BrushType::SharpCrease, BrushType::Nudge,   BrushType::SnakeHook};
+                                      BrushType::Layer,   BrushType::SharpCrease, BrushType::Nudge,   BrushType::Tendril};
 
 std::string lower(std::string s) {
     for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));

@@ -87,7 +87,7 @@ TEST(brush_previews) {
         if (t != kPaintBrush) CHECK(s.lift > 0.01f); // every brush leaves a mark
     }
     // Tendril and Elastic Tendril pull a horn well past the silhouette, as a drag in the viewport does.
-    for (BrushType t : {BrushType::SnakeHook, BrushType::KelvinSnake}) {
+    for (BrushType t : {BrushType::Tendril, BrushType::KelvinSnake}) {
         const auto mesh = sculptBrushPreview(nullptr, int(t));
         CHECK(mesh && measure(*mesh).reach >= 0.25f);
     }
@@ -239,7 +239,7 @@ TEST(brush_preview_alpha_only_where_it_applies) {
     CHECK(!hasAlphaLook(BrushToolSettings()));
     CHECK(!hasAlphaLook(settingsWith("none")));
     CHECK(hasAlphaLook(settingsWith("Pores")));
-    for (BrushType t : {BrushType::Smooth, BrushType::Move, BrushType::SnakeHook, BrushType::KelvinGrab}) {
+    for (BrushType t : {BrushType::Smooth, BrushType::Move, BrushType::Tendril, BrushType::KelvinGrab}) {
         CHECK(!brushTakesAlpha(t));
         const auto plain = sculptBrushPreview(nullptr, int(t));
         const auto with = withLook(nullptr, int(t), settingsWith("Pores"));

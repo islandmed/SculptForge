@@ -216,13 +216,13 @@ bool App::previewStrokes() const {
 }
 
 bool App::asyncStrokeAllowed() const {
-    // Sculpt strokes of queued dabs only: Move, Snake Hook and the drag strokes work in strokeTo itself; painting,
+    // Sculpt strokes of queued dabs only: Move, Tendril and the drag strokes work in strokeTo itself; painting,
     // masking and dynamic topology (which changes the layout the renderer packs for) stay in the frame loop.
     const bool recipe = strokeRecipe() != nullptr;
     return interactiveStrokes_ && (predictiveStrokes() || backgroundDabs()) && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
            !doc_.sculptor.dyntopo.enabled && previewLod_ < 0 && !faceTakePlaying_ &&
            !doc_.mesh.micro && // (a micro level is sculpted and drawn by core/MicroSculpt and the MicroRenderer)
-           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook)) &&
+           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril)) &&
            strokeType_ != StrokeType::DragRect && strokeType_ != StrokeType::DragDot;
 }
 

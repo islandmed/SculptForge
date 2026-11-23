@@ -190,7 +190,7 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         break;
     }
     case BrushType::Move:
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
     case BrushType::Nudge: {
         const ImVec2 a(c.x - r * 0.45f, c.y + r * 0.35f), b(c.x + r * 0.45f, c.y - r * 0.35f);
         dl->AddLine(a, b, hi, w);

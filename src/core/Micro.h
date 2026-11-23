@@ -31,7 +31,7 @@
 // corner e + 1: e0 = (k, 0), e1 = (n - k, k), e2 = (0, n - k), k = 0..n.
 //
 // What a scalar displacement can't do: move points sideways. Brushes that slide the surface (Move's sideways
-// part, Snake Hook, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
+// part, Tendril, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
 // resamples the heights from where its pull would bring the surface (see microBrushSupport).
 #pragma once
 

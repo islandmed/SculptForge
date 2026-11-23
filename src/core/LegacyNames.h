@@ -33,8 +33,9 @@ struct Word {
     std::string_view title; // ... and capitalised (UPPER is made from `lower`)
 };
 
-// Longest first where one could contain another. W1..W13 in docs/legal/trademarks.md.
+// Longest first where one could contain another. W1..W14 in docs/legal/trademarks.md.
 inline constexpr Word kWords[] = {
+    {0x4F15F83B81B2B924ull, 9, "tendril", "Tendril"},         // W14 (a brush's stored name and ids)
     {0xBCFC81F111856264ull, 11, "sharpcrease", "SharpCrease"}, // W8
     {0xC1D54DDDFE279385ull, 11, "clayblock", "ClayBlock"},     // W9
     {0xEFC9B9E5E56A64CEull, 9, "facegroup", "FaceGroup"},      // W4
@@ -127,11 +128,5 @@ inline Json modernizeKeys(const Json& j) {
     for (const auto& [k, v] : j.members()) out.set(modernizeId(k), k == "brushIds" ? v : modernizeKeys(v));
     return out;
 }
-
-// Brush stored names renamed without a trademark reason (compared squashed and lower-case).
-struct Rename {
-    std::string_view old, now;
-};
-inline constexpr Rename kBrushNames[] = {{"snakehook", "Tendril"}};
 
 } // namespace sf::legacy
