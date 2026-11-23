@@ -14,6 +14,19 @@ PLAY = ('<svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><pat
         '68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg>')
 
 
+def note(v):
+    e = html.escape
+    if not v.get("since"):
+        return ""
+    items = "".join(f'<li>{e(i["text"])} <a href="{e(i["href"])}">Details</a></li>' for i in v["since"])
+    still = v.get("still")
+    tail = ""
+    if still:
+        t = e(still["text"]).replace(e(still["link"]), f'<a href="{e(still["href"])}">{e(still["link"])}</a>')
+        tail = f"<p>{t}</p>"
+    return f'<div class="cv-note"><p class="cv-note-h">{e(v["since_label"])}</p><ul>{items}</ul>{tail}</div>'
+
+
 def card(v):
     e = html.escape
     for k in ("id", "caption", "by", "channel", "thumb"):
@@ -32,6 +45,7 @@ def card(v):
             <noscript><p class="cv-credit"><a href="{watch}" rel="noopener">Watch on YouTube</a></p></noscript>
             <figcaption><a class="cv-title" href="{watch}" rel="noopener">{e(v['caption'])}</a>
               <span class="cv-by">by <a href="{e(v['channel'])}" rel="noopener">{e(v['by'])}</a></span></figcaption>
+            {note(v)}
           </figure>'''
 
 
