@@ -12,6 +12,7 @@
 
 #include "core/Benchmark.h"
 #include "core/Micro.h"
+#include "core/StarterMeshes.h"
 
 #include <algorithm>
 #include <cmath>
@@ -66,8 +67,8 @@ TEST(move_front_faces_only_leaves_back_facing_vertices_alone) {
                 backOn += movedOn;
             } else {
                 frontOn += movedOn;
-                // (squarely facing: the same grab bit for bit; the stretch near the silhouette eases in)
-                if (-glm::dot(nrm[v], kView) >= kGrabFrontFull) frontDiffers += on.mesh.positions[v] != off.mesh.positions[v];
+                // (squarely facing: the same grab bit for bit; the stretch towards what faces away eases in)
+                if (-glm::dot(nrm[v], kView) >= 0.95f) frontDiffers += on.mesh.positions[v] != off.mesh.positions[v];
             }
         }
         std::printf("  Move, View falloff%s: back-facing vertices moved %zu off / %zu on; front moved %zu, differs %zu\n",
@@ -111,6 +112,43 @@ TEST(move_front_faces_only_tears_nothing_at_the_silhouette) {
     }
 }
 
+TEST(move_front_faces_only_tears_no_ear_on_a_head) {
+    // The head from the front, a big Move dragged outward from each silhouette over the ears: ears and the thin skin round
+    // them face away a few edges from facing surface, so the facing alone left them shredded (artist-qa 11-23, thousands of
+    // folded edges). The weight follows the surface: nothing turned over, and what faces away stays.
+    const StarterMesh* head = findStarterMesh("human-head");
+    CHECK(head != nullptr);
+    if (!head) return;
+    for (bool viewFalloff : {false, true}) {
+        Document d;
+        std::string error;
+        CHECK(loadStarterMesh(*head, d, 2, error));
+        glm::vec3 lo(1e9f), hi(-1e9f);
+        for (const glm::vec3& q : d.mesh.positions) lo = glm::min(lo, q), hi = glm::max(hi, q);
+        const float height = hi.y - lo.y;
+        const Mesh start = d.mesh;
+        const glm::vec3 mid = (lo + hi) * 0.5f;
+        CHECK(d.sculptor.beginStroke(d.mesh, "Move"));
+        for (float side : {-1.0f, 1.0f}) {
+            RayHit hit;
+            const glm::vec3 from(mid.x + side * 0.46f * (hi.x - lo.x), lo.y + 0.55f * height, hi.z + 1.0f);
+            if (!d.bvh.raycast(d.mesh, from, kView, hit)) continue;
+            DabParams p = grabAt(hit.position, 0.2f * height, true, viewFalloff);
+            d.sculptor.beginGrab(d.mesh, d.bvh, p, Symmetry{false, false, false});
+            for (int i = 0; i < 5; ++i) d.sculptor.grab(d.mesh, d.bvh, glm::vec3(side * 0.03f * height, 0.0f, 0.0f));
+        }
+        d.undo.push(d.sculptor.endStroke());
+        size_t backMoved = 0;
+        for (size_t v = 0; v < start.positions.size(); ++v)
+            backMoved += glm::dot(start.normals[v], kView) > 0.0f && d.mesh.positions[v] != start.positions[v];
+        const size_t folded = turnedOver(start, d.mesh);
+        std::printf("  Move, Front faces only over a head's ears%s: %zu triangles turned over, %zu back-facing moved\n",
+                    viewFalloff ? ", View falloff" : "", folded, backMoved);
+        CHECK(backMoved == 0);
+        CHECK(folded == 0);
+    }
+}
+
 TEST(move_front_faces_only_off_is_the_old_grab) {
     // The flag is the only thing that changes the result: a default DabParams and an explicit false give the same bits,
     // with and without View falloff.
@@ -128,7 +166,7 @@ TEST(move_front_faces_only_off_is_the_old_grab) {
 namespace {
 
 // A micro level the grab runs on: Move along the normals (the grid) or on the cage below it.
-Moved microRun(bool alongNormals, bool frontOnly, std::vector<glm::vec3>* grid = nullptr) {
+Moved microRun(bool alongNormals, bool frontOnly, std::vector<glm::vec3>* grid = nullptr, std::vector<glm::vec3>* start = nullptr) {
     Document doc = makeDoc(makeBenchSphere(20000));
     std::string err;
     CHECK(microDivide(doc.mesh, 2, err));
@@ -144,6 +182,7 @@ Moved microRun(bool alongNormals, bool frontOnly, std::vector<glm::vec3>* grid =
         else if (d.z > 0.15f) r.front += moved;
     }
     if (grid) *grid = after.points;
+    if (start) *start = before.points;
     return r;
 }
 
@@ -151,13 +190,14 @@ Moved microRun(bool alongNormals, bool frontOnly, std::vector<glm::vec3>* grid =
 
 TEST(move_front_faces_only_holds_on_a_micro_level) {
     for (bool alongNormals : {true, false}) {
-        std::vector<glm::vec3> offPts, onPts;
-        const Moved off = microRun(alongNormals, false, &offPts), on = microRun(alongNormals, true, &onPts);
-        // (the same grab for the near side; the band at the silhouette follows its moved neighbours' frames, so it is left out)
+        std::vector<glm::vec3> offPts, onPts, startPts;
+        const Moved off = microRun(alongNormals, false, &offPts, &startPts), on = microRun(alongNormals, true, &onPts);
+        // (the option only ever takes weight away: no sample goes further with it than without; the near side's pull is the
+        // grab's, eased where it is within reach of what faces away)
         size_t frontDiffers = 0;
-        CHECK(offPts.size() == onPts.size());
-        for (size_t i = 0; i < offPts.size() && i < onPts.size(); ++i)
-            if (glm::normalize(offPts[i]).z > 0.8f && offPts[i] != onPts[i]) ++frontDiffers;
+        CHECK(offPts.size() == onPts.size() && offPts.size() == startPts.size());
+        for (size_t i = 0; i < offPts.size() && i < onPts.size() && i < startPts.size(); ++i)
+            if (glm::distance(startPts[i], onPts[i]) > glm::distance(startPts[i], offPts[i]) + 1e-5f) ++frontDiffers;
         std::printf("  Micro Move (%s): back samples moved %zu off / %zu on; front moved %zu, differs %zu\n",
                     alongNormals ? "along normals" : "cage", off.back, on.back, on.front, frontDiffers);
         CHECK(off.back > 0);

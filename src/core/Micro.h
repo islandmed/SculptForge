@@ -54,11 +54,17 @@ namespace sf {
 // (`facing` = -dot(normal, view), 1 = straight at it, 0 = edge on). None from the silhouette on, all from kGrabFrontFull
 // in, smooth between: a hard cut left the surface just inside the silhouette moving at full weight beside surface that
 // stayed, and the drag tore it into a seam (artist-qa 11-23).
-constexpr float kGrabFrontFull = 0.6f;
+constexpr float kGrabFrontFull = 0.6f, kGrabFrontReach = 0.75f; // (the reach: in brush radii)
 inline float grabFrontWeight(float facing) {
     const float t = facing <= 0.0f ? 0.0f : facing >= kGrabFrontFull ? 1.0f : facing / kGrabFrontFull;
     return t * t * (3.0f - 2.0f * t);
 }
+// On a thin part (an ear) the facing flips within a few edges, so the facing alone still jumps from full to none between
+// neighbours. Also: a vertex keeps only the share of its weight that its distance along the surface from the nearest vertex
+// facing away allows (none at it, all from `reach` on, smooth between). Returns, for the vertices of `region` and those
+// round them within `reach`, the weight of every one that keeps less than all (the rest are absent: 1).
+std::unordered_map<uint32_t, float> grabFrontField(const Mesh& mesh, std::span<const uint32_t> region, const glm::vec3& view,
+                                                   float reach);
 
 class BVH;
 class CommandRegistry;

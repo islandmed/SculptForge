@@ -1082,11 +1082,27 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
     grabWeight_.resize(base + cand.size() * cs, 0.0f);
     grabNormal_.resize(base + cand.size() * cs, glm::vec3(0.0f));
     std::vector<uint8_t> used(cand.size(), 0);
+    // Front faces only: the base corners' weights (facing, and distance from what faces away), mixed to each grid point.
+    std::unordered_map<uint32_t, float> front;
+    if (frontOnly) {
+        std::vector<uint32_t> region;
+        for (uint32_t t : cand)
+            for (int c = 0; c < 3; ++c) region.push_back(m.triangles[t][c]);
+        std::sort(region.begin(), region.end());
+        region.erase(std::unique(region.begin(), region.end()), region.end());
+        front = grabFrontField(m, region, view, kGrabFrontReach * radius);
+    }
     poolFor(cand.size(), [&](size_t b, size_t e) {
         MicroTriangle T;
         for (size_t k = b; k < e; ++k) {
             const uint32_t t = cand[k];
             T.set(m, t, n);
+            float corner[3] = {1.0f, 1.0f, 1.0f}; // (Front faces only: the base corners' weights)
+            if (frontOnly)
+                for (int c = 0; c < 3; ++c) {
+                    const auto it = front.find(m.triangles[t][c]);
+                    if (it != front.end()) corner[c] = it->second;
+                }
             const int16_t* g = mm.disp.data() + size_t(t) * mm.samples;
             float* w = grabWeight_.data() + base + k * cs;
             glm::vec3* nrm = grabNormal_.data() + base + k * cs;
@@ -1100,8 +1116,10 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
                     const float d = glm::distance(p, center);
                     if (d >= radius) continue;
                     float k = 1.0f;
-                    if (frontOnly) { // (facing away: stays; near the silhouette it eases in)
-                        k = grabFrontWeight(-glm::dot(nn, view) / std::max(glm::length(view), 1e-12f));
+                    if (frontOnly) { // (facing away: stays; near it, and near what faces away on the base, it eases in)
+                        const float wi = float(n - i - j) / float(n), wj = float(i) / float(n), wk = float(j) / float(n);
+                        k = std::min(grabFrontWeight(-glm::dot(nn, view) / std::max(glm::length(view), 1e-12f)),
+                                     corner[0] * wi + corner[1] * wj + corner[2] * wk);
                         if (k <= 0.0f) continue;
                     }
                     w[c] = brushFalloff(d, radius, focal) * k;
