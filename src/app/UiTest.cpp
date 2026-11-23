@@ -1567,6 +1567,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
     if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
     if (name == "glyphs_missing") return double(glyphs::missingLastFrame()); // drawn as "?" in the last frame
+    if (name == "info_font_px") return double(app_.infoFontPx_); // the title strip's Verts / Tris / Part readout (12 px, or 15 for CJK)
     if (name == "glyphs_merged") return double(glyphs::mergedCount());       // typed characters taken from other fonts
     if (name == "font_atlas_kpx") { // the font atlas texture, thousands of pixels (its size: memory, upload time)
         const ImFontAtlas* a = ImGui::GetIO().Fonts;
