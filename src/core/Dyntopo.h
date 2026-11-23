@@ -13,7 +13,11 @@
 // Masked and hidden parts are left alone. With symmetry on, every operation is done on its mirror images at the
 // same time, so mirrored dabs make mirrored topology.
 //
-// Quads under the brush become triangles; UVs are dropped (a remeshed surface has none) and come back on undo.
+// Quads under the brush become triangles. UVs (and so the painted texture) are kept: a split's new corners take
+// the midpoint of the UVs it splits, a collapse and a flip reuse the UVs of the corners they keep, and relaxing
+// slides a vertex's UVs with it, so the paint stays on the surface and the texture is never touched. A vertex on a
+// UV seam (its triangles have more than one UV for it) is never collapsed and a seam edge never flipped: that
+// would stretch the texture.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -78,6 +82,7 @@ struct TopologyTriangleValues {
     std::vector<glm::uvec3> triangles;
     std::vector<uint32_t> facegroups, quadPartners;
     std::vector<uint8_t> hidden;
+    std::vector<glm::vec2> uvs; // 3 per slot (the corners' texture coordinates)
     size_t bytes() const;
 };
 
@@ -89,7 +94,6 @@ struct TopologyUndo {
     std::vector<uint32_t> vertexSlots, triangleSlots;
     TopologyVertexValues vertices;
     TopologyTriangleValues triangles;
-    std::vector<glm::vec2> uvs; // the whole UVs of the other state, when it had them (dynamic topology drops them)
     // Slots whose positions / colours must be worked out again from layers after applying (only when brush undo
     // entries from before the stroke's first remesh were merged in; normally every value is exact).
     std::vector<uint32_t> reevaluate;
@@ -170,6 +174,12 @@ private:
     void vtReplace(uint32_t v, uint32_t from, uint32_t to);
     void moveVertex(uint32_t from, uint32_t to);
     void moveTriangle(uint32_t from, uint32_t to);
+    // UVs (corner c of triangle t is mesh.uvs[3 t + c]; all of this is a no-op on a mesh without UVs).
+    glm::vec2 cornerUv(uint32_t t, uint32_t v) const;
+    void setCornerUv(uint32_t t, uint32_t v, const glm::vec2& uv); // (t is recorded already)
+    bool seamVertex(uint32_t v) const;                              // its corners don't all have one UV
+    bool seamEdge(uint32_t a, uint32_t b) const;                    // the triangles on it differ at an end
+    void slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface
     void compact();
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4

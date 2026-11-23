@@ -70,8 +70,10 @@ It is a preference (saved automatically) and is saved with the project; from a s
 - **Vertex Paint, mask values and sculpt layers** are carried onto new vertices (blended between their
   neighbours).
 - **Quads** under the brush become triangles. The rest of the mesh keeps its quads.
-- **UVs are dropped** the first time a stroke remeshes a Part (the status bar says so), since the new
-  triangles have none. Undo brings them back. Unwrap again with **Auto UV** when you are done.
+- **UVs and the painted texture are kept.** New triangles get UVs from the ones they split, so paint
+  stays where you put it and the texture itself is never touched. Along a UV seam the triangles are left
+  as they are (a seam vertex is never merged, a seam edge never flipped), so the seam can stay finer than the rest. Undo
+  brings back the exact UVs.
 
 ## Subdivision levels
 

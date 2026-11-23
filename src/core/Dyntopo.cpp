@@ -81,6 +81,23 @@ void swapSlots(std::vector<T>& a, const std::vector<uint32_t>& slots, std::vecto
     stored.swap(current);
 }
 
+// The same for per-corner values (3 per slot).
+void swapSlots3(std::vector<glm::vec2>& a, const std::vector<uint32_t>& slots, std::vector<glm::vec2>& stored, size_t count) {
+    if (a.empty()) return;
+    std::vector<glm::vec2> current;
+    current.reserve(slots.size() * 3);
+    for (uint32_t s : slots)
+        if (size_t(s) * 3 + 2 < a.size()) current.insert(current.end(), a.begin() + std::ptrdiff_t(s) * 3, a.begin() + std::ptrdiff_t(s) * 3 + 3);
+    a.resize(count * 3);
+    size_t k = 0;
+    for (uint32_t s : slots)
+        if (s < count && k + 3 <= stored.size()) {
+            std::copy_n(stored.begin() + std::ptrdiff_t(k), 3, a.begin() + std::ptrdiff_t(s) * 3);
+            k += 3;
+        }
+    stored.swap(current);
+}
+
 template <class T>
 size_t bytesOf(const std::vector<T>& v) {
     return v.size() * sizeof(T);
@@ -126,11 +143,11 @@ size_t TopologyVertexValues::bytes() const {
 }
 
 size_t TopologyTriangleValues::bytes() const {
-    return bytesOf(triangles) + bytesOf(facegroups) + bytesOf(quadPartners) + bytesOf(hidden);
+    return bytesOf(triangles) + bytesOf(facegroups) + bytesOf(quadPartners) + bytesOf(hidden) + bytesOf(uvs);
 }
 
 size_t TopologyUndo::bytes() const {
-    return vertices.bytes() + triangles.bytes() + bytesOf(vertexSlots) + bytesOf(triangleSlots) + bytesOf(uvs);
+    return vertices.bytes() + triangles.bytes() + bytesOf(vertexSlots) + bytesOf(triangleSlots);
 }
 
 void TopologyUndo::swapWith(Mesh& mesh) {
@@ -138,7 +155,7 @@ void TopologyUndo::swapWith(Mesh& mesh) {
     zipVertexArrays(mesh, vertices, [&](auto& a, auto& stored) { swapSlots(a, vertexSlots, stored, vertexCount); });
     zipTriangleArrays(mesh, triangles, [&](auto& a, auto& stored) { swapSlots(a, triangleSlots, stored, triangleCount); });
     mesh.normals.resize(vertexCount, glm::vec3(0.0f, 1.0f, 0.0f));
-    std::swap(uvs, mesh.uvs);
+    swapSlots3(mesh.uvs, triangleSlots, triangles.uvs, triangleCount);
     vertexCount = nv;
     triangleCount = nt;
 }
@@ -164,6 +181,8 @@ void DynamicTopology::recordTriangle(uint32_t t) {
         zipTriangleArrays(*mesh_, undo_->triangles, [&](auto& a, auto& stored) {
             if (!a.empty()) stored.push_back(a[t]);
         });
+    if (t < startTriangles_ && !mesh_->uvs.empty())
+        undo_->triangles.uvs.insert(undo_->triangles.uvs.end(), mesh_->uvs.begin() + std::ptrdiff_t(t) * 3, mesh_->uvs.begin() + std::ptrdiff_t(t) * 3 + 3);
 }
 
 void DynamicTopology::markVertex(uint32_t v) {
@@ -274,6 +293,7 @@ uint32_t DynamicTopology::newTriangle(const glm::uvec3& tri, uint32_t like) {
         forTriangleArrays(m, [&](auto& a) {
             if (!a.empty()) a.emplace_back();
         });
+        if (!m.uvs.empty()) m.uvs.resize(m.uvs.size() + 3, glm::vec2(0.0f));
         deadT_.push_back(0);
     }
     recordTriangle(t);
@@ -324,6 +344,43 @@ void DynamicTopology::killTriangle(uint32_t t) {
     markTriangle(t);
 }
 
+glm::vec2 DynamicTopology::cornerUv(uint32_t t, uint32_t v) const {
+    const glm::uvec3& tri = mesh_->triangles[t];
+    const uint32_t c = tri.x == v ? 0u : tri.y == v ? 1u : 2u;
+    return mesh_->uvs[size_t(t) * 3 + c];
+}
+
+void DynamicTopology::setCornerUv(uint32_t t, uint32_t v, const glm::vec2& uv) {
+    const glm::uvec3& tri = mesh_->triangles[t];
+    const uint32_t c = tri.x == v ? 0u : tri.y == v ? 1u : 2u;
+    mesh_->uvs[size_t(t) * 3 + c] = uv;
+    markTriangle(t);
+}
+
+bool DynamicTopology::seamVertex(uint32_t v) const {
+    if (mesh_->uvs.empty()) return false;
+    bool first = true;
+    glm::vec2 uv(0.0f);
+    for (uint32_t t : mesh_->vertexTriangles(v)) {
+        const glm::vec2 u = cornerUv(t, v);
+        if (first) uv = u, first = false;
+        else if (std::abs(u.x - uv.x) > 1e-6f || std::abs(u.y - uv.y) > 1e-6f) return true;
+    }
+    return false;
+}
+
+bool DynamicTopology::seamEdge(uint32_t a, uint32_t b) const {
+    if (mesh_->uvs.empty()) return false;
+    uint32_t tris[4];
+    const int n = std::min(2, edgeTriangles(a, b, tris));
+    if (n < 2) return false;
+    for (uint32_t v : {a, b}) {
+        const glm::vec2 d = cornerUv(tris[0], v) - cornerUv(tris[1], v);
+        if (std::abs(d.x) > 1e-6f || std::abs(d.y) > 1e-6f) return true;
+    }
+    return false;
+}
+
 void DynamicTopology::moveTriangle(uint32_t from, uint32_t to) {
     Mesh& m = *mesh_;
     recordTriangle(to);
@@ -331,6 +388,7 @@ void DynamicTopology::moveTriangle(uint32_t from, uint32_t to) {
     forTriangleArrays(m, [&](auto& a) {
         if (!a.empty()) a[to] = a[from];
     });
+    if (!m.uvs.empty()) std::copy_n(m.uvs.begin() + std::ptrdiff_t(from) * 3, 3, m.uvs.begin() + std::ptrdiff_t(to) * 3);
     if (!m.quadPartners.empty()) {
         const uint32_t p = m.quadPartners[to];
         if (p != Mesh::kNoQuad && p < m.quadPartners.size() && m.quadPartners[p] == from) {
@@ -385,6 +443,7 @@ void DynamicTopology::compact() {
     forTriangleArrays(m, [&](auto& a) {
         if (!a.empty()) a.resize(nt);
     });
+    if (!m.uvs.empty()) m.uvs.resize(nt * 3);
     bvh_->resizeTriangles(nt);
     deadT_.resize(nt); // (every slot below nt is live again)
     freeT_.clear();
@@ -768,8 +827,18 @@ uint32_t DynamicTopology::split(uint32_t a, uint32_t b) {
         const uint32_t x = tri[k], y = tri[(k + 1) % 3], c = tri[(k + 2) % 3];
         glm::uvec3 first = tri;
         first[(k + 1) % 3] = v; // (x, v, c) in t's own rotation
+        glm::vec2 uv[3];
+        if (!m.uvs.empty())
+            for (int j = 0; j < 3; ++j) uv[j] = m.uvs[size_t(t) * 3 + size_t(j)];
         setTriangle(t, first);
-        newTriangle(glm::uvec3(v, y, c), t);
+        const uint32_t second = newTriangle(glm::uvec3(v, y, c), t);
+        if (!m.uvs.empty()) { // (the new corner takes the midpoint of this triangle's own UVs: a seam stays a seam)
+            const glm::vec2 mid = (uv[k] + uv[(k + 1) % 3]) * 0.5f;
+            m.uvs[size_t(t) * 3 + size_t((k + 1) % 3)] = mid;
+            m.uvs[size_t(second) * 3 + 0] = mid;
+            m.uvs[size_t(second) * 3 + 1] = uv[(k + 1) % 3];
+            m.uvs[size_t(second) * 3 + 2] = uv[(k + 2) % 3];
+        }
         (void)x;
     }
     ++stats.splits;
@@ -923,6 +992,8 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
 
 bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
     const Mesh& m = *mesh_;
+    // (A vertex on a UV seam has no single UV to merge into: collapsing it would stretch the texture.)
+    if (!m.uvs.empty() && (seamVertex(keep) || seamVertex(drop))) return false;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
     if (n < 1 || n > 2) return false;
@@ -991,6 +1062,12 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
     Mesh& m = *mesh_;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
+    const bool midpoint = p != m.positions[keep];
+    glm::vec2 mergedUv(0.0f); // (neither end is on a seam, so each has one UV, both on the edge's triangles)
+    if (!m.uvs.empty() && n >= 1) {
+        const glm::vec2 uk = cornerUv(tris[0], keep), ud = cornerUv(tris[0], drop);
+        mergedUv = midpoint ? (uk + ud) * 0.5f : uk;
+    }
     for (int i = 0; i < n && i < 2; ++i) killTriangle(tris[i]);
     const IndexRing around = m.vertexTriangles(drop);
     std::vector<uint32_t>& list = ringA_;
@@ -1001,7 +1078,11 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
             if (tri[c] == drop) tri[c] = keep;
         setTriangle(t, tri);
     }
-    const bool midpoint = p != m.positions[keep];
+    if (!m.uvs.empty())
+        for (uint32_t t : m.vertexTriangles(keep)) {
+            recordTriangle(t);
+            setCornerUv(t, keep, mergedUv);
+        }
     if (midpoint) interpolateVertex(keep, keep, drop, 0.5f, p);
     markVertex(keep);
     killVertex(drop);
@@ -1091,6 +1172,7 @@ bool DynamicTopology::flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d)
     const Mesh& m = *mesh_;
     uint32_t tris[4];
     if (edgeTriangles(a, b, tris) != 2 || featureEdge(a, b)) return false;
+    if (seamEdge(a, b)) return false; // (the two triangles' UVs don't share a chart there)
     c = d = kNone;
     for (int i = 0; i < 2; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
@@ -1154,8 +1236,17 @@ void DynamicTopology::flip(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
         while (k < 3 && tri[k] != a) ++k;
         if (tri[(k + 1) % 3] != b) std::swap(t1, t2);
     }
+    // (Not a seam edge: both triangles' UVs are in one chart, so each corner keeps the UV it has.)
+    glm::vec2 ua(0.0f), ub(0.0f), uc(0.0f), ud(0.0f);
+    if (!m.uvs.empty()) {
+        ua = cornerUv(t1, a), ub = cornerUv(t1, b), uc = cornerUv(t1, c), ud = cornerUv(t2, d);
+    }
     setTriangle(t1, glm::uvec3(c, a, d));
     setTriangle(t2, glm::uvec3(d, b, c));
+    if (!m.uvs.empty()) {
+        mesh_->uvs[size_t(t1) * 3 + 0] = uc, mesh_->uvs[size_t(t1) * 3 + 1] = ua, mesh_->uvs[size_t(t1) * 3 + 2] = ud;
+        mesh_->uvs[size_t(t2) * 3 + 0] = ud, mesh_->uvs[size_t(t2) * 3 + 1] = ub, mesh_->uvs[size_t(t2) * 3 + 2] = uc;
+    }
     ++stats.flips;
     ++ops_;
 }
@@ -1233,7 +1324,7 @@ void DynamicTopology::relaxPass() {
             in = in || glm::dot(d0, d0) <= r2;
         }
         if (!in) continue;
-        if (featureEdges(v, other) != 0) continue;
+        if (featureEdges(v, other) != 0 || seamVertex(v)) continue; // (a seam vertex must stay on its seam)
         ring(v, r);
         if (r.size() < 3) continue;
         glm::vec3 avg(0.0f);
@@ -1265,8 +1356,41 @@ void DynamicTopology::relaxPass() {
         }
         if (!ok) continue;
         recordVertex(v);
+        slideUvs(v, to);
         m.positions[v] = to;
         if (!m.base.empty()) m.base[v] += d;
+    }
+}
+
+// The vertex is about to slide along the surface to `to`: its UVs follow, each triangle's own map of its plane
+// to UV space extended to the new place (all of them averaged: they agree up to the surface's curvature), so the
+// paint stays on the surface. A vertex on a seam keeps its UVs.
+void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
+    Mesh& m = *mesh_;
+    if (m.uvs.empty() || seamVertex(v)) return;
+    const auto& pos = m.positions;
+    const glm::vec3 d = to - pos[v];
+    glm::vec2 shift(0.0f);
+    int n = 0;
+    for (uint32_t t : m.vertexTriangles(v)) {
+        const glm::uvec3& tri = m.triangles[t];
+        const glm::vec3 e1 = pos[tri.y] - pos[tri.x], e2 = pos[tri.z] - pos[tri.x];
+        const glm::vec2 u1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], u2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        const glm::vec3 normal = glm::cross(e1, e2);
+        const float nn = glm::dot(normal, normal);
+        const float g11 = glm::dot(e1, e1), g12 = glm::dot(e1, e2), g22 = glm::dot(e2, e2);
+        const float det = g11 * g22 - g12 * g12;
+        if (!(nn > 1e-24f) || !(det > 0.0f)) continue;
+        const glm::vec3 w = d - normal * (glm::dot(d, normal) / nn);
+        const float r1 = glm::dot(w, e1), r2 = glm::dot(w, e2);
+        shift += u1 * ((r1 * g22 - r2 * g12) / det) + u2 * ((g11 * r2 - g12 * r1) / det);
+        ++n;
+    }
+    if (n == 0 || !std::isfinite(shift.x) || !std::isfinite(shift.y)) return;
+    shift /= float(n);
+    for (uint32_t t : m.vertexTriangles(v)) {
+        recordTriangle(t);
+        setCornerUv(t, v, cornerUv(t, v) + shift);
     }
 }
 
@@ -1356,6 +1480,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     recordedNow_.clear();
     if (!dyntopoBlocker(mesh).empty() || !(edgeLength > 0.0f) || !(radius > 0.0f)) return false;
     if (mesh_ && mesh_ != &mesh) return false; // (another mesh mid-stroke)
+    if (!mesh.uvs.empty() && mesh.uvs.size() != mesh.triangleCount() * 3) return false; // (UVs that don't fit: leave it alone)
     if (!mesh_) {
         // A former subdivision level (its levels deleted) may still derive its adjacency from them: store it.
         if (mesh.implicitAdjacency()) mesh.rebuildTopology();
@@ -1370,11 +1495,6 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
         deadV_.assign(mesh.vertexCount(), 0);
         deadT_.assign(mesh.triangleCount(), 0);
         changedVFlag_.assign(mesh.vertexCount(), 0);
-        if (!mesh.uvs.empty()) { // a remeshed surface has no UVs: they come back with undo
-            undo_->uvs = std::move(mesh.uvs);
-            mesh.uvs.clear();
-            mesh.topologyDirty = true;
-        }
     }
     center_ = center;
     radius_ = radius;
@@ -1478,7 +1598,7 @@ std::unique_ptr<TopologyUndo> DynamicTopology::finish(Mesh& mesh, BVH& bvh) {
     std::vector<uint32_t>().swap(gridHead_);
     std::vector<uint32_t>().swap(gridNext_);
     std::vector<uint32_t>().swap(regionVerts_);
-    if (undo->vertexSlots.empty() && undo->triangleSlots.empty() && undo->uvs.empty()) return nullptr;
+    if (undo->vertexSlots.empty() && undo->triangleSlots.empty()) return nullptr;
     return undo;
 }
 

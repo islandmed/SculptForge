@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -413,7 +414,7 @@ TEST(dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh) {
     CHECK(invalid(d.mesh, true).empty());
 }
 
-TEST(dyntopo_carries_attributes_and_drops_uvs) {
+TEST(dyntopo_carries_attributes_and_keeps_uvs) {
     Document d = sphereDoc(2);
     Mesh& m = d.mesh;
     m.ensureColors();
@@ -465,7 +466,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     for (int i = 0; i < 8; ++i) dabToward(d, glm::vec3(0.1f * float(i) - 0.4f, 0.05f, 3.0f), 0.35f, BrushType::Standard, Symmetry{});
     d.undo.push(d.sculptor.endStroke());
     CHECK(invalid(m, true).empty());
-    CHECK(m.uvs.empty());
+    CHECK(m.uvs.size() == m.triangleCount() * 3); // (kept: every corner of every triangle has its UV)
     CHECK(m.colors.size() == m.vertexCount());
     CHECK(m.facegroups.size() == m.triangleCount());
     CHECK(m.layers[0].delta.size() == m.vertexCount() && m.base.size() == m.vertexCount());
@@ -490,6 +491,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     CHECK(std::abs(groupArea(m, 3) - area3) < 0.05f * area3);
     d.undo.undo(m, d.bvh);
     CHECK(m.uvs.size() == m.triangleCount() * 3);
+    CHECK(m.uvs == std::vector<glm::vec2>(m.triangleCount() * 3, glm::vec2(0.5f)));
     CHECK(borderVerts(m).size() == borderBefore);
 }
 
@@ -809,4 +811,167 @@ TEST(dyntopo_failing_candidates_are_bounded_per_dab) {
     CHECK(dt.stats.collapses == 0); // (nothing can collapse: every edge is a feature)
     CHECK(invalid(d.mesh, true).empty());
     d.undo.push(d.sculptor.endStroke());
+}
+
+// ---------------------------------------------------------------------------
+// UVs and the painted texture (a Dynamic stroke used to drop the UVs, and with them the paint)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A flat Part (y = 0, x and z in -1..1) with two UV islands that meet along the seam x = 0: left x < 0, right x > 0,
+// each mapped by its plane position (0.2 UV per unit) into its own half of the texture.
+glm::vec2 seamUv(const glm::vec3& p, bool right) { return glm::vec2(p.x * 0.2f + (right ? 0.75f : 0.25f), p.z * 0.2f + 0.5f); }
+
+bool rightIsland(const Mesh& m, uint32_t t) {
+    const glm::uvec3 tri = m.triangles[t];
+    return m.positions[tri.x].x + m.positions[tri.y].x + m.positions[tri.z].x > 0.0f;
+}
+
+Document seamPlane(int resolution) {
+    Document d = makeDoc(makePlane(resolution, 2.0f));
+    d.sculptor.dyntopo.enabled = true;
+    d.sculptor.dyntopo.detail = 0.8f;
+    Mesh& m = d.mesh;
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) m.uvs[size_t(t) * 3 + size_t(c)] = seamUv(m.positions[m.triangles[t][c]], rightIsland(m, t));
+    m.rebuildTopology();
+    d.bvh.build(m);
+    // A texture with a pattern in every texel, so any change is visible.
+    m.texture = makeTexture(128, 128);
+    PaintTexture& tex = *m.texture;
+    for (size_t i = 0; i < tex.texelCount(); ++i) {
+        tex.pixels[i * 4 + 0] = uint8_t(i * 37u);
+        tex.pixels[i * 4 + 1] = uint8_t((i / 128u) * 11u);
+        tex.pixels[i * 4 + 2] = uint8_t(i * 5u + 90u);
+        tex.pixels[i * 4 + 3] = 255;
+    }
+    return d;
+}
+
+// A straight-down dab at (x, z) on the flat Part (strength small: the Part stays flat, so the UVs can be checked
+// against the plane).
+void flatDab(Document& d, float x, float z, float radius) {
+    DabParams p;
+    p.center = glm::vec3(x, 0.0f, z);
+    p.viewDir = glm::vec3(0.0f, -1.0f, 0.0f);
+    p.radius = radius;
+    p.strength = 0.01f;
+    Symmetry none;
+    none.x = false;
+    d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, none);
+}
+
+} // namespace
+
+TEST(dyntopo_keeps_uvs_and_texture_across_a_seam) {
+    Document d = seamPlane(16);
+    Mesh& m = d.mesh;
+    const Mesh before = m;
+    const std::vector<uint8_t> texels = m.texture->pixels;
+    const auto texture = m.texture;
+    // A stroke across the seam, small and large dabs (the Part gets finer and coarser under it).
+    CHECK(d.sculptor.beginStroke(m, "Standard"));
+    for (int i = 0; i < 10; ++i) flatDab(d, 0.12f * float(i) - 0.55f, 0.1f * float(i % 3) - 0.1f, i < 6 ? 0.25f : 0.5f);
+    d.undo.push(d.sculptor.endStroke());
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() != before.triangleCount());
+    CHECK(m.uvs.size() == m.triangleCount() * 3);
+    // The paint is untouched: the same texture object, the same texels.
+    CHECK(m.texture == texture);
+    CHECK(m.texture->pixels == texels);
+    // Every corner is still the plane's mapping of its place on its own island (the seam stayed a seam), and no
+    // triangle's texture is stretched: its UV area stays 0.04 of its area.
+    float worstUv = 0.0f, lowRatio = 10.0f, highRatio = 0.0f;
+    size_t seamCorners = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        const bool right = rightIsland(m, t);
+        for (int c = 0; c < 3; ++c) {
+            worstUv = std::max(worstUv, glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[tri[c]], right)));
+            if (std::abs(m.positions[tri[c]].x) < 1e-5f) ++seamCorners;
+        }
+        const glm::vec2 u1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], u2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        const float uvArea = 0.5f * std::abs(u1.x * u2.y - u1.y * u2.x);
+        const float area = 0.5f * glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+        const float ratio = uvArea / area;
+        lowRatio = std::min(lowRatio, ratio);
+        highRatio = std::max(highRatio, ratio);
+    }
+    CHECK(worstUv < 2e-3f);
+    CHECK(lowRatio > 0.04f * 0.9f && highRatio < 0.04f * 1.1f);
+    CHECK(seamCorners > 0);
+    // The seam is intact: a texture lookup on each side of it still reads that side's texels.
+    CHECK(bvhMatches(m, d.bvh));
+    // Undo brings back the exact UVs, redo the new ones.
+    const Mesh after = m;
+    d.undo.undo(m, d.bvh);
+    CHECK(m.uvs == before.uvs);
+    CHECK(m.triangles == before.triangles);
+    CHECK(m.texture->pixels == texels);
+    d.undo.redo(m, d.bvh);
+    CHECK(m.uvs == after.uvs);
+    CHECK(m.triangles == after.triangles);
+    CHECK(m.texture->pixels == texels);
+}
+
+TEST(dyntopo_never_collapses_a_seam_vertex) {
+    Document d = seamPlane(16);
+    d.sculptor.dyntopo.detail = 0.0f; // coarse: the brush wants to collapse what is under it
+    Mesh& m = d.mesh;
+    auto seamVertices = [](const Mesh& mesh) { // (the vertices on the seam: they can be split, never removed)
+        size_t n = 0;
+        for (const glm::vec3& p : mesh.positions)
+            if (std::abs(p.x) < 1e-5f) ++n;
+        return n;
+    };
+    const size_t seamBefore = seamVertices(m);
+    CHECK(d.sculptor.beginStroke(m, "Standard"));
+    for (int i = 0; i < 6; ++i) flatDab(d, 0.0f, 0.3f * float(i) - 0.75f, 0.9f);
+    d.undo.push(d.sculptor.endStroke());
+    const size_t seamAfter = seamVertices(m);
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() < size_t(2 * 16 * 16)); // (it did simplify away from the seam)
+    CHECK(seamAfter >= seamBefore); // (but nothing on the seam collapsed)
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c)
+            CHECK(glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[m.triangles[t][c]], rightIsland(m, t))) < 2e-3f);
+}
+
+TEST(dyntopo_keeps_uvs_on_a_curved_part_with_symmetry_and_undo) {
+    Document d = sphereDoc(3);
+    Mesh& m = d.mesh;
+    // Two islands (upper and lower half, planar maps), so the equator is a seam all the way round.
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        const bool upper = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f;
+        for (int c = 0; c < 3; ++c)
+            m.uvs[size_t(t) * 3 + size_t(c)] = glm::vec2(m.positions[tri[c]].x, m.positions[tri[c]].z) * 0.25f + glm::vec2(upper ? 0.25f : 0.75f, 0.5f);
+    }
+    m.rebuildTopology();
+    d.bvh.build(m);
+    const Mesh before = m;
+    d.sculptor.dyntopo.detail = 0.8f;
+    Symmetry sym; // (X mirror on, as by default)
+    for (int s = 0; s < 3; ++s) {
+        CHECK(d.sculptor.beginStroke(m, "Standard"));
+        for (int i = 0; i < 8; ++i) dabToward(d, glm::vec3(0.12f * float(i) - 0.4f, 0.35f * float(s) - 0.3f, 3.0f), 0.3f, BrushType::Standard, sym);
+        d.undo.push(d.sculptor.endStroke());
+        CHECK(invalid(m, true).empty());
+        CHECK(m.uvs.size() == m.triangleCount() * 3);
+    }
+    CHECK(m.triangleCount() != before.triangleCount());
+    // Each island's UVs stay inside the range the planar map gave it (nothing flung out or extrapolated).
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec2 uv = m.uvs[size_t(t) * 3 + size_t(c)];
+            const bool upper = uv.x < 0.5f;
+            CHECK(std::abs(uv.x - (upper ? 0.25f : 0.75f)) < 0.3f && std::abs(uv.y - 0.5f) < 0.3f);
+        }
+    CHECK(bvhMatches(m, d.bvh));
+    while (d.undo.canUndo()) d.undo.undo(m, d.bvh);
+    CHECK(m.uvs == before.uvs);
+    CHECK(m.triangles == before.triangles);
 }
