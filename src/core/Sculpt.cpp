@@ -1291,10 +1291,10 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
 // Is the region under a Trim dab a thin sheet (a shell, a wing, a cloth-thin Part): most of what faces the viewer has a wall
 // behind it, parallel to it, within `kTrimSheet` of the brush radius? Sampled, a few rays. A solid form with pockets (the
 // nostrils and lips of a head) is not: Trim there stays what it was, a plane that takes everything above it.
-static constexpr float kTrimSheet = 0.6f;
+static constexpr float kTrimSheet = 1.5f; // (a wing 0.12 thick at its middle under a brush of radius 0.1 is a sheet)
 static bool trimRegionIsSheet(const Mesh& mesh, const BVH& bvh, std::span<const uint32_t> verts, const glm::vec3& center,
                               const glm::vec3& viewDir, float r) {
-    constexpr size_t kSamples = 48;
+    constexpr size_t kSamples = 400; // (half of a thin Part's region is its far side, and the pen's disc is a part of the rest: ~60 rays)
     if (mesh.normals.size() != mesh.vertexCount() || verts.size() < 8) return false;
     const size_t stride = std::max<size_t>(1, verts.size() / kSamples);
     const float eps = 1e-3f * r;

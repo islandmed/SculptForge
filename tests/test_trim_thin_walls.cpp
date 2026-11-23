@@ -8,6 +8,7 @@
 
 #include "core/Primitives.h"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <map>
@@ -142,6 +143,64 @@ void check(const char* what, const Result& r, float wall, float radius) {
     if (wall > 2.0f * keep) CHECK(r.skinMoved > 0.0f); // and the skin is still trimmed where there is wall to spare
 }
 
+// A closed wing: a sphere squashed to 1.4 x 0.06 x 1 (0.12 thick at its middle, thinner toward the rim), symmetric in Y, so the
+// underside's vertex under each top vertex is known. Strokes from above, three rounds: the top never reaches the underside, the
+// underside does not move.
+Result trimClosedWing(float radius, float strength, bool frontOnly) {
+    static Fixture fx = [] {
+        Fixture f;
+        f.mesh = makeIcosphere(7, 1.0f);
+        for (glm::vec3& p : f.mesh.positions) p *= glm::vec3(1.4f, 0.06f, 1.0f);
+        f.mesh.recomputeAllNormals();
+        f.bvh.build(f.mesh);
+        return f;
+    }();
+    static std::vector<uint32_t> under = [] { // vertex v (y > 0) -> its mirror in y (-1: none)
+        std::map<std::array<long, 3>, uint32_t> at;
+        const auto key = [](const glm::vec3& p) {
+            return std::array<long, 3>{std::lround(p.x * 1e5f), std::lround(p.y * 1e5f), std::lround(p.z * 1e5f)};
+        };
+        for (uint32_t v = 0; v < fx.mesh.positions.size(); ++v) at[key(fx.mesh.positions[v])] = v;
+        std::vector<uint32_t> m(fx.mesh.positions.size(), ~0u);
+        for (uint32_t v = 0; v < fx.mesh.positions.size(); ++v) {
+            glm::vec3 q = fx.mesh.positions[v];
+            q.y = -q.y;
+            const auto it = at.find(key(q));
+            if (it != at.end()) m[v] = it->second;
+        }
+        return m;
+    }();
+    Document d = docFrom(fx);
+    const std::vector<glm::vec3> before = d.mesh.positions;
+    for (int round = 0; round < 3; ++round) {
+        for (const float z : {-0.1f, 0.1f + 0.4f * radius}) {
+            d.sculptor.beginStroke(d.mesh, "Trim");
+            for (int i = 0; i < 40; ++i) {
+                DabParams p;
+                const float x = -0.5f + 0.025f * float(i);
+                const float y = 0.06f * std::sqrt(std::max(0.0f, 1.0f - (x / 1.4f) * (x / 1.4f) - z * z));
+                p.center = glm::vec3(x, y, z);
+                p.viewDir = glm::vec3(0.0f, -1.0f, 0.0f);
+                p.radius = radius, p.strength = strength, p.pressure = 0.2f + 0.8f * float(i) / 39.0f;
+                p.strokeDelta = glm::vec3(0.025f, 0.0f, 0.0f);
+                p.frontFacesOnly = frontOnly;
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::Trim, p, kNoSym);
+            }
+            d.undo.push(d.sculptor.endStroke());
+        }
+    }
+    Result r;
+    for (uint32_t v = 0; v < before.size(); ++v) {
+        if (before[v].y > 1e-4f && under[v] != ~0u)
+            r.minWall = std::min(r.minWall, d.mesh.positions[v].y - d.mesh.positions[under[v]].y);
+        if (before[v].y < -1e-4f) r.farMoved = std::max(r.farMoved, glm::distance(d.mesh.positions[v], before[v]));
+        if (before[v].y > 1e-4f) r.skinMoved = std::max(r.skinMoved, glm::distance(d.mesh.positions[v], before[v]));
+    }
+    r.nan = nonFinite(d.mesh);
+    r.flips = flippedFaces(before, d.mesh);
+    return r;
+}
+
 } // namespace
 
 TEST(trim_never_tears_a_thin_shell) {
@@ -164,4 +223,19 @@ TEST(trim_never_tears_a_thin_wing) {
                               front ? "on" : "off");
                 check(what, trimWing(wall, radius, 0.8f, front), wall, radius);
             }
+}
+
+TEST(trim_never_tears_a_closed_thin_wing) {
+    for (const float radius : {0.1f, 0.2f, 0.4f})
+        for (const bool front : {false, true}) {
+            char what[96];
+            std::snprintf(what, sizeof what, "closed wing, radius %.2f, front faces only %s", double(radius), front ? "on" : "off");
+            const Result r = trimClosedWing(radius, 0.8f, front);
+            std::printf("  %s: thinnest wall %.5f, underside moved %.2g, top moved %.4f, flips %zu\n", what, double(r.minWall),
+                        double(r.farMoved), double(r.skinMoved), r.flips);
+            CHECK(r.nan == 0);
+            CHECK(r.minWall > 0.0f);     // the top never reaches the underside under it
+            CHECK(r.farMoved < 1e-6f);   // the underside is not Trim's to push
+            CHECK(r.skinMoved > 0.0f);   // the top is still trimmed
+        }
 }
