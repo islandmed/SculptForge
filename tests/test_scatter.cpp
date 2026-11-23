@@ -198,6 +198,11 @@ TEST(scatter_round_pieces_pack_by_their_own_sphere) {
     std::printf("  balls: %zu fit by their box, %zu by their own sphere\n", loose.placed, tight.placed);
 }
 
+TEST(scatter_refuses_a_piece_without_size) {
+    std::string error;
+    CHECK(scatterPlace(ball(), vec3(0.0f), settings(10), nullptr, &error).empty() && !error.empty()); // no NaN, a reason
+}
+
 TEST(scatter_keeps_to_the_masked_area) {
     Mesh m = ball();
     std::vector<float>& mask = m.ensureMask();
@@ -308,6 +313,13 @@ TEST(scatter_command_one_undo_step_joined_or_separate) {
         CHECK(reg.execute(doc, "scatter", {{"shape", std::string(shape)}, {"count", 5.0}, {"keep_apart", true}}).ok);
         CHECK(reg.execute(doc, "undo").ok && doc.parts.size() == 2);
     }
+    // Two Parts with one name: by name it finds the first (the surface itself: refused), by number the one meant.
+    doc.parts[0].name = "Box";
+    CHECK(!reg.execute(doc, "scatter", {{"part", std::string("Box")}, {"count", 3.0}}).ok);
+    CHECK(reg.execute(doc, "scatter", {{"part", 1.0}, {"count", 3.0}}).ok);
+    CHECK(doc.partMesh(1).triangleCount() == 3 * boxTris);
+    CHECK(reg.execute(doc, "undo").ok);
+    doc.parts[0].name = "Ball";
     // By index, over another target.
     CHECK(reg.execute(doc, "scatter", {{"part", 0.0}, {"target", std::string("Box")}, {"count", 3.0}}).ok);
     CHECK(reg.execute(doc, "undo").ok);

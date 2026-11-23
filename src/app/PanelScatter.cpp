@@ -47,7 +47,7 @@ void App::runScatter() {
            {"spacing", double(scatterSpacing_)},
            {"fit", std::string(scatterTight_ ? "tight" : "round")},
            {"separate", scatterSeparate_}};
-    if (scatterPiece_) a["part"] = doc_.parts[size_t(doc_.partIndex(scatterPiece_))].name;
+    if (scatterPiece_) a["part"] = double(doc_.partIndex(scatterPiece_)); // (by index: names can repeat)
     else a["shape"] = std::string(kShapes[std::clamp(scatterShape_, 0, kShapeCount - 1)]), a["size"] = double(scatterSize_);
     // The last Scatter, still the last step on this surface: this one takes its place.
     const uint32_t surface = doc_.activePartInfo().id;

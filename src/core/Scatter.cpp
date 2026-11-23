@@ -264,6 +264,7 @@ std::vector<ScatterCopy> scatterPlace(const Mesh& target, const vec3& half, cons
     items.reserve(size_t(s.count));
     // The rest of the surface is reached by the copies' largest bounding sphere plus the gap: one grid cell.
     const float rmax = (s.pieceRadius > 0.0f ? s.pieceRadius : glm::length(half)) * hi;
+    if (!(rmax > 0.0f) || !std::isfinite(rmax)) return fail("Scatter: that piece has no size");
     const float cell = 2.0f * rmax * (1.0f + std::max(0.0f, s.spacing));
     if (!s.keepApart) {
         items.resize(size_t(s.count));
@@ -343,8 +344,9 @@ std::vector<ScatterCopy> scatterPlace(const Mesh& target, const vec3& half, cons
                         if (j == i || !contact(a, items[j], half, s, &push)) return;
                         // Slide along the surface: the part of the push that leaves it does nothing once the copy
                         // goes back onto it, so a push mostly along the normal goes sideways instead.
-                        const float len = glm::length(push);
+                        float len = glm::length(push);
                         vec3 slide = push - a.normal * glm::dot(push, a.normal);
+                        if (len < 1e-6f * a.radius) len = 0.25f * a.radius; // (two copies on the same spot: no way out to read)
                         if (glm::length(slide) < 0.25f * len) {
                             vec3 away = a.centre - items[j].centre;
                             away -= a.normal * glm::dot(away, a.normal);
@@ -577,16 +579,17 @@ void registerScatterCommands(CommandRegistry& reg) {
                  const int target = targetName.empty() ? doc.activePart : partArg(doc, targetName);
                  if (target < 0) return {false, "Scatter: no Part '" + targetName + "' to scatter over"};
                  const std::string shape = argString(a, "shape");
-                 const std::string which = argString(a, "part", a.contains("part") && std::holds_alternative<double>(a.at("part"))
-                                                                     ? std::to_string(int(argNumber(a, "part", -1)))
-                                                                     : std::string());
+                 // part= as a number is an index (the panel passes one: two Parts can share a name); as text, a name or an index.
+                 const bool byIndex = a.contains("part") && std::holds_alternative<double>(a.at("part"));
+                 const std::string which = byIndex ? std::to_string(int(argNumber(a, "part", -1))) : argString(a, "part");
                  if (shape.empty() == which.empty()) return {false, "Scatter: give the piece as part= (a Part) or shape= (a built-in shape)"};
                  Mesh scratchTarget, scratchSource, own;
                  const Mesh& surface = partPlacedMesh(doc, target, scratchTarget);
                  std::string pieceName;
                  const Mesh* piece = nullptr;
                  if (!which.empty()) {
-                     const int source = partArg(doc, which);
+                     const int index = int(argNumber(a, "part", -1));
+                     const int source = byIndex ? (index >= 0 && index < doc.partCount() ? index : -1) : partArg(doc, which);
                      if (source < 0) return {false, "Scatter: no Part '" + which + "' to scatter"};
                      if (source == target) return {false, "Scatter: pick another Part than the surface itself"};
                      piece = &partPlacedMesh(doc, source, scratchSource);
