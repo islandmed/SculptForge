@@ -1,0 +1,167 @@
+# Shift smooths with whatever brush is picked (0.13.12 member report: "hold Shift to smooth isn't working"). With Front faces only, Connected only and View falloff on, in both input styles.
+# Each case: a bump made with Standard, then six Shift strokes over it with the brush named; the bump (the surface's distance
+# from the pristine sphere, moved_sum) must come down, as it does under the Smooth brush itself.
+run ui_look look=classic layout=classic
+# front_faces-classic
+run new_sphere subdivisions=6
+input_style classic
+camera 0 0
+key x
+expect_value symmetry_x == 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.front_faces
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.front_faces
+
+# front_faces-sculptforge
+run new_sphere subdivisions=6
+input_style sculptforge
+camera 0 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.front_faces
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.front_faces
+
+# connected_only-classic
+run new_sphere subdivisions=6
+input_style classic
+camera 0 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.connected_only
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.connected_only
+
+# connected_only-sculptforge
+run new_sphere subdivisions=6
+input_style sculptforge
+camera 0 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.connected_only
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.connected_only
+
+# view_falloff-classic
+run new_sphere subdivisions=6
+input_style classic
+camera 0 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.view_falloff
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.view_falloff
+
+# view_falloff-sculptforge
+run new_sphere subdivisions=6
+input_style sculptforge
+camera 0 0
+brush_size 70
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action draw.view_falloff
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+action draw.view_falloff

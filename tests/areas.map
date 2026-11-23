@@ -113,6 +113,7 @@ ui_air_strokes              sculpt
 ui_along_normal             sculpt
 ui_alpha_*                  sculpt
 ui_alternate_smooth         sculpt
+ui_shift_smooth_*           sculpt
 ui_big_mesh_tip             sculpt
 ui_brush_*                  sculpt
 ui_builtin_presets          sculpt
