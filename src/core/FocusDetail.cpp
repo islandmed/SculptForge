@@ -44,6 +44,11 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 double msSince(Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); }
+// SF_FOCUS_TRACE=1: a line on stderr for each update() or brush promotion over 10 ms (where a frame's time went)
+bool focusTrace() {
+    static const bool on = [] { const char* e = std::getenv("SF_FOCUS_TRACE"); return e && e[0] == '1'; }();
+    return on;
+}
 
 // Files by their UTF-8 names (Windows: the wide API, so a name outside the code page works too).
 std::FILE* openWrite(const std::string& path) {
@@ -779,9 +784,11 @@ void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park) {
 }
 
 void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit) {
+    const auto t0 = Clock::now();
     brushWaiting_.fetch_add(1, std::memory_order_acq_rel); // (update() stops between batches and lets this in)
     std::unique_lock<std::mutex> lock(mutex_);
     brushWaiting_.fetch_sub(1, std::memory_order_acq_rel);
+    const double waited = msSince(t0);
     std::vector<uint32_t> need;
     for (uint32_t t : tris) {
         if (t >= state_.size()) continue;
@@ -789,7 +796,11 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
         if (state_[t] == kCoarse) need.push_back(t);
         else if (edit) state_[t] = kDirty;
     }
+    const bool busy = ThreadPool::shared().busy();
     if (!need.empty()) promoteLocked(mm, need, edit, true);
+    if (focusTrace() && msSince(t0) > 10.0)
+        std::fprintf(stderr, "focus ensureFull %.1f ms: waited %.1f, %zu of %zu tiles promoted (pool %s)\n", msSince(t0), waited,
+                     need.size(), tris.size(), busy ? "busy" : "free");
 }
 
 void FocusDetail::ensureAllFull(MicroMesh& mm, bool edit) {
@@ -859,7 +870,10 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         return;
     }
     if (!lock.owns_lock()) lock.lock();
+    const double lockWait = msSince(t0);
     gaveWay_ = 0;
+    double promoteMs = 0.0, demoteMs = 0.0;
+    size_t promotedNow = 0, parkedNow = 0;
     // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
     // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
     // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
@@ -987,11 +1001,13 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
             poolFor(victims.size(), [&](size_t b, size_t e) {
                 for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
             }, 1, 2);
+            parkedNow += dirty;
             if (dirty > 0) {
                 const double per = msSince(p0) / double(dirty);
                 parkMs_[busy] = parkMs_[busy] > 0.0 ? 0.7 * parkMs_[busy] + 0.3 * per : per;
             }
             for (uint32_t t : victims) demoteLocked(mm, t, false);
+            demoteMs += msSince(p0);
         } while (fullTiles_ + room > maxFull && !victims.empty() && !lru.empty() && msSince(t0) <= budgetMs);
         return fullTiles_ + room <= maxFull;
     };
@@ -1011,6 +1027,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         }
         const auto b0 = Clock::now();
         promoteLocked(mm, std::span<const uint32_t>(scratch_.data() + done, count), false, false);
+        promoteMs += msSince(b0), promotedNow += count;
         const double per = msSince(b0) / double(count);
         tileMs_[busy] = tileMs_[busy] > 0.0 ? 0.7 * tileMs_[busy] + 0.3 * per : per;
         done += count;
@@ -1024,6 +1041,10 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     stats_.lastUpdateMs = msSince(t0);
     lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
     lastPending_.store(stats_.lastPending, std::memory_order_relaxed);
+    if (focusTrace() && stats_.lastUpdateMs > 10.0)
+        std::fprintf(stderr, "focus update %.1f ms: lock wait %.1f, promote %zu tiles %.1f, demote (%zu parked) %.1f, %s, pending %zu\n",
+                     stats_.lastUpdateMs, lockWait, promotedNow, promoteMs, parkedNow, demoteMs, fromQueue ? "queue" : "scored",
+                     stats_.lastPending);
 }
 
 FocusStats FocusDetail::stats() const {
