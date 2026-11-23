@@ -1,0 +1,21 @@
+# A brush click or drag that starts off every model leaves the camera exactly where it was (phoenix: a click in empty
+# canvas sent the model out of view and the Size read 3.6 km).
+run new_sphere subdivisions=4
+key f
+camera 0 0
+click "Dynamic##draw.dynamic"
+click "Standard##brush.standard"
+zoom 3
+remember camera_distance d0
+remember camera_pan p0
+remember camera_yaw y0
+remember world_radius_mm r0
+stroke 0.03 0.03 0.03 0.03
+expect_value camera_distance == $d0
+expect_value camera_pan == $p0
+expect_value camera_yaw == $y0
+drag_path 0.97 0.9 0.972 0.901
+expect_value camera_distance == $d0
+expect_value camera_pan == $p0
+expect_value world_radius_mm < $r0*4
+expect_value can_undo == 0

@@ -89,6 +89,25 @@ TEST(touch_pinch_zoom_steps) {
     CHECK(near(c.distance, 5.0f, 1e-3f));
 }
 
+// A click in empty canvas leaves the camera where it was: two contacts that jump apart (or together) in one event are
+// one bounded step, not a 1000x dolly (the phoenix clip: the model left the view, Size read 3.6 km).
+TEST(touch_one_event_never_flings_the_camera) {
+    TouchGesture g;
+    g.down(1, {0.5f, 0.5f});
+    g.down(2, {0.5001f, 0.5f}); // a resting finger beside the clicking one
+    TwoFingerStep s;
+    CHECK(g.move(2, {0.9f, 0.5f}, s));
+    CHECK(s.scale <= kMaxPinchStep && s.scale >= 1.0f);
+    g.move(2, {0.5002f, 0.5f}, s);
+    CHECK(s.scale >= 1.0f / kMaxPinchStep && s.scale <= kMaxPinchStep);
+    CHECK(pinchZoomSteps(1e-4f) >= pinchZoomSteps(1.0f / kMaxPinchStep));
+    CHECK(pinchZoomSteps(1e4f) <= pinchZoomSteps(kMaxPinchStep));
+    Camera c;
+    const float d0 = c.distance;
+    c.zoom(pinchZoomSteps(1e-6f));
+    CHECK(c.distance <= d0 * kMaxPinchStep * 1.001f);
+}
+
 TEST(palm_guard_follows_the_pen) {
     PalmGuard g;
     CHECK(!g.active(0.0)); // no pen yet: fingers count

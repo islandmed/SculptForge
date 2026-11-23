@@ -48,6 +48,12 @@ private:
     bool gesture_ = false;
 };
 
+// One pinch event can't change the view more than this: two contacts that land on the spot (a click's resting
+// finger, a lost finger id) read as a span going from ~0 to a hand's width, and one such step flung the camera
+// 1000x out (empty-canvas click, trackpad). A real pinch moves a few percent per event.
+constexpr float kMaxPinchStep = 2.0f;
+float clampPinchScale(float scale); // into 1/kMaxPinchStep .. kMaxPinchStep
+
 // Camera::zoom steps (x0.88 of the distance each) for a pinch that spread the fingers by `scale`: the model grows
 // on screen by about the same factor. 0 for a scale that isn't finite and positive.
 float pinchZoomSteps(float scale);

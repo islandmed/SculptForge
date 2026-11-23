@@ -41,7 +41,7 @@ bool TouchGesture::move(uint64_t id, glm::vec2 p, TwoFingerStep& step) {
     const float l0 = glm::length(d0), l1 = glm::length(d1);
     constexpr float kMinSpan = 1e-4f; // two fingers on the same spot: no pinch or twist to measure
     if (l0 > kMinSpan && l1 > kMinSpan) {
-        step.scale = l1 / l0;
+        step.scale = clampPinchScale(l1 / l0);
         float a = std::atan2(d1.y, d1.x) - std::atan2(d0.y, d0.x);
         constexpr float kPi = 3.14159265358979f;
         if (a > kPi) a -= 2.0f * kPi;
@@ -69,9 +69,11 @@ void TouchGesture::clear() {
     gesture_ = false;
 }
 
+float clampPinchScale(float scale) { return std::clamp(scale, 1.0f / kMaxPinchStep, kMaxPinchStep); }
+
 float pinchZoomSteps(float scale) {
     if (!std::isfinite(scale) || !(scale > 0.0f)) return 0.0f;
-    return std::log(scale) / -std::log(0.88f); // Camera::zoom: distance * 0.88^steps = distance / scale
+    return std::log(clampPinchScale(scale)) / -std::log(0.88f); // Camera::zoom: distance * 0.88^steps = distance / scale
 }
 
 } // namespace sf
