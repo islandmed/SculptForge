@@ -5,6 +5,20 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.14
+
+```features
+date: 2026-11-23
+tagline: Sculpting with Dynamic on no longer erases the texture of a painted Part.
+highlight: Sculpting with Dynamic on no longer erases the texture of a painted Part
+title: Dynamic keeps your paint
+line: Sculpt with Dynamic on over a painted Part and the texture stays, through Undo, Redo and reopening the file.
+action: guide:texture-painting.md
+```
+
+- **Dynamic** keeps a painted Part's texture: on 0.13.11 and 0.13.12, sculpting with Dynamic on could erase the
+  paint. If you lost paint to this, we are sorry; it won't happen again.
+
 ## Version 0.13.13
 
 ```features
