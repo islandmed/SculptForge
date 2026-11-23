@@ -57,6 +57,8 @@ public:
     size_t pendingShading() const { return pendingCount_ + staleCount_; }
     // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
     size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
+    // Pages (full grid and shading) of full tiles that wait for a frame's budget to be shaded (MicroFocus: pores come in with them).
+    size_t pendingPages() const { return focus_ ? focus_->pendingPages() : 0; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.

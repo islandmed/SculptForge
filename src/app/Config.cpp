@@ -138,6 +138,7 @@ Json toJson(const UiPrefs& p) {
     j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
     j.set("showViewFigure", p.showViewFigure);
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
+    if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
     j.set("language", p.language);
     j.set("lengthUnit", p.lengthUnit);
@@ -258,6 +259,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
+    if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
     p.lookSaved = lookFromJson(j, p);
@@ -874,7 +876,7 @@ void App::initActions() {
         "Version, licence and the open-source components SculptForge is built with.");
     add("help.support", "Support SculptForge...", "Help", nullptr, [this] { openSupportPage("help-menu"); }, ICON_LC_HEART, nullptr,
         nullptr, nullptr,
-        "SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request "
+        "SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request "
         "a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.");
     add("help.discord", "Join the Discord...", "Help", nullptr, [this] { openDiscordPage(); }, ICON_LC_MESSAGE_CIRCLE,
         nullptr, nullptr, nullptr,
@@ -2129,6 +2131,14 @@ void drawInterfaceSection(App& app) {
     ui::HelpText("Palettes strictly A-Z", nullptr,
                  "Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
                  "Preferences > Interface");
+    {
+        bool newer = app.newerMenuRows();
+        if (ImGui::Checkbox(tr("Show newer menu rows"), &newer)) p.newerMenuRows = newer ? 1 : 0;
+        ui::HelpText("Show newer menu rows", nullptr,
+                     "File > Render with..., and Preferences > Scripts and > Render bridge, came after 0.13.0. Off by default in the "
+                     "Classic layout, on in the SculptForge layout; a feature you already set up keeps its row either way.",
+                     "Preferences > Interface");
+    }
     ImGui::Checkbox(tr("Left-handed layout"), &app.layout().leftHanded);
     ui::HelpText("Left-handed layout", nullptr, "Mirror the shelves and trays: tools on the left, navigation on the right.",
                  "Preferences > Interface");

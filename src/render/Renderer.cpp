@@ -48,6 +48,7 @@ layout(location = 3) in float aMask; // constant 0 when the mesh has no mask
 out vec4 vPaint;                     // linear colour, mask
 #endif
 uniform mat4 uView;
+uniform mat3 uNormalFix; // normals of a Part drawn by a stretching matrix (Renderer::drawItem); identity otherwise
 uniform mat4 uProj;
 uniform vec3 uGridOrigin;
 uniform float uGridStep;
@@ -209,7 +210,7 @@ void main() {
     }
 #endif
     vec4 p = uView * vec4(world, 1.0);
-    vNormalCurv = vec4(mat3(uView) * normal, curvature);
+    vNormalCurv = vec4(mat3(uView) * (uNormalFix * normal), curvature);
 #ifdef FLAT
     vViewPos = p.xyz;
 #endif
@@ -243,6 +244,7 @@ uniform samplerBuffer uUvs; // RG32F, 3 corners per drawn triangle
 #ifdef NORMALMAP
 uniform samplerBuffer uTangents; // RGBA32F, 3 corners per drawn triangle
 uniform mat4 uView;
+uniform mat3 uNormalFix; // normals of a Part drawn by a stretching matrix (Renderer::drawItem); identity otherwise
 #endif
 out FragData {
     vec4 vNormalCurv;
@@ -271,7 +273,7 @@ void main() {
         o.vUv = texelFetch(uUvs, prim * 3 + i).xy;
 #ifdef NORMALMAP
         vec4 t = texelFetch(uTangents, prim * 3 + i);
-        o.vTangent = vec4(mat3(uView) * t.xyz, t.w);
+        o.vTangent = vec4(mat3(uView) * (uNormalFix * t.xyz), t.w);
 #endif
         o.vPrimBase = vPrimBase[0];
         gl_PrimitiveID = gl_PrimitiveIDIn;
@@ -345,6 +347,7 @@ uniform samplerBuffer uShade;
 uniform int uN;
 uniform int uSamples;
 uniform mat4 uView;
+uniform mat3 uNormalFix; // normals of a Part drawn by a stretching matrix (Renderer::drawItem); identity otherwise
 uniform int uMicroWire; // 1: the wireframe of the base (the level below the micro level) on the micro surface
 vec4 gNC;
 float gMask;
@@ -433,7 +436,7 @@ void microFetch() {
 #endif
     vec3 c3 = (vec3(s0.z, s1.z, s2.z) * 255.0 - 128.0) / 127.0;
     float c = dot(c3, w);
-    gNC = vec4(mat3(uView) * normalize(n), c * abs(c));
+    gNC = vec4(mat3(uView) * normalize(uNormalFix * normalize(n)), c * abs(c));
     gMask = dot(vec3(s0.w, s1.w, s2.w), w);
     if (uMicroWire == 1) {
         // The base triangle's barycentric weights, in pixels from each edge: about a pixel wide line on its edges.
@@ -1245,6 +1248,11 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     }
     auto at = [&](const char* name) { return gl::GetUniformLocation(p.id, name); };
     p.view = at("uView");
+    p.normalFix = at("uNormalFix");
+    if (p.normalFix >= 0) { // (an unset mat3 is all zeros: every draw sets it, and this is the safe default)
+        gl::UseProgram(p.id);
+        gl::UniformMatrix3fv(p.normalFix, 1, GL_FALSE, glm::value_ptr(glm::mat3(1.0f)));
+    }
     p.proj = at("uProj");
     p.gridOrigin = at("uGridOrigin");
     p.gridStep = at("uGridStep");
@@ -1478,6 +1486,13 @@ size_t Renderer::microPendingCoarse() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
         if (s.micro) total += s.micro->pendingCoarse();
+    return total;
+}
+
+size_t Renderer::microPendingPages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingPages();
     return total;
 }
 
@@ -1919,6 +1934,20 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     }
 }
 
+// What turns normals (carried by the model's matrix as if it were a rotation and an even scale) into the true ones
+// when the matrix stretches: (M^T M)^-1 times its geometric mean, so a rotation or an even scale gives the identity.
+glm::mat3 Renderer::normalFixFor(const glm::mat3& m) {
+    const glm::mat3 mtm = glm::transpose(m) * m;
+    const float det = glm::determinant(mtm);
+    if (!(det > 1e-20f)) return glm::mat3(1.0f);
+    const glm::mat3 fix = glm::inverse(mtm) * std::cbrt(det);
+    const glm::mat3 one(1.0f);
+    float off = 0.0f;
+    for (int c = 0; c < 3; ++c)
+        for (int r = 0; r < 3; ++r) off = std::max(off, std::abs(fix[c][r] - one[c][r]));
+    return off < 1e-5f ? one : fix; // (even scales keep exactly the identity the shaders were given before)
+}
+
 void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings) {
     if (!item.moved) {
         drawSlot(s, item.active, item.flat, settings);
@@ -1927,10 +1956,12 @@ void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSet
     const glm::mat4 view = frameView_;
     const CullView cull = frameCull_;
     frameView_ = view * item.model;
+    frameNormalFix_ = normalFixFor(glm::mat3(item.model));
     frameCull_ = CullView::from(frameView_, frameProj_);
     frameCull_.backfaces = cull.backfaces;
     drawSlot(s, item.active, item.flat, settings);
     frameView_ = view;
+    frameNormalFix_ = glm::mat3(1.0f);
     frameCull_ = cull;
 }
 
@@ -4128,6 +4159,7 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
+    gl::UniformMatrix3fv(p->normalFix, 1, GL_FALSE, glm::value_ptr(frameNormalFix_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
     gl::Uniform4fv(p->viewport, 1, glm::value_ptr(frameViewport_));
     const bool orthographic = frameProj_[3][3] == 1.0f;
@@ -4203,6 +4235,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     const auto bind = [&](const MeshProgram* p) {
     gl::UseProgram(p->id);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
+    gl::UniformMatrix3fv(p->normalFix, 1, GL_FALSE, glm::value_ptr(frameNormalFix_));
     gl::UniformMatrix4fv(p->proj, 1, GL_FALSE, glm::value_ptr(frameProj_));
     gl::Uniform3fv(p->gridOrigin, 1, glm::value_ptr(s.grid.origin));
     gl::Uniform1f(p->gridStep, s.grid.step);

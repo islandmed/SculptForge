@@ -723,6 +723,70 @@ TEST(focus_detail_project_names_its_detail_file) {
     (void)edited;
 }
 
+// A scene opened from a bare .sfdetail, saved as a project and reopened keeps every tile (the project names a copy of the
+// file; nothing is baked into the project), untouched or edited, and the base cage with it.
+TEST(focus_detail_bare_file_round_trips_through_a_project) {
+    const std::string src = writeSmall("roundtrip-src.sfdetail");
+    const std::vector<int16_t> original = fullValues(src);
+    CHECK(!original.empty());
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    const std::vector<glm::vec3> basePositions = m.positions;
+    Document doc = makeDoc(std::move(m));
+    const auto dir = std::filesystem::path(focusTempPath("roundtrip"));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    const std::string proj = (dir / "head.sfproj").string(), detail = (dir / "head.sfdetail").string();
+    // Untouched, nothing ever promoted: every tile of the copy equals the original.
+    CHECK(saveProject(proj, doc, err));
+    CHECK(fullValues(detail) == original);
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    CHECK(back.mesh.micro && back.mesh.micro->focus);
+    if (back.mesh.micro && back.mesh.micro->focus) {
+        CHECK(back.mesh.positions == basePositions);
+        CHECK(streamedFull(back.mesh) == original);
+    }
+    // Some tiles looked at (promoted, not edited), then saved: still equal.
+    back.mesh.micro->focus->ensureFull(*back.mesh.micro, allTiles(back.mesh), false);
+    CHECK(saveProject(proj, back, err));
+    CHECK(fullValues(detail) == original);
+    // An edit changes only what it touches; everything else stays byte-equal after the round trip.
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.1f, 0.0f, 5.0f), 0.1f, 0.7f);
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    CHECK(edited != original);
+    CHECK(saveProject(proj, doc, err));
+    CHECK(fullValues(detail) == edited);
+    Document again;
+    CHECK(loadProject(proj, again, err));
+    if (again.mesh.micro && again.mesh.micro->focus) CHECK(streamedFull(again.mesh) == edited);
+}
+
+// Save As into a folder that doesn't exist yet makes it (the project and its detail file both go in it).
+TEST(focus_detail_save_as_creates_the_folder) {
+    const std::string src = writeSmall("newfolder-src.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(src, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    Document doc = makeDoc(std::move(m));
+    const auto dir = std::filesystem::path(focusTempPath("newfolder"));
+    std::filesystem::remove_all(dir);
+    const std::string proj = (dir / "a" / "b" / "head.sfproj").string();
+    CHECK(saveProject(proj, doc, err));
+    CHECK(std::filesystem::exists(dir / "a" / "b" / "head.sfdetail"));
+    Document back;
+    CHECK(loadProject(proj, back, err));
+    // A folder that can't be made says so.
+    const std::string blocked = (dir / "a" / "b" / "head.sfproj" / "x" / "y.sfproj").string(); // under a file
+    CHECK(!saveProject(blocked, doc, err));
+    CHECK(err.find("Can't create the folder") != std::string::npos);
+}
+
 // A shared project can't make us open other files: its detail file is a plain name beside it ending in .sfdetail,
 // and the file must be a regular file reached without a symlink (a FIFO or a device is refused without blocking).
 TEST(focus_detail_project_detail_names_are_confined) {

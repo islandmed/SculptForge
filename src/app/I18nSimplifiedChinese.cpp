@@ -1319,12 +1319,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "向 SculptForge 网站确认是否有新版本。SculptForge 每天也会自动检查一次（偏好设置 > 更新）。"},
     {"Version, licence and the open-source components SculptForge is built with.",
      "版本、许可，以及 SculptForge 所使用的开源组件。"},
-    {"SculptForge is free and stays free. A membership adds betas and early builds, Member Requests (one request a "
-     "month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in "
-     "your browser. Nothing in the app changes either way.",
-     "SculptForge 免费且将一直免费。成为会员可获得 Beta 版与抢先版本、Member Requests（每月一个请求，先为你开发并列出你的名字）、投票决定下"
-     "一步开发内容，以及名列致谢名单：会在浏览器中打开 sculptforge.app/support.html。无论如何，应用程序本身都不会有任"
-     "何改变。"},
+    {"SculptForge is free and stays free. A membership adds early builds, like SculptForge for Android today, Member Requests (one request a month, built first and credited to you), a vote on what we build next and your name in the credits: opens sculptforge.app/support.html in your browser. Nothing in the app changes either way.",
+     "SculptForge 免费且将始终免费。加入会员可获得抢先版本（如现在的 Android 版 SculptForge）、Member Requests（每月一个请求，先为你开发并列出你的名字）、投票决定接下来开发的内容，以及在致谢名单中列入你的名字：在浏览器中打开 sculptforge.app/support.html。无论如何，应用内的内容均保持不变。"},
     {"The official SculptForge community on Discord: questions, tips and work in progress. Opens the invite in your "
      "browser. Bugs still go to Report a problem (GitHub issues).",
      "SculptForge 官方 Discord 社区：提问、技巧与进行中的作品。会在浏览器中打开邀请链接。错误报告仍请使用“报告问题”"
@@ -1558,6 +1554,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Left shelf width", "左侧工具栏宽度"},
     {"Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
      "拖动可调整此栏的宽度（色彩区会随之变大）。双击恢复默认宽度。"},
+    {"Show newer menu rows", "显示较新的菜单行"},
+    {"File > Render with..., and Preferences > Scripts and > Render bridge, came after 0.13.0. Off by default in the Classic layout, on in the SculptForge layout; a feature you already set up keeps its row either way.",
+     "File > Render with...、Preferences > Scripts 和 > Render bridge 是 0.13.0 之后加入的。Classic 布局默认关闭，SculptForge 布局默认开启；你已设置好的功能无论如何都会保留其行。"},
     {"Mask the whole visible Part.", "遮罩整个可见部件。"},
     {"Unmask everything (also: Ctrl+drag on the background, away from the model).",
      "取消所有遮罩（也可以：在远离模型的背景上 Ctrl+拖动）。"},
@@ -2324,7 +2323,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Pack on", "启用资源包"},
     {"Off: its items leave the lists until you switch it on again (nothing is deleted).",
      "关闭：其项目会从列表中移除，直到你再次启用（不会删除任何内容）。"},
-    {"Free for everyone. Members get betas and a vote on what's next.", "人人免费使用。会员可抢先体验测试版，并投票决定接下来的开发方向。"},
+    {"Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next.",
+     "对所有人免费。会员可获得抢先版本（如现在的 Android 版 SculptForge），并可投票决定后续内容。"},
     {"Hold Ctrl over any control to see what it does. Shift+F1 opens the guide any time.", "按住 Ctrl，将光标移至任何控件上，即可查看其功能。Shift+F1 随时打开用户指南。"},
     {"Opens in your browser.", "在浏览器中打开。"},
     {"Your art is never uploaded or used for training.", "你的作品绝不会被上传或用于训练。"},
@@ -2534,7 +2534,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Swap the left and right expressions (and the head's turn), if the character winks with the wrong eye.",
      "交换左右表情（与头部转向），用于角色眨错眼睛时。"},
     // --- PanelProject.cpp (tools/i18n/coverage.py) ---
-    {"Members get betas early.", "会员可抢先获取 Beta 版。"},
+    {"Members get early builds, like SculptForge for Android today.",
+     "会员可获得抢先版本，如现在的 Android 版 SculptForge。"},
     {"Become a member", "成为会员"},
     {"Featured creator", "特色创作者"},
     {"Hide this video.", "隐藏此视频。"},
@@ -2548,12 +2549,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "卡片也随它而来（关闭此开关即可关闭）。不会发送任何关于你或你电脑的信息。"},
     {"Update channel", "更新通道"},
     {"Stable", "稳定版"},
-    {"Preview (betas)", "预览（Beta 版）"},
-    {"Stable offers only finished releases. Preview also offers the betas the update feed names. Betas are a member "
-     "perk: members get them from the private members' repository and the #members channel on Discord. When the "
-     "stable release passes a beta, Preview offers that.",
-     "稳定版只提供正式发布版本。预览另外也提供更新来源列出的 Beta 版。Beta 版是会员福利：会员可从私人会员仓库与 "
-     "Discord 的 #members 频道获取。当稳定版超越某个 Beta 版时，预览会改为提供稳定版。"},
+    {"Preview (early builds)",
+     "预览（抢先版本）"},
+    {"Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
+     "当有抢先版本时，会员可在此获取。目前此频道获取的版本与稳定版相同。"},
     // --- PanelRetopo.cpp (tools/i18n/coverage.py) ---
     {"Automatic quad retopology: rebuilds the Part as clean, all-quad topology whose edge loops follow the forms, close to Target Quads. Runs in the background (Cancel stops it); undoable. Then divide it and use Part > Project > Project Detail to bring the detail back.", "自动四边面重新拓扑：将部件重建为干净、全四边面的拓扑，其边环顺着形体走，面数接近目标四边面数。在后台运行（“取消”可停止）；可撤销。之后细分它，再用部件 > 投影 > Project Detail 找回细节。"},
     {"The Quad Remesh Guides brush: drag on the model to draw a curve for Quad Remesh's edge loops to follow, around "
@@ -2572,6 +2571,16 @@ constexpr Entry kSimplifiedChinese[] = {
      "型用法：对副本运行 Quad Remesh，细分几次，显示原始模型，再 Project Detail。"},
     {"Quick Remesh", "Quick Remesh"},
     {"Remesh after each stroke", "每笔触后重新网格化"},
+    {"Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s",
+     "每笔触后重新网格化：已跳过，此部件有细分层级（重新网格化会移除它们）。%s"},
+    {"Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s",
+     "每笔触后重新网格化：已跳过，此部件有雕刻图层（重新网格化会移除它们）。%s"},
+    {"Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s",
+     "每笔触后重新网格化：已跳过，此部件有绘制贴图（转移贴图需要一些时间）。%s"},
+    {"%s remeshes it anyway.",
+     "按 %s 仍可重新网格化。"},
+    {"Tool > Remesh > Remesh remeshes it anyway.",
+     "按“工具 > 重新网格化 > 重新网格化”仍可重新网格化。"},
     {"After a stroke that stretched the surface (edges pulled to more than 1.6 times their length), the active Part "
      "is remeshed at the Resolution above in the background. Sculpting never waits: a stroke made meanwhile remeshes "
      "again. Each remesh is one undo step. Not on a Part with subdivision levels, sculpt layers or a painted texture.",
@@ -3912,6 +3921,7 @@ constexpr Entry kSimplifiedChinese[] = {
      "%s: %s，%s，%d%%\n单击：开启 / 关闭。右键：混合和不透明度。"},
     {"%s: roughness %.2f, metallic %.0f",
      "%s: 粗糙度 %.2f，金属度 %.0f"},
+    {"Metal reflects its surroundings: it looks dark in a dark environment.", "金属会反射周围环境：在较暗的环境中会显得偏暗。"},
     {"%zu points, height %.3g, reach %.2f radii",
      "%zu 个点，高度 %.3g，范围 %.2f 倍半径"},
     {"%zu result",
@@ -4455,8 +4465,6 @@ constexpr Entry kSimplifiedChinese[] = {
      "雕刻到 Splat"},
     {"SculptForge has a new look",
      "SculptForge 换了新外观"},
-    {"SculptForge is free. A membership adds betas and early builds, a vote on what we build next, Member Requests (one request a month, built first and credited to you) and your name in the credits. %s",
-     "SculptForge 是免费的。会员可抢先获得测试版和早期版本、投票决定接下来开发什么、提出会员请求（每月一个，先为你开发并列出你的名字），并列名于致谢名单。%s"},
     {"Search brushes (scales, skin, stone...)",
      "搜索笔刷（鳞片、皮肤、石头...）"},
     {"Selection brushes (Ctrl+Shift)",

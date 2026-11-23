@@ -486,7 +486,7 @@ void App::drawSupportUi() {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextDisabled("%s", tr("Free for everyone. Members get betas and a vote on what's next."));
+            ImGui::TextDisabled("%s", tr("Free for everyone. Members get early builds, like SculptForge for Android today, and a vote on what's next."));
             if (sheet) {
                 welcomeBodyH_ = ImGui::GetCursorPosY();
                 ImGuiWindow* body = ImGui::GetCurrentWindow();

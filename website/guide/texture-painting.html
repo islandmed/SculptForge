@@ -17,7 +17,7 @@
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <meta property="og:url" content="https://sculptforge.app/guide/texture-painting.html">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=40">
+  <link rel="stylesheet" href="../style.css?v=44">
   <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v=60" defer></script>
@@ -116,7 +116,7 @@ Around every UV island the paint runs on a few texels into the empty space (padd
 One stroke is one undo step. SculptForge stores only the 64x64-texel tiles the stroke touched, so undo stays light even on an 8K texture. Layer edits (new layer, fill, clear, merge, flatten, delete) also keep only the tiles they changed, and an empty or single-colour tile costs almost nothing. Only an edit that changes a whole painted layer at once, like clearing a fully painted Base, stores the full layer.
 </li>
 <li>
-<kbd>Alt</kbd> paints back towards white on Base, and erases on a paint layer, as with vertex paint.
+<kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac) paints back towards white on Base, with every material channel back to its default, and erases on a paint layer, as with vertex paint.
 </li>
 <li>
 <kbd>C</kbd> over the model picks the texture&#x27;s colour under the cursor.

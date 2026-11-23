@@ -87,6 +87,8 @@ struct RenderBridgeUi {
     std::string rendersDir() const { return settings.rendersDir.empty() ? rb::defaultRendersDir() : settings.rendersDir; }
 };
 
+bool App::renderBridgeSetUp() const { return renderBridge_ && !renderBridge_->settings.helper.empty(); }
+
 void App::registerRenderBridgeUi() {
     renderBridge_ = std::make_shared<RenderBridgeUi>();
     RenderBridgeUi& r = *renderBridge_;

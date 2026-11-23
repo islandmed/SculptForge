@@ -6,6 +6,79 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.12] - 2026-11-22
+
+### Added
+- "**Clearer All-mode gizmo** (Transform > All): a ring within 15 degrees of edge-on (the front, side and top views)
+  is drawn faint and can't be picked, so a press on the bar takes the arrow or ball there; between 15 and 35 degrees
+  only the rim of the ring, past the arrow heads, picks; an arrow within 12 degrees of the view direction fades (a
+  hollow marker) and can't be picked. Rotate about an edge-on axis with the Rotate tool or turn the view a little.
+  Classic and Streamlined alike. Idea by Fenix on Discord."
+
+### Changed
+- "**Guide, Geometry**: the Remesh after each stroke text calls the brush by its own name, Tendril."
+- Release tooling: a missing standard `#include` that only the Ubuntu 22.04 packages build catches (they have no
+  precompiled headers) now fails the branch test run and CI first.
+- A UI-test check pins the Classic layout's defaults (menu rows, shelves, tray panels, colour cells, Interface
+  preferences), so a change that moves one fails the tests until it is made on purpose.
+- **Membership wording**: the Support help text, the Quick Tour, Preferences > Updates, the guide and the README say
+  members get "early builds, like SculptForge for Android today", no longer betas (member betas are paused). **Edit >
+  Preferences > Updates**: the update channel reads **Preview (early builds)** (was Preview (betas)), and its help
+  says plainly that it gets the same releases as Stable for now; your choice is kept. The Spanish, Chinese and
+  Japanese texts follow.
+- **Membership card**: the "Updated" moment and the yearly card say members get "early builds, like SculptForge for
+  Android today" and "early builds", no longer betas (member betas are paused).
+- File > Render with... (preview), Preferences > Scripts and Preferences > Render bridge (added after 0.13.0) are
+  hidden in the Classic layout until Preferences > Interface > Show newer menu rows is on, or until you set the
+  feature up (Python scripts enabled, a render helper chosen). They stay on in the SculptForge layout. The commands
+  and the command search are unchanged.
+- The Tool > Geometry Level slider applies a plain click at once, as before 0.13.7 (it waited about 0.35 s for a
+  possible double-click). A double-click still types a number: its first click has already switched, Esc leaves that
+  level.
+- Release tooling: the beta-path self-test runs on machines with a machine-wide push guard.
+- **Remesh after each stroke** (Tool > Remesh) tells you, once per Part and reason, when a stretching stroke is
+  skipped because the Part has subdivision levels, sculpt layers or a painted texture (a remesh would remove or redo
+  them), and names the key (Shift+R) that remeshes it anyway.
+
+### Fixed
+- **Palette Knife folded the surface where two strokes overlapped** (Fixes #198): a long knife stroke dragged its
+  vertices along with the clay, so the band along each side of the stroke was sheared into thin slivers (about four
+  times over on a stroke a brush and a half long), and the next stroke across them turned them over into dark creases.
+  The knife now carries the shape and leaves the vertices spread as they were: each dab flattens first, then drags,
+  and after the drag every vertex goes back to where the dab found it, on the dragged surface (where a very big brush
+  presses the surface flat against the way back, that dab moves the vertices with the clay as before). Six overlapping
+  strokes with X symmetry on a 1.3M-triangle sphere fold 0 triangles (2,343 folded and 860 turned inside out before)
+  and leave no slivers (up to 37,000 before); five stacked strokes with brushes up to most of the sphere's front (Size
+  200) fold none either, with far fewer slivers (8,000 against 278,000 at the largest); the dragging-brush close-up
+  session goes from 607 folded triangles to 0. Where a stroke runs near the mirror plane the two halves' drags now
+  blend instead of adding up (they used to drag the clay between them twice as far), and the halves match to about
+  half an edge (about 39 edges apart before). A drag alone carries the surface where it did before (within a tenth of
+  an edge); with its flattening the knife's ridges stand a little higher than before (5.8 against 4.4 edges on the
+  test strokes), as the old vertices bunched ahead of the tip had pulled its plane down. Palette Knife strokes cost
+  more to compute so they never fold: about 1.7 times as much, and at normal sizes its frames stay under about 14 ms
+  on the floor tier (8 to 9 ms before; at Size 200 about 90 ms against 75 ms); other brushes are unchanged. Vertex
+  paint under the knife now stays where it is instead of being smeared along. Tendril is tracked in #204.
+- **Forge Spheres**: a click that only selects a sphere in Move or Scale mode no longer adds an empty undo step, so
+  Ctrl+Z after a few clicks takes back the last real edit instead of nothing.
+- **Gizmo slow on dense Parts**: grabbing and dragging a Gizmo handle on a 5M triangle Part took 20-90 ms per frame
+  (balls, which scale along one axis, worst), against about 1 ms now. Every drag frame no longer walks the whole mesh
+  for its bounds, an axis scale is drawn by one matrix like a move, a turn or an even scale (its shading corrected,
+  the surface after the release is exactly what it was), and the press does its setup in parallel.
+- Nudge and Layer with **View falloff** (Brush palette) also moved the far side of the model, which showed after
+  orbiting (a member's report): like Standard, Inflate, Crease and Pinch (0.13.11), they leave what lies more than 3
+  brush radii behind the cursor along the view, fading in from 1.5. A thin part (an ear, a horn) is still reached
+  through. Move and Grab are unchanged.
+- Texture painting: Alt/Option-erase on the Base now also resets metallic, roughness and the other material channels,
+  so no metal stays under the white. A plain colour picked after a material swatch (Gold, Bare metal...) is plain
+  paint again instead of metal, and the metal swatches' tooltip says metal looks dark in a dark environment.
+- **Tendril** with Dynamic on pulled flat, folded sheets out of a coarse Part (reported by Tpqz_ on Discord): the
+  pinch that tapers the horn closed it to a thread thinner than the triangles Dynamic adds, which then folded. The
+  horn now tapers but never below about two triangle edges across, so it stays round (min/max width of its
+  cross-sections 0.9 on average and never under 0.6, at most 2 folded triangles; before as low as 0.08 and 250-460
+  folded). With **View falloff** on, Tendril also leaves the surface deeper than about 1.5 brush radii behind the tip
+  alone, as the other brushes do (#229), so a pull no longer drags front and back together into a sheet. Keys and
+  settings are unchanged.
+
 ## [0.13.11] - 2026-11-21
 
 ### Added
@@ -1865,7 +1938,7 @@ All notable changes to SculptForge are listed here. The format follows
   Retina screens; it was a font glyph that sat off centre (#150, thanks @tristratos).
 - SpaceMouse beside a pen (Discord, @fenixpoints, the first report from a real SpaceMouse): while the cap is pushed,
   the pointer motion and wheel a SpaceMouse driver sends for programs it doesn't know (3DxWare's defaults) no longer
-  move the cursor off the pen or zoom toward it; with Hold during strokes off, a Move, Snake Hook or KelvinGrab drag
+  move the cursor off the pen or zoom toward it; with Hold during strokes off, a Move, Tendril or KelvinGrab drag
   no longer pulls the grabbed part across the view when the view turns under a still pen; gizmo, selection and stamp
   drags hold the view whatever the setting. Guide: Navigation > SpaceMouse troubleshooting.
 

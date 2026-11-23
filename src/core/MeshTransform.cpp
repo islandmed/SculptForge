@@ -201,12 +201,20 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
     const size_t nv = mesh.vertexCount();
     const bool weighted = weights.size() == nv;
     std::vector<uint16_t> full(weighted ? nv : 0, 0); // every vertex's level (0 = still)
-    for (uint32_t v = 0; v < nv; ++v) {
-        const int l = weighted ? int(std::lround(std::clamp(weights[v], 0.0f, 1.0f) * kLevels)) : kLevels;
-        if (l <= 0) continue;
-        verts_.push_back(v);
-        level_.push_back(uint16_t(l));
-        if (weighted) full[v] = uint16_t(l);
+    if (!weighted) { // every vertex at full weight: no search, the lists in one pass (a 5M triangle press)
+        verts_.resize(nv);
+        level_.assign(nv, uint16_t(kLevels));
+        parallelRange(nv, [&](size_t b, size_t e) {
+            for (size_t v = b; v < e; ++v) verts_[v] = uint32_t(v);
+        });
+    } else {
+        for (uint32_t v = 0; v < nv; ++v) {
+            const int l = int(std::lround(std::clamp(weights[v], 0.0f, 1.0f) * kLevels));
+            if (l <= 0) continue;
+            verts_.push_back(v);
+            level_.push_back(uint16_t(l));
+            full[v] = uint16_t(l);
+        }
     }
     if (verts_.empty()) return false;
     mirror_ = mirror;
@@ -258,15 +266,19 @@ bool TransformSession::begin(const Mesh& mesh, std::vector<float> weights, Symme
     const auto& src = layer_ >= 0 ? mesh.positions : mesh.basePositions();
     base_.resize(verts_.size());
     normals_.resize(verts_.size());
-    for (size_t i = 0; i < verts_.size(); ++i) {
-        base_[i] = src[verts_[i]];
-        normals_[i] = mesh.normals[verts_[i]];
-    }
+    parallelRange(verts_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            base_[i] = src[verts_[i]];
+            normals_[i] = mesh.normals[verts_[i]];
+        }
+    });
     deltas_.resize(layer_ >= 0 ? 1 : mesh.layers.size());
     for (size_t l = 0; l < deltas_.size(); ++l) {
         const std::vector<glm::vec3>& d = mesh.layers[layer_ >= 0 ? size_t(layer_) : l].delta;
         deltas_[l].resize(verts_.size());
-        for (size_t i = 0; i < verts_.size(); ++i) deltas_[l][i] = d[verts_[i]];
+        parallelRange(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) deltas_[l][i] = d[verts_[i]];
+        });
     }
     active_ = true;
     return true;

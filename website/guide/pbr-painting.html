@@ -17,7 +17,7 @@
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <meta property="og:url" content="https://sculptforge.app/guide/pbr-painting.html">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=40">
+  <link rel="stylesheet" href="../style.css?v=44">
   <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v=60" defer></script>
@@ -88,7 +88,7 @@ Open <span class="path"><span>Tool</span><i>&#8250;</i><span>Texture Image</span
 One row per channel: the tick says whether the brush paints that channel; the five grey squares pick 0, 25, 50, 75 or 100%; the slider sets any value. Normal has two tilt sliders (0, 0 paints a flat normal). Emissive has a colour.
 </li>
 </ul>
-<p>Untick Base Color to paint only roughness (a wet patch, a polished edge) without touching the colour. Every stroke is one undo step for all the channels it painted. The brush&#x27;s falloff, alpha, pen pressure, symmetry and mask apply to every channel alike; erasing (<kbd>Alt</kbd>) paints Base back to each channel&#x27;s default and makes layers transparent.</p>
+<p>Untick Base Color to paint only roughness (a wet patch, a polished edge) without touching the colour. Every stroke is one undo step for all the channels it painted. The brush&#x27;s falloff, alpha, pen pressure, symmetry and mask apply to every channel alike; erasing (<kbd>Alt</kbd>, <kbd>Option</kbd> on a Mac) paints Base back to white and every channel back to its default, whichever channels the brush paints, and makes layers transparent. A material swatch (Gold, Bare metal...) sets the brush&#x27;s metallic and roughness; picking a plain colour afterwards gives them back, so red after Gold is red paint, not red metal (click Metallic&#x27;s 100% square or a swatch again for a red metal). Metal reflects its surroundings, so in the PBR view it looks dark in a dark environment.</p>
 <p><strong>C over the model picks the whole material</strong>: the colour and every channel under the cursor become the brush material, and the brush then paints all of the texture&#x27;s channels.</p>
 <h2 id="layers-and-channels">Layers and channels<a class="anchor" href="#layers-and-channels" aria-label="Link to this section">#</a></h2>
 <p>Paint layers (<a href="texture-painting.html#paint-layers-on-a-texture">Texture painting</a>) hold every channel. In <span class="path"><span>Tool</span><i>&#8250;</i><span>Paint Layers</span></span>, each layer row gets a row of <strong>channel chips</strong> (BC, R, M, N, H, AO, E, Op):</p>

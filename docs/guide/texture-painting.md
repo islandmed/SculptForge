@@ -61,8 +61,9 @@ sharp as the texture: a hard alpha gives the same texels on a two-triangle plane
 Each Part keeps its own choice, saved in the project. **Show texture** (Texture Image, or the **Paint** menu) hides
 the texture in the viewport without deleting it.
 
-> **Smoothing colour:** holding <kbd>Shift</kbd> with the Paint brush blends [vertex paint](vertex-paint.md#paint-with-the-paint-brush)
-> toward the neighbouring colours. On a Part that paints into a texture, <kbd>Shift</kbd> still smooths the shape.
+> **Smoothing:** holding <kbd>Shift</kbd> with the Paint brush blends [vertex paint](vertex-paint.md#paint-with-the-paint-brush)
+> toward the neighbouring colours. On a Part that paints into a texture it blends the texels the same way, across UV seams, in
+> every channel the brush paints (Base Color and the material channels ticked under **Paint > Material**), and never moves the shape.
 
 ## How texture painting works
 
@@ -78,7 +79,7 @@ the texture in the viewport without deleting it.
   light even on an 8K texture. Layer edits (new layer, fill, clear, merge, flatten, delete) also keep only the
   tiles they changed, and an empty or single-colour tile costs almost nothing. Only an edit that changes a whole
   painted layer at once, like clearing a fully painted Base, stores the full layer.
-- <kbd>Alt</kbd> paints back towards white on Base, and erases on a paint layer, as with vertex paint.
+- <kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac) paints back towards white on Base, with every material channel back to its default, and erases on a paint layer, as with vertex paint.
 - <kbd>C</kbd> over the model picks the texture's colour under the cursor.
 
 > **Tip:** Painting stays fast with big textures on big meshes: only the triangles under the brush are visited,

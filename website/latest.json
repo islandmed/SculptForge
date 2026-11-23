@@ -1,17 +1,16 @@
 {
-  "version": "0.13.11",
+  "version": "0.13.12",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Forge Sphere chains stay smooth while you drag, even with hundreds of spheres",
-    "Shift with the Paint brush blends colour on textured Parts and never moves the shape",
-    "View falloff keeps Standard, Inflate and Crease off the far side of your model",
-    "Pen side-button orbit and pan move steadily again, and Inflate swells evenly at tube ends",
-    "Bakes tell you when the search distance is too short, with one click to bake again"
+    "Tendril pulls round, tapering horns, even with Dynamic on",
+    "Palette Knife strokes cross and stack without creasing",
+    "The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode",
+    "Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once"
   ],
   "support": {
     "founding": {
-      "taken": 16,
+      "taken": 17,
       "limit": 100
     }
   }

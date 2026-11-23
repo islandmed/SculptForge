@@ -212,6 +212,15 @@ std::vector<std::string> Demo::scopeItems(const std::string& scope) {
     return {out.begin(), out.end()};
 }
 
+std::vector<std::string> Demo::scopeItemsInOrder(const std::string& scope) {
+    std::vector<std::string> out;
+    for (const auto& item : items().labelled)
+        if (std::find(item.scopes.begin(), item.scopes.end(), scope) != item.scopes.end() &&
+            std::find(out.begin(), out.end(), item.text) == out.end())
+            out.push_back(item.text);
+    return out;
+}
+
 void Demo::noteClippedLabel(const std::string& label) { items().clipped.push_back({label.substr(0, label.find("##")), items().scopes}); }
 
 std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
@@ -276,6 +285,11 @@ void Demo::update(float dt) {
         const auto now = std::chrono::steady_clock::now();
         if (lastFrame_.time_since_epoch().count() != 0)
             longestFrameMs_ = std::max(longestFrameMs_, std::chrono::duration<double, std::milli>(now - lastFrame_).count());
+        // SF_UI_FRAME_LOG=1 (with SF_UI_PROFILE=1): one log line per frame, "uiframe LINE MS", for percentile tables.
+        static const bool frameLog = std::getenv("SF_UI_FRAME_LOG") != nullptr;
+        if (frameLog && lastFrame_.time_since_epoch().count() != 0)
+            SDL_Log("uiframe %d %.2f", step_ < stepLines_.size() ? stepLines_[step_] : -1,
+                    std::chrono::duration<double, std::milli>(now - lastFrame_).count());
         lastFrame_ = now;
     }
     if (!stepLines_.empty()) { // SF_UI_PROFILE: the frame just drawn belongs to the step that was running

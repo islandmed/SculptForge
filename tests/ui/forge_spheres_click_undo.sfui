@@ -1,0 +1,39 @@
+# Forge Spheres: a click on a sphere in Move (or Scale) mode only selects it; it is no edit, so it adds no undo step.
+# Before, each such click left an empty "Forge Sphere move" step, and Ctrl+Z after a few clicks took back nothing
+# (an artist-qa session: the second Ctrl+Z after undoing a delete didn't put a moved leg back).
+interactive_strokes on
+run forgesphere_new radius=1
+run part_visibility index=0 visible=false
+run forgesphere_add parent=0 position=1.2,0,0 radius=0.4 symmetry=x
+run forgesphere_add parent=1 position=1.9,-0.4,0 radius=0.25 symmetry=x
+expect_value forgespheres == 5
+wait 0.3
+click "Forge Spheres##tool.forgespheres"
+click "Forge Spheres/Move"
+key f
+wait 0.3
+remember forgesphere_x1 x0
+drag_forgesphere 1 body 80 -40 0.4
+remember forgesphere_x1 x1
+expect_value forgesphere_x1 > $x0
+# Alt+click deletes the hand (both sides); undo brings it back.
+hold alt
+drag_forgesphere 3 body 0 0 0.05
+hold none
+expect_value forgespheres == 3
+key ctrl+z
+expect_value forgespheres == 5
+# Clicks that select, in Move and in Scale: no undo steps.
+drag_forgesphere 1 body 0 0 0.05
+expect_value forgesphere_selected == 1
+drag_forgesphere 3 body 0 0 0.05
+click "Forge Spheres/Scale"
+drag_forgesphere 0 body 0 0 0.05
+expect_value forgesphere_x1 == $x1
+# So the next Ctrl+Z takes back the move.
+key ctrl+z
+expect_value forgesphere_x1 < $x1
+expect_value forgesphere_x1 > $x0-0.001
+expect_value forgesphere_x1 < $x0+0.001
+key ctrl+shift+z
+expect_value forgesphere_x1 == $x1

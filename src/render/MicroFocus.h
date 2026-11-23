@@ -49,7 +49,8 @@ public:
     size_t gpuBytes() const { return bytes_; }
     size_t pages() const { return pageCount_; }
     size_t pagesShaded() const { return shadedPages_; }
-    size_t pendingPages() const { return pendingShade_.size(); }
+    // Work for the next frames: pages shading, pages the frame's budget left, tiles the last draw drew finer than their page.
+    size_t pendingPages() const { return pendingShade_.size() + unpaged_ + (levelsChanged_ ? 1 : 0); }
     // Base triangles whose coarse shading waits for a frame's budget (a stroke re-shades its tiles over several frames).
     size_t pendingCoarse() const { return pendingCoarse_.size() - coarseHead_; }
 
@@ -70,6 +71,8 @@ private:
     void shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoints);
     void freePage(uint32_t slot);
 
+    size_t unpaged_ = 0; // wanted pages beyond the last frame's upload budget
+    bool levelsChanged_ = false; // a draw drew some cluster finer than the coarse level since the last sync
     double splitMs_[kParts] = {};
     uint32_t n_ = 1, samples_ = 3, coarseN_ = 1, coarseSamples_ = 3, shift_ = 0, record_ = 0, slots_ = 0;
     MicroMesh coarse_;               // the coarse level: every tile's coarse grid (shading only)

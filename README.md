@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.11:</strong> Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again (<a href="https://sculptforge.app/guide/forge-spheres.md">how it works</a>)
+  <strong>New in 0.13.12:</strong> Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side (<a href="https://sculptforge.app/guide/sculpting.md">how it works</a>)
 </p>
 
 <p align="center">
@@ -76,7 +76,7 @@ SculptForge has no telemetry, no account and no servers of its own. AI features 
 SculptForge is free, and nothing in the app is ever paywalled. Every release stays free for everyone; bug-fix and security releases go out to all the same day.
 
 - **[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year):
-  - Betas and early builds, and the monthly feature vote
+  - Early builds, like SculptForge for Android today, and the monthly feature vote
   - One Member Request a month, built first and credited to you
   - #members on Discord and your name in the [credits](https://sculptforge.app/supporters.html)
   - The first 100 are Founding Members, price locked for good

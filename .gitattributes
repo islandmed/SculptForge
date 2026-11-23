@@ -4,6 +4,8 @@
 tools/brush-gallery/repo/** -text
 website/gallery/** -text
 tests/data/** -text
+# UI-test golden files are compared byte for byte with what the app writes (LF): no CRLF on Windows checkouts.
+tests/ui/golden/** -text
 bench/pack/** -text
 # Parallel branches all add lines at the top of these two: keep both sides instead of conflicting (the release
 # coordinator checks the order of the merged result before tagging).

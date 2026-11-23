@@ -17,7 +17,7 @@
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <meta property="og:url" content="https://sculptforge.app/guide/installing.html">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="../style.css?v=40">
+  <link rel="stylesheet" href="../style.css?v=44">
   <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <script src="search-index.js?v=60" defer></script>
@@ -234,7 +234,7 @@ Click <strong>Open</strong> in the dialog that appears.
 <p>The next chapter, <a href="interface.html">The interface</a>, explains what everything on screen does.</p>
 <h2 id="updating-and-uninstalling">Updating and uninstalling<a class="anchor" href="#updating-and-uninstalling" aria-label="Link to this section">#</a></h2>
 <p>SculptForge tells you when there is a new version. Once a day at start-up it downloads a small file from its website that names the newest version; if yours is older, a banner at the top of the 3D view says what&#x27;s new, with <strong>What&#x27;s new</strong>, <strong>Download</strong>, <strong>Later</strong> and <strong>Skip this version</strong>.</p>
-<p>Nothing about you or your computer is sent. <span class="path"><span>Help</span><i>&#8250;</i><span>Check for updates</span></span> asks right away, and <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Updates</span></span> turns the daily check off (and picks the update channel: <strong>Stable</strong>, or <strong>Preview</strong> for the betas).</p>
+<p>Nothing about you or your computer is sent. <span class="path"><span>Help</span><i>&#8250;</i><span>Check for updates</span></span> asks right away, and <span class="path"><span>Edit</span><i>&#8250;</i><span>Preferences</span><i>&#8250;</i><span>Updates</span></span> turns the daily check off (and picks the update channel: <strong>Stable</strong>, or <strong>Preview</strong> for early builds).</p>
 <p><strong>One-click update.</strong> The Linux AppImage and the Windows installer and portable zip also get an <strong>Update</strong> button on the banner. It downloads the new version in the background (with a progress bar and <strong>Cancel</strong>), checks it, and then asks: <strong>Restart now</strong> installs it and starts the new version; <strong>Later</strong> installs it when you quit, so the next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.</p>
 <p>What the check means: the files come only from SculptForge&#x27;s own GitHub releases, over a checked secure connection; the release&#x27;s list of checksums must carry the SculptForge release signature (a key built into the app); and the download must match its checksum. If any of that fails, nothing is changed and nothing downloaded is run: the banner says what went wrong and <strong>Download</strong> still opens the release page.</p>
 <p>The current version is kept beside the new one (the AppImage as <code>&lt;name&gt;.AppImage.old</code>, the portable folder as <code>&lt;folder&gt;.old</code>) until the new version has started once, then removed; if the new version doesn&#x27;t start, the old one is put back. The Windows installer asks for permission to change Program Files, as installing does.</p>
