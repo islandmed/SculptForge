@@ -33,3 +33,8 @@ moved outside a stroke (MicroMesh::strokeEnded, skipped by MicroFocus shadeAll a
 on a big Clay stroke's release doubled peak RAM at random on core-400m..800m with a 1-2 s stall); budget-0 shadePending runs in
 16k-patch slices and drops staging over two slices; App::wantsFrames counts Renderer::microShadingWantsFrame so a plain micro
 level's backlog drains with no input. Tests: micro_freeze_stroke_release_base_move_is_the_strokes, tests/ui/micro_shade_rest.sfui.
+Focus Detail memory (re-land): reshade-win's shadeAll took the whole coarse queue at once on Undo/Redo/Move, and the coarse
+MicroShader's partial sums, shadeStaging_ and the base-sized coarseShade_ copy stayed at that size (streamed lion +1.8 GB over
+0.13.12). MicroFocus::shadeCoarse now shades in 16k-tile slices straight into slot-ordered staging (shadeLevel's prepare hook;
+coarseShade_ removed), sendPages is sliced the same way (a widen's re-send), and MicroShader/MicroFocus::trimScratch free big-batch
+scratch afterwards. Streamed lion undo/redo/move session peak 5385 -> 3146 MB (0.13.12: 3554).
