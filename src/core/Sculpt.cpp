@@ -1247,8 +1247,8 @@ static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
 // the far wall (no hole is left to see until it has crossed). Now only what faces the cut (the skin; the far wall and
 // an underside face away and keep still, over a short ramp so no edge forms where the facing turns) is trimmed, and
 // each vertex stops `kTrimKeep` of the brush radius short of the first surface below it along the cut: a wall thinner
-// than that is left as it is. Only where the brush region is a thin sheet (trimRegionIsSheet): a solid form with pockets, a
-// head with its nostrils and lips, is trimmed flat as ever. The BVH is the one the previous dab refit, so the walls are where they were.
+// than that is left as it is. Only on a thin Part (trimPartIsThin): a solid form, a head with its nostrils and lips, is
+// trimmed flat as ever. The BVH is the one the previous dab refit, so the walls are where they were.
 static constexpr float kTrimKeep = 0.02f; // of the brush radius (Trim's own plane stands this far below the surface at full strength)
 // `normals[i]`: verts[i]'s normal, read before the dab (the adaptive path rewrites the normals as it goes).
 // The wall below a vertex is found along its own normal (a sheet's rim, whose edge runs along the wall, still finds the
@@ -1288,41 +1288,34 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
     }, 256);
 }
 
-// Is the region under a Trim dab a thin sheet (a shell, a wing, a cloth-thin Part): most of what faces the viewer has a wall
-// behind it, parallel to it, within `kTrimSheet` of the brush radius, and nothing within `kTrimClear` radii beyond that wall?
-// Sampled, a few rays. A solid form with pockets (the eyelids, nostrils and lips of a head) is not: Trim there stays what it
-// was, a plane that takes everything above it.
-static constexpr float kTrimSheet = 2.0f; // (a wing 0.12 thick at its middle under a brush of radius 0.1 is a sheet)
-static constexpr float kTrimClear = 4.0f; // radii of open air behind a sheet's far wall
-static bool trimRegionIsSheet(const Mesh& mesh, const BVH& bvh, std::span<const uint32_t> verts, const glm::vec3& center,
-                              const glm::vec3& viewDir, float r) {
-    constexpr size_t kSamples = 400; // (half of a thin Part's region is its far side, and the pen's disc is a part of the rest: ~60 rays)
-    if (mesh.normals.size() != mesh.vertexCount() || verts.size() < 8) return false;
-    const size_t stride = std::max<size_t>(1, verts.size() / kSamples);
-    const float eps = 1e-3f * r;
-    size_t seen = 0, thin = 0;
-    RayHit hit;
-    for (size_t i = 0; i < verts.size(); i += stride) {
-        const uint32_t v = verts[i];
-        const glm::vec3 n = mesh.normals[v];
-        if (glm::dot(n, viewDir) >= 0.0f || glm::distance(mesh.positions[v], center) > 0.7f * r) continue; // (the visible skin near the pen)
-        ++seen;
-        glm::vec3 side = glm::cross(n, glm::vec3(0.267f, 0.534f, 0.802f));
-        const float sideLen = glm::length(side);
-        if (sideLen > 1e-6f) side *= 2e-3f * r / sideLen;
-        for (const float sgn : {1.0f, -1.0f}) {
-            if (!bvh.raycast(mesh, mesh.positions[v] - n * eps + side * sgn, -n, hit)) continue;
-            if (glm::dot(hit.normal, -n) > 0.7f && hit.t + eps < kTrimSheet * r) {
-                // (and open air behind it: the lid of an eye, the lips, a pocket in a solid have more surface within a few radii)
-                RayHit behind;
-                if (!bvh.raycast(mesh, hit.position - n * (4.0f * eps), -n, behind) || behind.t > kTrimClear * r) {
-                    ++thin;
-                    break;
-                }
-            }
+// Is this Part a thin sheet (a shell, a wing, an Extract, a cloth-thin Part)? Its mean wall thickness, 2 x volume / area, is a
+// few percent of its size or less; a head's is a third of it. A Part-wide fact, decided once per stroke, so the dabs of a
+// stroke never change their mind: what a local test (a wall behind the skin, air behind the wall) could not give, as the lids
+// and lips of a head are thin walls too, and a closed shell has surface behind its far wall.
+static constexpr float kTrimThinPart = 0.08f; // of the Part's bounding-box diagonal
+static bool trimPartIsThin(const Mesh& mesh) {
+    const size_t tris = mesh.triangles.size();
+    if (tris < 8 || mesh.positions.empty()) return false;
+    const AABB box = mesh.bounds();
+    const glm::vec3 o = 0.5f * (box.min + box.max), ext = box.max - box.min;
+    const double diag = double(glm::length(ext));
+    if (diag <= 0.0) return false;
+    constexpr size_t kBlock = 8192;
+    std::vector<std::pair<double, double>> parts((tris + kBlock - 1) / kBlock, {0.0, 0.0}); // (6 x volume, 2 x area)
+    poolFor(tris, [&](size_t b, size_t e) {
+        auto& acc = parts[b / kBlock];
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 f = mesh.triangles[t];
+            const glm::dvec3 a = glm::dvec3(mesh.positions[f.x] - o), c = glm::dvec3(mesh.positions[f.y] - o),
+                             d = glm::dvec3(mesh.positions[f.z] - o);
+            acc.first += glm::dot(a, glm::cross(c, d));
+            acc.second += glm::length(glm::cross(c - a, d - a));
         }
-    }
-    return seen >= 8 && 2 * thin > seen;
+    }, kBlock);
+    double v6 = 0.0, a2 = 0.0;
+    for (const auto& p : parts) v6 += p.first, a2 += p.second;
+    if (a2 <= 0.0) return false;
+    return std::abs(v6 / 6.0) * 4.0 / a2 < double(kTrimThinPart) * diag; // 2 V / A, A = a2 / 2
 }
 
 void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p) {
@@ -1345,8 +1338,15 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         if (verts_.empty()) return;
     }
 
-    // Trim on a thin sheet: the wall behind the skin is protected (keepTrimWalls); on anything else it is the plane it always was.
-    const bool trimSheet = type == BrushType::Trim && !p.invert && trimRegionIsSheet(mesh, bvh, verts_, p.center, p.viewDir, p.radius);
+    // Trim on a thin Part: the wall behind the skin is protected (keepTrimWalls); on anything else it is the plane it always was.
+    bool trimSheet = false;
+    if (type == BrushType::Trim && !p.invert) {
+        if (thinStroke_ != strokeId_ || thinMesh_ != &mesh) {
+            thinPart_ = trimPartIsThin(mesh);
+            thinStroke_ = strokeId_, thinMesh_ = &mesh;
+        }
+        trimSheet = thinPart_;
+    }
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
     adaptiveDab_ = (adaptiveDabs || analyticNormals) && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
                    type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Layer && type != BrushType::Morph &&
