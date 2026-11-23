@@ -1,0 +1,39 @@
+# gh#184: a long live stroke that grows a streamed Micro level's height range (MicroMesh::widen) spreads the widen over two
+# frames: the widen's own frame keeps the old heights and step on the GPU (the same surface), the next re-sends them and
+# places no dabs (App::drainStrokeDabs, MicroRenderer::sync). Both in one frame were 0.7-1 s on a 2.6M base. The view must
+# end up as the same mesh sent up whole and shaded again (view_stale, mean pixel difference 0-255): no cracks, nothing stale.
+# A widen splits only when it takes its frame's budget; ctest sets SF_WIDEN_SPLIT_MS=0 so every widen splits on any computer.
+# Not on Windows: no Focus Detail there (CMakeLists.txt).
+# cold: SF_FOCUS_DETAIL is set here, and a warm server doesn't keep it between scripts.
+run ui_look look=classic layout=classic
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=6
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+remember micro_step before
+remember micro_widen_deferrals deferred
+
+interactive_strokes on
+click "Standard##brush.standard"
+run brush_set_alpha name=Bolt
+brush_size 120
+# The first Draw stroke on a new level widens. Held down, every frame drains its dabs on the frame's budget (a quick `stroke`
+# on a slow renderer can land whole in its release, which places every dab at once: no deferral to see).
+drag_path 0.35 0.45 0.5 0.5 0.65 0.55 keep
+expect_value stroking == 1
+wait_value micro_widen_deferrals > $deferred 60 # (real time)
+expect_value micro_step > $before
+release
+stroke 0.35 0.55 0.65 0.45 1.0
+stroke 0.35 0.45 0.65 0.55 1.0
+stroke 0.35 0.55 0.65 0.45 1.0
+wait_idle 60
+wait_value micro_pending_coarse == 0 120 # (real time: llvmpipe takes far longer than this computer)
+wait_idle 60
+print view_stale
+expect_value view_stale < 0.001
+shot micro_widen_live_stroke

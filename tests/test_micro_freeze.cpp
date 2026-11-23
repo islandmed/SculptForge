@@ -113,3 +113,23 @@ TEST(undo_base_revision_skips_micro_only_steps) {
     doc.undo.push(std::move(moved));
     CHECK(doc.undo.baseRevision() != base0);
 }
+
+// A big Clay stroke moves the base under its micro level, and its last queued dabs land in endStroke, before the level
+// stops stroking: the renderer saw a base moved by "anything but a stroke" and shaded the stroke's whole backlog in the
+// release frame (core-800m: ~500k triangles, a 2-3 s frame, +1.9 GB kept). The release says the move is the stroke's.
+TEST(micro_freeze_stroke_release_base_move_is_the_strokes) {
+    Document doc = microDoc();
+    Symmetry none;
+    none.x = false;
+    doc.mesh.clearDirty();
+    CHECK(doc.sculptor.beginStroke(doc.mesh, "Clay"));
+    for (int i = 0; i < 6; ++i)
+        doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Clay, dabAt(glm::vec3(0.1f * float(i), 0.0f, 1.0f), 0.9f), none);
+    doc.undo.push(doc.sculptor.endStroke());
+    const MicroMesh& mm = *doc.mesh.micro;
+    CHECK(doc.mesh.dirtyBegin < doc.mesh.dirtyEnd); // (the base moved: the big-brush base kernel)
+    CHECK(!mm.stroking);
+    CHECK(mm.strokeEnded);
+    doc.mesh.micro->clearDirty(); // (the renderer's sync)
+    CHECK(!mm.strokeEnded);
+}

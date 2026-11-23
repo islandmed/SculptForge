@@ -9,6 +9,8 @@ fixed: After a long stroke on a streamed Micro level, the edited detail leaving 
   for seconds on lower-spec computers: it goes a little each frame (#184).
 fixed: Big brushes on a high Micro level lag less: each dab no longer reads and writes the whole of every triangle it
   touches, only the part under the brush (#184).
+fixed: No pause in the middle of a long stroke on a streamed Micro level when the stroke grows the level's height
+  range: the work is spread over two frames (#184).
 ---
 Reviewers: MicroStroke::end keeps the Morton order and Forge Ink hashes on the main thread and hands the change and its
 packing to a background thread (MicroUndo::pending; settle() waits in swapWith and the Timeline sidecar; bytes() counts the
@@ -21,3 +23,8 @@ tests/ui/micro_widen_keeps_shading.sfui (view_stale 0 once idle against a full r
 Brush lag: MicroStroke::dab's plane samples at the kernel's stride while thousands of points stay under the brush
 (planeSamples, else every second point as before; micro_big_plane_brush_on_a_coarse_plane_stride_matches), and
 interpolateCoarse skips coarse cells whose corners are all 0 (bit-identical to the old per-point loop).
+Widen mid-stroke: a widen that takes its frame's dab budget (MicroMesh::widenMs; SF_WIDEN_SPLIT_MS overrides) ends its frame's
+dabs and MicroRenderer::sync keeps the GPU's old heights and step for it (resendLater); the next frame re-sends them and places
+no dabs (App::drainStrokeDabs, budgeted only). A quicker widen re-sends in its own frame as before. MicroStroke::widenAhead
+widens at a frame's start when two of the last dab's additions would pass the range; the undo copies rescale on the pool.
+Test: tests/ui/micro_widen_live_stroke.sfui (interactive strokes; micro_widen_deferrals, view_stale 0 once idle).

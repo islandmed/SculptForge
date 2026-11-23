@@ -256,6 +256,7 @@ void MicroStroke::begin(Mesh& m) {
     }
     if (vertStamp_.size() != m.vertexCount()) vertStamp_.assign(m.vertexCount(), 0);
     strokeStep_ = mm.step;
+    lastAdd_ = 0.0f;
     grabMirrors_.clear();
     grabTris_.clear();
     grabWeight_.clear();
@@ -440,7 +441,10 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
 
     // The displacement range this dab may need: widened first (it costs precision) when what a dab adds could
     // pass it; a dab that still clips (planes far off) widens it for the next one.
-    if (!maskBrush) widen(mm, float(mm.rangeMax) * mm.step + 0.12f * r * s);
+    if (!maskBrush) {
+        lastAdd_ = 0.12f * r * s;
+        widen(mm, float(mm.rangeMax) * mm.step + lastAdd_);
+    }
 
     // 1. The base triangles within reach.
     if (++dabEpoch_ == 0) {
@@ -963,10 +967,21 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
     return true;
 }
 
+bool MicroStroke::widenAhead(MicroMesh& mm) {
+    if (!active_ || lastAdd_ <= 0.0f) return false;
+    const float need = float(mm.rangeMax) * mm.step + 2.0f * lastAdd_;
+    if (!(need > mm.rangeWorld())) return false;
+    widen(mm, need);
+    return true;
+}
+
 void MicroStroke::widen(MicroMesh& mm, float need) {
     const int div = mm.widen(need);
     if (div == 1) return;
-    for (int16_t& v : oldDisp_) v = int16_t(int(v) / div);
+    // (the undo copies of the tiles touched so far: a long stroke's are a few hundred MB, #184)
+    poolFor(oldDisp_.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) oldDisp_[i] = int16_t(int(oldDisp_[i]) / div);
+    }, 1 << 16);
     for (auto& [key, old] : oldTiles_)
         for (int16_t& v : old) v = int16_t(int(v) / div);
     strokeStep_ = mm.step;
@@ -1209,6 +1224,9 @@ std::unique_ptr<MicroUndo> MicroStroke::end(Mesh& m) {
     active_ = false;
     if (m.micro) {
         m.micro->stroking = false;
+        // (the stroke's last queued dabs moved the base before this: not a base moved by anything but a stroke, which
+        // the renderer shades whole at once; core-800m: ~500k triangles of backlog in one 2-3 s frame, +1.9 GB)
+        m.micro->strokeEnded = true;
         if (m.micro->grabbing) m.micro->grabbing = false, m.micro->shadeNow = true; // (a Move's last frame shows whole)
         if (const uint64_t cap = currentTierConfig().residentCacheCapMB) m.micro->disp.trim(size_t(cap) << 20);
     }

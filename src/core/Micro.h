@@ -122,7 +122,10 @@ struct MicroMesh {
     bool stroking = false;  // a stroke is running (TierConfig draft normals: the renderer shades less meanwhile)
     bool grabbing = false;  // the running stroke is a Move (MicroStroke::beginGrab): its shading shows on each frame, never budgeted
     bool shadeNow = false;  // an edit whose shading must show on the next frame in full (undo, redo, a Move's end; #184)
+    bool strokeEnded = false; // a stroke ended since the renderer last looked: the base its last dabs moved is the stroke's (budgeted)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
+    bool resendLater = false; // a stroke's widen took its frame's budget: the renderer re-sends on the next frame (App, #184)
+    float widenMs = 0.0f;   // what the last widen took
     uint64_t revision = 0;  // bumped by every edit
     // Which level this is (new on Divide / load; kept by copies, which hold the same values): the renderer keeps
     // its GPU copy while the serial stays.
@@ -348,6 +351,9 @@ public:
     // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
     // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
+    // Widens now when the range is within two of the last dab's additions of full (App: at the start of a frame's
+    // dabs, so the widen's frame holds nothing else, #184). True when it widened.
+    bool widenAhead(MicroMesh& mm);
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
     void grab(Mesh& m, const glm::vec3& delta);
     // Puts every grid point the stroke changed back (the stroke stays open).
@@ -399,6 +405,7 @@ private:
     void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed = nullptr);
     bool active_ = false;
     float strokeStep_ = 0.0f;
+    float lastAdd_ = 0.0f; // what the last dab could add to the range (widenAhead)
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)
     std::vector<uint32_t> tiles_;         // the touched base triangles, in order
     std::vector<int16_t> oldDisp_;        // tiles_.size() * samples
