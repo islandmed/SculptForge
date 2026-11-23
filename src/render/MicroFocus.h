@@ -76,6 +76,7 @@ private:
     bool growPool(uint32_t pages);
     void sendPages(const MicroMesh& mm, MicroRenderer& r, const std::vector<uint32_t>& slots);
     void shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoints);
+    void trimScratch(size_t slice); // (after a big batch: staging and the coarse shader's scratch back to a few slices)
     void freePage(uint32_t slot);
 
     size_t unpaged_ = 0; // wanted pages beyond the last frame's upload budget
@@ -110,7 +111,7 @@ private:
     double coarseNsPerTile_ = 0.0; // measured: a tile handed to shadeCoarse, its ring of neighbours included
     size_t bytes_ = 0;
     std::vector<int16_t> staging_;
-    std::vector<uint32_t> shadeStaging_, written_, coarseShade_;
+    std::vector<uint32_t> shadeStaging_, written_;
     struct Uniforms {
         GLuint program = 0;
         GLint cn = -1, cSamples = -1, record = -1, shift = -1;

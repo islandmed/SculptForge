@@ -999,10 +999,17 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
 }
 
 void MicroShader::shadeLevel(const Mesh& base, const MicroMesh& level, std::span<const uint32_t> dirty, bool all,
-                             std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow) {
+                             std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow,
+                             const Prepare& prepare) {
     level_ = &level;
-    shade(base, dirty, all, written, out, {}, grow);
+    shade(base, dirty, all, written, out, prepare, grow);
     level_ = nullptr;
+}
+
+void MicroShader::trimScratch(size_t maxBytes) {
+    if (partial_.capacity() * sizeof(float) > maxBytes) std::vector<float>().swap(partial_);
+    for (std::vector<uint32_t>* v : {&ring_, &ring2_, &seed_, &grown_})
+        if (v->capacity() * sizeof(uint32_t) > maxBytes) std::vector<uint32_t>().swap(*v);
 }
 
 void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool grow, std::vector<uint32_t>& written,
