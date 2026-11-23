@@ -1013,6 +1013,7 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         CHECK(reg.execute(d, "dyntopo", {{"enabled", true}, {"freeze_levels", true}, {"detail", 50.0}}).ok);
         if (painted) CHECK(reg.execute(d, "uv_auto", {{"resolution", 2048.0}}).ok);
         Mesh& m = d.mesh;
+        if (painted) m.texture = makeTexture(2048, 2048); // (its size sets how far a UV may stray: the padding is 4 texels)
         d.bvh.build(m);
         const AABB b = m.bounds();
         const glm::vec3 lo = b.min, hi = b.max, ext = hi - lo;
@@ -1023,12 +1024,13 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         auto mark = [&](const Mesh& mesh) {
             for (uint32_t t = 0; t < mesh.triangleCount() && painted; ++t) {
                 const glm::vec2 a = mesh.uvs[size_t(t) * 3], e1 = mesh.uvs[size_t(t) * 3 + 1] - a, e2 = mesh.uvs[size_t(t) * 3 + 2] - a;
-                for (int i = 0; i <= 8; ++i)
-                    for (int j = 0; i + j <= 8; ++j) {
-                        const glm::vec2 q = a + e1 * (float(i) / 8.0f) + e2 * (float(j) / 8.0f);
+                const int steps = std::max(8, int(std::max(glm::length(e1), glm::length(e2)) * float(kGrid)) + 1); // (a sample a pixel)
+                for (int i = 0; i <= steps; ++i)
+                    for (int j = 0; i + j <= steps; ++j) {
+                        const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
                         const int x = int(q.x * kGrid), y = int(q.y * kGrid);
-                        for (int dy = -3; dy <= 3; ++dy)
-                            for (int dx = -3; dx <= 3; ++dx)
+                        for (int dy = -2; dy <= 2; ++dy) // (the padding painting leaves around a chart: 4 texels of 2048)
+                            for (int dx = -2; dx <= 2; ++dx)
                                 if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
                     }
             }
@@ -1070,11 +1072,16 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         size_t stray = 0;
         for (uint32_t t = 0; t < m.triangleCount(); ++t) {
             const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
-            const int x = int(c.x * kGrid), y = int(c.y * kGrid);
-            if (x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)]) ++stray;
+            bool out = false;
+            for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
+                const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
+                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+            }
+            stray += out ? 1 : 0;
         }
         std::printf("  triangles whose UVs left every chart: %zu\n", stray);
-        CHECK(stray <= 40); // (of ~75000: a corner just past the padding of a chart, where a tight bend of a seam moved)
+        CHECK(stray <= 20); // (of ~75000: a corner just past the padding of a chart; a white speck on the paint)
     }
     std::printf("  folded edges: %zu without UVs, %zu with\n", folds[0], folds[1]);
     CHECK(folds[1] <= 2 * folds[0] + 10);

@@ -17,8 +17,8 @@
 // the midpoint of the UVs it splits, a collapse and a flip reuse the UVs of the corners they keep, and relaxing
 // slides a vertex's UVs with it, so the paint stays on the surface and the texture is never touched. A vertex on a
 // UV seam (its triangles have more than one UV for it) merges into a neighbour with the UV that neighbour has on each
-// side of the seam, stays where it is (never at a midpoint), is relaxed only along the seam, and a seam edge is never
-// flipped: those would stretch the texture.
+// side of the seam, stays where it is (never at a midpoint, never relaxed), and a seam edge is never flipped: those
+// would stretch the texture or take a corner out of its chart.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -188,10 +188,6 @@ private:
         int n = 0;
     };
     bool chartShifts(uint32_t v, const glm::vec3& d, UvChart* charts, int& count) const; // false: more than 4 charts
-    bool seamNeighbors(uint32_t v, uint32_t* out) const;                // v's two neighbours along its seam, false if not exactly two
-    // Each chart's corner of seam vertex v a fraction of the way to the middle of its two neighbours' corners (apply), or
-    // only whether that stays within the texture's padding around the chart (!apply).
-    bool slideSeamUvs(uint32_t v, const uint32_t* along, float fraction, bool apply);
     // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
     // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
     // A chart keep has no corner in (e.g. across a thin strip between two seams) gets drop's UV there moved to keep along
