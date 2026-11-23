@@ -9,6 +9,15 @@ wait_idle 60
 expect_value brush_builtin_looks == 0
 expect_value brush_looks == 0
 
+# The pack brushes the reporters named go on the shelf: their thumbnails are the same before and after a pick.
+click "##addbrush"
+click "Hard Cut"
+click "##addbrush"
+click "Flat Plane"
+click "##addbrush"
+click "Clay Strip"
+wait_idle 60
+
 # A brush with its own alpha, then each built-in brush in turn (first use of each), then the library brushes the reporter
 # named, then the built-ins again.
 run brush_create name="Scales Cut" depth=0.3 alpha=scales
