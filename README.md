@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.12:</strong> tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side (<a href="https://sculptforge.app/guide/sculpting.md">how it works</a>)
+  <strong>New in 0.13.12:</strong> Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side (<a href="https://sculptforge.app/guide/sculpting.md">how it works</a>)
 </p>
 
 <p align="center">

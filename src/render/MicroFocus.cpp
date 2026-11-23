@@ -344,6 +344,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
                       bool stroking, bool viewMoving) {
     const MicroMesh& mm = *mesh.micro;
     const FocusDetail* fd = mm.focus.get();
+    levelsChanged_ = false; // (the want list below reads what the last draw drew)
     ++frame_;
     Lap lap{splitMs_};
     // Changed heights: records, coarse grids, pages (a tile that went coarse gives its page back).
@@ -424,11 +425,13 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         }
     }
     const TierConfig& tier = currentTierConfig();
+    if (want.empty()) unpaged_ = 0;
     if (!want.empty()) {
         std::sort(want.begin(), want.end());
         // At most the frame's upload budget of heights (their shading follows within the shading budget).
         const size_t perFrame = std::max<size_t>(16, size_t(tier.uploadBudgetMBPerFrame << 20) / (size_t(samples_) * 2));
-        if (want.size() > perFrame) want.resize(perFrame);
+        const size_t leftover = want.size() > perFrame ? want.size() - perFrame : 0; // (for the next frames)
+        if (leftover) want.resize(perFrame);
         std::vector<uint32_t> victims; // pages not drawn fine this frame, least recently first
         bool victimsListed = false;
         std::vector<uint32_t> added;
@@ -454,6 +457,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
             added.push_back(s);
             pendingShade_.push_back(s);
         }
+        unpaged_ = added.size() == want.size() ? leftover : 0; // (a full pool leaves the rest coarse: no frames for them)
         resend.insert(resend.end(), added.begin(), added.end());
     }
     sendPages(mm, r, resend);
@@ -475,7 +479,11 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
 
 void MicroFocus::bind(GLuint program, const std::vector<uint8_t>& visible, const std::vector<int8_t>& levels) {
     drawn_.resize(levels.size());
-    for (size_t c = 0; c < levels.size(); ++c) drawn_[c] = visible[c] ? levels[c] : int8_t(-1);
+    for (size_t c = 0; c < levels.size(); ++c) {
+        const int8_t l = visible[c] ? levels[c] : int8_t(-1);
+        if (l != drawn_[c] && l > int8_t(FocusDetail::kCoarseLevel)) levelsChanged_ = true; // (pages for them: the next sync)
+        drawn_[c] = l;
+    }
     if (u_.program != program) {
         u_.program = program;
         auto at = [&](const char* name) { return gl::GetUniformLocation(program, name); };

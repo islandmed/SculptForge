@@ -115,7 +115,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;sfdetail;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -782,6 +782,11 @@ int App::runUiTest(int w, int h, int fps) {
             return 1;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
+        for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
+            syncScene();
+            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        }
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
@@ -1085,7 +1090,8 @@ bool App::wantsFrames(double now) const {
            renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
            renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
            renderer_.microPendingCoarse() > 0 || // a micro level's coarse shading still waits for a frame's budget (after a stroke)
-           renderer_.microShadingWantsFrame(); // ... and without Focus Detail its patches' shading (a big stroke's backlog, #184)
+           renderer_.microShadingWantsFrame() || // ... and without Focus Detail its patches' shading (a big stroke's backlog, #184)
+           renderer_.microPendingPages() > 0; // a streamed level's pages still wait to be shaded (the fine detail on open)
 }
 
 uint64_t App::frameKey() const {
@@ -3419,6 +3425,15 @@ void App::runCommand(const std::string& name, const Args& args) {
         reviewPackFile(argString(args, "path"));
         lastCommandOk_ = packs_.review != nullptr;
         return;
+    }
+    if (name == "open") { // a Focus Detail file is the app's (a streamed level), not the core command's
+        const std::string path = argString(args, "path");
+        std::string ext = extensionUtf8(path);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".sfdetail") {
+            lastCommandOk_ = openFocusDetail(path);
+            return;
+        }
     }
     // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
     // A running macro and the "keep original" / preview forms don't touch the levels.

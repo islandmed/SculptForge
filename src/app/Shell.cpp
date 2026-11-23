@@ -42,6 +42,17 @@ namespace sf {
 
 namespace {
 
+// Text with a Chinese, Japanese or Korean character (kana, ideographs, Hangul, full-width forms): the dense scripts.
+bool hasWideText(const char* text) {
+    for (const char* p = text; *p;) {
+        unsigned int c = 0;
+        p += ImTextCharFromUtf8(&c, p, nullptr);
+        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7AF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF))
+            return true;
+    }
+    return false;
+}
+
 constexpr ImGuiWindowFlags kShellFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                                          ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing |
@@ -1356,8 +1367,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
     const float infoX = ImGui::GetCursorPosX();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
+    ImFont* const regularFont = ImGui::GetFont();
     size_t tris = 0, verts = 0;
     for (int i = 0; i < doc_.partCount(); ++i) {
         tris += doc_.partMesh(i).triangleCount();
@@ -1379,6 +1389,12 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
         std::strncat(info, tr("Unlit"), sizeof info - std::strlen(info) - 1);
     }
+    // A dense character (Chinese, Japanese, Korean: a Part named 頭, or those UIs' labels) is a grey smudge at 12 px: that
+    // readout takes the regular face; Latin keeps the small one, so its line is as it was.
+    ImFont* const infoFont = hasWideText(info) ? regularFont : fontSmall_;
+    if (infoFont) ImGui::PushFont(infoFont);
+    infoFontPx_ = ImGui::GetFontSize();
+    ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
@@ -1403,19 +1419,19 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             // The status message is what just happened, so it stands out from the readout: the regular font, in
             // the bright text colour (still elided to the space the small-font readout leaves).
             ImGui::SameLine(0.0f, 20.0f * s);
-            if (fontSmall_) ImGui::PopFont();
+            if (infoFont) ImGui::PopFont();
             ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
             const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
             ImGui::PushStyleColor(ImGuiCol_Text, layout_.customize ? theme::accent : error ? theme::danger : theme::textBright);
             ImGui::TextUnformatted(elide(ImGui::GetFont(), msg, avail - infoW - 20.0f * s).c_str());
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered() && msg.size() > 40) ImGui::SetTooltip("%s", msg.c_str());
-            if (fontSmall_) ImGui::PushFont(fontSmall_);
+            if (infoFont) ImGui::PushFont(infoFont);
         }
     } else if (avail > 40.0f * s) {
         ImGui::TextDisabled("%s", elide(ImGui::GetFont(), info, avail).c_str());
     }
-    if (fontSmall_) ImGui::PopFont();
+    if (infoFont) ImGui::PopFont();
 
     // QuickSave, the layout presets and Menus are small dark chips with readable labels: buttons, but quieter than
     // the shelves (Menus on is an option: raised grey with an underline). 1 2 3 are segments of one control.
