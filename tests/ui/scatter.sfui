@@ -36,6 +36,16 @@ wait 0.3
 shot scatter-200
 ui_scale 100
 wait 0.3
+# Separate Parts goes up to 500 copies (artist-qa 11-23: ticked over 500, the live scatter vanished for good). Ticked at
+# 200 it makes 200 Parts; Count dragged past 500 unticks it and the live scatter stays, joined, still one undo step.
+click "Scatter/Separate Parts"
+wait 0.3
+expect_value parts == 201
+drag 0.90 0.417 0.995 0.417 0.3 release
+wait 0.5
+expect_status "Scattered"
+expect_value parts == 2
+expect "Scatter/Keep it"
 key ctrl+z
 wait 0.3
 expect_value parts == 1

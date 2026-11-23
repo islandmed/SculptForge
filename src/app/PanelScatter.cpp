@@ -51,16 +51,27 @@ void App::runScatter() {
     else a["shape"] = std::string(kShapes[std::clamp(scatterShape_, 0, kShapeCount - 1)]), a["size"] = double(scatterSize_);
     // The last Scatter, still the last step on this surface: this one takes its place.
     const uint32_t surface = doc_.activePartInfo().id;
-    if (scatterRevision_ && doc_.undo.revision() == scatterRevision_ && scatterTarget_ == surface && doc_.partIndex(scatterMade_) >= 0)
-        runCommand("undo");
+    const bool replacing = scatterRevision_ && doc_.undo.revision() == scatterRevision_ && scatterTarget_ == surface &&
+                           doc_.partIndex(scatterMade_) >= 0;
+    if (replacing) runCommand("undo");
     const size_t before = doc_.parts.size();
     const auto t0 = std::chrono::steady_clock::now();
     runCommand("scatter", a);
     scatterMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     if (!lastCommandOk_ || doc_.parts.size() <= before) {
-        scatterRevision_ = 0;
+        // Refused (too many copies for separate Parts, nothing masked...): the scatter it was to replace comes back,
+        // still live, and the reason stays on the status line and under the buttons.
+        const std::string why = status_;
+        if (replacing) {
+            runCommand("redo");
+            scatterRevision_ = doc_.undo.revision();
+        } else {
+            scatterRevision_ = 0;
+        }
+        status_ = scatterResult_ = why;
         return;
     }
+    scatterResult_ = status_;
     scatterRevision_ = doc_.undo.revision();
     scatterTarget_ = surface;
     scatterMade_ = doc_.parts[size_t(doc_.activePart + 1)].id; // (it goes right below its surface)
@@ -181,7 +192,11 @@ void App::drawScatterContents() {
     ImGui::EndDisabled();
 
     tray::GroupLabel(*this, "Result");
+    // One Part per copy goes up to kScatterMaxSeparate copies: above that the box can't be ticked.
+    if (scatterCount_ > kScatterMaxSeparate) scatterSeparate_ = false;
+    ImGui::BeginDisabled(scatterCount_ > kScatterMaxSeparate);
     toggled(ui::Checkbox(tr("Separate Parts##scatter_separate"), &scatterSeparate_));
+    ImGui::EndDisabled();
     ui::HelpText("Separate Parts", nullptr,
                  "Each copy becomes its own Part (up to 500). Off: all of them are one Part, each copy its own face group.",
                  kScatterPath);
@@ -197,6 +212,12 @@ void App::drawScatterContents() {
         ImGui::SameLine();
         if (ImGui::Button(tr("Keep it##scatter_keep_result"), ImVec2(-1, 0))) scatterRevision_ = 0;
         ui::HelpText("Keep it", nullptr, "Keeps this Scatter as it is: the settings no longer change it.", kScatterPath);
+    }
+    // What the last Scatter did (how many, how many left out, how long), in full: the status line cuts it short.
+    if (!scatterResult_.empty()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", scatterResult_.c_str());
+        ImGui::PopTextWrapPos();
     }
     if (redo && live) runScatter();
 }

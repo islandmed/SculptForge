@@ -1904,6 +1904,7 @@ private:
     uint64_t scatterRevision_ = 0;
     uint32_t scatterTarget_ = 0, scatterMade_ = 0;
     double scatterMs_ = 0.0;
+    std::string scatterResult_; // its result line (or why it was refused), shown under the buttons
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
     int tubeRadiusEditPoint_ = -1;
