@@ -3,6 +3,10 @@
 # Scatter chapter. Scatter runs inside the command (no background job), so frame waits are enough.
 run ui_look look=classic layout=classic
 wait 0.3
+# Classic keeps the rows added after 0.13.0 out unless Show newer menu rows is on.
+expect_not "Scatter##tool.scatter"
+run ui_look look=classic layout=classic newer_rows=true
+wait 0.3
 run new_sphere subdivisions=5
 wait 0.3
 click "Scatter##tool.scatter"

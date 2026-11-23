@@ -942,7 +942,8 @@ void App::drawPalette_Tool() {
         drawTubeContents(); // PanelTube.cpp
         Demo::popScope();
     }
-    if (subpalette("tool.scatter", "Scatter")) {
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (or while a Scatter is still live).
+    if ((newerMenuRows() || scatterRevision_) && subpalette("tool.scatter", "Scatter")) {
         tray::Section section;
         Demo::pushScope("Scatter");
         drawScatterContents(); // PanelScatter.cpp

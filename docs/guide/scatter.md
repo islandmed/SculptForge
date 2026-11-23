@@ -13,7 +13,8 @@ follow it, each at its own random size and turn.
 
 ## Scatter copies
 
-1. Select the Part to cover (it is the surface), then open **Tool > Scatter**.
+1. Select the Part to cover (it is the surface), then open **Tool > Scatter**. (In the Classic layout, turn on
+   **Edit > Preferences > Interface > Show newer menu rows** first.)
 2. Pick the **Piece**: a built-in shape (set its **Shape size**) or another Part.
 3. Set **Count** and press **Scatter**. The copies become a new Part, "<piece> Scatter", right below the surface.
 4. <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes them away again.
