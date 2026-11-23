@@ -16,8 +16,9 @@
 // Quads under the brush become triangles. UVs (and so the painted texture) are kept: a split's new corners take
 // the midpoint of the UVs it splits, a collapse and a flip reuse the UVs of the corners they keep, and relaxing
 // slides a vertex's UVs with it, so the paint stays on the surface and the texture is never touched. A vertex on a
-// UV seam (its triangles have more than one UV for it) is never collapsed and a seam edge never flipped: that
-// would stretch the texture.
+// UV seam (its triangles have more than one UV for it) merges into a neighbour with the UV that neighbour has on each
+// side of the seam, stays where it is (never at a midpoint), is relaxed only along the seam, and a seam edge is never
+// flipped: those would stretch the texture.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -180,6 +181,24 @@ private:
     bool seamVertex(uint32_t v) const;                              // its corners don't all have one UV
     bool seamEdge(uint32_t a, uint32_t b) const;                    // the triangles on it differ at an end
     void slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface
+    // The charts around v (its triangles grouped by their UV at v) and how far each one's UV at v moves when v
+    // moves by d along the surface: every triangle's own map of its plane to UV space, extended, averaged per chart.
+    struct UvChart {
+        glm::vec2 at{0.0f}, shift{0.0f};
+        int n = 0;
+    };
+    bool chartShifts(uint32_t v, const glm::vec3& d, UvChart* charts, int& count) const; // false: more than 4 charts
+    bool seamNeighbors(uint32_t v, uint32_t* out) const;                // v's two neighbours along its seam, false if not exactly two
+    // Each chart's corner of seam vertex v a fraction of the way to the middle of its two neighbours' corners (apply), or
+    // only whether that stays within the texture's padding around the chart (!apply).
+    bool slideSeamUvs(uint32_t v, const uint32_t* along, float fraction, bool apply);
+    // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
+    // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
+    // A chart keep has no corner in (e.g. across a thin strip between two seams) gets drop's UV there moved to keep along
+    // that chart's surface (chartShifts), as relaxing would, if that stays within a couple of texels of the chart (the
+    // padding the texture has around it); else, or for a vertex of more than four charts, false.
+    bool collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
+                        std::vector<std::pair<uint32_t, glm::vec2>>& out) const;
     void compact();
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4
@@ -253,6 +272,7 @@ private:
     mutable std::vector<std::pair<uint32_t, uint32_t>> orbitScratch_; // candidate()
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
+    mutable std::vector<std::pair<uint32_t, glm::vec2>> uvPlan_; // collapseUvPlan's result (triangle, UV of the merged vertex)
 };
 
 } // namespace sf

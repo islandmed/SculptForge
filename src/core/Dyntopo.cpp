@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Dyntopo.h"
 
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -367,6 +368,49 @@ bool DynamicTopology::seamVertex(uint32_t v) const {
         else if (std::abs(u.x - uv.x) > 1e-6f || std::abs(u.y - uv.y) > 1e-6f) return true;
     }
     return false;
+}
+
+bool DynamicTopology::collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
+                                     std::vector<std::pair<uint32_t, glm::vec2>>& out) const {
+    out.clear();
+    const Mesh& m = *mesh_;
+    if (m.uvs.empty() || n < 1) return true;
+    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
+    glm::vec2 atDrop[2], atKeep[2];
+    for (int i = 0; i < n && i < 2; ++i) {
+        atDrop[i] = cornerUv(edgeTris[i], drop);
+        atKeep[i] = cornerUv(edgeTris[i], keep);
+    }
+    UvChart charts[4];
+    int chartCount = -1; // (made when a triangle needs it)
+    for (uint32_t t : m.vertexTriangles(drop)) {
+        if (t == edgeTris[0] || (n == 2 && t == edgeTris[1])) continue;
+        const glm::vec2 du = cornerUv(t, drop);
+        bool found = false, clash = false;
+        glm::vec2 uv(0.0f);
+        for (int i = 0; i < n && i < 2; ++i) {
+            if (!same(du, atDrop[i])) continue;
+            if (!found) uv = atKeep[i], found = true;
+            else if (!same(uv, atKeep[i])) clash = true;
+        }
+        if (found && !clash) {
+            out.emplace_back(t, uv);
+            continue;
+        }
+        // The edge's triangles say nothing about this chart: drop's corner moves onto keep along the chart's surface.
+        if (chartCount < 0) {
+            chartCount = 0;
+            if (!chartShifts(drop, m.positions[keep] - m.positions[drop], charts, chartCount)) return false;
+        }
+        for (int k = 0; k < chartCount; ++k) {
+            if (!same(charts[k].at, du)) continue;
+            // (Past the padding around the chart the texture has nothing: only a short way out is safe.)
+            const float reach = 2.5f / float(std::max(m.texture ? m.texture->width : 1024, 256));
+            if (glm::length(charts[k].shift) > reach) return false;
+            out.emplace_back(t, charts[k].at + charts[k].shift);
+        }
+    }
+    return true;
 }
 
 bool DynamicTopology::seamEdge(uint32_t a, uint32_t b) const {
@@ -968,6 +1012,11 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
         keep = std::min(a, b);
         drop = std::max(a, b);
         p = (pos[a] + pos[b]) * 0.5f;
+        if (!mesh_->uvs.empty() && (seamVertex(a) || seamVertex(b))) { // (a seam vertex stays where it is: the other merges into it)
+            keep = seamVertex(keep) || !seamVertex(drop) ? keep : drop;
+            drop = keep == a ? b : a;
+            p = pos[keep];
+        }
         return true;
     }
     if (fa == 0) {
@@ -992,11 +1041,12 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
 
 bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
     const Mesh& m = *mesh_;
-    // (A vertex on a UV seam has no single UV to merge into: collapsing it would stretch the texture.)
-    if (!m.uvs.empty() && (seamVertex(keep) || seamVertex(drop))) return false;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
     if (n < 1 || n > 2) return false;
+    // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
+    if (!m.uvs.empty() && p != m.positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
+    if (!m.uvs.empty() && p == m.positions[keep] && !collapseUvPlan(keep, drop, tris, n, uvPlan_)) return false;
     uint32_t opposite[2] = {kNone, kNone};
     for (int i = 0; i < n; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
@@ -1063,10 +1113,14 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
     const bool midpoint = p != m.positions[keep];
-    glm::vec2 mergedUv(0.0f); // (neither end is on a seam, so each has one UV, both on the edge's triangles)
+    glm::vec2 mergedUv(0.0f); // (midpoint: neither end is on a seam, so each has one UV, both on the edge's triangles)
+    bool plan = false;
     if (!m.uvs.empty() && n >= 1) {
-        const glm::vec2 uk = cornerUv(tris[0], keep), ud = cornerUv(tris[0], drop);
-        mergedUv = midpoint ? (uk + ud) * 0.5f : uk;
+        if (midpoint) {
+            mergedUv = (cornerUv(tris[0], keep) + cornerUv(tris[0], drop)) * 0.5f;
+        } else {
+            plan = collapseUvPlan(keep, drop, tris, n, uvPlan_);
+        }
     }
     for (int i = 0; i < n && i < 2; ++i) killTriangle(tris[i]);
     const IndexRing around = m.vertexTriangles(drop);
@@ -1078,11 +1132,15 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
             if (tri[c] == drop) tri[c] = keep;
         setTriangle(t, tri);
     }
-    if (!m.uvs.empty())
-        for (uint32_t t : m.vertexTriangles(keep)) {
-            recordTriangle(t);
-            setCornerUv(t, keep, mergedUv);
-        }
+    if (!m.uvs.empty()) {
+        if (midpoint)
+            for (uint32_t t : m.vertexTriangles(keep)) {
+                recordTriangle(t);
+                setCornerUv(t, keep, mergedUv);
+            }
+        else if (plan)
+            for (const auto& [t, uv] : uvPlan_) setCornerUv(t, keep, uv);
+    }
     if (midpoint) interpolateVertex(keep, keep, drop, 0.5f, p);
     markVertex(keep);
     killVertex(drop);
@@ -1324,9 +1382,14 @@ void DynamicTopology::relaxPass() {
             in = in || glm::dot(d0, d0) <= r2;
         }
         if (!in) continue;
-        if (featureEdges(v, other) != 0 || seamVertex(v)) continue; // (a seam vertex must stay on its seam)
+        if (featureEdges(v, other) != 0) continue;
         ring(v, r);
         if (r.size() < 3) continue;
+        if (seamVertex(v)) { // (a seam vertex only slides along its seam, towards the middle of the two next ones)
+            uint32_t along[2];
+            if (!seamNeighbors(v, along) || !slideSeamUvs(v, along, 0.5f, false)) continue;
+            r.assign(along, along + 2);
+        }
         glm::vec3 avg(0.0f);
         for (uint32_t u : r) avg += m.positions[u];
         avg /= float(r.size());
@@ -1337,7 +1400,16 @@ void DynamicTopology::relaxPass() {
     }
     // Applied one by one, each only if no triangle around it turns over or goes flat.
     const float minArea = 1e-4f * target_ * target_;
-    for (const auto& [v, d] : moves) {
+    for (const auto& [v, planned] : moves) {
+        glm::vec3 d = planned;
+        uint32_t along[2];
+        const bool seam = seamVertex(v) && seamNeighbors(v, along);
+        if (seam) { // (its UVs follow its neighbours' as they are now, so its move does too: they may have moved since the plan)
+            if (!slideSeamUvs(v, along, 0.5f, false)) continue;
+            const glm::vec3 n = faceNormalAt(v);
+            d = (m.positions[along[0]] + m.positions[along[1]]) * 0.5f - m.positions[v];
+            d = (d - n * glm::dot(d, n)) * 0.5f;
+        }
         const glm::vec3 to = m.positions[v] + d;
         bool ok = true;
         for (uint32_t t : m.vertexTriangles(v)) {
@@ -1356,23 +1428,26 @@ void DynamicTopology::relaxPass() {
         }
         if (!ok) continue;
         recordVertex(v);
-        slideUvs(v, to);
+        if (seam) slideSeamUvs(v, along, 0.5f, true);
+        else slideUvs(v, to);
         m.positions[v] = to;
         if (!m.base.empty()) m.base[v] += d;
     }
 }
 
-// The vertex is about to slide along the surface to `to`: its UVs follow, each triangle's own map of its plane
-// to UV space extended to the new place (all of them averaged: they agree up to the surface's curvature), so the
-// paint stays on the surface. A vertex on a seam keeps its UVs.
-void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
-    Mesh& m = *mesh_;
-    if (m.uvs.empty() || seamVertex(v)) return;
+bool DynamicTopology::chartShifts(uint32_t v, const glm::vec3& d, UvChart* charts, int& count) const {
+    const Mesh& m = *mesh_;
     const auto& pos = m.positions;
-    const glm::vec3 d = to - pos[v];
-    glm::vec2 shift(0.0f);
-    int n = 0;
+    count = 0;
+    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
     for (uint32_t t : m.vertexTriangles(v)) {
+        const glm::vec2 at = cornerUv(t, v);
+        int k = 0;
+        while (k < count && !same(charts[k].at, at)) ++k;
+        if (k == count) {
+            if (count == 4) return false;
+            charts[count++] = {at, glm::vec2(0.0f), 0};
+        }
         const glm::uvec3& tri = m.triangles[t];
         const glm::vec3 e1 = pos[tri.y] - pos[tri.x], e2 = pos[tri.z] - pos[tri.x];
         const glm::vec2 u1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], u2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
@@ -1383,14 +1458,93 @@ void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
         if (!(nn > 1e-24f) || !(det > 0.0f)) continue;
         const glm::vec3 w = d - normal * (glm::dot(d, normal) / nn);
         const float r1 = glm::dot(w, e1), r2 = glm::dot(w, e2);
-        shift += u1 * ((r1 * g22 - r2 * g12) / det) + u2 * ((g11 * r2 - g12 * r1) / det);
-        ++n;
+        charts[k].shift += u1 * ((r1 * g22 - r2 * g12) / det) + u2 * ((g11 * r2 - g12 * r1) / det);
+        ++charts[k].n;
     }
-    if (n == 0 || !std::isfinite(shift.x) || !std::isfinite(shift.y)) return;
-    shift /= float(n);
+    for (int k = 0; k < count; ++k) {
+        if (charts[k].n > 0) charts[k].shift /= float(charts[k].n);
+        if (!std::isfinite(charts[k].shift.x) || !std::isfinite(charts[k].shift.y)) charts[k].shift = glm::vec2(0.0f);
+    }
+    return true;
+}
+
+bool DynamicTopology::seamNeighbors(uint32_t v, uint32_t* out) const {
+    int found = 0;
+    for (uint32_t u : mesh_->neighbors(v))
+        if (seamEdge(v, u)) {
+            if (found == 2) return false;
+            out[found++] = u;
+        }
+    return found == 2;
+}
+
+// A seam vertex slides towards the middle of its two neighbours along the seam, and in each chart its corner goes the same
+// fraction of the way to the middle of those neighbours' UVs in that chart: it stays on the chart's own boundary. A bend in
+// the seam puts the chord's middle off the chart's edge (outside it where the edge is concave), by fraction x the bend's
+// depth: that must stay within the padding the texture has around a chart (a couple of texels), else nothing moves.
+bool DynamicTopology::slideSeamUvs(uint32_t v, const uint32_t* along, float fraction, bool apply) {
+    Mesh& m = *mesh_;
+    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
+    const float reach = 2.0f / float(std::max(m.texture ? m.texture->width : 1024, 256));
+    glm::vec2 ats[4], targets[4];
+    int count = 0;
     for (uint32_t t : m.vertexTriangles(v)) {
-        recordTriangle(t);
-        setCornerUv(t, v, cornerUv(t, v) + shift);
+        const glm::vec2 at = cornerUv(t, v);
+        int k = 0;
+        while (k < count && !same(ats[k], at)) ++k;
+        if (k < count) continue;
+        if (count == 4) return false;
+        // This chart's UVs of the two neighbours: from a triangle of the chart that has the neighbour.
+        glm::vec2 n[2];
+        int got = 0;
+        for (int i = 0; i < 2; ++i)
+            for (uint32_t t2 : m.vertexTriangles(v)) {
+                const glm::uvec3& tri = m.triangles[t2];
+                if (!(tri.x == along[i] || tri.y == along[i] || tri.z == along[i]) || !same(cornerUv(t2, v), at)) continue;
+                n[i] = cornerUv(t2, along[i]);
+                ++got;
+                break;
+            }
+        if (got != 2) return false; // (a chart that has only one of them: no moving along the seam)
+        const glm::vec2 chord = n[1] - n[0], off = at - n[0];
+        const float chordLen = glm::length(chord);
+        const float bend = chordLen > 1e-12f ? std::abs(chord.x * off.y - chord.y * off.x) / chordLen : 0.0f;
+        if (fraction * bend > reach) return false;
+        ats[count] = at;
+        targets[count++] = at + ((n[0] + n[1]) * 0.5f - at) * fraction;
+    }
+    if (!apply) return true;
+    for (uint32_t t : m.vertexTriangles(v)) {
+        const glm::vec2 at = cornerUv(t, v);
+        for (int k = 0; k < count; ++k)
+            if (same(ats[k], at)) {
+                recordTriangle(t);
+                m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = targets[k];
+                markTriangle(t);
+                break;
+            }
+    }
+    return true;
+}
+
+// The vertex is about to slide along the surface to `to`: its UVs follow (chartShifts), so the seam stays a seam and
+// the paint stays on the surface.
+void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
+    Mesh& m = *mesh_;
+    if (m.uvs.empty()) return;
+    UvChart charts[4];
+    int count = 0;
+    if (!chartShifts(v, to - m.positions[v], charts, count)) return; // (more charts than a vertex has any use for: leave its UVs)
+    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
+    for (uint32_t t : m.vertexTriangles(v)) {
+        const glm::vec2 at = cornerUv(t, v);
+        for (int k = 0; k < count; ++k)
+            if (same(charts[k].at, at)) {
+                recordTriangle(t);
+                m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = at + charts[k].shift;
+                markTriangle(t);
+                break;
+            }
     }
 }
 

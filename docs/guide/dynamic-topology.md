@@ -71,9 +71,9 @@ It is a preference (saved automatically) and is saved with the project; from a s
   neighbours).
 - **Quads** under the brush become triangles. The rest of the mesh keeps its quads.
 - **UVs and the painted texture are kept.** New triangles get UVs from the ones they split, so paint
-  stays where you put it and the texture itself is never touched. Along a UV seam the triangles are left
-  as they are (a seam vertex is never merged, a seam edge never flipped), so the seam can stay finer than the rest. Undo
-  brings back the exact UVs.
+  stays where you put it and the texture itself is never touched. Along a UV seam the remesh works
+  along the seam only (its vertices merge and relax along it, a seam edge is never flipped), so a seam can stay a
+  little finer than the rest. Undo brings back the exact UVs.
 
 ## Subdivision levels
 

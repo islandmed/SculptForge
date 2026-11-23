@@ -828,6 +828,19 @@ bool rightIsland(const Mesh& m, uint32_t t) {
     return m.positions[tri.x].x + m.positions[tri.y].x + m.positions[tri.z].x > 0.0f;
 }
 
+// How far triangle t's UVs stray from the mapping of the island they follow (the better fit of the two): a seam end on the
+// boundary may slide a little, and its chart goes with it.
+float islandError(const Mesh& m, uint32_t t) {
+    float best = 1e9f;
+    for (bool right : {false, true}) {
+        float worst = 0.0f;
+        for (int c = 0; c < 3; ++c)
+            worst = std::max(worst, glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[m.triangles[t][c]], right)));
+        best = std::min(best, worst);
+    }
+    return best;
+}
+
 Document seamPlane(int resolution) {
     Document d = makeDoc(makePlane(resolution, 2.0f));
     d.sculptor.dyntopo.enabled = true;
@@ -887,11 +900,9 @@ TEST(dyntopo_uv_invariants_paint_untouched_and_no_stretch_across_a_seam) {
     size_t seamCorners = 0;
     for (uint32_t t = 0; t < m.triangleCount(); ++t) {
         const glm::uvec3 tri = m.triangles[t];
-        const bool right = rightIsland(m, t);
-        for (int c = 0; c < 3; ++c) {
-            worstUv = std::max(worstUv, glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[tri[c]], right)));
+        worstUv = std::max(worstUv, islandError(m, t));
+        for (int c = 0; c < 3; ++c)
             if (std::abs(m.positions[tri[c]].x) < 1e-5f) ++seamCorners;
-        }
         const glm::vec2 u1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], u2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
         const float uvArea = 0.5f * std::abs(u1.x * u2.y - u1.y * u2.x);
         const float area = 0.5f * glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
@@ -916,7 +927,7 @@ TEST(dyntopo_uv_invariants_paint_untouched_and_no_stretch_across_a_seam) {
     CHECK(m.texture->pixels == texels);
 }
 
-TEST(dyntopo_uv_invariants_seam_vertices_are_never_collapsed) {
+TEST(dyntopo_uv_invariants_seam_vertices_collapse_only_along_the_seam) {
     Document d = seamPlane(16);
     d.sculptor.dyntopo.detail = 0.0f; // coarse: the brush wants to collapse what is under it
     Mesh& m = d.mesh;
@@ -932,11 +943,9 @@ TEST(dyntopo_uv_invariants_seam_vertices_are_never_collapsed) {
     d.undo.push(d.sculptor.endStroke());
     const size_t seamAfter = seamVertices(m);
     CHECK(invalid(m, false, 1).empty());
-    CHECK(m.triangleCount() < size_t(2 * 16 * 16)); // (it did simplify away from the seam)
-    CHECK(seamAfter >= seamBefore); // (but nothing on the seam collapsed)
-    for (uint32_t t = 0; t < m.triangleCount(); ++t)
-        for (int c = 0; c < 3; ++c)
-            CHECK(glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[m.triangles[t][c]], rightIsland(m, t))) < 2e-3f);
+    CHECK(m.triangleCount() < size_t(2 * 16 * 16)); // (it did simplify)
+    CHECK(seamAfter < seamBefore);  // (seam vertices merged into their neighbours along the seam, and the UV check below holds)
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) CHECK(islandError(m, t) < 2e-3f);
 }
 
 TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
@@ -974,4 +983,99 @@ TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
     while (d.undo.canUndo()) d.undo.undo(m, d.bvh);
     CHECK(m.uvs == before.uvs);
     CHECK(m.triangles == before.triangles);
+}
+
+namespace {
+// Edges whose two triangles face away from each other (a fold-over).
+size_t foldedEdges(const Mesh& m) {
+    std::map<std::pair<uint32_t, uint32_t>, std::vector<glm::vec3>> e;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        const glm::vec3 n = glm::normalize(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+        for (int c = 0; c < 3; ++c) e[{std::min(tri[c], tri[(c + 1) % 3]), std::max(tri[c], tri[(c + 1) % 3])}].push_back(n);
+    }
+    size_t folds = 0;
+    for (const auto& [k, v] : e)
+        if (v.size() == 2 && glm::dot(v[0], v[1]) < 0.0f) ++folds;
+    return folds;
+}
+} // namespace
+
+// The Human head (one level, Auto UV: seams all round the eyes and the face), six strokes across the eyes with the
+// brushes an artist uses: Dynamic must leave it about as clean as on a head without UVs (a Part whose seam vertices
+// could not merge or relax tore open at the eyelids: 140 folded edges against 6), with sane UVs everywhere.
+TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_one) {
+    size_t folds[2] = {0, 0};
+    for (int painted = 0; painted < 2; ++painted) {
+        Document d;
+        CommandRegistry reg;
+        CHECK(reg.execute(d, "new_starter_mesh", {{"name", std::string("human-head")}}).ok);
+        CHECK(reg.execute(d, "dyntopo", {{"enabled", true}, {"freeze_levels", true}, {"detail", 50.0}}).ok);
+        if (painted) CHECK(reg.execute(d, "uv_auto", {{"resolution", 2048.0}}).ok);
+        Mesh& m = d.mesh;
+        d.bvh.build(m);
+        const AABB b = m.bounds();
+        const glm::vec3 lo = b.min, hi = b.max, ext = hi - lo;
+        const float diag = glm::length(ext);
+        // Where the charts are (every texel a UV triangle touches, and a few around it): a triangle's UVs must stay in there.
+        constexpr int kGrid = 1024;
+        std::vector<uint8_t> occupied(size_t(kGrid) * kGrid, 0);
+        auto mark = [&](const Mesh& mesh) {
+            for (uint32_t t = 0; t < mesh.triangleCount() && painted; ++t) {
+                const glm::vec2 a = mesh.uvs[size_t(t) * 3], e1 = mesh.uvs[size_t(t) * 3 + 1] - a, e2 = mesh.uvs[size_t(t) * 3 + 2] - a;
+                for (int i = 0; i <= 8; ++i)
+                    for (int j = 0; i + j <= 8; ++j) {
+                        const glm::vec2 q = a + e1 * (float(i) / 8.0f) + e2 * (float(j) / 8.0f);
+                        const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                        for (int dy = -3; dy <= 3; ++dy)
+                            for (int dx = -3; dx <= 3; ++dx)
+                                if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
+                    }
+            }
+        };
+        mark(m);
+        struct Stroke {
+            BrushType type;
+            float radius; // of the head's size
+        };
+        const Stroke strokes[] = {{BrushType::Standard, 0.06f}, {BrushType::Standard, 0.18f}, {BrushType::Clay, 0.12f},
+                                  {BrushType::Clay, 0.05f},     {BrushType::Smooth, 0.15f},   {BrushType::Tendril, 0.08f}};
+        for (const Stroke& s : strokes) {
+            CHECK(d.sculptor.beginStroke(m, "Standard"));
+            for (int i = 0; i < 24; ++i) { // a wavy line across the eyes, seen from the front
+                const float fx = 0.25f + 0.5f * float(i) / 23.0f, fy = 0.62f + 0.04f * std::sin(float(i) * 0.7f);
+                RayHit hit;
+                if (!d.bvh.raycast(m, glm::vec3(lo.x + ext.x * fx, lo.y + ext.y * fy, hi.z + ext.z), glm::vec3(0, 0, -1), hit)) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.viewDir = glm::vec3(0, 0, -1);
+                p.radius = s.radius * diag;
+                p.strength = 0.5f;
+                d.sculptor.dab(m, d.bvh, s.type, p, Symmetry{});
+            }
+            d.undo.push(d.sculptor.endStroke());
+        }
+        CHECK(invalid(m, false, 0).empty());
+        folds[painted] = foldedEdges(m);
+        if (!painted) continue;
+        CHECK(m.uvs.size() == m.triangleCount() * 3);
+        size_t outliers = 0;
+        for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+            const glm::vec2 u0 = m.uvs[size_t(t) * 3], u1 = m.uvs[size_t(t) * 3 + 1], u2 = m.uvs[size_t(t) * 3 + 2];
+            if (std::max({glm::distance(u0, u1), glm::distance(u1, u2), glm::distance(u2, u0)}) > 0.08f) ++outliers; // (a chart is small)
+            for (const glm::vec2& u : {u0, u1, u2})
+                if (u.x < -0.01f || u.x > 1.01f || u.y < -0.01f || u.y > 1.01f) ++outliers;
+        }
+        CHECK(outliers == 0);
+        size_t stray = 0;
+        for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+            const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
+            const int x = int(c.x * kGrid), y = int(c.y * kGrid);
+            if (x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)]) ++stray;
+        }
+        std::printf("  triangles whose UVs left every chart: %zu\n", stray);
+        CHECK(stray <= 40); // (of ~75000: a corner just past the padding of a chart, where a tight bend of a seam moved)
+    }
+    std::printf("  folded edges: %zu without UVs, %zu with\n", folds[0], folds[1]);
+    CHECK(folds[1] <= 2 * folds[0] + 10);
 }
