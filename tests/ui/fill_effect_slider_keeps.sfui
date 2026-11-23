@@ -53,6 +53,17 @@ expect_value fill_noise_contrast == $contrast_new
 key ctrl+shift+z
 expect_value fill_fill_value == $value_new
 
+# A typed value (double-click) is the one stored, not the old copy or the click's middle value.
+double_click "Paint Layers/##contrast"
+expect_value typing == 1
+type_here 2.5
+key enter
+expect_value typing == 0
+wait 0.3
+expect_value fill_noise_contrast == 2.5
+key ctrl+z
+expect_value fill_noise_contrast != 2.5
+
 # The material slider (Roughness, once its channel is on) keeps its value on release the same way.
 click "R##fillch"
 remember fill_roughness rough_old
