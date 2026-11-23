@@ -243,6 +243,7 @@ const char* load(ProcLoader loader);
 GLint maxTextureBufferTexels();
 uint32_t bufferChunkTexels(uint32_t natural);
 void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+bool testTinyGpu(); // a test lowered the limit to 256 texels or less: no 2D-texture fallback either (a texture then cannot be shown)
 // Partial buffer updates as GPU copies (render/BufferUpload.h): on Mesa's OpenGL over D3D12, whose glBufferSubData into
 // busy texture buffers removes the device; elsewhere BufferSubData (copies cost large micro strokes a third of their frame
 // rate on Mesa/Apple, 11-17). setTestCopyUploads: 1/0 forces it (`gl_limits copies=`, tests only), -1 the driver's.

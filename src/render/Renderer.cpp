@@ -2181,7 +2181,7 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
         GLint maxSize = 0;
         gl::GetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
         const int w = std::min(maxSize, 4096);
-        if (w >= 2048 && drawn * 3 <= size_t(w) * size_t(maxSize)) uvWidth = w;
+        if (w >= 2048 && !gl::testTinyGpu() && drawn * 3 <= size_t(w) * size_t(maxSize)) uvWidth = w;
     }
     const bool textured = uvInBuffer || uvWidth > 0;
     s.uvsWanted = wantUvs;

@@ -19,6 +19,15 @@ expect_value texture_painted > 3000
 expect_value texture_uv_width > 0
 render_cell "textured, painted x small GPU limits" mode=lit
 shot texture_small_gpu
+# a GPU with nothing to hold the UVs in (texels=256 or less, tests only): the status bar and the panel say the texture is not shown
+gl_limits texels=256
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.5
+expect_value texture_not_shown == 1
+expect_value texture_uv_width == 0
+render_cell "textured x no UV storage (drawn without the texture)" mode=lit
 # a big limit again: the buffer
 gl_limits texels=0
 run new_sphere subdivisions=5
