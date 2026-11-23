@@ -382,6 +382,11 @@ void App::drawPalette_Brush() {
     ImGui::SameLine();
     ui::Checkbox("View falloff##draw.view_falloff", &uiPrefs_.viewFalloff);
     ui::HelpAction(*this, "draw.view_falloff");
+    if (newerMenuRows() || uiPrefs_.contactFacing) { // (a row after 0.13.0: Classic keeps its old rows unless asked)
+        ui::Checkbox("Contact facing##draw.contact_facing", &uiPrefs_.contactFacing);
+        ui::HelpAction(*this, "draw.contact_facing");
+        if (uiPrefs_.contactFacing) ui::SliderInside("##facing_angle", &uiPrefs_.facingAngle, 30.0f, 180.0f, "Facing angle %.0f");
+    }
     ImGui::Checkbox(tr("Smooth keeps volume##smooth_keep_volume"), &smoothKeepVolume_);
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "

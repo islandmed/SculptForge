@@ -31,7 +31,7 @@
 // corner e + 1: e0 = (k, 0), e1 = (n - k, k), e2 = (0, n - k), k = 0..n.
 //
 // What a scalar displacement can't do: move points sideways. Brushes that slide the surface (Move's sideways
-// part, Snake Hook, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
+// part, Tendril, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
 // resamples the heights from where its pull would bring the surface (see microBrushSupport).
 #pragma once
 
@@ -373,6 +373,13 @@ public:
     // (tests set it huge: every second point).
     float planeSamples = 7000.0f;
     bool adaptive = true;
+    // Contact facing (DabParams::contactFacing) for the next dabs: the hint (the picked normal, unit length; zero = off). A dab
+    // finds the contact normal from it on the micro surface under the cursor and weighs each point by its own micro
+    // surface normal against that (facingWeight), and by the falloff along the base surface (a slot in the base: the
+    // far wall fades by the long way round). Adaptive Detail tiles weigh by the base normal there (their points' own
+    // normals are the root grid's plus deltas finer than any fold the brush meets).
+    glm::vec3 facingNormal{0.0f};
+    float facingAngle = 180.0f;
     uint32_t lastStride = 1; // the stride the last dab used
     uint32_t lastPlaneStride = 1; // ... and its brush plane
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
@@ -397,7 +404,8 @@ private:
     void endTiles(MicroUndo& u, const MicroTiles& tiles);
     bool dabTiles(Mesh& m, BrushType type, const glm::vec3& center, float r, float strength, bool invert, float focal,
                   const glm::vec3& areaNormal, const glm::vec3& areaCenter, const glm::vec3& right, const glm::vec3& up,
-                  const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth);
+                  const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth,
+                  const std::function<float(uint32_t, const float*, const glm::vec3&, float)>& facing = {});
     std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
     std::vector<int16_t> snap_;           // Pinch, Crease, Sharp Crease: the grids of this dab's triangles as it found them
     std::vector<uint32_t> snapOf_;        // per base triangle: its grid in snap_ + 1 (0 = none)
@@ -421,6 +429,12 @@ private:
     std::vector<uint32_t> vertStamp_;
     std::vector<uint32_t> corners_;
     float baseEdge_ = 0.0f; // the base's average edge length
+    // Contact facing: the base vertices' distance along the base surface from the dab's centre (keepConnected's flood:
+    // a slot in the base fades by the long way round), valid where floodStamp_ == floodReached_.
+    std::vector<uint32_t> floodVerts_, floodStamp_, floodQueue_;
+    std::vector<float> floodDist_, floodSurface_;
+    uint32_t floodEpoch_ = 0, floodReached_ = 0, floodClosed_ = 0; // (markClosedPieces' stamps, the last dab's)
+    std::vector<uint32_t> floodWide_;
     // Move: per mirror its triangles and, per triangle, weight and direction of its coarse grid points.
     struct GrabMirror {
         glm::mat3 mirror{1.0f};

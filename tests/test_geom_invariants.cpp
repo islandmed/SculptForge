@@ -144,7 +144,7 @@ Promise promiseOf(BrushType t) {
     case BrushType::Smooth: p.rough = true, p.cleanEdge = false; break;
     case BrushType::Crease: p.dir = Dir::CutOnly; break;
     case BrushType::Vdm: p.cleanEdge = false, p.flips = false, p.reach = 1.45f, p.spacing = 1.0f; break; // (stamps, overhangs)
-    case BrushType::SnakeHook: // (pulls the region along the stroke: on arcs laid on the unmoved surface a crossing folds it, which no
+    case BrushType::Tendril: // (pulls the region along the stroke: on arcs laid on the unmoved surface a crossing folds it, which no
                                // artist stroke does: recorded strokes judge that, drag_brushes_replay_session)
         p.reach = 2.5f, p.flips = false, p.cleanEdge = false, p.folds = false; break;
     case BrushType::Nudge: case BrushType::KelvinSnake: case BrushType::Cloth:
@@ -363,8 +363,8 @@ void checkReplaySession() {
     for (const BrushRecipe& r : builtinBrushRecipes())
         if (r.name == "Palette Knife") knife = r;
     struct Step { const char* label; const BrushRecipe* recipe; BrushType type; const char* fixture; size_t allowed; };
-    const Step steps[] = {{"Tendril", nullptr, BrushType::SnakeHook, "tendril_cross", 250},
-                          {"Tendril", nullptr, BrushType::SnakeHook, "tendril_long", 4800},
+    const Step steps[] = {{"Tendril", nullptr, BrushType::Tendril, "tendril_cross", 250},
+                          {"Tendril", nullptr, BrushType::Tendril, "tendril_long", 4800},
                           {"Palette Knife", &knife, BrushType::Standard, "knife_cross_overlap", 50},
                           {"Nudge", nullptr, BrushType::Nudge, "nudge_cross", 50}};
     Document d = denseSphere();
@@ -670,7 +670,7 @@ size_t foldedPairs(const Mesh& m) {
         Document d = denseSphere();
         d.sculptor.dyntopo.enabled = true, d.sculptor.dyntopo.constantDetail = true, d.sculptor.dyntopo.detail = 0.5f;
         for (const char* fx : {"tendril_cross", "tendril_long"}) {
-            replayStrokes(d, nullptr, BrushType::SnakeHook, loadStrokeFixture(fx));
+            replayStrokes(d, nullptr, BrushType::Tendril, loadStrokeFixture(fx));
             const size_t folded = foldedPairs(d.mesh);
             std::printf("  dynamic topology %s: %zu triangles, %zu folded pairs\n", fx, d.mesh.triangleCount(), folded);
             expect(nonFinite(d.mesh) == 0, "Tendril: NaN in %s", fx);
@@ -683,7 +683,7 @@ size_t foldedPairs(const Mesh& m) {
             f.radius = 0.95f;
             Document d = denseSphere();
             const std::vector<glm::vec3> start = d.mesh.positions;
-            replayStrokes(d, nullptr, BrushType::SnakeHook, f);
+            replayStrokes(d, nullptr, BrushType::Tendril, f);
             const size_t folded = foldedFaces(start, d.mesh);
             std::printf("  Size 200 %s: moved %.4f, %zu triangles folded\n", fx, maxMove(start, d.mesh), folded);
             expect(folded == 0, "Tendril: %zu triangles folded at radius 0.95 in %s", folded, fx);

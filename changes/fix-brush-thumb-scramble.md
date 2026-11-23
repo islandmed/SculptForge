@@ -1,0 +1,7 @@
+---
+fixed: "**Brush thumbnails and alphas after picking a brush that carries its own alpha**: after you clicked a library or pack brush with its own alpha (Hard Cut, Flat Plane, Engrave...), each plain brush you clicked next for the first time (Clay, Clay Block, Sharp Crease, Inflate, Pinch...) took that alpha along, so its thumbnail turned into a scrambled alpha preview and it really stroked with the alpha. A brush's own alpha now stays with it; a brush starts plain. If a brush still shows an alpha you did not pick, **Brush > Reset Brush to Default** puts the shipped settings back."
+testers:
+  - "Any OS: click a library brush with its own alpha (Hard Cut or Flat Plane), then Clay, Clay Block, Sharp Crease, Inflate, Pinch, Flatten, Crease, Trim in the shelf: their thumbnails stay the same as at the start, and Clay strokes show no alpha texture."
+  - "Windows with a pen: same clicks with the pen, then a few strokes with Clay: plain strokes. Pick an alpha yourself on Standard, then click Clay: Clay still starts with that alpha (unchanged)."
+---
+Reviewers: App::syncBrushSettings (a first-use brush that follows a custom brush whose live alpha is the recipe's own starts with the shipped alpha and alpha options; App::alphaIsBrushsOwn). A session-picked alpha still carries to a first-use brush (tests/ui/brush_settings.sfui). Tests: tests/ui/brush_thumb_stable.sfui (every shelf brush plus Hard Cut and Flat Plane; ui test value brush_builtin_looks), brush_previews_do_not_change_after_other_brushes_render.

@@ -34,7 +34,7 @@ enum class BrushType {
     Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch,
     SharpCrease, // sharp V-crease with the sides pinched toward the stroke
     ClayBlock, // square-ish, flat-topped clay
-    SnakeHook,   // pulls the region along the stroke (strokeDelta), tapering
+    Tendril,     // pulls the region along the stroke (strokeDelta), tapering
     Trim,        // Plane Trim: a plane cuts away everything above it
     Layer,       // raises to one fixed height per stroke (overlaps never stack)
     Nudge,       // slides the surface sideways along the stroke
@@ -43,7 +43,7 @@ enum class BrushType {
     KelvinGrab,  // elastic move: drags the surface like clay, bulging with Squash (Poisson's ratio)
     KelvinTwist, // turns the surface around the view axis, fading smoothly
     KelvinScale, // pinches (or swells) the surface toward the centre
-    KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
+    KelvinSnake, // multi-scale elastic Tendril: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
@@ -73,7 +73,7 @@ struct DabParams {
     float pressure = 1.0f;              // tablet pressure, 0..1
     bool invert = false;
     bool frontFacesOnly = false;
-    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, SnakeHook, Nudge, Sharp Crease)
+    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, Tendril, Nudge, Sharp Crease)
     const BrushAlpha* alpha = nullptr;   // stamp shaping the falloff (null/empty = round)
     glm::vec3 alphaUp{0.0f, 1.0f, 0.0f}; // world direction of the alpha's top edge (screen up, or rotated)
     float focal = 0.0f;                  // classic Falloff, -1..1 (brushFalloff; alphaFalloff with an alpha)
@@ -90,6 +90,13 @@ struct DabParams {
     // on screen, so the brush reaches through the model along the view as a cylinder.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Contact facing: the surface under the cursor decides what moves. The falloff is measured along the surface (the
+    // Connected only flood's edge paths, Sculptor::keepFacing), so what the brush reaches only round a fold (the far wall
+    // of a narrow slot) stays put while the rim under the cursor follows smoothly; and each vertex's weight fades with the
+    // angle between its normal and the contact normal (the averaged normal right under the cursor): full up to half of
+    // `facingAngle` (degrees), none from `facingAngle` on (the back of a thin part). Not on Move (it grabs what it reaches).
+    bool contactFacing = false;
+    float facingAngle = 180.0f;
     // A stamp (Drag Stamp, Slide Stamp: one big dab per drag step) with an alpha also takes the visible surface under
     // its footprint on the view plane, which a surface curving away puts outside the dab's sphere (#174). Not on the
     // many-dab alpha brushes (Dots, Spray), which keep the sphere: a dab there is per-frame hot.
@@ -146,11 +153,24 @@ inline float brushDistance(const struct DabParams& p, const glm::vec3& x) {
 // Scratch for keepConnected (a stamp per vertex, so nothing is cleared between dabs).
 struct ConnectedScratch {
     std::vector<uint32_t> stamp, queue;
+    std::vector<float> dist; // (`surface`: per vertex, valid where stamped reached)
     uint32_t epoch = 0;
 };
 // Connected only: keeps the vertices of `verts` (in increasing order) that the vertex of `verts` nearest `seed`
-// reaches through edges between vertices of `verts`; the order stays.
-void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
+// reaches through edges between vertices of `verts`; the order stays. `surface` (Contact facing): also each kept
+// vertex's distance from `seed` along the surface (the flood's edge paths, each vertex relaxed from the neighbours
+// reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
+                   std::vector<float>* surface = nullptr);
+// Contact facing, right after keepConnected over `all` (its list before the call): stamps the vertices of `all` the
+// flood didn't reach that lie on a piece closed within `all` (none of its vertices has an edge leaving it: an eyeball
+// modelled on its own, inside the flood's sphere) with the returned value, which differs from `reached` (the flood's
+// stamp, returned too). The others it left (a piece running out of the sphere, maybe joined round a deep fold) keep
+// neither.
+struct PieceStamps {
+    uint32_t reached = 0, closed = 0;
+};
+PieceStamps markClosedPieces(const Mesh& mesh, std::span<const uint32_t> all, ConnectedScratch& scratch);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
 // (viewFalloff), then keepConnected from `center` (connectedOnly). `footprint` (an alpha stamp, #174): also the
 // surface facing the viewer under the stamp's footprint on the view plane, which a surface curving away reaches
@@ -162,6 +182,60 @@ void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, cons
 // falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
 // there is no surface there).
 glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, float focal = 0.0f);
+// Contact facing (DabParams::contactFacing): the contact normal, the falloff-weighted average normal of the region's
+// vertices within a quarter of `radius` of `center` that face within kContactCone of `hint` (the picked triangle's normal,
+// else against the view): it smooths the picked normal's noise, and neither the far wall of a narrow gap nor the rim a
+// cursor near it reaches tilts it. `hint` when none does.
+constexpr float kContactCone = 0.9f; // (cosine: 26 degrees)
+glm::vec3 contactNormal(const Mesh& mesh, std::span<const uint32_t> verts, const glm::vec3& center, float radius,
+                        const glm::vec3& hint);
+// The hint contactNormal starts from: the picked normal, else against the view.
+inline glm::vec3 contactHint(const DabParams& p) {
+    return glm::dot(p.pickNormal, p.pickNormal) > 1e-12f ? p.pickNormal : -p.viewDir;
+}
+// The weight of a vertex with normal `n` against the contact normal: 1 up to half of `angleDeg`, 0 from it on, a
+// smoothstep in the cosine between.
+// Contact facing's cut by the depth of the fold (the far wall of a slot, down one wall, across the floor and up the other):
+// the share of the falloff in space a vertex keeps from its `detour`, how much longer the way along the surface (the
+// flood's edge paths, less an edge or two of their zigzag near the centre: `edge`) is than the straight line, in brush
+// radii. Up to kDetourKeep radii all of it, none from kDetourCut on, a smoothstep between: a slot deeper than the brush
+// (detours from about 3.2 radii) keeps its far wall, while an eyeball under its lids (joined to them round the lid's
+// margin, detours up to about 2 radii on the starter head) moves with them, as without the option. One rule for every
+// vertex, so the cut has no border of its own.
+constexpr float kDetourKeep = 2.3f, kDetourCut = 3.1f;
+// (the flood that measures it, past the brush: what it doesn't reach lies more than 2 (kDetourFlood - 1) radii round)
+constexpr float kDetourFlood = 2.6f;
+// The detour in brush radii (the way along the surface less the straight line and an edge or two of the flood's zigzag).
+inline float detourRadii(float inSpace, float along, float edge, float radius) {
+    return std::max(0.0f, along - inSpace - 2.0f * edge) / radius;
+}
+inline float detourShare(float detour) {
+    const float t = std::clamp((detour - kDetourKeep) / (kDetourCut - kDetourKeep), 0.0f, 1.0f);
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
+// How much of the Facing angle's fade (facingWeight) a vertex takes, by its detour: none up to kGateKeep radii round (a
+// lid's inner skin, just round its margin from the outer one: faded, the margin stretches into a bright sliver), all
+// from kGateFull on (the back of a thin part, round its edge). With no detour known (a region past the flood's cap), all.
+constexpr float kGateKeep = 0.75f, kGateFull = 1.5f;
+inline float facingGate(float detour) {
+    const float t = std::clamp((detour - kGateKeep) / (kGateFull - kGateKeep), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+// A vertex's Contact facing weight from its facingWeight, its detour and the cosine of its normal against the contact
+// normal. Past kGateKeep radii round, surface turned away from the contact (across or against it: the far wall of a slot
+// less deep than kDetourKeep) is cut as well, all of it from 60 degrees on, none within 30: an eyeball under its lids
+// faces as they do and moves with them.
+inline float contactWeight(float facing, float detour, float cosine) {
+    const float t = std::clamp((cosine - 0.5f) / 0.366f, 0.0f, 1.0f);
+    const float turned = 1.0f - t * t * (3.0f - 2.0f * t);
+    return (1.0f - (1.0f - facing) * facingGate(detour)) * (1.0f - turned * facingGate(detour)) * detourShare(detour);
+}
+inline float facingWeight(const glm::vec3& n, const glm::vec3& contact, float angleDeg) {
+    const float a = glm::radians(std::clamp(angleDeg, 10.0f, 180.0f));
+    const float lo = std::cos(a), hi = std::cos(0.5f * a);
+    const float t = std::clamp((glm::dot(n, contact) - lo) / (hi - lo), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
 // The parameter s of the point point + s * dir (dir unit length) nearest the ray origin + t * rayDir: where a
 // cursor ray says a grab sliding along the line should be. False when the line is within `minSine` (the sine of
 // the angle between them) of parallel to the ray, so the cursor can't say where along it.
@@ -410,6 +484,13 @@ private:
     std::vector<uint32_t> crispStamp_; // (the stroke id's low 32 bits, as layerStamp_: 12 bytes a vertex in all)
     std::vector<float> crispDone_;
     std::vector<float> crispFacing_; // (the vertex normal's dot with the plane's, when the stroke found it)
+    // A pinching recipe: where each vertex stood when this stroke first reached it (pinchStamp_ = the stroke that wrote it), so the
+    // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
+    std::vector<uint32_t> pinchStamp_;
+    std::vector<glm::vec3> pinchStart_;
+    std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
+    std::vector<float> pinchTaper_;
+    uint32_t pinchDab_ = 0;
     std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
     std::vector<glm::vec3> crispMoved_;
     std::vector<uint32_t> crispSlideVerts_; // (its relax's)
@@ -468,7 +549,7 @@ private:
     // A micro level's mask as the base cage sees it. Moving a base vertex shifts the grid points of the triangles
     // around it (their corners) and, through the corners' normals, those of the ring beyond; so a base vertex is as
     // free as the freest grid point within two rings leaves it: 1 - the largest mask in the triangles touching it or
-    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Snake Hook, Vdm...) goes through
+    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Tendril, Vdm...) goes through
     // displaceAll, which scales by it: a fully masked grid point holds still, bit for bit. Computed on demand, kept
     // for the stroke (no stroke that moves vertices edits the mask).
     void cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts);
@@ -587,6 +668,14 @@ private:
     std::vector<glm::vec3> shrunk_;
     std::vector<std::pair<uint32_t, uint32_t>> shrunkIndex_;
     std::vector<float> weights_, influence_;
+    // Contact facing (DabParams::contactFacing): each of verts_'s weight (the angle gate times the falloff along the surface
+    // over the one in space, `reach` radii); keepFacing fills it and drops the vertices at 0.
+    std::vector<float> facing_, surface_;
+    std::vector<uint32_t> facingVerts_, wideVerts_; // (the floods' vertices; the wide one's, before it)
+    static constexpr size_t kSurfaceMax = size_t(1) << 21; // (the surface distance's flood: about 15 ms a dab there)
+    bool keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, float reach);
+    // ... on a micro level: copy `m`'s contact hint (contactHint) into `d` (kept for Forge Ink's replays) and the grid's stroke.
+    void microFacing(const DabParams& p, const SymCopy& m, MicroDab& d);
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;
     // Move brush: each mirror's vertices and weights (grabMirrors_: where each mirror's run ends, and its

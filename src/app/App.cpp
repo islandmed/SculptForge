@@ -1447,7 +1447,7 @@ int App::run() {
         // for a limited time, then look at the pointer again.
         // Continuous (#31): a pointer held still keeps dabbing where it is, 30 times a second.
         if (strokeContinuous_ && drag_ == Drag::Stroke && !firstDabPending_ && dabQueue_.empty() &&
-            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook && strokeType_ != StrokeType::DragRect &&
+            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril && strokeType_ != StrokeType::DragRect &&
             strokeType_ != StrokeType::DragDot) {
             const double nowS = double(SDL_GetTicksNS()) * 1e-9;
             if (nowS - strokeMovedAt_ > 0.05 && nowS - continuousDabAt_ > 1.0 / 30.0) {
@@ -2832,7 +2832,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
 // ---------------------------------------------------------------------------
 
 bool App::alongNormalBrush(BrushType t) const {
-    return t == BrushType::Move || t == BrushType::SnakeHook || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
+    return t == BrushType::Move || t == BrushType::Tendril || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
 }
 
 // Along the normal (from the discussions): with the invert key held as the stroke begins (Preferences > Input >
@@ -2980,8 +2980,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     lazyMouse_.reset(glm::vec2(x, y));
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        grabLast_ = hit.position; // the pulled tip (see tendrilTo)
         beginAlongNormal(hit, radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight()));
         return;
     }
@@ -3059,8 +3059,8 @@ void App::strokeTo(float x, float y) {
         kelvinTo(x, y);
         return;
     }
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        snakeHookTo(x, y);
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        tendrilTo(x, y);
         return;
     }
     if (steadyOn()) { // Steady Stroke, with every stroke type: the brush trails the pointer on a string
@@ -3301,6 +3301,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
     p.frontFacesOnly = st.frontFacesOnly;
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
+    p.contactFacing = st.contactFacing;
+    p.facingAngle = st.facingAngle;
     p.stampFootprint = stamp || benchStampFootprint_;
     p.focal = st.focal;
     if (!dabView_) { // (the solver's: when its batch is committed)
@@ -3786,6 +3788,14 @@ void App::syncScene() {
     renderer_.syncScene(scene);
     renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
                          splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
+    // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
+    // that paints nothing and no word why.
+    {
+        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
+        if (notShown && !textureNoticeShown_)
+            status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
+        textureNoticeShown_ = notShown;
+    }
     updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;

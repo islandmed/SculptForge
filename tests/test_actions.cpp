@@ -194,7 +194,7 @@ TEST(search_aliases_are_generic_words) {
     CHECK(brushFromName("SharpCrease", t) && t == BrushType::SharpCrease);
     CHECK(brushFromName("sharp crease", t) && t == BrushType::SharpCrease);
     CHECK(brushFromName("Clay Block", t) && t == BrushType::ClayBlock);
-    CHECK(brushFromName("snakehook", t) && t == BrushType::SnakeHook);
+    CHECK(brushFromName("tendril", t) && t == BrushType::Tendril);
     CHECK(!brushFromName("frobnicate", t));
 }
 

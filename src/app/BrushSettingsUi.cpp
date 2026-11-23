@@ -145,12 +145,33 @@ void App::syncBrushSettings() {
         return;
     }
     const bool firstUse = !brushSettings_.known(key);
-    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings());
+    const BrushToolSettings live = liveBrushSettings();
+    const bool leavingOwnAlpha = firstUse && alphaIsBrushsOwn(brushSettingsKey_, live);
+    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, live);
+    if (leavingOwnAlpha) { // a brush's own alpha stays with it: the next brush starts plain, thumbnail and strokes alike
+        const BrushToolSettings plain = BrushSettingsStore::shipped(key);
+        next.alphaName = plain.alphaName;
+        next.alphaPath = plain.alphaPath;
+        next.alphaInvert = plain.alphaInvert;
+        next.alphaOptions = plain.alphaOptions;
+    }
     if (firstUse) recipeAlpha(next); // a brush-pack brush starts with its own alpha (or none), not the last brush's
     if (firstUse) recipePenPressure(next);
     applyBrushSettings(next);
     brushSettingsKey_ = key;
     syncAlphaTile();
+}
+
+// True when `s`'s alpha is the one the custom brush under `key` brought with it (a library or pack brush's own), not one
+// picked for the session: that one must not spread to the next brush clicked.
+bool App::alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const {
+    if (key.rfind("custom:", 0) != 0 || !s.alphaPath.empty()) return false;
+    for (const BrushRecipe& r : doc_.brushes) {
+        if (brushSettingsKey("", r.name) != key) continue;
+        const bool own = !r.alpha.empty() ? lower(s.alphaName) == lower(r.alpha) : !r.origin.pack.empty();
+        return own && hasAlphaLook(s);
+    }
+    return false;
 }
 
 void App::recipeAlpha(BrushToolSettings& s) const {

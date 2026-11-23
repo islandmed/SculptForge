@@ -217,13 +217,16 @@ public:
     // The same with a material: every channel the brush has and the texture enables gets its value (BaseColor
     // only when `material.channels` has it), with the same falloff, coverage and undo.
     size_t dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const BrushMaterial& material, Symmetry sym);
-    // Smooth colour (Shift with the Paint brush): blends the colour texels under the brush toward the average of their
-    // neighbours by falloff x strength x pressure x (1 - mask), with symmetry, on the active layer (its coverage
-    // smooths too). "Neighbours" are the UV-island texels within the mesh's mean triangle edge in texels, so a stroke
-    // smears as far as the same stroke does on vertex colours, and across UV seams (a texel next to an island's border
-    // averages the colours of the surface that continues on the other side, found through the mesh). Each dab reads the texels as the last one left them,
+    // Smooth (Shift with the Paint brush): blends the texels under the brush toward the average of their neighbours
+    // by falloff x strength x pressure x (1 - mask), with symmetry, on the active layer (its coverage smooths too).
+    // Every channel the stroke was begun with smooths: Base Color and the material channels (Roughness, Metallic,
+    // Normal, Height, ...), so a stroke painted with several channels softens in all of them. "Neighbours" are the
+    // UV-island texels within the mesh's mean triangle edge in texels, so a stroke smears as far as the same stroke
+    // does on vertex colours, and across UV seams (a texel next to an island's border averages the texels of the
+    // surface that continues on the other side, found through the mesh; a Normal there is turned into this island's
+    // tangent frame first, and renormalised after the blend). Each dab reads the texels as the last one left them,
     // so a drag keeps smoothing.
-    // Touches no material channel and never the shape. Needs begin(mesh, channelBit(BaseColor)). Returns texels changed.
+    // Never the shape. Needs begin(mesh, channels). Returns texels changed.
     size_t smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym);
     // Ends the stroke: the touched tiles become `record.textureTiles` (nothing when no texel changed).
     void end(UndoRecord& record);
@@ -244,7 +247,8 @@ private:
         std::vector<uint32_t> stamp;   // last dab that wrote the texel
         std::array<ChannelTile, kChannelCount> channels; // [c] valid when the stroke paints channel c
         std::vector<uint32_t> pendingTexel; // smoothDab: the texels (in tile) the dab computed, written once all are
-        std::vector<uint32_t> pendingRgba;  // and their new values (RGBA bytes)
+        std::vector<uint32_t> pendingRgba;  // and their new values (RGBA bytes; unused when the stroke leaves Base Color alone)
+        std::array<std::vector<uint8_t>, kChannelCount> pendingChannel; // [c]: the same texels' new material values (texelBytes each)
     };
     // The images material channel c paints into (the target layer's or Base), null when the stroke doesn't paint c.
     TileImage* channelTarget(PaintTexture& tex, int c) const;
@@ -288,7 +292,7 @@ private:
     std::mutex tileMutex_;                          // guards making a tile
     uint32_t dab_ = 0;
     int smoothRadius_ = 0;                        // smoothDab: the largest blur radius in texels (0: not worked out yet this stroke)
-    std::vector<std::vector<float>> smoothBlur_; // smoothDab: per tile, the box-blurred colour sums of the dab
+    std::array<std::vector<std::vector<float>>, kChannelCount> smoothBlur_; // smoothDab: [channel][tile], the box-blurred sums of the dab (colour x alpha, alpha, count)
     uint64_t smoothKey_ = 0;                      // smoothDab: what the cached tile windows were built for (the radii)
     std::vector<uint8_t> smoothIslandK_;          // smoothDab: the blur's radius in texels per UV island (the same 3D reach on every chart)
     std::shared_ptr<const SmoothTopo> smoothTopo_; // smoothDab: the UV islands and the triangles around each vertex (cached by UV layout)

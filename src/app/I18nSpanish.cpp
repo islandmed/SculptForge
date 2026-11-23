@@ -2039,6 +2039,10 @@ constexpr Entry kSpanish[] = {
     {"Keep the plane the stroke starts on for the whole stroke.", "Mantiene el plano donde empieza el trazo durante todo el trazo."},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "Un borde de punta duro y limpio y un aplanado completo, para planos de superficie dura."},
     {"View falloff", "Ver atenuación"},
+    {"Contact facing", "Orientación de contacto"},
+    {"Facing angle %.0f", "Ángulo de orientación %.0f"},
+    {"The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.",
+     "La superficie bajo el cursor decide qué se mueve: la atenuación se mide a lo largo de la superficie, así que la pared opuesta de una ranura estrecha o el otro lado de un pliegue se quedan como están mientras el borde bajo el cursor sigue al pincel. Ángulo de orientación (180 al principio) también atenúa la superficie que mira hacia otro lado: fuerza completa hasta la mitad del ángulo, ninguna más allá. Las formas suaves se mueven igual que sin la opción. Mover y Agarrar siguen alcanzándolo todo. Se guarda con las preferencias y el proyecto."},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
      "smooth for the rest of the stroke.",
@@ -4726,6 +4730,8 @@ constexpr Entry kSpanish[] = {
      "Siguiente"},
     {"No UVs: Auto UV makes them",
      "Sin UV: Auto UV las crea"},
+    {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
+     "Este chip gráfico no puede mostrar la textura en un modelo tan denso. La pintura sigue yendo a la textura (verla en la vista UV o exportarla); reduce el número de triángulos para verla en el modelo."},
     {"No UVs: Tool > Texture Image > Auto UV",
      "Sin UV: Herramienta > Imagen de textura > Auto UV"},
     {"No alpha matches \"%s\"",

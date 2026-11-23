@@ -4,7 +4,7 @@
 // Kelvinlet brushes and Alpha / VDM from viewport in the app (core/Kelvinlet.h, core/ViewCapture.h):
 //   - KelvinGrab drags the grabbed point in the view plane, as Move does; KelvinTwist and KelvinScale act where
 //     the stroke began and a drag to the right turns clockwise / swells (to the left: back / pinches);
-//     KelvinSnake goes through snakeHookTo (PanelBrushes.cpp) and Detail Clone through the normal dabs.
+//     KelvinSnake goes through tendrilTo (PanelBrushes.cpp) and Detail Clone through the normal dabs.
 //   - Brush > Kelvinlet: Squash (Poisson's ratio), Sharpness, the Detail Clone spacing.
 //   - Capture from view (Ctrl+Alt+C): drag a square (or circle) over the model; a window shows the captured
 //     height alpha and VDM, their options, and Use / Save to library buttons.

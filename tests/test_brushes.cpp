@@ -1,7 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// v0.2 brushes (Sharp Crease, Clay Block, SnakeHook, Trim, Layer, Nudge),
+// v0.2 brushes (Sharp Crease, Clay Block, Tendril, Trim, Layer, Nudge),
 // alphas, stroke helpers (lazy mouse, spray, spacing) and brush_set_alpha.
 #include "TestHarness.h"
 
@@ -57,7 +57,7 @@ glm::vec3 moved(const Document& d, const std::vector<glm::vec3>& before, uint32_
 TEST(brush_names_cover_new_types) {
     CHECK(std::string(brushName(BrushType::SharpCrease)) == "SharpCrease");
     CHECK(std::string(brushName(BrushType::ClayBlock)) == "ClayBlock");
-    CHECK(std::string(brushName(BrushType::SnakeHook)) == "Tendril");
+    CHECK(std::string(brushName(BrushType::Tendril)) == "Tendril");
     CHECK(std::string(brushName(BrushType::Trim)) == "Trim");
     CHECK(std::string(brushName(BrushType::Layer)) == "Layer");
     CHECK(std::string(brushName(BrushType::Nudge)) == "Nudge");
@@ -153,12 +153,12 @@ TEST(clay_block_is_square_and_flat_topped) {
     CHECK(d.mesh.positions[nearest(d.mesh, glm::vec3(0.45f, 0, 0))].y == 0.0f);
 }
 
-TEST(snake_hook_pulls_and_tapers) {
+TEST(tendril_pulls_and_tapers) {
     Document d = planeDoc();
     const auto before = d.mesh.positions;
     DabParams p = dabAt(glm::vec3(0.0f));
     p.strokeDelta = glm::vec3(0, 0.05f, 0);
-    stroke(d, BrushType::SnakeHook, p);
+    stroke(d, BrushType::Tendril, p);
     const uint32_t c = nearest(d.mesh, glm::vec3(0)), side = nearest(d.mesh, glm::vec3(0.15f, 0, 0));
     CHECK(std::abs(moved(d, before, c).y - 0.05f) < 1e-4f); // the tip follows the stroke
     CHECK(moved(d, before, side).y > 0.0f && moved(d, before, side).y < 0.05f);
@@ -167,12 +167,12 @@ TEST(snake_hook_pulls_and_tapers) {
 
     // Re-centred on the tip every step (as the app does), it pulls out a horn.
     Document h = planeDoc();
-    h.sculptor.beginStroke(h.mesh, "SnakeHook");
+    h.sculptor.beginStroke(h.mesh, "Tendril");
     glm::vec3 tip(0.0f);
     for (int i = 0; i < 40; ++i) {
         DabParams s = dabAt(tip);
         s.strokeDelta = glm::vec3(0, 0.025f, 0);
-        h.sculptor.dab(h.mesh, h.bvh, BrushType::SnakeHook, s, kNoSymmetry);
+        h.sculptor.dab(h.mesh, h.bvh, BrushType::Tendril, s, kNoSymmetry);
         tip += s.strokeDelta;
     }
     h.undo.push(h.sculptor.endStroke());
@@ -288,7 +288,7 @@ TEST(nudge_slides_along_the_surface) {
 }
 
 TEST(new_brushes_respect_mask_and_symmetry) {
-    const BrushType types[] = {BrushType::SharpCrease, BrushType::ClayBlock, BrushType::SnakeHook,
+    const BrushType types[] = {BrushType::SharpCrease, BrushType::ClayBlock, BrushType::Tendril,
                                BrushType::Trim,        BrushType::Layer,       BrushType::Nudge};
     for (BrushType type : types) {
         DabParams p = dabAt(glm::vec3(0.5f, 0, 0), 0.3f, 1.0f);

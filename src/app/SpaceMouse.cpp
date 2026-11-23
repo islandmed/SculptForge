@@ -226,7 +226,7 @@ bool App::spaceMouseHeld() const {
 
 bool App::grabStroke() const {
     if (drag_ != Drag::Stroke || !strokeSculpt_ || strokeRecipe()) return false;
-    return strokeBrush_ == BrushType::Move || strokeBrush_ == BrushType::SnakeHook ||
+    return strokeBrush_ == BrushType::Move || strokeBrush_ == BrushType::Tendril ||
            strokeBrush_ == BrushType::KelvinSnake || (strokeBrush_ == BrushType::KelvinGrab && kelvinStrokeBrush());
 }
 
