@@ -182,20 +182,16 @@ private:
     bool seamVertex(uint32_t v) const;                              // its corners don't all have one UV
     bool seamEdge(uint32_t a, uint32_t b) const;                    // the triangles on it differ at an end
     void slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface
-    // The charts around v (its triangles grouped by their UV at v) and how far each one's UV at v moves when v
-    // moves by d along the surface: every triangle's own map of its plane to UV space, extended, averaged per chart.
-    struct UvChart {
-        glm::vec2 at{0.0f}, shift{0.0f};
-        int n = 0;
-    };
-    bool chartShifts(uint32_t v, const glm::vec3& d, UvChart* charts, int& count) const; // false: more than 4 charts
     // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
     // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
-    // A chart keep has no corner in (e.g. across a thin strip between two seams) gets drop's UV there moved to keep along
-    // that chart's surface (chartShifts) if that stays within a texel (the texture is padded a few texels beyond a chart);
-    // else, or for a vertex of more than four charts, false.
+    // Where keep has no UV for a triangle of drop's (a chart it has no corner in) the plan is false: moving drop's corner
+    // there would take it out of the paint, and errors of that kind add up over a long stroke.
     bool collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
                         std::vector<std::pair<uint32_t, glm::vec2>>& out) const;
+    // Whether merging drop into keep leaves each chart's outline where its paint is: a vertex on a chart's outline (a
+    // seam or an open edge) that is merged along it replaces two outline segments by one chord, which lies outside the
+    // chart where the outline bends in (the texture has nothing there). Refused when it moves the outline out.
+    bool outlineStaysInChart(uint32_t keep, uint32_t drop) const;
     void compact();
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4
