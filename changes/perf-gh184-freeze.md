@@ -28,3 +28,8 @@ dabs and MicroRenderer::sync keeps the GPU's old heights and step for it (resend
 no dabs (App::drainStrokeDabs, budgeted only). A quicker widen re-sends in its own frame as before. MicroStroke::widenAhead
 widens at a frame's start when two of the last dab's additions would pass the range; the undo copies rescale on the pool.
 Test: tests/ui/micro_widen_live_stroke.sfui (interactive strokes; micro_widen_deferrals, view_stale 0 once idle).
+Re-land for 0.13.13 (with fix/gh184-reshade-win, both reverted from 0.13.12): a stroke's own release no longer counts as a base
+moved outside a stroke (MicroMesh::strokeEnded, skipped by MicroFocus shadeAll and MicroRenderer's budget-0 rule; that whole-shade
+on a big Clay stroke's release doubled peak RAM at random on core-400m..800m with a 1-2 s stall); budget-0 shadePending runs in
+16k-patch slices and drops staging over two slices; App::wantsFrames counts Renderer::microShadingWantsFrame so a plain micro
+level's backlog drains with no input. Tests: micro_freeze_stroke_release_base_move_is_the_strokes, tests/ui/micro_shade_rest.sfui.
