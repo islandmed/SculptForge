@@ -38,3 +38,6 @@ MicroShader's partial sums, shadeStaging_ and the base-sized coarseShade_ copy s
 0.13.12). MicroFocus::shadeCoarse now shades in 16k-tile slices straight into slot-ordered staging (shadeLevel's prepare hook;
 coarseShade_ removed), sendPages is sliced the same way (a widen's re-send), and MicroShader/MicroFocus::trimScratch free big-batch
 scratch afterwards. Streamed lion undo/redo/move session peak 5385 -> 3146 MB (0.13.12: 3554).
+MicroRenderer::shadePending holds its staging through a budgeted catch-up (freed once the backlog is empty or after an unbudgeted sync;
+freed every drain frame it was allocated again each time) and slices the stale pass too: lucy-112m without Focus Detail (Windows' path),
+worst frame per 2 s after two 240 px strokes 84 84 91 62 62 -> 61 56 64 62 16 ms (0.13.12: 45 56 70 16 12).

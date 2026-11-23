@@ -722,14 +722,19 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
             if (!(w & bit)) w |= bit, ++staleCount_;
         }
     }
-    if (staging_.capacity() > kShadeSlice * S * 4 * 2) std::vector<uint8_t>().swap(staging_); // (no whole-level staging kept)
     if (const size_t room = shaded < limit ? limit - shaded : 0; !deferStale && staleCount_ && room) {
         seeds.clear();
         for (size_t w = 0; w < stale_.size() && seeds.size() < room; ++w)
             for (uint64_t bits = stale_[w] & ~pending_[w]; bits && seeds.size() < room; bits &= bits - 1)
                 seeds.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
-        if (!seeds.empty()) shaded += shadeSeeds(mesh, seeds, nullptr);
+        for (size_t at = 0; at < seeds.size(); at += kShadeSlice)
+            shaded += shadeSeeds(mesh, std::span<const uint32_t>(seeds).subspan(at, std::min(kShadeSlice, seeds.size() - at)), nullptr);
     }
+    // No whole-level staging kept, but held through a budgeted catch-up: freed once the backlog is empty or after an
+    // unbudgeted sync (freed on every frame of a drain, it was allocated again by the next: drain frames 60-90 ms vs 45-70
+    // in 0.13.12 on a 112M level, Windows' path).
+    if ((!shadeBudget || (!pendingCount_ && !staleCount_)) && staging_.capacity() > kShadeSlice * S * 4 * 2)
+        std::vector<uint8_t>().swap(staging_);
     if (shaded) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(shaded * S);
