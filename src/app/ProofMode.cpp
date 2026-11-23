@@ -1166,7 +1166,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 double f[MicroFocus::kParts] = {};
                 renderer_.takeFocusSplit(f);
                 ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
-                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->stats().lastPending));
+                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->lastPending()));
                 ph.pendingShade.push_back(double(renderer_.microPendingCoarse()));
                 for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
             }

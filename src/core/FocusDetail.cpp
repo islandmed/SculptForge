@@ -779,7 +779,9 @@ void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park) {
 }
 
 void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    brushWaiting_.fetch_add(1, std::memory_order_acq_rel); // (update() stops between batches and lets this in)
+    std::unique_lock<std::mutex> lock(mutex_);
+    brushWaiting_.fetch_sub(1, std::memory_order_acq_rel);
     std::vector<uint32_t> need;
     for (uint32_t t : tris) {
         if (t >= state_.size()) continue;
@@ -846,7 +848,18 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     const auto t0 = Clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size());
-    std::unique_lock<std::mutex> lock(mutex_);
+    // A brush's promotion (ensureFull on the stroke thread) holds or wants the lock: this frame doesn't wait for it
+    // (that wait was the 120 px stroke's 80-150 ms frames); the next frame goes on. At most kGiveWay frames in a row,
+    // then it waits (demotions keep a long stroke within the budget).
+    constexpr int kGiveWay = 4;
+    std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+    if (gaveWay_ < kGiveWay && (brushWaiting_.load(std::memory_order_acquire) > 0 || !lock.try_lock())) {
+        ++gaveWay_;
+        lastMs_.store(msSince(t0), std::memory_order_relaxed);
+        return;
+    }
+    if (!lock.owns_lock()) lock.lock();
+    gaveWay_ = 0;
     // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
     // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
     // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
@@ -873,6 +886,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         ++scored_.frames;
         ++stats_.skippedUpdates;
         stats_.lastUpdateMs = msSince(t0);
+        lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
         return;
     }
     // Still promoting what the last scoring wanted (a view after strokes: tens of thousands of tiles, a batch a
@@ -991,14 +1005,15 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         tileMs_ = tileMs_ > 0.0 ? 0.7 * tileMs_ + 0.3 * per : per;
         done += count;
         if (msSince(t0) > budgetMs) break;
-        lock.unlock(); // let a brush's ensureFull in between batches
-        lock.lock();
+        if (brushWaiting_.load(std::memory_order_acquire) > 0) break; // a brush's ensureFull goes first (demotions still run)
     }
     demoteFor(0);
     scored_ = {true, view, brush, mm.revision, fullTiles_, budgetBytes, fromQueue ? scored_.frames + 1 : 0, done == 0 && !scratch_.empty()};
     stats_.lastWanted = wanted;
     stats_.lastPending = scratch_.size() - done;
     stats_.lastUpdateMs = msSince(t0);
+    lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
+    lastPending_.store(stats_.lastPending, std::memory_order_relaxed);
 }
 
 FocusStats FocusDetail::stats() const {

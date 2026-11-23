@@ -118,7 +118,9 @@ public:
     // 0 = coarse (upsampled), 1 = full.
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
     FocusStats stats() const;
-    double lastUpdateMs() const { std::lock_guard<std::mutex> lock(mutex_); return stats_.lastUpdateMs; } // (stats() without its counts: per frame)
+    // stats().lastUpdateMs and lastPending without the lock (per frame: never waits on a brush's promotion)
+    double lastUpdateMs() const { return lastMs_.load(std::memory_order_relaxed); }
+    size_t lastPending() const { return lastPending_.load(std::memory_order_relaxed); }
     const std::string& path() const { return path_; }
     bool unsaved() const; // edits since the last save
 
@@ -188,6 +190,10 @@ private:
     std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
     std::vector<uint32_t> victims_; // (update: one frame's demotions)
     bool lruValid_ = false;
+    std::atomic<double> lastMs_{0.0};
+    std::atomic<size_t> lastPending_{0};
+    std::atomic<int> brushWaiting_{0}; // ensureFull callers waiting for the lock: update() gives way to them
+    int gaveWay_ = 0;      // (update, main thread: frames in a row it gave way to a brush)
     double tileMs_ = 0.0; // (update: a promoted tile's recent cost, sizing a frame's batches to its budget)
     // The mapped file
 #if defined(_WIN32)

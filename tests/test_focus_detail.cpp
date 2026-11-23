@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -491,9 +492,11 @@ TEST(focus_detail_brush_thread_and_frames_together) {
             std::vector<uint32_t> tiles;
             for (int i = 0; i < 8; ++i) tiles.push_back((k = k * 1664525u + 1013904223u) % mm.baseTriangles);
             fd->ensureFull(mm, tiles, false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1)); // (the dab's own work)
         }
     });
-    for (int f = 0; f < 60; ++f) {
+    // (frames give way to the brush's promotions a few at a time: until the budget demotes, while the brush runs)
+    for (int f = 0; f < 2000 && (f < 60 || fd->stats().demoted == 0); ++f) {
         FocusBrush b;
         b.present = true;
         b.position = glm::vec3(std::sin(float(f) * 0.2f), 0.1f, 0.8f);
