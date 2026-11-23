@@ -2,12 +2,50 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ThreadPool.h"
 
+#include <algorithm>
+#include <cerrno>
 #include <cstdlib>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <pthread.h>
+#include <sys/qos.h>
+#elif defined(__linux__)
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace sf {
 
 namespace {
 thread_local bool insidePoolJob = false;
+}
+
+LowerThreadPriority::LowerThreadPriority() {
+#if defined(_WIN32)
+    old_ = GetThreadPriority(GetCurrentThread());
+    set_ = old_ != THREAD_PRIORITY_ERROR_RETURN && SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+#elif defined(__APPLE__)
+    set_ = pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0) == 0; // (std::async: a thread of its own here)
+#elif defined(__linux__)
+    const id_t tid = static_cast<id_t>(syscall(SYS_gettid)); // (per thread on Linux: its own nice)
+    errno = 0;
+    old_ = getpriority(PRIO_PROCESS, tid);
+    set_ = errno == 0 && setpriority(PRIO_PROCESS, tid, std::min(old_ + 10, 19)) == 0;
+#endif
+}
+
+LowerThreadPriority::~LowerThreadPriority() {
+    if (!set_) return;
+#if defined(_WIN32)
+    SetThreadPriority(GetCurrentThread(), old_);
+#elif defined(__linux__)
+    setpriority(PRIO_PROCESS, static_cast<id_t>(syscall(SYS_gettid)), old_); // (may be refused unprivileged: harmless)
+#endif
 }
 
 ThreadPool::ThreadPool(int threads) {

@@ -854,8 +854,9 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
         if (focus_) {
             static const std::vector<uint64_t> none;
-            if (mm.allDirty || mm.rescaled) focus_->syncAll(mesh, *this);
+            if (mm.allDirty) focus_->syncAll(mesh, *this);
             else {
+                if (mm.rescaled) focus_->resendHeights(mesh, *this); // (the same surface: then this sync's tiles as usual)
                 focus_->cameraMoving = cameraMoving;
                 // Undo, redo, a Move and a base moved by anything but a stroke (a transform, its undo) show whole on this frame.
                 focus_->shadeAll = mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking);

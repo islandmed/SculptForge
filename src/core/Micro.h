@@ -38,8 +38,10 @@
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -357,8 +359,12 @@ public:
     // stride of the micro grid) and interpolated in between, so its evaluation cost doesn't grow with the micro
     // level. Off: every grid point (tests compare).
     static constexpr int kBrushSamples = 48;
+    // The brush plane samples coarser than every second grid point only while the brush still covers this many
+    // (tests set it huge: every second point).
+    float planeSamples = 7000.0f;
     bool adaptive = true;
     uint32_t lastStride = 1; // the stride the last dab used
+    uint32_t lastPlaneStride = 1; // ... and its brush plane
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
@@ -445,8 +451,28 @@ struct MicroUndo {
     bool tilesApplied = true; // (as `applied`, for the tiles' journal)
     bool swapWhole = false;
     std::shared_ptr<MicroMesh> whole;
+    // A stroke's journal still being packed on a background thread (MicroStroke::end: #184, ~0.5-1 s of the release
+    // frame on a few million tiles). `tris` and `keys` are final already; settle() waits for the rest and takes it
+    // (swapWith does, so an undo pressed at once is still exact).
+    struct Pack;
+    std::shared_ptr<Pack> pending;
+    void settle();
     void swapWith(Mesh& m);
-    size_t bytes() const;
+    size_t bytes() const; // (while packing: the unpacked size, an upper bound)
+};
+
+// MicroUndo::pending: what the background packing hands over (MicroUndo::settle).
+struct MicroUndo::Pack {
+    std::shared_future<void> done;
+    std::atomic<bool> hurry{false}; // (someone waits: no more pauses for strokes)
+    ~Pack() {
+        hurry = true;
+        if (done.valid()) done.wait(); // (the work writes into this: never freed under it)
+    }
+    bool journal = false;
+    std::vector<uint8_t> packed;
+    std::vector<int16_t> firsts, disp;
+    size_t rawBytes = 0; // the unpacked change (bytes() meanwhile)
 };
 
 // --- Undoable document operations ---

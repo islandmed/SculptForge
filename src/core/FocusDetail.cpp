@@ -716,7 +716,8 @@ void FocusDetail::rescale(MicroMesh& mm, int doublings) {
     }, 64);
     for (uint32_t t = 0; t < T; ++t)
         if (state_[t] != kCoarse) shareEdges(tris_, mm, t, [&](uint32_t u) { return state_[u] == kCoarse ? 1 : 0; });
-    mm.markAllDirty();
+    // (not markAllDirty: the same surface, re-rounded; widen's `rescaled` has the renderer re-send every tile's heights
+    // and keep the shading, MicroFocus::resendHeights. #184: all of it re-shaded, a 1-2 s frame on a 2.6M base.)
 }
 
 bool FocusDetail::unsaved() const {
@@ -752,6 +753,9 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     };
     const size_t maxFull = std::max<size_t>(budgetBytes / (size_t(samples_) * 2), 1);
     const bool inBudget = fullTiles_ <= maxFull; // (else demotions wait on frames)
+    // The view moving (an orbit): demotions wait for a frame at rest unless the full tiles reach twice the budget (#184:
+    // a batch a frame cost an orbit after a long stroke ~10% of its frame rate on the floor tier).
+    const bool viewMoving = scored_.valid && !sameView(scored_.view, view);
     const bool unchanged = scored_.valid && scored_.frames < kRescore && inBudget && !mm.stroking && scored_.revision == mm.revision &&
                            scored_.fullTiles == fullTiles_ && scored_.budgetBytes == budgetBytes && sameView(scored_.view, view) &&
                            sameBrush(scored_.brush, brush);
@@ -826,9 +830,12 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     // Demotion candidates: full tiles not wanted for kLinger frames, least recently wanted first (never a dirty
     // one while stroking: a dab on the solver thread may be writing it).
     constexpr uint32_t kLinger = 8;
+    constexpr size_t kDemoteBatch = 64;
+    size_t demoted = 0; // (this update's, over all the calls below)
     std::vector<uint32_t>& lru = lru_;
     auto demoteFor = [&](size_t room) {
         if (fullTiles_ + room <= maxFull) return true;
+        if (viewMoving && fullTiles_ + room <= 2 * maxFull) return false; // (before the list: it scans every tile)
         if (!lruValid_) {
             lruValid_ = true;
             lru.clear();
@@ -836,10 +843,13 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
         }
+        // Within the frame's budget (a long stroke leaves thousands of edited tiles over it, each compressed as it
+        // goes: #184, 1.6-2.8 s in one floor frame); the rest goes on the next frames (at least a batch a frame).
         while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
+            if (demoted >= kDemoteBatch && msSince(t0) > budgetMs) break;
             const uint32_t t = lru.back();
             lru.pop_back();
-            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t);
+            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t), ++demoted;
         }
         return fullTiles_ + room <= maxFull;
     };

@@ -224,6 +224,7 @@ TEST(micro_tiles_small_dab_writes_tiles_not_root_and_undoes) {
     UndoRecord r = fineStroke(doc);
     CHECK(r.micro != nullptr);
     CHECK(!r.micro->tileKeys.empty());
+    r.micro->settle(); // (the journal is packed off the release: #184)
     CHECK(r.micro->tris.empty() || r.micro->journal || !r.micro->disp.empty()); // (root tiles were saved by touch; their change is zero)
     const MicroMesh& mm = *doc.mesh.micro;
     CHECK(mm.tiles != nullptr);
@@ -1149,6 +1150,55 @@ TEST(micro_adaptive_brush_matches_full) {
     CHECK(watertight(b.mesh));
 }
 
+TEST(micro_big_plane_brush_invariant_coarse_plane_stride) {
+    // #184: a big brush's plane (Clay, Flatten, Trim) is found on fewer grid points (while thousands stay under the
+    // brush), a small one's on every second point as before. Overlapping dabs over a rough surface land where the
+    // every-second-point plane puts them (no wobble that could stack up), a small brush is bit-identical, and the
+    // brushes keep their promise on either plane: Clay only adds, Trim only cuts.
+    for (BrushType type : {BrushType::Clay, BrushType::Flatten, BrushType::Trim})
+        for (float r : {0.6f, 0.04f}) {
+            Document a = microDoc(5), b = microDoc(5);
+            Symmetry sym;
+            a.sculptor.microStroke().planeSamples = 1e30f; // (every second point)
+            std::vector<int16_t> start;
+            float startStep = 0.0f;
+            for (Document* d : {&a, &b}) {
+                microNoise(d->mesh, 0.002f, 60.0f, 7);
+                start = d->mesh.micro->disp;
+                startStep = d->mesh.micro->step;
+                d->sculptor.beginStroke(d->mesh, "Clay");
+                for (int i = 0; i < 6; ++i)
+                    d->sculptor.dab(d->mesh, d->bvh, type, dabAt(glm::normalize(glm::vec3(r * 0.4f * float(i - 3), 0.05f, 1.0f)), r, 0.8f), sym);
+                d->undo.push(d->sculptor.endStroke());
+            }
+            CHECK(a.sculptor.microStroke().lastPlaneStride == 2);
+            const MicroMesh &ma = *a.mesh.micro, &mb = *b.mesh.micro;
+            CHECK(ma.step == mb.step);
+            float change = 0.0f, diff = 0.0f;
+            for (size_t k = 0; k < ma.disp.size(); ++k) {
+                change = std::max(change, std::abs(float(ma.disp[k]) - float(start[k])));
+                diff = std::max(diff, std::abs(float(ma.disp[k]) - float(mb.disp[k])));
+            }
+            std::printf("  %s r %.2f: plane stride %u, largest change %.0f, largest difference %.0f (steps)\n", brushName(type), r,
+                        b.sculptor.microStroke().lastPlaneStride, change, diff);
+            CHECK(change > 0.0f);
+            CHECK(watertight(b.mesh));
+            if (mb.step == startStep && (type == BrushType::Clay || type == BrushType::Trim)) { // (a widen rescales the units)
+                size_t wrong = 0;
+                for (size_t k = 0; k < mb.disp.size(); ++k)
+                    wrong += type == BrushType::Clay ? mb.disp[k] < start[k] : mb.disp[k] > start[k];
+                CHECK(wrong == 0);
+            }
+            if (r < 0.1f) {
+                CHECK(b.sculptor.microStroke().lastPlaneStride == 2);
+                CHECK(ma.disp == mb.disp);
+            } else {
+                CHECK(b.sculptor.microStroke().lastPlaneStride > 2);
+                CHECK(diff <= change * 0.01f);
+            }
+        }
+}
+
 TEST(micro_undo_journal_is_small) {
     // A stroke's undo step is its change, packed per tile in Morton order: far below 2 bytes per touched point.
     Document doc = microDoc(4);
@@ -1158,6 +1208,8 @@ TEST(micro_undo_journal_is_small) {
     for (int i = 0; i < 10; ++i)
         doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, dabAt(glm::normalize(glm::vec3(0.03f * float(i), 0.1f, 1)), 0.15f), sym);
     UndoRecord r = doc.sculptor.endStroke();
+    CHECK(r.micro != nullptr);
+    if (r.micro) r.micro->settle(); // (the journal is packed off the release: #184)
     CHECK(r.micro && r.micro->journal);
     const size_t raw = r.micro->tris.size() * doc.mesh.micro->samples * 2;
     std::printf("  micro undo journal: %zu tiles, %.1f KB (whole tiles %.1f KB)\n", r.micro->tris.size(),
