@@ -69,14 +69,12 @@ ones give more room for detail.
 
 | Tier | For | What it adds |
 |---|---|---|
-| **Essential** | every computer SculptForge runs on | settings tuned for the machine; Focus Detail (Linux and macOS for now) keeps 512 MB of full-resolution detail close by |
+| **Essential** | every computer SculptForge runs on | settings tuned for the machine; Focus Detail keeps 512 MB of full-resolution detail close by |
 | **Standard** | 16 GB of memory, 6 or more threads and a 4 GB graphics card (or graphics that share the memory) | twice the Focus Detail memory, streamed in faster |
 | **High** | 32 GB, 8 or more threads and an 8 GB graphics card (or 32 GB shared, such as an Apple Pro or Max) | 2 GB of Focus Detail, 16K paint and bake textures |
 | **Extreme** | 64 GB, 16 or more threads and a 16 GB graphics card (or 64 GB shared) | 4 GB of Focus Detail, the most of everything |
 
 A graphics card or processor that measures slow keeps a lower tier, whatever its memory says.
-
-Focus Detail, and so its memory in the table, is on Linux and macOS for now.
 
 The first time SculptForge starts (and when you change the graphics card or the memory), a small card in the corner of
 the 3D view says what it found, for example *Your machine: RTX 3060, 12 GB VRAM, 32 GB RAM. Tier: High*, and what that
