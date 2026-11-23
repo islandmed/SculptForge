@@ -240,7 +240,7 @@ TEST(scatter_keep_apart_overfull_leaves_copies_out_never_overlapping) {
 
 TEST(scatter_keep_apart_10k_copies_timing) {
     // 10,000 small cubes over the sphere with keep apart, packed close enough that the start can't place them all
-    // apart and the relax has to make room: how long it takes (measured, printed for REPORT.md).
+    // apart and the relax has to make room: how long it takes (measured and printed).
     const vec3 half(0.0115f);
     ScatterSettings s = settings(10000);
     s.keepApart = true;

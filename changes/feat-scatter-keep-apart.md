@@ -17,4 +17,4 @@ testers:
 ---
 Keep apart: sphere or box (separating axis) pushes in the tangent plane, Jacobi passes in parallel, closest-point
 reprojection onto a BVH of only the allowed triangles, greedy removal of whatever still touches (the invariant holds
-by construction). Timings in REPORT.md.
+by construction).
