@@ -162,6 +162,10 @@ void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, cons
 // falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
 // there is no surface there).
 glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, float focal = 0.0f);
+// A Part's mean wall thickness (2 x volume / area) over its bounding-box diagonal: a few percent for a shell, a wing, an
+// Extract; about a third for a head. Trim protects the wall behind its skin on a Part under kTrimThinPart (infinity: no triangles).
+constexpr float kTrimThinPart = 0.08f;
+float partThinness(const Mesh& mesh);
 // The parameter s of the point point + s * dir (dir unit length) nearest the ray origin + t * rayDir: where a
 // cursor ray says a grab sliding along the line should be. False when the line is within `minSine` (the sine of
 // the angle between them) of parallel to the ray, so the cursor can't say where along it.
@@ -538,7 +542,7 @@ private:
     // A bit per vertex: recorded in record_'s positions / mask / colours (cleared from those lists).
     std::vector<uint64_t> touched_, masked_, colored_;
     uint64_t strokeId_ = 0;
-    // Trim on a thin Part (shell, wing, Extract sheet; Sculpt.cpp trimPartIsThin): decided once per stroke and mesh.
+    // Trim on a thin Part (shell, wing, Extract sheet; Sculpt.cpp partThinness): decided once per stroke and mesh.
     uint64_t thinStroke_ = ~uint64_t(0);
     const Mesh* thinMesh_ = nullptr;
     bool thinPart_ = false;

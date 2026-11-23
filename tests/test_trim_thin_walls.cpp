@@ -6,6 +6,7 @@
 // inner face, the underside) does not move, and nothing turns over. With and without Front faces only, at several sizes.
 #include "GeomInvariants.h"
 
+#include "core/Benchmark.h"
 #include "core/Primitives.h"
 
 #include <array>
@@ -238,4 +239,21 @@ TEST(trim_never_tears_a_closed_thin_wing) {
             CHECK(r.farMoved < 1e-6f);   // the underside is not Trim's to push
             CHECK(r.skinMoved > 0.0f);   // the top is still trimmed
         }
+}
+
+// What Trim treats as a thin Part (partThinness < kTrimThinPart): the shells and the wing, not a solid form; a head, a sphere and
+// a flattened-but-solid ellipsoid stay on the plain Trim path.
+TEST(trim_thin_part_is_told_from_a_solid) {
+    const float shellT = partThinness(shell(0.012f).fx.mesh), wingT = partThinness(wing(0.012f).fx.mesh);
+    const float sphereT = partThinness(denseSphereFixture().mesh), headT = partThinness(makeBenchHead(200000));
+    Mesh slab = makeIcosphere(6, 1.0f);
+    for (glm::vec3& p : slab.positions) p *= glm::vec3(1.4f, 0.4f, 1.0f); // (a thick lens: 0.8 of 2.8)
+    const float lensT = partThinness(slab);
+    std::printf("  thickness over size: shell %.4f, wing %.4f, sphere %.3f, head %.3f, lens %.3f (thin below %.2f)\n", double(shellT),
+                double(wingT), double(sphereT), double(headT), double(lensT), double(kTrimThinPart));
+    CHECK(shellT < kTrimThinPart);
+    CHECK(wingT < kTrimThinPart);
+    CHECK(sphereT > 2.0f * kTrimThinPart);
+    CHECK(headT > 2.0f * kTrimThinPart);
+    CHECK(lensT > kTrimThinPart);
 }

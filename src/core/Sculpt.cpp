@@ -1247,7 +1247,7 @@ static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
 // the far wall (no hole is left to see until it has crossed). Now only what faces the cut (the skin; the far wall and
 // an underside face away and keep still, over a short ramp so no edge forms where the facing turns) is trimmed, and
 // each vertex stops `kTrimKeep` of the brush radius short of the first surface below it along the cut: a wall thinner
-// than that is left as it is. Only on a thin Part (trimPartIsThin): a solid form, a head with its nostrils and lips, is
+// than that is left as it is. Only on a thin Part (partThinness): a solid form, a head with its nostrils and lips, is
 // trimmed flat as ever. The BVH is the one the previous dab refit, so the walls are where they were.
 static constexpr float kTrimKeep = 0.02f; // of the brush radius (Trim's own plane stands this far below the surface at full strength)
 // `normals[i]`: verts[i]'s normal, read before the dab (the adaptive path rewrites the normals as it goes).
@@ -1292,14 +1292,14 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
 // few percent of its size or less; a head's is a third of it. A Part-wide fact, decided once per stroke, so the dabs of a
 // stroke never change their mind: what a local test (a wall behind the skin, air behind the wall) could not give, as the lids
 // and lips of a head are thin walls too, and a closed shell has surface behind its far wall.
-static constexpr float kTrimThinPart = 0.08f; // of the Part's bounding-box diagonal
-static bool trimPartIsThin(const Mesh& mesh) {
+float partThinness(const Mesh& mesh) {
     const size_t tris = mesh.triangles.size();
-    if (tris < 8 || mesh.positions.empty()) return false;
+    const float none = std::numeric_limits<float>::infinity();
+    if (tris < 8 || mesh.positions.empty()) return none;
     const AABB box = mesh.bounds();
     const glm::vec3 o = 0.5f * (box.min + box.max), ext = box.max - box.min;
     const double diag = double(glm::length(ext));
-    if (diag <= 0.0) return false;
+    if (diag <= 0.0) return none;
     constexpr size_t kBlock = 8192;
     std::vector<std::pair<double, double>> parts((tris + kBlock - 1) / kBlock, {0.0, 0.0}); // (6 x volume, 2 x area)
     poolFor(tris, [&](size_t b, size_t e) {
@@ -1314,8 +1314,8 @@ static bool trimPartIsThin(const Mesh& mesh) {
     }, kBlock);
     double v6 = 0.0, a2 = 0.0;
     for (const auto& p : parts) v6 += p.first, a2 += p.second;
-    if (a2 <= 0.0) return false;
-    return std::abs(v6 / 6.0) * 4.0 / a2 < double(kTrimThinPart) * diag; // 2 V / A, A = a2 / 2
+    if (a2 <= 0.0) return none;
+    return float(std::abs(v6 / 6.0) * 4.0 / a2 / diag); // 2 V / A, A = a2 / 2
 }
 
 void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p) {
@@ -1342,7 +1342,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     bool trimSheet = false;
     if (type == BrushType::Trim && !p.invert) {
         if (thinStroke_ != strokeId_ || thinMesh_ != &mesh) {
-            thinPart_ = trimPartIsThin(mesh);
+            thinPart_ = partThinness(mesh) < kTrimThinPart;
             thinStroke_ = strokeId_, thinMesh_ = &mesh;
         }
         trimSheet = thinPart_;
