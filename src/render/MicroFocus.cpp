@@ -168,24 +168,45 @@ void MicroFocus::shadeCoarse(const Mesh& mesh, MicroRenderer& r, const std::vect
         return;
     }
     if (tris.empty()) return;
-    // (into a copy indexed by base triangle, then gathered in slot order and sent in runs)
-    if (coarseShade_.size() != size_t(r.baseTriangles_) * CS) coarseShade_.assign(size_t(r.baseTriangles_) * CS, 0);
-    shader_.shadeLevel(mesh, coarse_, tris, false, written_, [&](uint32_t t) -> uint32_t* { return coarseShade_.data() + size_t(t) * CS; },
-                       true);
-    std::vector<uint32_t> sorted(written_);
-    std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf[a] < slotOf[b]; });
-    shadeStaging_.resize(sorted.size() * CS);
-    for (size_t i = 0; i < sorted.size(); ++i) std::memcpy(shadeStaging_.data() + i * CS, coarseShade_.data() + size_t(sorted[i]) * CS, CS * 4);
-    if (!sorted.empty()) r.upload_.stage(shadeStaging_.data(), sorted.size() * CS * 4);
-    for (size_t i = 0; i < sorted.size();) {
-        const uint32_t s0 = slotOf[sorted[i]], chunk = s0 / r.chunkSlots_;
-        size_t j = i + 1;
-        while (j < sorted.size() && slotOf[sorted[j]] == slotOf[sorted[j - 1]] + 1 && slotOf[sorted[j]] / r.chunkSlots_ == chunk) ++j;
-        const MicroRenderer::Chunk& c = r.chunks_[chunk];
-        r.upload_.copy(c.shade, i * CS * 4, size_t(s0 - c.firstSlot) * CS * 4, (j - i) * CS * 4);
-        i = j;
+    // In slices, each written straight into its staging in slot order (the shader's prepare sees the tiles first) and
+    // sent in runs. A whole-queue batch (Undo, Redo, Move under shadeAll) at once kept a base-sized scatter copy, the
+    // batch's staging and ~1 GB of the shader's edge sums on a streamed 2.6M base (+1.9 GB over 0.13.12).
+    constexpr size_t kSlice = 16384;
+    std::vector<uint32_t>& index = r.stageIndex_;
+    if (index.size() != r.baseTriangles_) index.assign(r.baseTriangles_, 0);
+    std::vector<uint32_t> sorted;
+    for (size_t at = 0; at < tris.size(); at += kSlice) {
+        const std::span<const uint32_t> slice = std::span<const uint32_t>(tris).subspan(at, std::min(kSlice, tris.size() - at));
+        sorted.clear();
+        shader_.shadeLevel(mesh, coarse_, slice, false, written_,
+                           [&](uint32_t t) -> uint32_t* { return shadeStaging_.data() + size_t(index[t]) * CS; }, true,
+                           [&](std::span<const uint32_t> set) {
+                               sorted.assign(set.begin(), set.end());
+                               std::sort(sorted.begin(), sorted.end(), [&](uint32_t a, uint32_t b) { return slotOf[a] < slotOf[b]; });
+                               for (size_t i = 0; i < sorted.size(); ++i) index[sorted[i]] = uint32_t(i);
+                               shadeStaging_.resize(sorted.size() * CS);
+                           });
+        if (sorted.empty()) continue;
+        r.upload_.stage(shadeStaging_.data(), sorted.size() * CS * 4);
+        for (size_t i = 0; i < sorted.size();) {
+            const uint32_t s0 = slotOf[sorted[i]], chunk = s0 / r.chunkSlots_;
+            size_t j = i + 1;
+            while (j < sorted.size() && slotOf[sorted[j]] == slotOf[sorted[j - 1]] + 1 && slotOf[sorted[j]] / r.chunkSlots_ == chunk) ++j;
+            const MicroRenderer::Chunk& c = r.chunks_[chunk];
+            r.upload_.copy(c.shade, i * CS * 4, size_t(s0 - c.firstSlot) * CS * 4, (j - i) * CS * 4);
+            i = j;
+        }
     }
     BufferUpload::done();
+    trimScratch(kSlice);
+}
+
+// Gives back what one big batch left at its size (the next big one takes it again; slices stay small).
+void MicroFocus::trimScratch(size_t slice) {
+    const size_t keep = slice * 8 * std::max<size_t>(samples_, coarseSamples_) * 4;
+    if (shadeStaging_.capacity() * 4 > keep) std::vector<uint32_t>().swap(shadeStaging_);
+    if (staging_.capacity() * 2 > keep) std::vector<int16_t>().swap(staging_);
+    shader_.trimScratch(keep);
 }
 
 bool MicroFocus::growPool(uint32_t want) {
@@ -250,18 +271,25 @@ void MicroFocus::sendPages(const MicroMesh& mm, MicroRenderer& r, const std::vec
     for (uint32_t s : slots)
         if (page_[s]) list.push_back({(page_[s] & ~kShaded) - 1, s});
     std::sort(list.begin(), list.end());
-    staging_.resize(list.size() * S);
-    poolFor(list.size(), [&](size_t b, size_t e) {
-        for (size_t k = b; k < e; ++k) std::memcpy(staging_.data() + k * S, mm.disp.data() + size_t(r.order_[list[k].second]) * S, S * 2);
-    }, 64);
-    if (!list.empty()) r.upload_.stage(staging_.data(), list.size() * S * 2);
-    for (size_t i = 0; i < list.size();) {
-        size_t j = i + 1;
-        while (j < list.size() && list[j].first == list[j - 1].first + 1) ++j;
-        r.upload_.copy(poolDisp_, i * S * 2, size_t(list[i].first) * S * 2, (j - i) * S * 2);
-        i = j;
+    // In slices: a widen re-sends every resident page (resendHeights), which staged the whole pool at once.
+    constexpr size_t kSlice = 16384;
+    for (size_t at = 0; at < list.size(); at += kSlice) {
+        const size_t count = std::min(kSlice, list.size() - at);
+        staging_.resize(count * S);
+        poolFor(count, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k)
+                std::memcpy(staging_.data() + k * S, mm.disp.data() + size_t(r.order_[list[at + k].second]) * S, S * 2);
+        }, 64);
+        r.upload_.stage(staging_.data(), count * S * 2);
+        for (size_t i = 0; i < count;) {
+            size_t j = i + 1;
+            while (j < count && list[at + j].first == list[at + j - 1].first + 1) ++j;
+            r.upload_.copy(poolDisp_, i * S * 2, size_t(list[at + i].first) * S * 2, (j - i) * S * 2);
+            i = j;
+        }
     }
     BufferUpload::done();
+    trimScratch(kSlice);
 }
 
 // Full shading for the pages waiting for it, up to `budgetPoints` grid points.
@@ -307,6 +335,7 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     pendingShade_.clear();
     pendingCoarse_.clear(); // (shadeCoarse(all) below shades every tile)
     coarseHead_ = 0;
+    sweepNext_ = sweepEnd_ = 0;
     coarseQueued_.assign(r.baseTriangles_, 0);
     buildCoarse(mesh, mm, {});
     std::vector<uint32_t> none;
@@ -322,6 +351,20 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     bytes_ += size_t(slots_) * 4;
     pageTableDirty_ = false;
+    lap(kSyncAll);
+}
+
+void MicroFocus::resendHeights(const Mesh& mesh, MicroRenderer& r) {
+    const MicroMesh& mm = *mesh.micro;
+    Lap lap{splitMs_};
+    buildCoarse(mesh, mm, {});
+    std::vector<uint32_t> held;
+    writeRecords(mm, r, held, true);
+    for (uint32_t s = 0; s < slots_; ++s)
+        if (page_[s]) held.push_back(s);
+    sendPages(mm, r, held);
+    pendingShade_.insert(pendingShade_.end(), held.begin(), held.end());
+    sweepNext_ = 0, sweepEnd_ = r.baseTriangles_;
     lap(kSyncAll);
 }
 
@@ -364,18 +407,30 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         for (uint32_t t : reshade)
             if (!coarseQueued_[t]) coarseQueued_[t] = 1, pendingCoarse_.push_back(t);
     }
-    if (pendingCoarse() > 0) {
+    if (queuedCoarse() > 0) {
         // While a stroke runs: strokeShadeMs of it, then the rest on the next frames (a tile under the brush is queued once
         // however many frames change it). While the view or the camera moves a tenth of that (an orbit after a stroke isn't slowed by the
         // catch-up), at rest the same as while stroking (a rest frame stays near 30 fps), until the queue is empty.
         const TierConfig& tc = currentTierConfig();
-        const size_t take = coarseShadeBatch(pendingCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
+        const size_t take = shadeAll ? queuedCoarse() // (not the sweep: that runs only once the queue is empty)
+                                     : coarseShadeBatch(queuedCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
         std::vector<uint32_t> batch(pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_ + take));
         for (uint32_t t : batch) coarseQueued_[t] = 0;
         coarseHead_ += take;
         if (coarseHead_ == pendingCoarse_.size()) pendingCoarse_.clear(), coarseHead_ = 0;
         else if (coarseHead_ > (size_t(1) << 16) && coarseHead_ * 2 > pendingCoarse_.size())
             pendingCoarse_.erase(pendingCoarse_.begin(), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_)), coarseHead_ = 0;
+        const auto started = std::chrono::steady_clock::now();
+        shadeCoarse(mesh, r, batch, false);
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(batch.size());
+        coarseNsPerTile_ = coarseNsPerTile_ > 0.0 ? coarseNsPerTile_ * 0.7 + ns * 0.3 : ns;
+    } else if (sweepNext_ < sweepEnd_ && !stroking) {
+        const TierConfig& tc = currentTierConfig();
+        const size_t take = coarseShadeBatch(sweepEnd_ - sweepNext_, std::max(tc.strokeShadeMs, 2.0) * (viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
+        std::vector<uint32_t> batch(take);
+        for (size_t i = 0; i < take; ++i) batch[i] = sweepNext_ + uint32_t(i);
+        sweepNext_ += uint32_t(take);
+        if (sweepNext_ >= sweepEnd_) sweepNext_ = sweepEnd_ = 0;
         const auto started = std::chrono::steady_clock::now();
         shadeCoarse(mesh, r, batch, false);
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(batch.size());

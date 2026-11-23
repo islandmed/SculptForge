@@ -71,9 +71,18 @@ ImTextureID App::brushThumbnail(int brushType) {
     return thumbs_.brush(brushType, has ? &look : nullptr);
 }
 
+// True when `s` is just the look the recipe itself has (its own alpha and turn, the Dots stroke, no tiling): its thumbnail
+// is then the recipe's own preview, the same before and after the brush is picked.
+static bool recipesOwnLook(const BrushRecipe& r, const BrushToolSettings& s) {
+    const AlphaOptions& o = s.alphaOptions;
+    return s.alphaPath.empty() && !s.alphaInvert && s.stroke == StrokeType::Dots &&
+           lower(s.alphaName) == lower(r.alpha.empty() ? std::string("Round") : r.alpha) && o.followStroke == r.alphaFollow &&
+           o.angle == r.alphaAngle && o.tileX == 1 && o.tileY == 1;
+}
+
 ImTextureID App::recipeThumbnail(const BrushRecipe& recipe) {
     BrushToolSettings look;
-    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
     return thumbs_.recipe(recipe, has ? &look : nullptr);
 }
 
@@ -86,7 +95,7 @@ void App::regenerateBrushThumbnail(int brushType) {
 
 void App::regenerateRecipeThumbnail(const BrushRecipe& recipe) {
     BrushToolSettings look;
-    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look);
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
     thumbs_.regenerateRecipe(recipe, has ? &look : nullptr);
 }
 

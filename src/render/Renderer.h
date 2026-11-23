@@ -313,11 +313,13 @@ public:
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
     size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
+    size_t microWidenDeferrals() const; // (MicroRenderer::widenDeferrals, all slots)
     size_t microPendingPages() const;  // (MicroRenderer::pendingPages, all slots)
     // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
     size_t microTilePages() const;
     size_t microTilePageBytes() const;
     bool microTilePagesWantFrame() const; // (MicroTilePages::wantsFrame: one more frame pages what came into view)
+    bool microShadingWantsFrame() const;  // a shown micro level's shading still drains over frames (MicroRenderer::pendingShading)
     // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
     void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
