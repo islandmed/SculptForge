@@ -2726,9 +2726,13 @@ void Sculptor::beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym)
         brushRegion(mesh, bvh, c, view, p.radius, p.connectedOnly, p.viewFalloff, verts_, connected_);
         const std::span<const glm::vec3> nrm = mesh.normals;
         for (uint32_t v : verts_) {
-            if (p.frontFacesOnly && glm::dot(nrm[v], view) > 0.0f) continue; // (facing away: as dabSingle skips it)
+            float k = 1.0f; // (Front faces only: facing away stays, near the silhouette it eases in: a hard cut tore the surface)
+            if (p.frontFacesOnly) {
+                k = grabFrontWeight(-glm::dot(nrm[v], view) / std::max(glm::length(view), 1e-12f));
+                if (k <= 0.0f) continue;
+            }
             float w = brushFalloff(brushDistance(mesh.positions[v], c, view, p.viewFalloff), p.radius, p.focal) *
-                      std::clamp(p.strength * 2.0f, 0.0f, 1.0f);
+                      std::clamp(p.strength * 2.0f, 0.0f, 1.0f) * k;
             if (w <= 0.0f) continue;
             grabVerts_.push_back(v);
             grabWeights_.push_back(w);

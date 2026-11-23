@@ -1099,8 +1099,12 @@ void MicroStroke::beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, fl
                     const glm::vec3 p = sp + nn * (float(g[MicroMesh::index(i, j, n)]) * mm.step);
                     const float d = glm::distance(p, center);
                     if (d >= radius) continue;
-                    if (frontOnly && glm::dot(nn, view) > 0.0f) continue; // (facing away: stays, as dabSingle skips it)
-                    w[c] = brushFalloff(d, radius, focal);
+                    float k = 1.0f;
+                    if (frontOnly) { // (facing away: stays; near the silhouette it eases in)
+                        k = grabFrontWeight(-glm::dot(nn, view) / std::max(glm::length(view), 1e-12f));
+                        if (k <= 0.0f) continue;
+                    }
+                    w[c] = brushFalloff(d, radius, focal) * k;
                     nrm[c] = nn;
                     used[k] = 1;
                 }

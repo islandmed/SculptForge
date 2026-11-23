@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Move with Front faces only (a user report, 0.13.12: Move under View falloff dragged the far side of a one-piece head,
-// and Connected only can't help there). The invariant: with Front faces only on, no vertex (no micro sample) whose
-// normal faces away from the view moves; the rest of the grab is what it was without it, bit for bit; off, the far
-// side goes with it under View falloff (the guide's "through the model": a zero above is the gate, not a missed stroke).
+// and Connected only can't help there). The invariants: with Front faces only on, no vertex (no micro sample) whose
+// normal faces away from the view moves; the surface facing the camera squarely is the grab it was without it, bit for
+// bit; the stretch between (the fade, grabFrontWeight) turns no triangle over: a hard cut at the silhouette tore the
+// surface into a seam (artist-qa 11-23); off, the far side goes with it under View falloff (the guide's "through the
+// model": a zero above is the gate, not a missed stroke).
 #include "GeomInvariants.h"
 #include "TestHarness.h"
 
@@ -32,10 +34,10 @@ DabParams grabAt(const glm::vec3& c, float radius, bool frontOnly, bool viewFall
     return p;
 }
 
-void drag(Document& d, const DabParams& p, const Symmetry& sym) {
+void drag(Document& d, const DabParams& p, const Symmetry& sym, const glm::vec3& step = glm::vec3(0.03f, 0.01f, 0.02f)) {
     CHECK(d.sculptor.beginStroke(d.mesh, "Move"));
     d.sculptor.beginGrab(d.mesh, d.bvh, p, sym);
-    for (int i = 0; i < 5; ++i) d.sculptor.grab(d.mesh, d.bvh, glm::vec3(0.03f, 0.01f, 0.02f));
+    for (int i = 0; i < 5; ++i) d.sculptor.grab(d.mesh, d.bvh, step);
     d.undo.push(d.sculptor.endStroke());
 }
 
@@ -64,7 +66,8 @@ TEST(move_front_faces_only_leaves_back_facing_vertices_alone) {
                 backOn += movedOn;
             } else {
                 frontOn += movedOn;
-                frontDiffers += on.mesh.positions[v] != off.mesh.positions[v];
+                // (squarely facing: the same grab bit for bit; the stretch near the silhouette eases in)
+                if (-glm::dot(nrm[v], kView) >= kGrabFrontFull) frontDiffers += on.mesh.positions[v] != off.mesh.positions[v];
             }
         }
         std::printf("  Move, View falloff%s: back-facing vertices moved %zu off / %zu on; front moved %zu, differs %zu\n",
@@ -73,6 +76,38 @@ TEST(move_front_faces_only_leaves_back_facing_vertices_alone) {
         CHECK(backOn == 0);
         CHECK(frontOn > 100);
         CHECK(frontDiffers == 0); // (the near side is the same grab, bit for bit)
+    }
+}
+
+namespace {
+size_t turnedOver(const Mesh& before, const Mesh& after) {
+    size_t n = 0;
+    for (size_t t = 0; t < before.triangles.size(); ++t) {
+        const glm::uvec3 f = before.triangles[t];
+        const glm::vec3 a = glm::cross(before.positions[f.y] - before.positions[f.x], before.positions[f.z] - before.positions[f.x]);
+        const glm::vec3 b = glm::cross(after.positions[f.y] - after.positions[f.x], after.positions[f.z] - after.positions[f.x]);
+        n += glm::dot(a, b) < 0.0f;
+    }
+    return n;
+}
+} // namespace
+
+TEST(move_front_faces_only_tears_nothing_at_the_silhouette) {
+    // A long drag across the edge of the sphere with the brush reaching round it: the near side moves, the far side stays,
+    // and the surface between folds over nowhere (the hard cut turned hundreds of triangles over here).
+    for (bool viewFalloff : {false, true}) {
+        Document d = makeDoc(makeIcosphere(6, 1.0f));
+        const Mesh start = d.mesh;
+        const glm::vec3 c = glm::normalize(glm::vec3(0.8f, 0.0f, 0.6f)); // near the right-hand silhouette
+        drag(d, grabAt(c, 0.7f, true, viewFalloff), Symmetry{false, false, false}, glm::vec3(0.06f, 0.02f, 0.0f));
+        const size_t folded = turnedOver(start, d.mesh);
+        size_t backMoved = 0;
+        for (size_t v = 0; v < start.positions.size(); ++v)
+            backMoved += glm::dot(start.normals[v], kView) > 0.0f && d.mesh.positions[v] != start.positions[v];
+        std::printf("  Move, Front faces only%s across the silhouette: %zu triangles turned over, %zu back-facing moved\n",
+                    viewFalloff ? ", View falloff" : "", folded, backMoved);
+        CHECK(backMoved == 0);
+        CHECK(folded == 0);
     }
 }
 
@@ -122,7 +157,7 @@ TEST(move_front_faces_only_holds_on_a_micro_level) {
         size_t frontDiffers = 0;
         CHECK(offPts.size() == onPts.size());
         for (size_t i = 0; i < offPts.size() && i < onPts.size(); ++i)
-            if (glm::normalize(offPts[i]).z > 0.3f && offPts[i] != onPts[i]) ++frontDiffers;
+            if (glm::normalize(offPts[i]).z > 0.8f && offPts[i] != onPts[i]) ++frontDiffers;
         std::printf("  Micro Move (%s): back samples moved %zu off / %zu on; front moved %zu, differs %zu\n",
                     alongNormals ? "along normals" : "cage", off.back, on.back, on.front, frontDiffers);
         CHECK(off.back > 0);

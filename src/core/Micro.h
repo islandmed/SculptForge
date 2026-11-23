@@ -50,6 +50,16 @@
 
 namespace sf {
 
+// Front faces only for a grab (Move): the share of its weight a point keeps by how squarely its normal faces the camera
+// (`facing` = -dot(normal, view), 1 = straight at it, 0 = edge on). None from the silhouette on, all from kGrabFrontFull
+// in, smooth between: a hard cut left the surface just inside the silhouette moving at full weight beside surface that
+// stayed, and the drag tore it into a seam (artist-qa 11-23).
+constexpr float kGrabFrontFull = 0.6f;
+inline float grabFrontWeight(float facing) {
+    const float t = facing <= 0.0f ? 0.0f : facing >= kGrabFrontFull ? 1.0f : facing / kGrabFrontFull;
+    return t * t * (3.0f - 2.0f * t);
+}
+
 class BVH;
 class CommandRegistry;
 class MicroHistory;
@@ -344,7 +354,8 @@ public:
     // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
     // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
-    // `frontOnly`: grid points whose surface normal faces away from `view` (into the scene) keep weight 0 (Front faces only).
+    // `frontOnly`: grid points whose surface normal faces away from `view` (into the scene) keep weight 0 and those near the
+    // silhouette fade in (grabFrontWeight, Front faces only).
     void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror,
                    const glm::vec3& view = glm::vec3(0.0f, 0.0f, -1.0f), bool frontOnly = false);
     void grab(Mesh& m, const glm::vec3& delta);
