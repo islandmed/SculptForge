@@ -64,7 +64,6 @@
 #include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
-#include "render/MicroFocus.h"
 #include "core/Utf8Path.h"
 
 #include <imgui.h>
@@ -115,7 +114,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;sfdetail;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -782,6 +781,11 @@ int App::runUiTest(int w, int h, int fps) {
             return 1;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
+        for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
+            syncScene();
+            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        }
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
@@ -1084,7 +1088,8 @@ bool App::wantsFrames(double now) const {
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
            renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
            renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
-           renderer_.microPendingCoarse() > 0; // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microPendingCoarse() > 0 || // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microPendingPages() > 0; // a streamed level's pages still wait to be shaded (the fine detail on open)
 }
 
 uint64_t App::frameKey() const {
@@ -1613,24 +1618,10 @@ int App::run() {
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
-        if (phases == 7 && frameLogMs >= 0.0) {
-            // A streamed Micro level (Focus Detail) adds its main-thread parts and the coarse shading still waiting (#184's
-            // freeze: SF_FRAME_LOG=100 for the reporter's log). (Taken every frame, so a slow frame shows its own; not while
-            // Help > Benchmark runs, which takes them itself.)
-            double f[MicroFocus::kParts] = {};
-            const bool focus = !proof_ && doc_.mesh.micro && doc_.mesh.micro->focus;
-            if (focus) renderer_.takeFocusSplit(f);
-            if (phase[6] - phase[0] > frameLogMs) {
-                SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
-                        phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
-                        phase[5] - phase[4], phase[6] - phase[5]);
-                if (focus)
-                    SDL_Log("frame micro: promote %.1f, coarse %.1f, records %.1f, shade coarse %.1f, pages %.1f, shade pages %.1f, "
-                            "whole %.1f ms; %zu tiles waiting for shading%s",
-                            doc_.mesh.micro->focus->lastUpdateMs(), f[0], f[1], f[2], f[3], f[4], f[5], renderer_.microPendingCoarse(),
-                            doc_.sculptor.strokeActive() ? ", stroking" : "");
-            }
-        }
+        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
+            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                    phase[5] - phase[4], phase[6] - phase[5]);
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
@@ -3393,6 +3384,15 @@ void App::runCommand(const std::string& name, const Args& args) {
         reviewPackFile(argString(args, "path"));
         lastCommandOk_ = packs_.review != nullptr;
         return;
+    }
+    if (name == "open") { // a Focus Detail file is the app's (a streamed level), not the core command's
+        const std::string path = argString(args, "path");
+        std::string ext = extensionUtf8(path);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".sfdetail") {
+            lastCommandOk_ = openFocusDetail(path);
+            return;
+        }
     }
     // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
     // A running macro and the "keep original" / preview forms don't touch the levels.

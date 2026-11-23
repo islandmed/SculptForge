@@ -5,6 +5,50 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.12
+
+```features
+date: 2026-11-22
+tagline: Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side.
+highlight: Tendril pulls round, tapering horns, even with Dynamic on
+highlight: Palette Knife strokes cross and stack without creasing
+highlight: The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode
+highlight: Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once
+title: Round Tendril horns
+line: With Dynamic on, a long Tendril pull stays a round, tapering tube instead of thinning into a flat sheet.
+action: guide:sculpting.md
+title: Clean Palette Knife
+line: Crossing and stacked knife strokes, big brushes and mirrored strokes leave the surface smooth, with no dark creases.
+action: guide:sculpting.md
+title: Smooth Gizmo on heavy Parts
+line: Dragging a Gizmo handle on a multi-million triangle Part stays as smooth as turning the view.
+action: guide:gizmo.md
+```
+
+- **Tendril**: with Dynamic on, long pulls stay round tubes; with **View falloff** on, the far side stays put.
+  Reported by @Tpqz_.
+- **Palette Knife** no longer creases where strokes overlap, with big brushes and mirrored strokes too (#198).
+- **Gizmo**: dragging a handle on a multi-million triangle Part stays as smooth as turning the view; in **All** mode
+  a ring seen edge-on fades and can't be pressed by mistake. Idea by Fenix on Discord.
+- **Nudge and Layer** with **View falloff** work only the surface facing you; Move and Grab still reach through.
+- **Level slider**: a click switches the level at once again; a double-click still opens the number field.
+- **Classic layout**: File > Render with..., Preferences > Scripts and > Render bridge show when you turn on
+  **Preferences > Interface > Show newer menu rows**.
+- **Remesh after each stroke** says why it skipped a Part and names the key that remeshes it anyway.
+- **Texture painting**: Alt-erase on the Base also clears metal; **Forge Spheres**: a selecting click adds no
+  empty undo step.
+- "**Clearer gizmo (All mode)**: a ring seen edge-on fades and is not pressed by mistake, a ring turned a little picks
+  out at its rim past the arrows, and an arrow pointing at you fades. Idea by Fenix on Discord."
+- **Classic menus keep their old rows**: File > Render with..., Preferences > Scripts and > Render bridge show in the
+  SculptForge layout; in Classic, turn them on with **Preferences > Interface > Show newer menu rows**.
+- **Palette Knife no longer creases where strokes overlap**: crossing and stacked strokes, big brushes and mirrored
+  strokes too, stay clean.
+- **Gizmo on heavy Parts**: pressing and dragging a handle (arrows, balls, rings, squares) stays as smooth as turning
+  the view, also on multi-million triangle Parts.
+- **Nudge and Layer with View falloff** only work the surface facing you: the far side of a thick part no longer moves
+  with it. Move and Grab still carry everything inside the circle.
+- **Tendril tip**: for long pulls, turn on **Dynamic** on the top shelf so the surface adds detail as it stretches.
+
 ## Version 0.13.11
 
 ```features

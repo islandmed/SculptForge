@@ -308,6 +308,7 @@ public:
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
     size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
+    size_t microPendingPages() const;  // (MicroRenderer::pendingPages, all slots)
     // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
     size_t microTilePages() const;
     size_t microTilePageBytes() const;

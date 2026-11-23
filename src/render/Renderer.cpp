@@ -1489,6 +1489,13 @@ size_t Renderer::microPendingCoarse() const {
     return total;
 }
 
+size_t Renderer::microPendingPages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingPages();
+    return total;
+}
+
 size_t Renderer::microTilePages() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)

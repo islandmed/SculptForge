@@ -74,33 +74,6 @@ private:
     std::atomic<bool> serial_{false};
 };
 
-// While one is alive, poolFor on this thread runs inline: background work (a stroke's undo packing after the
-// release) that must never hold the pool the frame's dabs use.
-struct PoolInline {
-    PoolInline() { ++depth(); }
-    ~PoolInline() { --depth(); }
-    PoolInline(const PoolInline&) = delete;
-    PoolInline& operator=(const PoolInline&) = delete;
-    static int& depth() {
-        thread_local int d = 0;
-        return d;
-    }
-};
-
-// While one is alive, the calling thread runs at a lower priority than the frame's (a stroke's undo packing after the
-// release, #184: at the same priority it slowed the next frames' pool work up to 5x on the floor tier); the old
-// priority comes back after (std::async may run on a pooled thread). Best effort: nothing if the system refuses.
-class LowerThreadPriority {
-public:
-    LowerThreadPriority();
-    ~LowerThreadPriority();
-    LowerThreadPriority(const LowerThreadPriority&) = delete;
-    LowerThreadPriority& operator=(const LowerThreadPriority&) = delete;
-private:
-    int old_ = 0;
-    bool set_ = false;
-};
-
 // Calls fn(begin, end) for the blocks [b * block, min(n, (b + 1) * block)) of [0, n) on the shared pool.
 // Each block is one call, so per-block partial results indexed by begin / block are deterministic. Fewer than
 // `minBlocks` blocks run inline, in order (waking threads would cost more than the work).
@@ -109,7 +82,7 @@ void poolFor(size_t n, F&& fn, size_t block = 4096, size_t minBlocks = 4) {
     if (n == 0) return;
     block = std::max<size_t>(block, 1);
     const size_t blocks = (n + block - 1) / block;
-    if (blocks < std::max<size_t>(minBlocks, 2) || PoolInline::depth() > 0) {
+    if (blocks < std::max<size_t>(minBlocks, 2)) {
         for (size_t b = 0; b < blocks; ++b) fn(b * block, std::min(n, (b + 1) * block));
         return;
     }

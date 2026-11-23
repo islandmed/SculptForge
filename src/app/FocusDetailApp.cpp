@@ -16,12 +16,12 @@
 
 namespace sf {
 
-void App::openFocusDetail(const std::string& path) {
+bool App::openFocusDetail(const std::string& path) {
     Mesh m;
     std::string error;
     if (!FocusDetail::open(path, m, error)) {
         status_ = "Focus Detail: " + error;
-        return;
+        return false;
     }
     const size_t tris = microTriangleCount(m);
     doc_.setMesh(std::move(m), stemUtf8(path));
@@ -30,6 +30,7 @@ void App::openFocusDetail(const std::string& path) {
     std::snprintf(buf, sizeof buf, "Focus Detail: %.2f billion micro triangles; full detail loads where you look and sculpt",
                   double(tris) / 1e9);
     status_ = buf;
+    return true;
 }
 
 void App::updateFocusDetail(float heightPx) {

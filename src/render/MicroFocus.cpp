@@ -307,7 +307,6 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     pendingShade_.clear();
     pendingCoarse_.clear(); // (shadeCoarse(all) below shades every tile)
     coarseHead_ = 0;
-    sweepNext_ = sweepEnd_ = 0;
     coarseQueued_.assign(r.baseTriangles_, 0);
     buildCoarse(mesh, mm, {});
     std::vector<uint32_t> none;
@@ -326,24 +325,11 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     lap(kSyncAll);
 }
 
-void MicroFocus::resendHeights(const Mesh& mesh, MicroRenderer& r) {
-    const MicroMesh& mm = *mesh.micro;
-    Lap lap{splitMs_};
-    buildCoarse(mesh, mm, {});
-    std::vector<uint32_t> held;
-    writeRecords(mm, r, held, true);
-    for (uint32_t s = 0; s < slots_; ++s)
-        if (page_[s]) held.push_back(s);
-    sendPages(mm, r, held);
-    pendingShade_.insert(pendingShade_.end(), held.begin(), held.end());
-    sweepNext_ = 0, sweepEnd_ = r.baseTriangles_;
-    lap(kSyncAll);
-}
-
 void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>& dirty, const std::vector<uint64_t>& moved,
                       bool stroking, bool viewMoving) {
     const MicroMesh& mm = *mesh.micro;
     const FocusDetail* fd = mm.focus.get();
+    levelsChanged_ = false; // (the want list below reads what the last draw drew)
     ++frame_;
     Lap lap{splitMs_};
     // Changed heights: records, coarse grids, pages (a tile that went coarse gives its page back).
@@ -378,30 +364,18 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         for (uint32_t t : reshade)
             if (!coarseQueued_[t]) coarseQueued_[t] = 1, pendingCoarse_.push_back(t);
     }
-    if (queuedCoarse() > 0) {
+    if (pendingCoarse() > 0) {
         // While a stroke runs: strokeShadeMs of it, then the rest on the next frames (a tile under the brush is queued once
         // however many frames change it). While the view or the camera moves a tenth of that (an orbit after a stroke isn't slowed by the
         // catch-up), at rest the same as while stroking (a rest frame stays near 30 fps), until the queue is empty.
         const TierConfig& tc = currentTierConfig();
-        const size_t take = shadeAll ? queuedCoarse() // (not the sweep: that runs only once the queue is empty)
-                                     : coarseShadeBatch(queuedCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
+        const size_t take = coarseShadeBatch(pendingCoarse(), tc.strokeShadeMs * (stroking ? 1.0 : viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
         std::vector<uint32_t> batch(pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_ + take));
         for (uint32_t t : batch) coarseQueued_[t] = 0;
         coarseHead_ += take;
         if (coarseHead_ == pendingCoarse_.size()) pendingCoarse_.clear(), coarseHead_ = 0;
         else if (coarseHead_ > (size_t(1) << 16) && coarseHead_ * 2 > pendingCoarse_.size())
             pendingCoarse_.erase(pendingCoarse_.begin(), pendingCoarse_.begin() + std::ptrdiff_t(coarseHead_)), coarseHead_ = 0;
-        const auto started = std::chrono::steady_clock::now();
-        shadeCoarse(mesh, r, batch, false);
-        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(batch.size());
-        coarseNsPerTile_ = coarseNsPerTile_ > 0.0 ? coarseNsPerTile_ * 0.7 + ns * 0.3 : ns;
-    } else if (sweepNext_ < sweepEnd_ && !stroking) {
-        const TierConfig& tc = currentTierConfig();
-        const size_t take = coarseShadeBatch(sweepEnd_ - sweepNext_, std::max(tc.strokeShadeMs, 2.0) * (viewMoving || cameraMoving ? 0.1 : 1.0), coarseNsPerTile_);
-        std::vector<uint32_t> batch(take);
-        for (size_t i = 0; i < take; ++i) batch[i] = sweepNext_ + uint32_t(i);
-        sweepNext_ += uint32_t(take);
-        if (sweepNext_ >= sweepEnd_) sweepNext_ = sweepEnd_ = 0;
         const auto started = std::chrono::steady_clock::now();
         shadeCoarse(mesh, r, batch, false);
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(batch.size());
@@ -424,11 +398,13 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
         }
     }
     const TierConfig& tier = currentTierConfig();
+    if (want.empty()) unpaged_ = 0;
     if (!want.empty()) {
         std::sort(want.begin(), want.end());
         // At most the frame's upload budget of heights (their shading follows within the shading budget).
         const size_t perFrame = std::max<size_t>(16, size_t(tier.uploadBudgetMBPerFrame << 20) / (size_t(samples_) * 2));
-        if (want.size() > perFrame) want.resize(perFrame);
+        const size_t leftover = want.size() > perFrame ? want.size() - perFrame : 0; // (for the next frames)
+        if (leftover) want.resize(perFrame);
         std::vector<uint32_t> victims; // pages not drawn fine this frame, least recently first
         bool victimsListed = false;
         std::vector<uint32_t> added;
@@ -454,6 +430,7 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
             added.push_back(s);
             pendingShade_.push_back(s);
         }
+        unpaged_ = added.size() == want.size() ? leftover : 0; // (a full pool leaves the rest coarse: no frames for them)
         resend.insert(resend.end(), added.begin(), added.end());
     }
     sendPages(mm, r, resend);
@@ -475,7 +452,11 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
 
 void MicroFocus::bind(GLuint program, const std::vector<uint8_t>& visible, const std::vector<int8_t>& levels) {
     drawn_.resize(levels.size());
-    for (size_t c = 0; c < levels.size(); ++c) drawn_[c] = visible[c] ? levels[c] : int8_t(-1);
+    for (size_t c = 0; c < levels.size(); ++c) {
+        const int8_t l = visible[c] ? levels[c] : int8_t(-1);
+        if (l != drawn_[c] && l > int8_t(FocusDetail::kCoarseLevel)) levelsChanged_ = true; // (pages for them: the next sync)
+        drawn_[c] = l;
+    }
     if (u_.program != program) {
         u_.program = program;
         auto at = [&](const char* name) { return gl::GetUniformLocation(program, name); };

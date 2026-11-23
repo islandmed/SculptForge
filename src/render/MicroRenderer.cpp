@@ -854,14 +854,8 @@ bool MicroRenderer::sync(Mesh& mesh) {
             for (uint64_t bits = mm.dirtyBits[w]; bits; bits &= bits - 1) scratch_.push_back(uint32_t(w * 64 + size_t(std::countr_zero(bits))));
         if (focus_) {
             static const std::vector<uint64_t> none;
-            if (mm.allDirty) focus_->syncAll(mesh, *this);
-            else {
-                if (mm.rescaled) focus_->resendHeights(mesh, *this); // (the same surface: then this sync's tiles as usual)
-                focus_->cameraMoving = cameraMoving;
-                // Undo, redo, a Move and a base moved by anything but a stroke (a transform, its undo) show whole on this frame.
-                focus_->shadeAll = mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking);
-                focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
-            }
+            if (mm.allDirty || mm.rescaled) focus_->syncAll(mesh, *this);
+            else focus_->cameraMoving = cameraMoving, focus_->sync(mesh, *this, scratch_, anyBase ? baseBits_ : none, mm.stroking, viewMoving);
         } else if (mm.allDirty || mm.rescaled) {
             uploadDispTiles(mesh, scratch_, true);
         } else if (!scratch_.empty()) {
@@ -912,9 +906,6 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             deferStale = mm.stroking;
-            // Undo, redo, a Move and a base moved by anything but a stroke show whole on this frame (#184; the same as
-            // MicroFocus's shadeAll: a level without Focus Detail, Windows and macOS among them, caught up over frames).
-            if (mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking)) shadeBudget = 0, deferStale = false;
             if (pendingCount_ || staleCount_) shadePending(mesh, false);
         }
     }

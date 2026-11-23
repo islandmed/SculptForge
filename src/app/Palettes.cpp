@@ -572,7 +572,7 @@ void App::drawPalette_Edit() {
 
 const App::SizeBounds& App::sizeBounds() {
     if (doc_.sculptor.strokeActive() || solverBusy()) return sizeBounds_; // (holds still during a stroke)
-    uint64_t key = doc_.undo.baseRevision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
+    uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
                    uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.parts.size()) << 56);
     for (size_t i = 0; i < doc_.parts.size(); ++i)
         if (!doc_.parts[i].visible) key ^= 0xC2B2AE3D27D4EB4Full * (i + 1);
