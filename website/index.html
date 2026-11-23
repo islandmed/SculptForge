@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <script>document.documentElement.classList.add("js")</script>
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css?v=44">
   <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
@@ -263,39 +263,42 @@ b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage
     <section id="community-videos" class="section cv" aria-labelledby="cv-title">
       <div class="wrap">
         <p class="eyebrow">Community videos</p>
-        <h2 id="cv-title">SculptForge, shown by the people using it</h2>
-        <p class="section-lede">Made and shared by artists in the community. A video loads from YouTube only when you press play.</p>
+        <h2 id="cv-title">From the community</h2>
+        <p class="section-lede">Walkthroughs and experiments from artists using SculptForge. A video loads from YouTube only when you press play.</p>
         <div class="cv-grid">
-          <figure class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/hNL7kkXLaD4?rel=0&amp;autoplay=1" data-title="An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.">
-            <div class="hero-yt-box">
-              <img src="media/cv-hNL7kkXLaD4.jpg" alt="" width="1280" height="720" loading="lazy">
-              <button type="button" class="hero-yt-play" aria-label="Play: An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets."><svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg></button>
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/hNL7kkXLaD4?rel=0&amp;autoplay=1" data-title="An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.">
+            <div class="cv-media">
+              <img src="media/cv-hNL7kkXLaD4.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
             </div>
-            <noscript><p class="cv-credit"><a href="https://www.youtube.com/watch?v=hNL7kkXLaD4" rel="noopener">Watch on YouTube</a></p></noscript>
-            <figcaption><a class="cv-title" href="https://www.youtube.com/watch?v=hNL7kkXLaD4" rel="noopener">An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.</a>
-              <span class="cv-by">by <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a></span></figcaption>
-            <div class="cv-note"><p class="cv-note-h">Since this video (16 November)</p><ul><li>Sculpt layers now go to Blender and come back as shape keys (0.13.10). <a href="guide/blender.html">Details</a></li><li>Gaussian splats show their view-dependent colour in the viewport (0.13.8; not on the Essential hardware tier). The compact .splat file format still has none. <a href="guide/scan-to-splat.html">Details</a></li><li>Windows code signing through the SignPath Foundation is in progress. Until it is live, the Windows builds are unsigned. <a href="code-signing.html">Details</a></li></ul><p>Still true: the benchmark figures are our own measurements; the raw outputs are on the <a href="benchmarks/">benchmarks page</a>.</p></div>
-          </figure>
-          <figure class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/qiNPiWJ5PRM?rel=0&amp;autoplay=1" data-title="An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.">
-            <div class="hero-yt-box">
-              <img src="media/cv-qiNPiWJ5PRM.jpg" alt="" width="1280" height="720" loading="lazy">
-              <button type="button" class="hero-yt-play" aria-label="Play: An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge."><svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg></button>
+            <div class="cv-body">
+              <p class="cv-caption">An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=hNL7kkXLaD4" rel="noopener">Watch on YouTube</a></p>
+              <details class="cv-note"><summary>Since this video (16 Nov)</summary><ul><li>Sculpt layers go to Blender and back as shape keys (0.13.10). <a href="guide/blender.html">Details</a></li><li>Splats show their view-dependent colour in the viewport (0.13.8; not on the Essential tier). .splat files still have none. <a href="guide/scan-to-splat.html">Details</a></li><li>Windows code signing is in progress; builds stay unsigned until it is live. <a href="code-signing.html">Details</a></li></ul><p>Still true: the benchmark figures are our own measurements. Raw outputs are on the <a href="benchmarks/">benchmarks page</a>.</p></details>
             </div>
-            <noscript><p class="cv-credit"><a href="https://www.youtube.com/watch?v=qiNPiWJ5PRM" rel="noopener">Watch on YouTube</a></p></noscript>
-            <figcaption><a class="cv-title" href="https://www.youtube.com/watch?v=qiNPiWJ5PRM" rel="noopener">An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.</a>
-              <span class="cv-by">by <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a></span></figcaption>
-            
-          </figure>
-          <figure class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/AL5q4gKyiZc?rel=0&amp;autoplay=1" data-title="A screen recording of the Blob-It Python script building a head in SculptForge.">
-            <div class="hero-yt-box">
-              <img src="media/cv-AL5q4gKyiZc.jpg" alt="" width="1280" height="720" loading="lazy">
-              <button type="button" class="hero-yt-play" aria-label="Play: A screen recording of the Blob-It Python script building a head in SculptForge."><svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg></button>
+          </article>
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/qiNPiWJ5PRM?rel=0&amp;autoplay=1" data-title="An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.">
+            <div class="cv-media">
+              <img src="media/cv-qiNPiWJ5PRM.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
             </div>
-            <noscript><p class="cv-credit"><a href="https://www.youtube.com/watch?v=AL5q4gKyiZc" rel="noopener">Watch on YouTube</a></p></noscript>
-            <figcaption><a class="cv-title" href="https://www.youtube.com/watch?v=AL5q4gKyiZc" rel="noopener">A screen recording of the Blob-It Python script building a head in SculptForge.</a>
-              <span class="cv-by">by <a href="https://www.youtube.com/@tpqztpqz5738" rel="noopener">TPQZ</a></span></figcaption>
-            
-          </figure>
+            <div class="cv-body">
+              <p class="cv-caption">An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=qiNPiWJ5PRM" rel="noopener">Watch on YouTube</a></p>
+              
+            </div>
+          </article>
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/AL5q4gKyiZc?rel=0&amp;autoplay=1" data-title="A screen recording of the Blob-It Python script building a head in SculptForge.">
+            <div class="cv-media">
+              <img src="media/cv-AL5q4gKyiZc.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: A screen recording of the Blob-It Python script building a head in SculptForge."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
+            </div>
+            <div class="cv-body">
+              <p class="cv-caption">A screen recording of the Blob-It Python script building a head in SculptForge.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@tpqztpqz5738" rel="noopener">TPQZ</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=AL5q4gKyiZc" rel="noopener">Watch on YouTube</a></p>
+              
+            </div>
+          </article>
         </div>
       </div>
     </section>
@@ -763,14 +766,14 @@ rez-env sculptforge -- sculptforge troll.usda \
   <script>
     (function () {
       document.querySelectorAll(".cv-card").forEach(function (card) {
-        card.querySelector(".hero-yt-play").addEventListener("click", function () {
+        card.querySelector(".cv-play").addEventListener("click", function () {
           var f = document.createElement("iframe");
           f.src = card.getAttribute("data-embed");
           f.title = card.getAttribute("data-title");
           f.allow = "accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen";
           f.allowFullscreen = true;
           f.referrerPolicy = "strict-origin-when-cross-origin";
-          card.querySelector(".hero-yt-box").replaceChildren(f);
+          card.querySelector(".cv-media").replaceChildren(f);
           f.focus();
         });
       });

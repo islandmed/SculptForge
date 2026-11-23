@@ -9,9 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "website/index.html"
 DATA = ROOT / "website/community-videos.json"
 START, END = "<!-- community-videos:start -->", "<!-- community-videos:end -->"
-PLAY = ('<svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3S12.8.3 '
-        '7.5 1.7a8.5 8.5 0 0 0-6 6C0 13 0 24 0 24s0 11 1.5 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C68 35 '
-        '68 24 68 24s0-11-1.5-16.3z" fill="#f28c3c"/><path d="M27 34V14l18 10z" fill="#1a0d04"/></svg>')
+PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>'
 
 
 def note(v):
@@ -24,7 +22,7 @@ def note(v):
     if still:
         t = e(still["text"]).replace(e(still["link"]), f'<a href="{e(still["href"])}">{e(still["link"])}</a>')
         tail = f"<p>{t}</p>"
-    return f'<div class="cv-note"><p class="cv-note-h">{e(v["since_label"])}</p><ul>{items}</ul>{tail}</div>'
+    return f'<details class="cv-note"><summary>{e(v["since_label"])}</summary><ul>{items}</ul>{tail}</details>'
 
 
 def card(v):
@@ -37,16 +35,17 @@ def card(v):
     if not (ROOT / "website" / v["thumb"]).exists():
         sys.exit(f"community-videos.json: no thumbnail website/{v['thumb']}")
     watch = f"https://www.youtube.com/watch?v={v['id']}"
-    return f'''          <figure class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/{v['id']}?rel=0&amp;autoplay=1" data-title="{e(v['caption'])}">
-            <div class="hero-yt-box">
-              <img src="{e(v['thumb'])}" alt="" width="1280" height="720" loading="lazy">
-              <button type="button" class="hero-yt-play" aria-label="Play: {e(v['caption'])}">{PLAY}</button>
+    return f'''          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/{v['id']}?rel=0&amp;autoplay=1" data-title="{e(v['caption'])}">
+            <div class="cv-media">
+              <img src="{e(v['thumb'])}" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: {e(v['caption'])}"><span>{PLAY}Play</span></button>
             </div>
-            <noscript><p class="cv-credit"><a href="{watch}" rel="noopener">Watch on YouTube</a></p></noscript>
-            <figcaption><a class="cv-title" href="{watch}" rel="noopener">{e(v['caption'])}</a>
-              <span class="cv-by">by <a href="{e(v['channel'])}" rel="noopener">{e(v['by'])}</a></span></figcaption>
-            {note(v)}
-          </figure>'''
+            <div class="cv-body">
+              <p class="cv-caption">{e(v['caption'])}</p>
+              <p class="cv-by">By <a href="{e(v['channel'])}" rel="noopener">{e(v['by'])}</a> <span aria-hidden="true">&middot;</span> <a href="{watch}" rel="noopener">Watch on YouTube</a></p>
+              {note(v)}
+            </div>
+          </article>'''
 
 
 def main():
@@ -55,8 +54,8 @@ def main():
     <section id="community-videos" class="section cv" aria-labelledby="cv-title">
       <div class="wrap">
         <p class="eyebrow">Community videos</p>
-        <h2 id="cv-title">SculptForge, shown by the people using it</h2>
-        <p class="section-lede">Made and shared by artists in the community. A video loads from YouTube only when you press play.</p>
+        <h2 id="cv-title">From the community</h2>
+        <p class="section-lede">Walkthroughs and experiments from artists using SculptForge. A video loads from YouTube only when you press play.</p>
         <div class="cv-grid">
 {chr(10).join(card(v) for v in vids)}
         </div>
