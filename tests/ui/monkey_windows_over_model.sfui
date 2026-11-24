@@ -1,0 +1,68 @@
+# A monkey sequence (seed 4 on the Actions runner, 11-24) whose maybe_action ui.brush_gallery and ui.brush_lab left a floating
+# window over the model through the way out, so the final plain stroke went to the window: unlatch closes them now, and the
+# monkey's way out closes floating windows (close_floating, the line added here; the rest as the runner wrote it, the monkey's own sequences shift with the
+# registry). expect_sculpts also reads the window over the stroke where it starts, so a slow runner can't flip it.
+run ui_look look=classic layout=classic
+wait 0.3
+release
+hold none
+unlatch
+run new_sphere subdivisions=3
+action brush.standard
+action tool.draw
+unlatch
+wait 0.1
+snapshot_start
+maybe_action stroke.type.slide_stamp
+key numpad7
+key escape
+key ctrl+z
+stroke 0.23 0.78 0.25 0.25
+stroke 0.77 0.46 0.74 0.26
+key ctrl+z
+maybe_action perf.keep_strokes_editable
+maybe_action panel.detach_guide
+maybe_action forgesphere.branch
+maybe_action brush.pen_strength_off
+maybe_action ui.brush_gallery
+orbit 60 0
+stroke 0.48 0.64 0.31 0.27
+stroke 0.55 0.40 0.68 0.25
+key ctrl+shift+z
+stroke 0.44 0.51 0.63 0.68
+stroke 0.72 0.78 0.20 0.30
+maybe_action stroke.continuous
+maybe_action paint.line_gradient
+maybe_action cut.polyline
+stroke 0.63 0.53 0.72 0.54
+key ctrl+z
+key ctrl+z
+stroke 0.36 0.67 0.54 0.63
+key ctrl+z
+stroke 0.71 0.32 0.62 0.27
+maybe_action brush.standard
+maybe_action brush.pinch
+stroke 0.54 0.27 0.72 0.64
+maybe_action brush.capture_view
+maybe_action ui.brush_lab
+key ctrl+z
+key escape
+stroke 0.53 0.44 0.32 0.52
+maybe_action view.shading_pbr
+stroke 0.30 0.74 0.48 0.26
+key numpad1
+key numpad1
+maybe_action brush.capture_view
+release
+hold none
+key escape
+close_floating
+action brush.clay
+action tool.draw
+expect_latched none
+expect_mesh_valid
+expect_sculpts
+undo_all
+expect_restored
+expect_mesh_valid
+shot way_out_clear

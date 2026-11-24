@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "render/GL.h"
 
-#include <algorithm>
-#include <cstring>
-
-#ifdef SF_GLES
 #include <SDL3/SDL_log.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <string>
-#endif
+#include <vector>
 
 namespace gl {
 
@@ -32,6 +30,30 @@ bool copyUploads() {
 }
 
 void setTestTexelLimit(uint32_t texels) { g_testTexelLimit = texels; }
+namespace { bool g_testRejectTextured = false; }
+void setTestRejectTextured(bool reject) { g_testRejectTextured = reject; }
+bool testRejectTextured() { return g_testRejectTextured; }
+
+namespace {
+void SF_GLAPI debugMessage(GLenum, GLenum type, GLuint id, GLenum, GLsizei length, const GLchar* message, const void*) {
+    if (type != GL_DEBUG_TYPE_ERROR && type != GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR) return;
+    static std::vector<GLuint> seen;
+    if (seen.size() >= 40 || std::find(seen.begin(), seen.end(), id) != seen.end()) return;
+    seen.push_back(id);
+    SDL_Log("GL driver message %u: %.*s", id, std::min(length, 400), message);
+}
+} // namespace
+
+void enableDebugLog() {
+#ifndef SF_GLES
+    if (!std::getenv("SF_GL_DEBUG")) return;
+#endif
+    if (!DebugMessageCallback) return;
+    DebugMessageCallback(&debugMessage, nullptr);
+    Enable(GL_DEBUG_OUTPUT);
+    while (GetError() != GL_NO_ERROR) { // (a stub entry point, or a context without it, may say so: nothing to log)
+    }
+}
 bool testTinyGpu() { return g_testTexelLimit != 0 && g_testTexelLimit <= 256; }
 
 GLint maxTextureBufferTexels() {

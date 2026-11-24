@@ -1104,6 +1104,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The fonts load only the Lucide icons src/ uses (src/app/IconsUsed.h, generated): a new ICON_LC_* needs the script run.
     add_test(NAME icons_used COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/icons_used.py --check)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
+    # Every shader the renderer compiles is valid GLSL ES 3.20 too (the Android renderer; desktop Mesa accepts what a phone's driver
+    # rejects), and each program's stages link: glslangValidator on the sources with the ES header GL.cpp puts on them. Skipped
+    # (exit 77) where glslangValidator isn't installed; CI installs glslang-tools.
+    add_test(NAME gles_shaders COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_gles_shaders.py)
+    set_tests_properties(gles_shaders PROPERTIES SKIP_RETURN_CODE 77)
     # assets/branding/sculptforge.icns: every slot decodes at its size, 16/32 px as RGB + mask, never PNG (#156).
     add_test(NAME icns COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py)
     add_test(NAME icns_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py --self-test)
@@ -1322,6 +1327,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     endforeach()
     sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
+    sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
+    sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
@@ -1613,6 +1620,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
+    # Make Shell on irregular plates of a dense curved surface: the rim is a smooth outline (tests/ui/extract_rim_plates.sfui).
+    sculptforge_ui_test(extract_rim_plates_1440 extract_rim_plates --size 1440x900)
+    sculptforge_ui_test(extract_rim_plates_2880 extract_rim_plates --size 2880x1800)
     # Tool > Reshape: Size, then the Stack, no duplicate sliders (tests/ui/deformation_ops.sfui, foirgairwolf on Discord).
     sculptforge_ui_test(deformation_ops_1024 deformation_ops --size 1024x768)
     sculptforge_ui_test(deformation_ops_1440 deformation_ops --size 1440x900)

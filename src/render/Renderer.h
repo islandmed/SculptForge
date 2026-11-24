@@ -234,6 +234,8 @@ public:
     // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
     // limits): painting still goes into the texture, the model draws without it. The panel says so.
     bool textureNotShown(uint32_t id) const;
+    // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
+    bool textureRejected(uint32_t id) const;
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
 
@@ -435,6 +437,9 @@ private:
     bool persistentUpload() const;  // the preference, SF_PERSISTENT_UPLOAD=0 / 1 overrides; needs GL_ARB_buffer_storage
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
+    // The textured program's two UV samplers (a buffer and a 2D texture) always have a complete texture of their own type
+    // bound, the unused one a single texel: a driver that checks every sampler (Mali) never meets an empty unit in the geometry shader.
+    GLuint dummyUvBufferData_ = 0, dummyUvBufferTexture_ = 0, dummyUv2D_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
     std::vector<ReferenceImage> references_; // setReferences
     struct ReferenceTexture {
@@ -465,6 +470,8 @@ private:
         GLuint uvTexture2D = 0;
         int uvWidth = 0;
         bool uvsWanted = false, uvsLost = false;
+        // The first textured draw checks for a GL error (drawSlot): the driver rejected it, and the Part draws without the texture.
+        mutable bool texturedChecked = false, texturedFailed = false;
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
         uint64_t textureSerial = 0, textureRevision = 0;
         int textureW = 0, textureH = 0;
