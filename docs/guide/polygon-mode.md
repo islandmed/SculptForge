@@ -1,6 +1,6 @@
 # Polygon mode: modelling with points, edges and faces
 
-![A detailed sculpture](images/wn-0120-crease.jpg)
+![A cube drawn as a wire cage with a square tunnel through it, the tunnel walls selected in orange](images/polygon-mode.jpg)
 
 > **In short:**
 > - **Tool > Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
