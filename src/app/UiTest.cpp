@@ -3811,7 +3811,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // A command that works on a worker (uv_auto: App::commandRunning) holds the script, frames still drawing,
         // until its result is in, like the console and an AI tool wait for it.
         auto next = std::make_shared<size_t>(0);
-        steps_.push_back([this, line, statements, next](float t) {
+        // ui_look changes which rows the palettes draw: one frame draws in the new look before the next step, so a click
+        // right after it finds the rows where they are now, not where the old look had them.
+        auto settle = std::make_shared<bool>(false);
+        steps_.push_back([this, line, statements, next, settle](float t) {
+            if (*settle) return true;
             if (*next > 0 && app_.commandRunning()) {
                 SDL_Delay(5); // real work runs in real time
                 if (t > 600.0f) fail(line, statements[*next - 1].command + " still running after 600 s");
@@ -3833,6 +3837,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
                 if (app_.commandRunning()) return false;
             }
+            for (const auto& st : statements)
+                if (st.command == "ui_look") return !(*settle = true);
             return true;
         });
         break;
