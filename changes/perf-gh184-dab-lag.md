@@ -3,7 +3,12 @@ fixed: **The surface lagging a second or two behind the brush on a dense Micro l
   re-shaded every patch within reach of the brush, not just the ones it changed. With an alpha (whose square reaches well
   past what it moves) that was more than twice the work, and the shading fell behind the stroke. A dab now re-shades only
   what it changed and the patches next to it.
+fixed: **A stroke on a Micro level showing only when released** (#184, thanks @HG4Science): on a level that isn't
+  streamed (Micro 3 on a 2.6M base, for one), each frame shaded fewer patches than its dabs changed, and the surface behind
+  the brush kept its old shading until you let go. Every frame now shades what it changed, so the stroke shows as you draw.
 testers:
+  - Linux or Windows, a 2M+ base at Micro 3: Clay brush, Bolt alpha, about 40 px, one long slow stroke without letting go.
+    The relief shows behind the brush while you draw, not only when you release.
   - Linux, a 2M+ base at Micro 4: Standard brush, Bolt alpha, size about 90 px, one long stroke. The relief shows right behind
     the brush, not a second or two later.
   - Any OS, Micro 3: the same stroke, then orbit. No dark or flat patches at the stroke's edges.
@@ -20,3 +25,11 @@ Widen sweep (own commit): without Focus Detail, a range widen re-sent the height
 off (±2/255 on a few pixels, until those patches were next shaded). MicroRenderer now sweeps every patch's shading
 afterwards, as MicroFocus does: within the rest budget, only once nothing else waits and no stroke runs; pendingShading()
 counts it, so the app keeps drawing until it is done and then rests. Test: ui micro_widen_sweep.
+Keep pace (own commit): MicroRenderer::shadePending takes at least this sync's changed patches while a stroke runs
+(keepPace), whatever the budget. Without it, at Micro 3 on the reporter's 2.58M base (Clay + Bolt 39 px, 8 threads), a frame
+changed 18-35K patches, the budget took ~7K (the measured ns per point already counts the ring, and the limit divides by 3
+for it again: ~3 ms of strokeShadeMs 10), and the backlog reached 560K patches by the release. With it: no backlog, mid-stroke
+view_stale on that scene 0.041 -> 0.0007; cost fps 44 -> 36, frame p50 22 -> 27 ms, pointer lag p50 51 -> 57 ms (x2 each).
+Focus Detail levels unchanged on purpose: their close view comes from pages (mid-stroke view_stale 0.00001 at Micro 4 there),
+and shading every changed coarse tile each frame cost a third of the fps on big strokes. Test: ui micro_stroke_shows_midstroke
+(squeezed budget, held live stroke: 0.647 without, 0.00007 with).

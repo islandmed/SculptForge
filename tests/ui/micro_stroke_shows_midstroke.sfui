@@ -1,0 +1,33 @@
+# gh#184 (0.13.14, Micro 3 on a 2.6M base): the stroke showed only once released. A frame's dabs changed more patches
+# than the frame's shading budget took, newest first, so the backlog behind the brush grew for the whole stroke. While a
+# stroke runs every frame now shades the patches it changed (MicroRenderer::keepPace): mid-stroke, with the pointer still
+# down, the view must match the same mesh sent up whole and shaded again (view_stale, mean pixel difference 0-255).
+# A level without Focus Detail (Focus levels draw the close view from their pages, shaded as they come). The squeezed
+# budget (SF_SHADE_BUDGET_POINTS) gives any computer the reporter's backlog. (cold: env is set here.)
+run ui_look look=classic layout=classic
+env SF_FOCUS_DETAIL 0
+run new_sphere subdivisions=6
+run micro_divide level=3
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+
+interactive_strokes on
+click "Clay##brush.clay"
+run brush_set_alpha name=Bolt
+brush_size 120
+# Prime the height range first: the stroke measured doesn't widen it (a widen keeps the shading it had until the sweep).
+stroke 0.25 0.30 0.25 0.70 1.0
+stroke 0.25 0.70 0.25 0.30 1.0
+wait_value micro_pending_shading == 0 120 # (real time: llvmpipe takes far longer than this computer)
+wait_idle 60
+env SF_SHADE_BUDGET_POINTS 2000
+drag_path 0.40 0.40 0.50 0.50 0.60 0.40 0.70 0.50 keep S=3
+expect_value stroking == 1
+expect_value view_stale < 0.005 # (measured once: it sends the mesh up whole)
+release
+env SF_SHADE_BUDGET_POINTS 0
+wait_value micro_pending_shading == 0 120
+wait_idle 60
+expect_value view_stale < 0.00001

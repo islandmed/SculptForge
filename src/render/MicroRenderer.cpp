@@ -694,7 +694,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // at all while a stroke runs (deferStale): its next dabs change most of them again, and what they'd change is
     // the brush's falloff tail at the patch border (usually nothing: a changed shared point changes both patches).
     // As many a frame as when each one also wrote its ring (~3 patches): shading as current as it was, for less.
-    const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX;
+    const size_t limit = shadeBudget ? std::max<size_t>({1, shadeBudget / (S * 3), keepPace ? scratch_.size() : 0}) : SIZE_MAX;
     std::vector<uint32_t>& seeds = scratch_;
     const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
     if (full) seeds.resize(limit);
@@ -955,6 +955,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             deferStale = mm.stroking;
+            keepPace = mm.stroking;
             // Undo, redo, a Move and a base moved by anything but a stroke show whole on this frame (#184; the same as
             // MicroFocus's shadeAll: a level without Focus Detail, Windows and macOS among them, caught up over frames).
             if (mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking && !mm.strokeEnded)) shadeBudget = 0, deferStale = false;
