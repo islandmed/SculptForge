@@ -604,7 +604,8 @@ Right-clicking a shelf item and choosing **Remove from shelf** works without Cus
 hold <kbd>Alt</kbd> (without <kbd>Ctrl</kbd>) and drag any checkbox, slider, choice, readout or button from any palette
 onto a shelf, Customize on or off. It is the palette's own control, live both ways; while <kbd>Alt</kbd> is held a slider
 is picked up, not changed. On the top or bottom shelf it is as wide as it is in its palette; on a side shelf it takes the
-column's width. A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
+column's width (a long label is cut off there: drag the left shelf's inner edge to widen the column, or point at it with
+<kbd>Ctrl</kbd> for its name). A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
 shelf until it is back; Customize Shelves shows it dim so you can move or remove it. The same drag puts a control into
 [My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there.
 

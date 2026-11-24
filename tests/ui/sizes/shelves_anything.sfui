@@ -22,6 +22,7 @@ hold alt
 drag_to "Draw/##drawsize" "Clay##brush.clay" -24 0
 hold none
 click "Draw/##totray"
+drag_item "##leftshelfgrip" 120 0       # (the left column widened for the long label)
 click "Tool/##totray"
 click "Preferences##palette.preferences"
 click "Preferences/##totray"

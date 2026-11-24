@@ -47,7 +47,10 @@ expect "Bottom shelf/##drawsize"
 drag_item "Bottom shelf/##drawsize" 40 0
 expect_value draw_size > 60
 click "Draw/##totray"                   # (out of the tray again: Preferences > Input then fits the tray)
-# Preferences > Input: Orbit around the pointer onto the left shelf (a side shelf: the column's inside width).
+# Preferences > Input: Orbit around the pointer onto the left shelf (a side shelf: the column's inside width; the column is
+# widened first by its grip, as a person would for a long label).
+drag_item "##leftshelfgrip" 120 0
+expect_value left_shelf_width >= 150
 click "Tool/##totray"                   # (Tool out of the tray: Preferences then starts at its top)
 click "Preferences##palette.preferences"
 click "Preferences/##totray"
