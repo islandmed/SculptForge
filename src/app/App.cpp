@@ -2275,6 +2275,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (referenceMouseDown(x, y, nav)) return; // Adjust Reference: move, scale it (ReferenceImages.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
+        if (polyMouseDown(x, y, mod)) return;  // Polygon mode: clicks and boxes select points / edges / faces (PanelPolygon.cpp)
         if (edgesMouseDown(x, y, mod)) return; // Edges mode: clicks select edges (PanelEdges.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
@@ -2783,6 +2784,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (key == SDLK_ESCAPE && guidesMode_ && drag_ != Drag::Guide) { // the QRemesh Guides brush off
         leaveGuides();
         status_ = "Quad Remesh Guides off";
+        return;
+    }
+    if (key == SDLK_ESCAPE && polyMode_ && drag_ == Drag::None) { // Polygon mode off (PanelPolygon.cpp)
+        setPolyMode(false);
         return;
     }
     if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_ || facePlacing_)) { // Append > Insert
@@ -3771,7 +3776,11 @@ void App::syncScene() {
         Mesh* mesh = doc_.checkedOut(i) ? &shown : &s.data->mesh;
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
-        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
+        // Polygon mode (PanelPolygon.cpp): its Part is drawn with flat faces while the mode is on, so a cage's hard edges,
+        // bevels and extrusions read as built instead of as smooth-shaded gradients and bands; display only, the Part's own
+        // shading setting is untouched and comes back when the mode exits.
+        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading) ||
+                          (polyMode_ && active);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
         scene.back().model = gizmoDrawnTransform(i);
@@ -3923,6 +3932,7 @@ void App::drawUi() {
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawEdgeOverlay();   // Edges mode: the selected edges (PanelEdges.cpp)
+    drawPolyOverlay();   // Polygon mode: the selected points / edges / faces (PanelPolygon.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawWeldPreviewOverlay(); // the points Merge by Distance would merge (PanelMeshCheck.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
@@ -3951,7 +3961,7 @@ void App::drawUi() {
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || stencil_.adjust || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
-                         uvToolActive() || tubeDraw_ || tubeActive() || edgesMode_;
+                         uvToolActive() || tubeDraw_ || tubeActive() || edgesMode_ || polyMode_;
     // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
     ImVec2 sliderOpened;
     PickerUi::Slider sliderWhich;

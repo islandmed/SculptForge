@@ -953,6 +953,12 @@ void App::drawPalette_Tool() {
         drawGeometrySection(); // PanelGeometry.cpp
         Demo::popScope();
     }
+    if (subpalette("tool.polygon", "Polygon")) {
+        tray::Section section;
+        Demo::pushScope("Polygon");
+        drawPolygonContents(); // Polygon mode: Points / Edges / Faces and the operations (PanelPolygon.cpp)
+        Demo::popScope();
+    }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
         // QRemesh (quad retopology) first: the same controls and settings as in Tool > Geometry.
