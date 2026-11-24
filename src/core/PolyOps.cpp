@@ -9,6 +9,8 @@
 
 #include "core/PolyBevel.h"
 
+#include "core/PolyInset.h"
+
 #include "core/Document.h"
 #include "core/FaceGroups.h"
 #include "core/Mesh.h"
@@ -210,6 +212,7 @@ void registerBuiltinPolyOps(PolyOpRegistry& reg) {
     // The modelling ops register here, one line each (core/PolyExtrude.cpp, PolyInset.cpp, PolyBevel.cpp,
     // PolyEdgeLoop.cpp, PolySpan.cpp).
     registerPolyExtrudeOp(reg);
+    registerPolyInsetOp(reg);
     registerPolySpanOp(reg);
     registerPolyEdgeLoopOp(reg); // edge_loop (core/PolyEdgeLoop.h)
     registerPolyBevelOp(reg);

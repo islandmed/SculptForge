@@ -139,6 +139,7 @@ add_library(sculptforge_core STATIC
   src/core/CloseHoles.cpp
   src/core/PolySpan.cpp
   src/core/PolyBevel.cpp
+  src/core/PolyInset.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
