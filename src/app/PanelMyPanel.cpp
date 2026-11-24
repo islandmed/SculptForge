@@ -122,7 +122,8 @@ bool App::drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav; // (nav would scroll it to a hidden neighbour)
     ImGui::PushID(entry.c_str());
-    if (!place.known) { // the first time (and after it went missing): lay the body out unseen and find the control
+    // The first time, and after it went missing (then twice a second, not every frame): lay the body out unseen and find the control.
+    if (!place.known && !(place.missing && ImGui::GetTime() - place.measured < 0.5)) {
         const ImVec2 start = ImGui::GetCursorScreenPos();
         place.missing = true;
         place.measured = ImGui::GetTime();

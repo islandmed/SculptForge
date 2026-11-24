@@ -2805,6 +2805,22 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         indices.push_back(i);
     }
     ImGui::PopStyleVar();
+    // Controls their palette hides now: looked for again twice a second, after the layout, so nothing on the shelf moves for it.
+    for (int i = 0; i < int(list.size()); ++i) {
+        const std::string& item = list[size_t(i)];
+        if (item.rfind("control:", 0) != 0 || shelfItemShown(shelf, item)) continue;
+        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item));
+        if (it == pinnedControls_.end() || ImGui::GetTime() - it->second.measured < 0.5) continue;
+        const MyPanelEntry e = myPanelEntry(item);
+        if (!e.valid()) continue;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImRect rc;
+        bool rm = false;
+        ImGui::PushID(i);
+        drawPinnedControl(item, e, shelf, vertical ? ImGui::GetWindowWidth() - 2.0f * pad.x : 180.0f * s, !vertical, 0.0f, rc, rm);
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(at);
+    }
     if (shelf == kShelfTop && !rects.empty()) {
         // What follows the Intensity slider on its line, and whether the row fits (with the sliders at their least).
         float tail = 0.0f, right = rects[0].Max.x;
@@ -2951,9 +2967,9 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
 // Customize mode so they can still be moved or removed.
 bool App::shelfItemShown(int shelf, const std::string& item) const {
     if (layout_.customize) return true;
-    if (item.rfind("control:", 0) == 0) { // a palette's control: not while its palette hides it (measured by drawPinnedControl),
-        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item)); // looked for again twice a second (it takes no room then)
-        return it == pinnedControls_.end() || !it->second.missing || ImGui::GetTime() - it->second.measured > 0.5;
+    if (item.rfind("control:", 0) == 0) { // a palette's control: not while its palette hides it (measured by drawPinnedControl;
+        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item)); // drawShelf looks for it again after its layout)
+        return it == pinnedControls_.end() || !it->second.missing;
     }
     if (item == "view.splats") return !doc_.splats.empty(); // only when there's a capture
     if (item == "draw.paint_vertex" || item == "draw.paint_texture") return hasTexture(doc_.mesh); // paint target
