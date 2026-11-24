@@ -953,6 +953,12 @@ void App::drawPalette_Tool() {
         drawGeometrySection(); // PanelGeometry.cpp
         Demo::popScope();
     }
+    if (subpalette("tool.polygon", "Polygon")) {
+        tray::Section section;
+        Demo::pushScope("Polygon");
+        drawPolygonContents(); // Polygon mode: Points / Edges / Faces and the operations (PanelPolygon.cpp)
+        Demo::popScope();
+    }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
         // QRemesh (quad retopology) first: the same controls and settings as in Tool > Geometry.
@@ -1077,6 +1083,14 @@ void App::drawPalette_Tool() {
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Viewport Look");
         drawShadingControls();
+    }
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (or while a Scatter is still live). Last,
+    // so the rows above sit in the same place in both looks.
+    if ((newerMenuRows() || scatterRevision_) && subpalette("tool.scatter", "Scatter")) {
+        tray::Section section;
+        Demo::pushScope("Scatter");
+        drawScatterContents(); // PanelScatter.cpp
+        Demo::popScope();
     }
 }
 

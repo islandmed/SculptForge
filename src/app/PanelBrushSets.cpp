@@ -202,6 +202,7 @@ void App::syncShelfBrushActions() {
                     paintMode_ = false;
                     guidesMode_ = false;
                     edgesMode_ = false;
+                    if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
                     maskBrush_.on = false;
                 }
         };

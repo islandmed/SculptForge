@@ -27,8 +27,11 @@
 #include "core/Masking.h"
 #include "core/Backdrop.h"
 #include "core/CloseHoles.h"
+#include "core/EdgeLoopInsert.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
 #include "core/UndoBatch.h"
@@ -46,6 +49,7 @@
 #include "core/QRemesh.h"
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
+#include "core/Scatter.h"
 #include "core/Garment.h"
 #include "core/GarmentDrape.h"
 #include "core/Deform.h"
@@ -741,6 +745,7 @@ CommandRegistry::CommandRegistry() {
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
+    registerScatterCommands(*this);          // scatter (Scatter.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
     registerDetailCommands(*this);           // detail_pass (core/DetailPass.cpp)
     registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
@@ -943,8 +948,11 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerEdgeLoopCommands(*this);   // edge_loop (core/EdgeLoopInsert.h)
     registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
+    registerPolySelectCommands(*this); // poly_mode, poly_select (core/PolyMode.h)
+    registerPolyOpCommands(*this);     // poly_op (core/PolyOps.h)
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
     registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)

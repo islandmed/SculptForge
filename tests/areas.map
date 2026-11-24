@@ -28,7 +28,6 @@ ui_e2e_cloth_*              cloth
 ui_e2e_extract_*            mesh
 ui_e2e_curves_*             mesh
 ui_e2e_voxel_*              mesh
-ui_e2e_dynamic_*            mesh
 ui_e2e_parts_*              mesh
 ui_e2e_export_*             io
 ui_e2e_prefs_*              io
@@ -71,6 +70,9 @@ ui_job_keeps_part           mesh
 ui_forge*                   mesh
 ui_geometry_groups*         mesh
 ui_edge_select*             mesh
+ui_polygon_mode*            mesh
+ui_polygon_extrude*         mesh
+ui_polygon_span*            mesh
 ui_levels_rebuild           mesh
 ui_layers_levels            mesh
 ui_multires                 mesh
@@ -114,6 +116,8 @@ ui_air_strokes              sculpt
 ui_along_normal             sculpt
 ui_alpha_*                  sculpt
 ui_alternate_smooth         sculpt
+ui_shift_smooth_*           sculpt
+ui_smooth_option_tags       sculpt
 ui_big_mesh_tip             sculpt
 ui_brush_*                  sculpt
 ui_builtin_presets          sculpt
@@ -256,11 +260,17 @@ test_render_clusters        render
 test_video_drivers          render
 test_space_camera           render
 test_close_holes            mesh
+test_poly_span              mesh
+test_poly_bevel             mesh
+test_poly_inset             mesh
 test_cut                    mesh
 test_decimate_valence       mesh
+test_edge_loop_insert       mesh
+test_poly_edge_loop         mesh
 test_divide_valence         mesh
 test_dyntopo                mesh
 test_edge_*                 mesh
+test_poly_*                 mesh
 test_extract_mirror         mesh
 test_face*                  mesh
 test_figure_pose            mesh
@@ -405,6 +415,8 @@ src/core/Arrangement*              mesh
 src/core/MeshBoolean*              mesh
 src/core/PartBoolean*              mesh
 src/core/CloseHoles*               mesh
+src/core/PolySpan*                 mesh
+src/core/PolyBevel*                mesh
 src/core/Tube*                     mesh
 src/core/Parts*                    mesh
 src/core/Multires*                 mesh
@@ -415,6 +427,9 @@ src/core/ForgeSpheres*             mesh
 src/core/FigurePose*               mesh
 src/core/ExtractMirror*            mesh
 src/core/EdgeSelect*               mesh
+src/core/Poly*                     mesh
+src/app/PanelPolygon*              mesh
+src/core/EdgeLoopInsert*           mesh
 src/core/Primitives*               mesh
 src/core/Sculptable*               mesh
 src/core/SelectionSets*            mesh
