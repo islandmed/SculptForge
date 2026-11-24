@@ -1082,6 +1082,14 @@ void App::drawPalette_Tool() {
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Viewport Look");
         drawShadingControls();
     }
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (or while a Scatter is still live). Last,
+    // so the rows above sit in the same place in both looks.
+    if ((newerMenuRows() || scatterRevision_) && subpalette("tool.scatter", "Scatter")) {
+        tray::Section section;
+        Demo::pushScope("Scatter");
+        drawScatterContents(); // PanelScatter.cpp
+        Demo::popScope();
+    }
 }
 
 // Radial symmetry (#63): the toggle with Local, then the count and the axis.
