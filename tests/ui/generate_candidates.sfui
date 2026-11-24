@@ -11,8 +11,8 @@ generator_stub sphere torus cube
 drop ../../assets/demo/teddy-sketch.png
 wait_for "Generate 3D/Generate 3D model" 5
 expect "Generate 3D/Candidates"
-expect "Generate 3D/Sculpting base: moderate density, clean quads"
-expect "Generate 3D/Reference: high fidelity"
+expect "Generate 3D/Sculpting base##result"
+expect "Generate 3D/Reference##result"
 expect "Generate 3D/Use as sculpting base"
 expect_text Generate a model and pick one first.
 expect_text The AI gives the form; SculptForge gives the topology.
@@ -20,7 +20,7 @@ expect_value ai_provenance == 0
 shot generate-flow-start
 
 # Reference first: the pick stays exactly as generated (no remesh, no button).
-click "Generate 3D/Reference: high fidelity"
+click "Generate 3D/Reference##result"
 expect_not "Generate 3D/Use as sculpting base"
 expect_text it stays exactly as generated
 click "Generate 3D/Generate 3D model"
@@ -56,7 +56,7 @@ expect_text (reference)
 
 # Sculpting base: the button rebuilds the picked model (Resolution down to its minimum, under Advanced, to keep the
 # test quick); the model as generated stays hidden as the Reference, the tags say which pass each Part is.
-click "Generate 3D/Sculpting base: moderate density, clean quads"
+click "Generate 3D/Sculpting base##result"
 expect_text About
 click "Generate 3D/Advanced##sculpting_base"
 drag_item "Generate 3D/Resolution" -400 0

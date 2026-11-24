@@ -568,7 +568,12 @@ void App::drawSculptingBase() {
     hint(tr("The AI gives the form; SculptForge gives the topology. Choose what the model you pick becomes:"));
     // The one choice (areas/ai.md #2): a sculpting base of moderate density in clean quads, or the model at full fidelity.
     const bool quads = generatedRemesh_ != int(GeneratedRemesh::Voxel);
-    ImGui::RadioButton(tr("Sculpting base: moderate density, clean quads"), &generatedResult_, int(GeneratedResult::SculptingBase));
+    auto subline = [&hint](const char* text) { // the qualifier under a radio, indented to its label
+        ImGui::Indent(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
+        hint(text);
+        ImGui::Unindent(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
+    };
+    ImGui::RadioButton(tr("Sculpting base##result"), &generatedResult_, int(GeneratedResult::SculptingBase));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         char tip[320];
         std::snprintf(tip, sizeof tip,
@@ -579,10 +584,12 @@ void App::drawSculptingBase() {
                       quads ? generatedQuadTarget(remeshResolution_) : 2 * generatedQuadTarget(remeshResolution_));
         ImGui::SetTooltip("%s", tip);
     }
-    ImGui::RadioButton(tr("Reference: high fidelity"), &generatedResult_, int(GeneratedResult::Reference));
+    subline(tr("Moderate density, clean quads"));
+    ImGui::RadioButton(tr("Reference##result"), &generatedResult_, int(GeneratedResult::Reference));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("The model exactly as the service made it, every triangle. Sculpt on a base of your "
                                    "own and Project Detail from it, or export it as it is."));
+    subline(tr("High fidelity, exactly as generated"));
     const bool base = generatedResult_ == int(GeneratedResult::SculptingBase);
     if (base && quads) {
         char text[160];
