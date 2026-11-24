@@ -290,7 +290,8 @@ SculptForge tells you when there is a new version. Once a day at start-up it dow
 that names the newest version; if yours is older, a banner at the top of the 3D view says what's new, with
 **What's new**, **Download**, **Later** and **Skip this version**.
 
-Nothing about you or your computer is sent. **Help > Check for updates** asks right away, and
+The check is counted per day by version and system, with no identifier and no IP address kept; nothing else about you or
+your computer is sent. **Help > Check for updates** asks right away, and
 **Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
 for early builds).
 

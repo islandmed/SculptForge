@@ -11,6 +11,16 @@ namespace sf {
 
 namespace {
 
+#if defined(__ANDROID__)
+constexpr const char* kOsName = "android";
+#elif defined(_WIN32)
+constexpr const char* kOsName = "windows";
+#elif defined(__APPLE__)
+constexpr const char* kOsName = "macos";
+#else
+constexpr const char* kOsName = "linux";
+#endif
+
 bool httpsUrl(const std::string& s) { return s.rfind("https://", 0) == 0 && s.size() > 8; }
 
 std::vector<uint64_t> versionParts(const std::string& v) {
@@ -198,6 +208,27 @@ bool applyInstallerChoice(const InstallerChoice& choice, int64_t stamp, int64_t&
     appliedStamp = stamp;
     checkUpdates = choice.checkUpdates;
     return true;
+}
+
+std::string countedFeedUrl(const std::string& fullVersion) {
+    return std::string(kUpdateCountedUrl) + "?v=" + fullVersion + "&os=" + kOsName;
+}
+
+std::vector<std::string> updateFeedChain(const std::string& counted, const std::string& source, const std::string& mirror) {
+    std::vector<std::string> chain;
+    if (!counted.empty() && source == kUpdateFeedUrl) chain.push_back(counted);
+    if (!source.empty()) chain.push_back(source);
+    if (!mirror.empty()) chain.push_back(mirror);
+    return chain;
+}
+
+bool readFeedChain(const std::vector<std::string>& chain,
+                   const std::function<bool(const std::string&, std::string&, std::string&)>& read, std::string& body,
+                   std::string& error) {
+    error.clear();
+    for (const std::string& from : chain)
+        if (read(from, body, error)) return true;
+    return false;
 }
 
 } // namespace sf

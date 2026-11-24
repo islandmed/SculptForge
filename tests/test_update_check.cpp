@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <set>
 
 using namespace sf;
 
@@ -155,4 +156,39 @@ TEST(installer_update_choice_applies_once_per_installer_run) {
     // A file without a usable time is ignored.
     check = false;
     CHECK(!applyInstallerChoice(on, 0, applied, check) && !check);
+}
+
+// The daily check asks the counted address first and falls back to the website, then its mirror, on any error.
+TEST(update_check_counted_address_falls_back_to_the_site) {
+    const std::string counted = countedFeedUrl("0.12.16");
+    CHECK(counted.rfind("https://link.sculptforge.app/latest.json?v=0.12.16&os=", 0) == 0);
+    const std::string os = counted.substr(counted.find("&os=") + 4);
+    CHECK(os == "linux" || os == "windows" || os == "macos" || os == "android");
+
+    const auto chain = updateFeedChain(counted, kUpdateFeedUrl, kUpdateFeedMirrorUrl);
+    CHECK(chain.size() == 3 && chain[0] == counted && chain[1] == kUpdateFeedUrl && chain[2] == kUpdateFeedMirrorUrl);
+    // Not counted: no counted address (manual check, dev build), a studio's channel, SF_UPDATE_FEED, a local file.
+    CHECK(updateFeedChain("", kUpdateFeedUrl, kUpdateFeedMirrorUrl).size() == 2);
+    CHECK(updateFeedChain(counted, "https://sw.acme.internal/latest.json", "").size() == 1);
+    CHECK(updateFeedChain(counted, "/tmp/feed.json", "")[0] == "/tmp/feed.json");
+
+    std::vector<std::string> asked;
+    auto reader = [&](const std::set<std::string>& works) {
+        return [&asked, works](const std::string& from, std::string& body, std::string& error) {
+            asked.push_back(from);
+            error.clear();
+            if (works.count(from)) { body = "feed from " + from; return true; }
+            error = "the server answered 503";
+            return false;
+        };
+    };
+    std::string body, error;
+    CHECK(readFeedChain(chain, reader({counted}), body, error) && body == "feed from " + counted && asked.size() == 1);
+    asked.clear();
+    CHECK(readFeedChain(chain, reader({kUpdateFeedUrl}), body, error) && body == std::string("feed from ") + kUpdateFeedUrl &&
+          asked.size() == 2 && error.empty()); // the worker down: the site answers, nothing is reported
+    asked.clear();
+    CHECK(readFeedChain(chain, reader({kUpdateFeedMirrorUrl}), body, error) && asked.size() == 3);
+    asked.clear();
+    CHECK(!readFeedChain(chain, reader({}), body, error) && asked.size() == 3 && error == "the server answered 503");
 }

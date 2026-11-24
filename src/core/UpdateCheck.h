@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -13,6 +14,9 @@
 namespace sf {
 
 inline constexpr const char* kUpdateFeedUrl = "https://sculptforge.app/latest.json";
+// The same file through the link relay's Worker, which counts the daily check by day, version and system (no id, no IP
+// kept) and answers with the website's own file. Asked first by the automatic check only; any error falls back.
+inline constexpr const char* kUpdateCountedUrl = "https://link.sculptforge.app/latest.json";
 // The same file on the website's GitHub copy, for networks that block sculptforge.app (new domains often are).
 inline constexpr const char* kUpdateFeedMirrorUrl = "https://islandmed.github.io/latest.json";
 inline constexpr int64_t kUpdateCheckInterval = 24 * 60 * 60; // seconds
@@ -54,6 +58,19 @@ struct UpdateInfo {
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas
 // (the feed's channels.preview, published by scripts/release.sh X.Y.Z-beta.N).
 enum class UpdateChannel { Stable, Preview };
+
+// The counted address for this build: "<kUpdateCountedUrl>?v=0.12.16&os=linux" (os: linux, windows, macos or android).
+std::string countedFeedUrl(const std::string& fullVersion);
+
+// Where the automatic check looks, in order: the counted address (when `counted` is not empty), then the feed, then its
+// mirror. The counted address leads only for the public feed: a studio's own channel, SF_UPDATE_FEED and a local file
+// are asked as they are.
+std::vector<std::string> updateFeedChain(const std::string& counted, const std::string& source, const std::string& mirror);
+
+// Reads the first of `chain` that `read` can fetch; false (with the last error) when none can.
+bool readFeedChain(const std::vector<std::string>& chain,
+                   const std::function<bool(const std::string& from, std::string& body, std::string& error)>& read,
+                   std::string& body, std::string& error);
 
 // Reads the feed; false (with `error`) when it isn't one: the version and an https download link are required.
 // On Preview the feed's channels.preview entry is offered when it is newer than the stable release; otherwise (and

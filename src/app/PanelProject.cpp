@@ -984,14 +984,16 @@ void App::startUpdateCheck(bool manual) {
     // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
     const std::shared_ptr<MemberAuth> member =
         memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
+    // The automatic check goes through the counted address (core/UpdateCheck.h); the manual one, a developer's build and
+    // UI tests ask the website itself, so they are never counted.
+    const std::string counted = !manual && options_.uiTest.empty() && !*SF_DEV_COMMIT ? countedFeedUrl(appFullVersion()) : std::string();
     // The featured creator card's feed rides along on the public feed only (never a studio's own channel).
     const bool featuredToo = !studioMode().active && policy::current().updateFeed.empty() && policy::current().updateMirror.empty();
     const std::string featuredDir = prefDir_;
-    std::thread([job, source, fallback, channel, member, featuredToo, featuredDir] {
+    std::thread([job, source, fallback, counted, channel, member, featuredToo, featuredDir] {
         std::string body;
         // A URL or a local file (a studio's mirror on a share; UI tests).
-        auto fetch = [&](const std::string& from) { return readFeedText(from, body, job->error); };
-        if (!fetch(source) && !fallback.empty()) fetch(fallback);
+        readFeedChain(updateFeedChain(counted, source, fallback), readFeedText, body, job->error);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
         if (featuredToo && !featuredDir.empty()) fetchFeatured(*job, source, fallback, featuredDir);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)

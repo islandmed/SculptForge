@@ -19,6 +19,11 @@ ALLOWED_ORIGINS = "https://sculptforge.app,https://www.sculptforge.app"
 name = "TOPICS"
 class_name = "Topic"
 
+# One data point per daily update check (blobs: version, os; nothing else): src/index.js, GET /latest.json.
+[[analytics_engine_datasets]]
+binding = "UPDATE_CHECKS"
+dataset = "update_checks"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Topic"]

@@ -160,6 +160,37 @@ export class Topic {
     }
 }
 
+// --- Daily update-check count (GET /latest.json) ---------------------------------------------------------------------
+// The app's once-a-day update check asks this Worker for the website's latest.json (same body, cached at the edge) and
+// the Worker writes one Workers Analytics Engine data point: blobs [version, os]. Nothing else is kept: no IP address,
+// user agent, header, id or cookie (the code below never reads them), and the request log is off (wrangler.toml). We
+// read the counts in the Cloudflare dashboard (Workers > sculptforge-link > Metrics; Analytics Engine, dataset
+// update_checks).
+export const FEED_URL = "https://sculptforge.app/latest.json";
+export const FEED_CACHE_SECONDS = 10 * 60;
+export const OS_NAMES = ["linux", "windows", "macos", "android"];
+const VERSION_PATTERN = /^\d{1,3}\.\d{1,3}\.\d{1,3}(-[a-z]{1,8}\.\d{1,3})?$/;
+
+// "0.12.16" / "0.13.0-beta.1" as sent by the app; anything else is counted as "other".
+export const cleanVersion = (v) => (typeof v === "string" && VERSION_PATTERN.test(v) ? v : "other");
+export const cleanOs = (os) => (OS_NAMES.includes(os) ? os : "other");
+
+// The website's latest.json, byte for byte. The edge keeps it ~10 minutes; the subrequest carries none of the app's
+// headers. Not ok (or unreachable): 502, and the app falls back to the website itself.
+async function latestJson(request, url, env) {
+    let body;
+    try {
+        const origin = await fetch(FEED_URL, { headers: { Accept: "application/json" }, cf: { cacheTtl: FEED_CACHE_SECONDS, cacheEverything: true } });
+        if (origin.ok) body = await origin.text();
+    } catch {
+        // (unreachable: the same 502)
+    }
+    if (body === undefined) return json({ error: "feed unavailable" }, 502, null);
+    if (request.method === "GET")
+        env.UPDATE_CHECKS?.writeDataPoint({ blobs: [cleanVersion(url.searchParams.get("v")), cleanOs(url.searchParams.get("os"))], doubles: [1] });
+    return respond(request.method === "HEAD" ? null : body, 200, null);
+}
+
 // What a person sees who opens link.sculptforge.app in a browser (a phone may save plain text as a file instead).
 const HOME_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>SculptForge link relay</title>
@@ -203,6 +234,7 @@ export default {
         if (request.method === "OPTIONS") return respond(null, 204, origin);
         if (url.pathname === "/" || url.pathname === "/relay" || url.pathname === "/relay/")
             return respond(HOME_PAGE, 200, origin, "text/html; charset=utf-8");
+        if (url.pathname === "/latest.json" && ["GET", "HEAD"].includes(request.method)) return latestJson(request, url, env);
 
         const deckMatch = url.pathname.match(/^\/deck\/([^/]+)\/(up|down)$/);
         if (deckMatch) {

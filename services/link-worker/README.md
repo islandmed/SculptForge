@@ -21,6 +21,14 @@ the first. Browsers may post only from the pages in `ALLOWED_ORIGINS`. No logs a
 **Cost:** one face connection is one POST and up to 200 polls (one every 1.5 s, stopped as soon as the answer
 arrives, at most 5 minutes). The free plan allows 100,000 Worker requests a day.
 
+## Update-check count
+
+`GET /latest.json?v=<version>&os=<linux|windows|macos|android>` returns the website's `latest.json` unchanged (the
+edge keeps it about 10 minutes) and writes one Workers Analytics Engine data point (dataset `update_checks`,
+blobs: version, os). No IP address, user agent, header or id is read or kept. The daily counts are in the Cloudflare
+dashboard: Workers > sculptforge-link > Metrics, and Analytics Engine for version and system. Deploy as below (the
+dataset is created by the first `wrangler deploy`).
+
 ## Test
 
 ```sh

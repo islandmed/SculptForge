@@ -17,6 +17,7 @@ class MemoryStorage {
 export function fakeEnv(allowedOrigins = "https://sculptforge.app") {
     const objects = new Map();
     const env = { ALLOWED_ORIGINS: allowedOrigins };
+    env.UPDATE_CHECKS = { points: [], writeDataPoint(point) { this.points.push(structuredClone(point)); } }; // Analytics Engine
     env.TOPICS = {
         idFromName: (name) => name,
         get(id) {
