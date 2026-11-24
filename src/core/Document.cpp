@@ -226,6 +226,20 @@ std::string Document::uniquePartName(const std::string& wanted) const {
     }
 }
 
+std::string Document::duplicatePartName(const std::string& source) const {
+    // The base: the source without a ".NN" number of its own (two or more digits after a dot, as the copies get).
+    std::string base = source;
+    const size_t dot = base.rfind('.');
+    if (dot != std::string::npos && dot + 3 <= base.size() &&
+        std::all_of(base.begin() + long(dot) + 1, base.end(), [](unsigned char ch) { return std::isdigit(ch) != 0; }))
+        base.erase(dot);
+    if (base.empty()) base = "Part";
+    for (int n = 1;; ++n) {
+        std::string candidate = base + (n < 10 ? ".0" : ".") + std::to_string(n);
+        if (findPart(candidate) < 0) return candidate;
+    }
+}
+
 uint32_t Document::addPartFolder(const std::string& name) {
     PartFolder f;
     f.id = nextFolderId_++;

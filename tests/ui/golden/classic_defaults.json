@@ -319,6 +319,7 @@
     "viewportCursor": 0,
     "backfaceCulling": false,
     "floorGrid": false,
+    "floorGridFixed": false,
     "uvPackColumns": 1,
     "uvPackRows": 1,
     "maskDarkness": 0.699999988,

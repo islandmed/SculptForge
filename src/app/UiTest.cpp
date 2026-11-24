@@ -1822,6 +1822,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "detached_panels") return double(app_.panelWindows_.size()); // in windows of their own (PanelWindows.cpp)
     if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;
     if (name == "floor_height") return double(app_.renderSettings_.floorHeight); // (the visible Parts' lowest point)
+    if (name == "floor_grid_fixed") return app_.uiPrefs_.floorGridFixed ? 1.0 : 0.0; // View > Display > Floor grid at Y=0
     if (name == "floor_grid_drawn") { // the 3D view drawn once more now: 1 if it drew the floor grid
         app_.benchmarkDrawMs(0);
         return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
@@ -1984,6 +1985,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
+    if (name == "camera_target_x") return app_.camera_.target.x; // the orbit target (centre view on the pointer)
+    if (name == "camera_target_y") return app_.camera_.target.y;
+    if (name == "camera_target_z") return app_.camera_.target.z;
+    if (name == "camera_eye_x") return app_.camera_.position().x; // where the eye is
+    if (name == "camera_eye_y") return app_.camera_.position().y;
+    if (name == "camera_eye_z") return app_.camera_.position().z;
     if (name == "camera_pitch") return glm::degrees(app_.camera_.pitch);
     if (name == "camera_roll") return glm::degrees(app_.camera_.roll);
     if (name == "camera_up") return (app_.camera_.orientation() * glm::vec3(0, 1, 0)).y;

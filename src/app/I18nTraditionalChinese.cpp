@@ -1896,9 +1896,19 @@ constexpr Entry kTraditionalChinese[] = {
     {"Floor grid", "地面網格"},
     {"A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
      "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-     "a stroke or a move ends. Off by default; saved automatically.",
+     "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
      "模型所站立地面上的淡淡網格（位於模型最低點，Y 軸向上），向遠處漸隱：用作透視和對齊部件的參考；紅線和藍線是 X 軸和 "
-     "Z 軸。筆觸或移動結束時更新位置。預設關閉；自動儲存。"},
+     "Z 軸。筆觸或移動結束時更新位置（「Y=0 處的地面網格」可使其保持靜止）。預設關閉；自動儲存。"},
+    {"Floor grid at Y=0", "Y=0 處的地面網格"},
+    {"Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+     "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+     "model); saved automatically.",
+     "將地面網格保持在世界座標高度零（Y=0），而非可見部件的最低點下方：上下移動部件或製作底座時的固定參考。預設關閉（網格跟隨模型）；自動儲存。"},
+    {"Centre view on the pointer", "將視圖置中於游標"},
+    {"Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+     "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+     "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+     "滑動視圖，使游標下方的點位於中心，同時保持縮放和角度；之後視圖會圍繞該點旋轉。在畫布上 Alt+中鍵點擊可在所有按鍵樣式下生效（拖曳仍為平移）；按下此動作的按鍵時，會在游標處執行相同動作（預設無按鍵：請在偏好設定 > 快速鍵中指定）。"},
     {"Backface culling", "背面剔除"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "

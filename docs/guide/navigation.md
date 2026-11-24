@@ -91,6 +91,7 @@ camera.
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> (Maya style: also <kbd>Alt</kbd>+<kbd>F</kbd>) |
+| Centre the view on the pointer | <kbd>Alt</kbd>+middle click (press and let go without dragging; every key style): the point under the pointer slides to the middle of the view, the zoom and the angle stay, and the view then turns about that point. Off the model it centres on that spot of the background. **Centre view on the pointer** in the Controls window (<kbd>F1</kbd>) can take a key, which does the same wherever the pointer is |
 | Reset the view | Maya style: <kbd>Alt</kbd>+<kbd>H</kbd> (front, upright, everything in view); any style: **Reset view** in the Controls window (<kbd>F1</kbd>), where you can give it a key |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
 | Sculpt from the background | Turn on **Edit > Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
@@ -119,8 +120,10 @@ Rectangle Mask and the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes wor
 on the floor the model stands on: its lowest point, with the up axis (Y) standing on it. It helps judge perspective
 and tilt and line up Parts; the red line is the X axis, the blue one Z.
 
-The floor moves when a stroke or a move ends (not during it). The squares step up by ten as you zoom out, and the grid
-fades into the distance; it never draws over the model, even seen from below.
+The floor moves when a stroke or a move ends (not during it). **Floor grid at Y=0** (next to it; off by default,
+remembered) keeps the grid at the world's height zero instead, a fixed reference while you move Parts up and down or
+work on a base: a Part below it then shows through the grid from above. The squares step up by ten as you zoom out, and
+the grid fades into the distance; it never draws over the model, even seen from below.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the

@@ -1344,6 +1344,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
+    sculptforge_ui_test(floor_grid_fixed_1440 floor_grid_fixed --size 1440x900) # View > Display > Floor grid at Y=0
+    sculptforge_ui_test(floor_grid_fixed_2880 floor_grid_fixed --size 2880x1800)
+    sculptforge_ui_test(parts_numbered_duplicates_1440 parts_numbered_duplicates --size 1440x900) # Head.01, Head.02 in the Parts list
+    sculptforge_ui_test(parts_numbered_duplicates_2880 parts_numbered_duplicates --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation

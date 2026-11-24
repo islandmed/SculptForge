@@ -104,8 +104,9 @@ You can also add files as Parts from elsewhere:
   and choose **Append as Part**.
 
 > **Tip:** **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>, also in the command palette as
-> **Duplicate Part**) copies the active Part with its layers and attributes, names it `<name> copy` and puts it
-> right under the original. Use it to keep a safe copy before a destructive step such as a remesh.
+> **Duplicate Part**) copies the active Part with its layers and attributes, numbers it (`Head` becomes `Head.01`,
+> then `Head.02`; a copy of a copy counts on from the same name) and puts it right under the original. Use it to keep a
+> safe copy before a destructive step such as a remesh.
 > **Linked Duplicate** instead makes a copy that shares the mesh and changes with it (rivets, legs, columns); see
 > [Linked Duplicates](linked-duplicates.md).
 

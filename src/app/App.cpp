@@ -2246,6 +2246,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
+    // Alt+middle click (no drag) centres the view on the pointer (centreViewOnPointer, every key style: an Alt+middle
+    // drag still pans, or orbits with Blender keys, from the press on).
+    centreClick_.pending = button == SDL_BUTTON_MIDDLE && (SDL_GetModState() & SDL_KMOD_ALT) &&
+                           !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_GUI)) && previewLod_ < 0;
+    centreClick_.x = x;
+    centreClick_.y = y;
+    centreClick_.dx = centreClick_.dy = 0.0f;
     zsMenu_.armed = false;
     // A right click on a Forge Sphere opens its menu (#8): Delete, Insert Between, Set as Root.
     if (button == SDL_BUTTON_RIGHT && forgesphereActive() && !doc_.mesh.forgespherePreview &&
@@ -2461,6 +2468,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     mouseX_ = x;
     mouseY_ = y;
     lastInputPen_ = fromPen;
+    if (centreClick_.pending) { // an Alt+middle click so far (as the right click's slop below; the drag never waits)
+        centreClick_.dx += dx;
+        centreClick_.dy += dy;
+        const float steps = std::hypot(centreClick_.dx, centreClick_.dy);
+        const float away = std::hypot(x - centreClick_.x, y - centreClick_.y);
+        if (std::max(steps, away) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (rightClick_.pending) { // a right click so far: the view waits until it is a drag
         // (By the motion's own steps, not the position: some input moves only relatively.) Past the slop, the
         // drag goes on by everything since the press, so it loses nothing.
@@ -2715,6 +2729,10 @@ void App::onMouseUp() {
     rollPending_ = false;
     rollSideways_ = false;
     rightClick_.pending = rightClick_.down = false;
+    if (centreClick_.pending) { // Alt+middle click: pressed and let go without moving
+        centreClick_.pending = false;
+        centreViewOnPointer(mouseX_, mouseY_);
+    }
     zsMenu_.armed = false;
     orbitStarted_ = false;
     orbitPivotPicked_ = false;
@@ -3664,8 +3682,9 @@ AABB App::sceneBounds() const {
 }
 
 void App::updateFloorHeight() {
-    if (!renderSettings_.floorGrid) {
-        floorKey_ = 0; // (measured again when it is turned on)
+    if (!renderSettings_.floorGrid || uiPrefs_.floorGridFixed) {
+        floorKey_ = 0; // (measured again when it is turned on, or set to follow the model again)
+        if (uiPrefs_.floorGridFixed) renderSettings_.floorHeight = 0.0f; // View > Display > Floor grid at Y=0
         return;
     }
     if (renderSettings_.stroking || drag_ != Drag::None) return; // after the stroke or the drag, not during it

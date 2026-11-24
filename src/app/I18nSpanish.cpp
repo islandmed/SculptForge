@@ -2152,11 +2152,21 @@ constexpr Entry kSpanish[] = {
     {"Floor grid", "Cuadrícula del suelo"},
     {"A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
      "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-     "a stroke or a move ends. Off by default; saved automatically.",
+     "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
      "Una cuadrícula tenue en el suelo sobre el que se apoya el modelo (su punto más bajo, Y hacia arriba), que "
      "se desvanece a lo lejos: una referencia para la perspectiva y para alinear Piezas; las líneas roja y azul "
-     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento. Desactivada por defecto; se guarda "
+     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento (Cuadrícula del suelo en Y=0 la deja fija). Desactivada por defecto; se guarda "
      "automáticamente."},
+    {"Floor grid at Y=0", "Cuadrícula del suelo en Y=0"},
+    {"Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+     "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+     "model); saved automatically.",
+     "Mantén la cuadrícula del suelo a la altura cero del mundo (Y=0) en lugar de bajo el punto más bajo de las Piezas visibles: una referencia fija mientras subes y bajas Piezas o trabajas en una base. Desactivada por defecto (la cuadrícula sigue al modelo); se guarda automáticamente."},
+    {"Centre view on the pointer", "Centrar la vista en el puntero"},
+    {"Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+     "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+     "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+     "Desplaza la vista para que el punto bajo el puntero quede en el centro, manteniendo el zoom y el ángulo; después la vista gira alrededor de ese punto. Alt+clic central en el lienzo lo hace en todos los estilos de teclas (arrastrar sigue desplazando); esta acción hace lo mismo en el puntero al pulsar su tecla (sin tecla por defecto: asigna una en Preferencias > Atajos)."},
     {"Backface culling", "Ocultar caras traseras"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "

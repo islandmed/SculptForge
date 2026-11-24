@@ -172,6 +172,7 @@ Json toJson(const UiPrefs& p) {
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
     j.set("floorGrid", p.floorGrid);
+    j.set("floorGridFixed", p.floorGridFixed);
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
@@ -307,6 +308,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     p.floorGrid = j["floorGrid"].asBool(p.floorGrid);
+    p.floorGridFixed = j["floorGridFixed"].asBool(p.floorGridFixed);
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);

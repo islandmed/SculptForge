@@ -646,9 +646,15 @@ void App::registerShellActions() {
     add({"view.floor_grid", "Floor grid", ICON_LC_GRID_2X2,
          "A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
          "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-         "a stroke or a move ends. Off by default; saved automatically.",
+         "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
          "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
          [this] { return renderSettings_.floorGrid; }, nullptr});
+    add({"view.floor_grid_fixed", "Floor grid at Y=0", ICON_LC_GRID_2X2,
+         "Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+         "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+         "model); saved automatically.",
+         "Render", "", "", [this] { uiPrefs_.floorGridFixed = !uiPrefs_.floorGridFixed; },
+         [this] { return uiPrefs_.floorGridFixed; }, nullptr});
     // The right shelf's view toggles (foirgairwolf on Discord): each flips a setting that lives elsewhere.
     add({"view.turntable", "Turntable", ICON_LC_ORBIT,
          "Rotation drags turn the view like a turntable, the model upright (on), or freely about the screen's axes "
