@@ -342,6 +342,8 @@ private:
     bool sizeRingPreviewIntensity_ = false;   // an Intensity pop-up's preview: a disc in the ring
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool smoothColourTagShown_ = false;  // the last cursor drawn carried the Shift-in-Paint-mode tag (smooth_colour_tag)
+    bool smoothBordersTagShown_ = false; // the last cursor drawn carried the "Smooth: face group borders only" tag (UI tests: smooth_borders_tag)
     bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
@@ -869,6 +871,7 @@ private:
     // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
     struct GeneratedCandidate {
         ai::GeneratorResult result;
+        AiProvenance ai;            // host, model, date (core/AiProvenance.h): the Part it becomes carries it
         std::shared_ptr<Mesh> mesh; // as generated, in one piece, its flat background dropped; null: it failed (error)
         BackdropRemoval backdrop;
         std::string error;
@@ -883,6 +886,10 @@ private:
     int candidateCount_ = 3;     // free and local services
     int paidCandidateCount_ = 1; // services billed per generation (fal.ai, Meshy, Hyper3D): one unless asked
     bool keepOtherCandidates_ = false; // the ones not picked stay as hidden Parts
+    // Generate 3D's one choice (areas/ai.md #2): what the pick becomes. Base: remeshed at once (Voxel, then Quad Remesh
+    // unless turned off under Advanced), the model as generated kept hidden as the Reference. Reference: as generated.
+    enum class GeneratedResult { SculptingBase, Reference };
+    int generatedResult_ = int(GeneratedResult::SculptingBase);
     bool keepHighDetail_ = true;       // the sculpting base keeps the generated model as a hidden Part to Project Detail from
     uint32_t generatedPart_ = 0;       // the picked candidate's Part (0: none)
     uint32_t highDetailPart_ = 0;      // its hidden high-detail copy, once the sculpting base is made
@@ -987,7 +994,7 @@ private:
     static bool isCircleShape(SelectShape s) { return s == SelectShape::Circle || s == SelectShape::CutCircle; }
     static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
     bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
-    enum class SelectTarget { Hide, Mask };
+    enum class SelectTarget { Hide, Mask, Poly }; // Poly: Polygon mode's box select (PanelPolygon.cpp)
     void beginSelection(float x, float y, SelectTarget target, SelectShape shape);
     void selectionMove(float x, float y);
     void selectionMouseUp();
@@ -1782,7 +1789,37 @@ private:
         BrushType brush = BrushType::Standard;
         int recipe = -1;
         bool paint = false;
-    } guidesFrom_, edgesFrom_;
+    } guidesFrom_, edgesFrom_, polyFrom_;
+    // Polygon mode (PanelPolygon.cpp, core/PolyMode.h, core/PolyOps.h): clicks and box drags on the model select
+    // points, edges or faces of the active Part; the Transform gizmo moves the selection; the operations (Tool >
+    // Polygon) run on it. Picking a brush or Esc leaves it; the gizmo works inside it.
+    void registerPolygonUiActions();
+    void setPolyMode(bool on);
+    void syncPolyMode();                                   // leaves the mode when another brush was picked
+    bool polyMouseDown(float x, float y, SDL_Keymod mod);  // true if it took the click (a box drag starts)
+    void polySelectMouseUp();                              // the box, or the click's element
+    // The element of the picked kind under a window point, or false off the model.
+    bool polyElementAt(float x, float y, uint32_t& index, RayHit* hit = nullptr);
+    void polyRunOp(const std::string& id);                 // poly_op with the panel's slider values
+    void drawPolyOverlay();                                // the selection over the model, the hovered element, a preview
+    void drawPolygonContents();                            // Tool > Polygon
+    bool polyMode_ = false;
+    bool polyWireBefore_ = false;                          // the wireframe toggle as it was before the mode turned it on
+    int polyPressClicks_ = 1;                              // the click count at the press (a double-click selects a loop / group)
+    std::map<std::string, Args> polyOpValues_;             // per op: the panel's parameter values
+    struct PolyOverlay {
+        const void* topo = nullptr;
+        uint64_t revision = 0, visibleKey = 0;
+        PolyElement element = PolyElement::Faces;
+        std::vector<uint32_t> items;  // the selected elements of the picked kind (faces: one half per polygon)
+        std::vector<uint8_t> visible; // per item: facing the camera
+        uint32_t hovered = ~0u;
+        // A live preview of an op while its slider moves: the result mesh's selected faces' edges.
+        std::string previewOp;
+        Args previewArgs;
+        std::vector<std::pair<glm::vec3, glm::vec3>> previewEdges;
+        bool previewOk = false;
+    } polyOverlay_;
     std::vector<glm::vec3> guidePath_; // the curve being drawn (points on the surface)
     float guidePathLast_[2] = {0.0f, 0.0f};
     float curvesStrength_ = 50.0f;     // Guide Strength 0-100 (QRemeshOptions::guideStrength x 100)
@@ -1851,6 +1888,8 @@ private:
     enum class TubeDepth { Surface, Pivot, Fixed };
     void registerTubeUiActions();
     void drawTubeContents();                                // Tool > Tube
+    void drawScatterContents();                             // Tool > Scatter (PanelScatter.cpp)
+    void runScatter();                                      // ... with the settings below (a setting changed: redoes the last one)
     void drawTubeShapeControls(float width);                // its Shape group
     bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
     void tubeDragTo(float x, float y);
@@ -1889,6 +1928,22 @@ private:
     uint32_t tubeRepeatPart_ = 0;   // Repeat along curve: the Part to repeat (its id; 0 = none picked)
     float tubeRepeatSpacing_ = 1.0f, tubeRepeatTurn_ = 0.0f; // ... how far apart the copies are, how far each is turned
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
+    // Tool > Scatter (PanelScatter.cpp, core/Scatter.h): the piece (a Part's id, 0 = the built-in shape) and the settings.
+    uint32_t scatterPiece_ = 0;
+    int scatterShape_ = 0;         // index into the built-in shapes (Pebble first)
+    float scatterSize_ = 0.04f;    // a built-in shape's size, a fraction of the surface's
+    int scatterCount_ = 200, scatterSeed_ = 1;
+    float scatterScaleMin_ = 1.0f, scatterScaleMax_ = 1.0f, scatterTurn_ = 180.0f, scatterTilt_ = 0.0f, scatterOffset_ = 0.0f;
+    bool scatterAlign_ = true, scatterFlat_ = false, scatterMasked_ = false, scatterSeparate_ = false;
+    bool scatterKeepApart_ = true, scatterTight_ = true;
+    float scatterSpacing_ = 0.0f;
+    // The last Scatter: the undo revision after it, its surface Part and the Part it made (ids). While it is the last step
+    // and its surface is active, a changed setting redoes it (one undo step stays); `ms`: how long it took (a slider held
+    // re-runs it as it moves only while that is quick).
+    uint64_t scatterRevision_ = 0;
+    uint32_t scatterTarget_ = 0, scatterMade_ = 0;
+    double scatterMs_ = 0.0;
+    std::string scatterResult_; // its result line (or why it was refused), shown under the buttons
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
     int tubeRadiusEditPoint_ = -1;

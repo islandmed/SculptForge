@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment_retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -118,11 +118,36 @@ jobs:
             echo "No jobs-data branch yet: main's snapshot"
           fi
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      - id: upload
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website
           include-hidden-files: true # website/.well-known/ (security.txt); nothing else under website/ is hidden
+      # 11-23/24: deploy-pages listed the run's artifacts about half a second after the upload finalized and got 0
+      # ("Found 0 artifact(s)") although the upload had succeeded (same run, ID in the upload's log): the list API lags
+      # the upload. 8 deploys failed this way, the same action versions passed minutes later. Wait here until the list
+      # shows it (twice in a row), and fail with the run and artifact IDs if it never does.
+      - name: Wait until the artifact is listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact_id }}
+        run: |
+          seen=0
+          for i in $(seq 1 60); do
+            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                  -q '[.artifacts[] | select(.name == "github-pages" and (.expired | not))] | length' 2>/dev/null || echo 0)
+            if [ "${n:-0}" -ge 1 ]; then seen=$((seen + 1)); else seen=0; fi
+            [ "$seen" -ge 2 ] && { echo "Artifact github-pages (ID $ARTIFACT_ID) is listed for run $GITHUB_RUN_ID after $i checks"; exit 0; }
+            sleep 3
+          done
+          echo "::error::Run $GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT): artifact github-pages (ID ${ARTIFACT_ID:-none}) was uploaded but is not listed for the run after 3 minutes: GitHub's artifact API, not the site. Re-run the failed job."
+          exit 1
+      # (A failed first try creates no deployment, so one more is safe.)
       - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        continue-on-error: true
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
       # Tell Bing and the other IndexNow search engines about the pages straight away (key file in website/).
       - name: IndexNow

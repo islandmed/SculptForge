@@ -46,9 +46,6 @@ struct BenchOptions {
     bool viewOnly = false;
     // Dynamic topology instead (--bench-dyntopo): spheres without subdivision levels, strokes that remesh.
     bool dyntopo = false;
-    // With --bench-dyntopo-uvs the sphere is a painted Part: UVs (two islands) and a 2K texture, so the strokes show
-    // what keeping the UVs costs (the renderer's sync of a textured Part under a remeshing stroke).
-    bool dyntopoUvs = false;
     // Micro-displacement levels instead (--bench-micro, core/Micro.h): sizes are micro triangles (millions), on
     // a base sphere at micro level `microLevel` (4: 256 micro triangles per base triangle).
     bool micro = false;
@@ -63,7 +60,7 @@ struct BenchOptions {
 
 // Command-line options shared by sculptforge-cli and the app: --bench, --bench-sizes 4,16,32 (millions of
 // triangles), --bench-dabs N, --bench-no-project (skip saving / opening, which needs twice the memory),
-// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes; --bench-dyntopo-uvs on a painted Part), --bench-micro (micro-displacement levels; --bench-micro-level N), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
+// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes), --bench-micro (micro-displacement levels; --bench-micro-level N), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
 // (advancing i past its value).
 struct BenchCommandLine {
     bool run = false;

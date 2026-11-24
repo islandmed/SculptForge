@@ -76,6 +76,9 @@ std::vector<std::string> App::latchedForTest() const {
     add(strokeLatch() == StrokeLatch::Mask, "mode: Mask latch");
     add(strokeLatch() == StrokeLatch::Select, "mode: Select latch");
     add(guidesMode_, "mode: QRemesh Guides");
+    // Polygon mode holds the viewport (clicks and drags select; PanelPolygon.cpp) except while a gizmo mode is on, which is
+    // named above and works inside it (W / E / R move the selection; Draw, Esc and a brush leave both).
+    add(polyMode_ && gizmo_.mode == GizmoMode::Off, "mode: Polygon");
     add(maskBrushActive(), "mode: Mask brush");
     add(stencil_.adjust, "mode: Stencil adjust");
     add(!cutPolyline_.empty(), "mode: Cut Polyline points");
@@ -111,6 +114,7 @@ void App::unlatchForTest() {
     gizmo_.hover = GizmoHandle::None;
     strokeLatch_ = {};
     guidesMode_ = false;
+    if (polyMode_) setPolyMode(false); // (restores the wireframe toggle too)
     maskBrush_.on = false;
     stencil_.adjust = false;
     cutPolyline_.clear();
@@ -119,6 +123,8 @@ void App::unlatchForTest() {
     capture_.armed = capture_.open = false;
     facePlacing_ = false;
     packs_.newOpen = false; // (a floating window Esc leaves open, over the model: it would hide later cases' strokes)
+    showBrushGallery_ = false; // (the same: Community brushes and AI Brush float over the model and survive Esc; a monkey
+    showBrushLab_ = false;     // sequence that opened one lost its final stroke to the window on the Actions runner, 11-24)
     capture_.open = false;
     drag_ = Drag::None;
     strokePopup_.open = false;
@@ -342,18 +348,33 @@ bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::strin
         run([this, before] {
             *before = {app_.doc_.activePart, app_.doc_.partCount(), app_.doc_.mesh.positions};
         });
+        // Whether a window floats over the stroke's start is read where the stroke starts, a frame after the pointer
+        // got there (ImGui's hover is a frame behind), not at the check frame: a slow runner read it late and failed a
+        // stroke the Brush Gallery had taken (11-24, seed 4 of the monkey).
+        const std::vector<std::string> strokeWords = splitScriptWords(kStroke);
+        const float u0 = std::strtof(strokeWords[1].c_str(), nullptr), v0 = std::strtof(strokeWords[2].c_str(), nullptr);
+        auto over = std::make_shared<std::string>();
+        steps_.push_back([this, over, u0, v0](float t) {
+            if (t == 0.0f) {
+                const ImVec2 at = onModel(u0, v0);
+                mouseMotion(at.x, at.y);
+                return false;
+            }
+            const ImGuiWindow* w = ImGui::GetCurrentContext()->HoveredWindow;
+            *over = w ? w->Name : "";
+            return true;
+        });
         lineText_ = kStroke;
         if (!parseStep(line, splitScriptWords(kStroke), error)) return false;
-        steps_.push_back([this, line, before](float t) {
+        steps_.push_back([this, line, before, over](float t) {
             if (t == 0.0f) return false;
             const auto& now = app_.doc_.mesh.positions;
             if (app_.doc_.activePart != before->part || app_.doc_.partCount() != before->parts)
                 fail(line, "a plain stroke made or picked another Part (Parts " + std::to_string(before->parts) + " -> " +
                                std::to_string(app_.doc_.partCount()) + ", active " + std::to_string(before->part) + " -> " +
                                std::to_string(app_.doc_.activePart) + ")");
-            else if (now == before->positions && ImGui::GetCurrentContext()->HoveredWindow)
-                SDL_Log("expect_sculpts: the window \"%s\" is over the model: the stroke went to it (not a latch)",
-                        ImGui::GetCurrentContext()->HoveredWindow->Name);
+            else if (now == before->positions && !over->empty())
+                SDL_Log("expect_sculpts: the window \"%s\" is over the model: the stroke went to it (not a latch)", over->c_str());
             else if (now == before->positions)
                 fail(line, "a plain stroke didn't change the mesh (tool: brush " +
                                std::to_string(app_.doc_.activeBrush >= 0 ? -1 : int(app_.brush_)) + ")");
@@ -408,6 +429,11 @@ bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::strin
         });
     } else if (verb == "unlatch") {
         run([this] { app_.unlatchForTest(); });
+        wait(0.05f);
+    } else if (verb == "close_floating") {
+        // close_floating: only the floating windows a person would close (Community brushes, AI Brush, the new-pack
+        // window), nothing else: a latch that survives Esc still shows up in expect_latched / expect_sculpts.
+        run([this] { app_.showBrushGallery_ = app_.showBrushLab_ = app_.packs_.newOpen = false; });
         wait(0.05f);
     } else if (verb == "snapshot_start") {
         run([this] {
@@ -717,6 +743,10 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
         if (neverRun(a.id) || !a.run || !a.checked) continue;
         // (known=FILE: actions whose modes have filed failures are left out: the monkey looks for new ones)
         if (std::any_of(known_.begin(), known_.end(), [&](const auto& k) { return k.first.rfind(a.id + " | ", 0) == 0; })) continue;
+        // A toggle that opens a floating window over the model (the Community brushes gallery) is no mode: Esc and a brush
+        // leave it open, and the final stroke lands on the window instead of the model (seed 9 once Polygon mode's
+        // toggles shifted the sequences). The mode matrix covers it as "opens a window: not a mode".
+        if (a.id == "ui.brush_gallery") continue;
         (a.id.rfind("brush.", 0) == 0 ? brushes : toggles).push_back(a.id);
     }
     if (brushes.empty()) {
@@ -747,7 +777,7 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
         }
     }
     // The way out, then the invariants.
-    for (const char* l : {"release", "hold none", "key escape", "action brush.clay", "action tool.draw", "expect_latched none",
+    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "expect_latched none",
                           "expect_mesh_valid", "expect_sculpts", "undo_all", "expect_restored", "expect_mesh_valid"})
         lines.emplace_back(l);
     return addCase(line, "monkey " + std::to_string(seed), nullptr, lines, error);

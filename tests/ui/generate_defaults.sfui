@@ -7,6 +7,9 @@ expect_text Hunyuan3D 2.1 (Tencent) - free, no token
 expect_text About 32768 quads, then 1 subdivision level
 shot generate-defaults
 expect_value generate_candidates == 0
+expect "Generate 3D/Sculpting base##result"   # the one choice (0.14): base (default) or reference
+expect "Generate 3D/Reference##result"
+click "Generate 3D/Advanced##sculpting_base"                          # the remesh knobs live under Advanced
 expect "Generate 3D/Keep a high-detail copy (hidden)"
 click "Generate 3D/Then Quad Remesh"
 wait 0.2
