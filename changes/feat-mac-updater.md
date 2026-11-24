@@ -2,9 +2,9 @@
 whats_new: **One-click update on macOS**: the update banner's **Update** button now works for the Mac app too. It downloads the new release, checks it, and **Restart now** swaps it into place; the old version is kept until the new one has started.
 highlight: One-click update on macOS
 added: **One-click update on macOS** (update banner > **Update**): the Mac app downloads the release's disk image from
-  SculptForge's GitHub releases to `~/Library/Caches/SculptForge/updates`, checks it against the release's signed checksum
-  list, copies the app out of it beside the current one, runs macOS's code signature check (`codesign --verify --deep
-  --strict`, and the same developer as the running app), and swaps the bundles in one step on **Restart now** (or at quit
+  SculptForge's GitHub releases to `~/Library/Caches/SculptForge/updates`, checks the download arrived intact (its checksum
+  must match the release's checksum list), copies the app out of it beside the current one, runs macOS's code signature
+  check (`codesign --verify --deep --strict`), and swaps the bundles in one step on **Restart now** (or at quit
   with **Later**). The old bundle is kept as `SculptForge.app.old` until the new version has started once, and put back
   when it doesn't start. No administrator password is ever asked for. Homebrew installs keep their `brew upgrade`
   line. `SF_UPDATE_DRY_RUN=1` runs every check and replaces nothing.

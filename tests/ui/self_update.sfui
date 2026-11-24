@@ -27,6 +27,13 @@ wait 0.2
 expect "Update##update.update"
 expect "Download"
 shot update-mac
+# The help says what the checks prove and no more: an ad-hoc signed build (every build in a UI test) never claims
+# "the same developer"; that sentence ends at the code signature check.
+hold ctrl
+hover "Update##update.update"
+expect_help arrived intact
+expect_help code signature check. You confirm
+hold none
 click "Update##update.update"
 expect_text "Downloading the update..."
 click "Cancel##update.cancel"

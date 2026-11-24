@@ -94,6 +94,20 @@ bool accentButton(const char* label) {
 
 bool releaseKey(uint8_t key[32]) { return update::parseHexKey(update::kUpdatePublicKeyHex, key); }
 
+// Whether this app carries a developer's team identifier (a Developer ID build). Today's Mac builds are ad-hoc signed:
+// false, and the banner's help never claims "the same developer" (cto 11-24: honest wording). Read once.
+bool runningAppHasTeam() {
+#if defined(__APPLE__)
+    static const bool has = [] {
+        std::string id, team;
+        return update::runningCodeIdentity(id, team) && !team.empty();
+    }();
+    return has;
+#else
+    return false;
+#endif
+}
+
 // SF_UPDATE_DRY_RUN=1 (testers): the update downloads, checks and unpacks, then removes what it unpacked instead of
 // replacing anything; the status line says what would have happened.
 bool updateDryRun() {
@@ -488,16 +502,26 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
         if (accentButton((std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) +
                           "##update.update").c_str()))
             startSelfUpdate(u);
-        if (install.kind == update::InstallKind::MacApp)
+        // What the checks prove, no more: the download arrived intact (the release's checksum list; its key lives with
+        // the project's releases, so it is no proof against someone who controls those) and, on a Mac, the bundle's
+        // own code signature; "the same developer" only once this app is a developer-signed build.
+        if (install.kind == update::InstallKind::MacApp && runningAppHasTeam())
             ui::HelpText("Update", nullptr,
-                         "Download the new version from SculptForge's GitHub releases over a checked connection; its checksum "
-                         "must be in the release's signed list, and the app inside must pass macOS's code signature check and "
-                         "come from the same developer as this one. You confirm before anything is replaced; the current "
-                         "version is kept until the new one has started.",
+                         "Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge "
+                         "checks the download arrived intact (its checksum must match the release's checksum list) and that "
+                         "the app inside passes macOS's code signature check and comes from the same developer as this one. "
+                         "You confirm before anything is replaced; the current version is kept until the new one has started.",
+                         "Update banner");
+        else if (install.kind == update::InstallKind::MacApp)
+            ui::HelpText("Update", nullptr,
+                         "Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge "
+                         "checks the download arrived intact (its checksum must match the release's checksum list) and that "
+                         "the app inside passes macOS's code signature check. You confirm before anything is replaced; the "
+                         "current version is kept until the new one has started.",
                          "Update banner");
         else
             ui::HelpText("Update", nullptr,
-                         "Download the new version from SculptForge's GitHub releases, check its signature and checksum, "
+                         "Download the new version from SculptForge's GitHub releases, check the download arrived intact, "
                          "and install it. The current version is kept until the new one has started.",
                          "Update banner");
         ImGui::SameLine();

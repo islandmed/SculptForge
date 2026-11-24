@@ -56,7 +56,9 @@ Fail at any step: the temporary file is deleted, nothing in place changes, nothi
 ## macOS
 
 The same chain (feed, fixed GitHub URLs, signed `SHA256SUMS.txt`, versioned name `SculptForge-<v>-darwin-universal.dmg`,
-hash), then a fourth check before the swap:
+hash), then a fourth check before the swap. What it proves, in one line (the UI, the guide and the changes note say no
+more): it protects against a broken or altered download; not against someone who controls the project's GitHub
+releases (the checksum-list key is an Actions secret there); a developer-signed Mac build adds that later.
 
 - **Where**: the bundle the running executable is in (`<...>/SculptForge.app/Contents/MacOS/sculptforge`), wherever the
   user keeps it. Not self-updated: a Homebrew cask (`brew upgrade --cask sculptforge`), a bundle Gatekeeper runs from a

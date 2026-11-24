@@ -301,8 +301,9 @@ next start is the new version. If you have unsaved changes, Restart now asks fir
 
 What the check means: the files come only from SculptForge's own GitHub releases, over a checked secure connection;
 the release's list of checksums must carry the SculptForge release signature (a key built into the app); and the
-download must match its checksum. If any of that fails, nothing is changed and nothing downloaded is run: the banner
-says what went wrong and **Download** still opens the release page.
+download must match its checksum. That protects against a broken or altered download, not against someone who
+controls the project's GitHub releases. If any of that fails, nothing is changed and nothing downloaded is run: the
+banner says what went wrong and **Download** still opens the release page.
 
 The current version is kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as
 `<folder>.old`, the Mac app as `SculptForge.app.old`) until the new version has started once, then removed; if the new
@@ -311,7 +312,8 @@ installing does.
 
 On a Mac the download is the release's disk image, kept in `~/Library/Caches/SculptForge/updates` until it is installed.
 Before anything is replaced, the app inside it must also pass macOS's own code signature check (`codesign --verify
---deep --strict`) and come from the same developer as the SculptForge you are running. SculptForge never asks for an
+--deep --strict`); a developer-signed Mac build (coming later) will also have to come from the same developer as the
+SculptForge you are running. SculptForge never asks for an
 administrator password: if your Applications folder isn't yours to write to, the banner says so and **Download** still
 works. A SculptForge installed with Homebrew is updated with `brew upgrade --cask sculptforge` instead.
 
