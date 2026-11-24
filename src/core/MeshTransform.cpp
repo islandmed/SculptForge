@@ -446,10 +446,19 @@ size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useM
     if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
     if (index == doc.activePart && figurePoseEditing(doc)) s.keepOp(); // a Pose Mesh move (core/FigurePose.h)
     const size_t n = s.movingVertices();
+    // A primitive from Append moved as a whole (no mask, no soft joint, no mirror) keeps its settings: the move goes
+    // into its placement (core/PrimitiveKit.h).
+    const bool wholePrimitive = part.data->primitive.any() && !mirror.x && !mirror.y && !mirror.z &&
+                                transformWeights(mesh, useMask, falloff).empty();
     s.apply(mesh, local);
     UndoRecord r = s.finish(mesh, bvh, label);
     if (r.empty()) return 0;
     undo.push(std::move(r));
+    if (wholePrimitive) {
+        PrimitiveSpec placed = part.data->primitive.spec();
+        placed.placement = local.matrix() * placed.placement;
+        setPrimitiveSpec(*part.data, std::move(placed), undo.revision());
+    }
     return n;
 }
 

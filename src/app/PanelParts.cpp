@@ -12,10 +12,12 @@
 #include "app/Demo.h"
 #include "app/Theme.h"
 #include "app/I18n.h"
+#include "app/Palettes.h"
 #include "app/Ui.h"
 #include <IconsLucide.h>
 #include "core/FigurePose.h"
 #include "core/Multires.h"
+#include "core/PrimitiveKit.h"
 #include "render/GL.h"
 #include "core/Utf8Path.h"
 
@@ -630,18 +632,28 @@ void App::drawPartsContents() {
     if (ImGui::Button(tr("Append"), ImVec2(third, 0))) ImGui::OpenPopup("##append");
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("Add a new Part beside the model"));
     if (ImGui::BeginPopup("##append")) {
-        if (ImGui::MenuItem(tr("Sphere"))) runCommand("part_append", {{"type", std::string("sphere")}});
-        if (ImGui::MenuItem(tr("Cube"))) runCommand("part_append", {{"type", std::string("cube")}});
-        if (ImGui::MenuItem(tr("Plane"))) runCommand("part_append", {{"type", std::string("plane")}});
-        for (const char* t : {"cylinder", "cone", "torus", "capsule", "icosphere", "quadsphere"}) { // #31
-            std::string label = t;
-            label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
-            if (label == "Quadsphere") label = "Quad Sphere";
-            if (ImGui::MenuItem(label.c_str())) runCommand("part_append", {{"type", std::string(t)}});
+        // Low-poly (core/PrimitiveKit.h): the cage Polygon mode starts from, instead of the dense sculpting mesh. A saved
+        // choice; either way the primitive's settings stay editable in this panel until the Part is sculpted.
+        ui::Checkbox(tr("Low-poly (Polygon mode)"), &uiPrefs_.appendLowPoly);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("New primitives come as a low-poly cage (12 segments, 1 ring, a 1-cell cube) for Polygon mode; "
+                                       "off: the dense sculpting mesh. The settings stay editable below the list until you sculpt."));
+        ImGui::Separator();
+        const Args lowPoly{{"low_poly", uiPrefs_.appendLowPoly}};
+        auto append = [&](const char* type) {
+            Args args = lowPoly;
+            args["type"] = std::string(type);
+            runCommand("part_append", args);
+        };
+        if (ImGui::MenuItem(tr("Sphere"))) append("sphere");
+        if (ImGui::MenuItem(tr("Cube"))) append("cube");
+        if (ImGui::MenuItem(tr("Plane"))) append("plane");
+        for (const char* t : {"cylinder", "cone", "torus", "capsule", "pipe", "icosphere", "quadsphere"}) { // #31
+            if (ImGui::MenuItem(primitiveLabel(t))) append(t);
         }
         ImGui::Separator();
         if (ImGui::BeginMenu(tr("Insert on the model"))) { // #34: drag on the surface to place it
-            for (const char* t : {"sphere", "cube", "cylinder", "cone", "torus", "capsule", "quadsphere"}) {
+            for (const char* t : {"sphere", "cube", "cylinder", "cone", "torus", "capsule", "pipe", "quadsphere"}) {
                 std::string label = t;
                 label[0] = char(std::toupper(static_cast<unsigned char>(label[0])));
                 if (label == "Quadsphere") label = "Quad Sphere";
@@ -714,6 +726,7 @@ void App::drawPartsContents() {
         ImGui::SameLine();
         ui::ActionButton(*this, "part.make_unique", ImVec2(half, 0), ui::Look::IconLabel);
     }
+    drawPrimitiveSection();
 
     const float arrowW = ImGui::GetFrameHeight();
     ImGui::BeginDisabled(active <= 0);
@@ -846,6 +859,98 @@ void App::drawPartsContents() {
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", tr("Alt+click a Part to select it"));
     if (fontSmall_) ImGui::PopFont();
+}
+
+// Primitive settings (core/PrimitiveKit.h): shown while the active Part is still exactly the primitive Append made.
+// A slider applies when let go (one undo step each); the presets switch every setting at once.
+void App::drawPrimitiveSection() {
+    if (!primitiveFresh(doc_, doc_.activePart)) return;
+    const PrimitiveSpec& spec = doc_.activePartInfo().data->primitive.spec();
+    const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ doc_.undo.revision();
+    if (key != primEditKey_) {
+        primEditKey_ = key;
+        primEdit_ = spec;
+    }
+    const PrimitiveControls c = primitiveControls(spec.type);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+    tray::GroupLabel(*this, "Primitive");
+    ui::HelpText("Primitive", nullptr,
+                 "This Part is still the primitive Append made: change its segments, rings, caps, radius or height here and "
+                 "it is built again (one undo step each). Sculpting, remeshing or editing its faces turns it into an "
+                 "ordinary mesh and the settings go; undo brings them back. Moving it whole with the Gizmo keeps them.",
+                 "Tool > Parts");
+    auto apply = [&] {
+        runCommand("part_primitive", {{"segments", double(primEdit_.segments)}, {"rings", double(primEdit_.rings)},
+                                      {"caps", double(primEdit_.caps)}, {"quad_caps", primEdit_.quadCaps},
+                                      {"radius", double(primEdit_.radius)}, {"radius2", double(primEdit_.radius2)},
+                                      {"height", double(primEdit_.height)}});
+    };
+    // The type, then the two presets: the Polygon-mode cage, or the dense sculpting mesh Append makes by default.
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", tr(primitiveLabel(spec.type)));
+    const float presetW = std::max(ui::ButtonWidth(tr("Low-poly")), ui::ButtonWidth(tr("Dense")));
+    ui::SameLineAt(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 2.0f * presetW - style.ItemSpacing.x);
+    if (ImGui::Button(tr("Low-poly"), ImVec2(presetW, 0))) runCommand("part_primitive", {{"preset", std::string("lowpoly")}});
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("The low-poly cage for Polygon mode"));
+    ImGui::SameLine();
+    if (ImGui::Button(tr("Dense"), ImVec2(presetW, 0))) runCommand("part_primitive", {{"preset", std::string("dense")}});
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("The dense mesh for sculpting"));
+
+    const bool sphere = spec.type == "sphere" || spec.type == "icosphere";
+    const bool cells = spec.type == "cube" || spec.type == "plane" || spec.type == "quadsphere";
+    ImGui::SetNextItemWidth(-1);
+    tray::SliderInt("##prim_segments", &primEdit_.segments, sphere ? 0 : cells ? 1 : 3, sphere ? 6 : cells ? 256 : 128, tr(c.segmentsLabel));
+    if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+    if (c.rings) {
+        ImGui::SetNextItemWidth(c.caps ? half : -1.0f);
+        tray::SliderInt("##prim_rings", &primEdit_.rings, spec.type == "torus" ? 3 : 1, 64, tr("Rings %d"));
+        if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+    }
+    if (c.caps) {
+        if (c.rings) ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        tray::SliderInt("##prim_caps", &primEdit_.caps, 0, 8, tr("Cap rings %d"));
+        if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("0: open ends; 1: a fan; more: rings of quads, then a fan"));
+        if (ui::Checkbox(tr("Quad caps"), &primEdit_.quadCaps)) apply();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Caps as an all-quad grid with no pole (segments become a multiple of 4)"));
+    }
+    if (c.radius) {
+        ImGui::SetNextItemWidth(c.radius2 ? half : -1.0f);
+        ui::SliderInside("##prim_radius", &primEdit_.radius, 0.02f, 1.0f, tr("Radius %.2f"));
+        if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+    }
+    if (c.radius2) {
+        if (c.radius) ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        ui::SliderInside("##prim_radius2", &primEdit_.radius2, 0.0f, 1.0f, tr(c.radius2Label));
+        if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+    }
+    if (c.height) {
+        ImGui::SetNextItemWidth(-1);
+        ui::SliderInside("##prim_height", &primEdit_.height, 0.02f, 1.0f, tr("Height %.2f"));
+        if (ImGui::IsItemDeactivatedAfterEdit()) apply();
+    }
+    if (c.axis) { // the shape's axis: up, or along X / Z (a wheel, an eye)
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", tr("Axis"));
+        ImGui::SameLine();
+        const float axisW = (ImGui::GetContentRegionAvail().x - 2.0f * style.ItemSpacing.x) / 3.0f;
+        for (int k = 0; k < 3; ++k) {
+            if (k) ImGui::SameLine();
+            const bool on = primEdit_.axis == k;
+            if (on) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
+            const char* label = k == 0 ? "X##prim_axis" : k == 1 ? "Y##prim_axis" : "Z##prim_axis";
+            if (ImGui::Button(label, ImVec2(axisW, 0)) && !on) {
+                primEdit_.axis = k;
+                runCommand("part_primitive", {{"axis", std::string(k == 0 ? "x" : k == 1 ? "y" : "z")}});
+            }
+            if (on) ImGui::PopStyleColor();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("The shape's axis: up (Y), or along X or Z"));
+    }
 }
 
 Args App::booleanArgs() const {

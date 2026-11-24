@@ -8,6 +8,7 @@
 #include "core/EdgeSelect.h"
 #include "core/Json.h"
 #include "core/Mesh.h"
+#include "core/PrimitiveKit.h"
 #include "core/QRemeshGuides.h"
 #include "core/Reference.h"
 #include "core/Sculpt.h"
@@ -50,6 +51,7 @@ struct PartData {
     bool bvhDirty = false;
     uint64_t cleanRevision = 0;
     std::vector<QRemeshGuide> qremeshGuides; // QRemesh Guides (core/QRemeshGuides.h)
+    PrimitiveState primitive; // the settings of a Part from Append, while its mesh is still the generated one (core/PrimitiveKit.h)
     uint32_t key = 0;
 };
 

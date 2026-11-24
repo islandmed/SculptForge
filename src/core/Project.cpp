@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <system_error>
 #include <thread>
 
@@ -889,6 +890,7 @@ struct LoadedPart {
     int activeLayer = -1;
     int link = -1;              // a linked copy of this earlier Part (#94): no mesh of its own
     glm::mat4 transform{1.0f};  // Part::transform
+    std::optional<PrimitiveSpec> primitive; // a primitive from Append whose settings still apply (core/PrimitiveKit.h)
     Mesh mesh;
     // A big mesh's BVH is built on its own thread once the positions and triangles are read (they don't change
     // after that), while the subdivision levels, topology and normals load.
@@ -989,6 +991,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
             st.set("transform", matrixJson(s.transform));
             version.need(8);
         }
+        if (s.data->primitive.any() && primitiveFresh(doc, i)) st.set("primitive", primitiveSpecJson(s.data->primitive.spec())); // (optional)
         int link = -1; // a linked copy (#94): the first Part with its mesh holds it
         for (int k = 0; k < i && link < 0; ++k)
             if (newIndex[size_t(k)] >= 0 && doc.parts[size_t(k)].data == s.data) link = newIndex[size_t(k)];
@@ -1238,6 +1241,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.bridgeName = sj["bridge_name"].asString();
             s.qremeshGuides = qremeshGuidesFromJson(sj["qremesh_guides"]);
             if (sj["transform"].isArray()) s.transform = matrixFromJson(sj["transform"]);
+            if (PrimitiveSpec spec; primitiveSpecFromJson(sj["primitive"], spec)) s.primitive = spec;
             if (const Json& lj = sj["link"]; lj.isNumber()) {
                 const double l = lj.asNumber(-1);
                 if (!(l >= 0 && l < double(parts.size() - 1)) || parts[size_t(l)].link >= 0) {
@@ -1365,6 +1369,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.parts[0].shading = parts[0].shading;
     doc.parts[0].boolean = parts[0].boolean;
     doc.parts[0].transform = parts[0].transform;
+    if (parts[0].primitive) setPrimitiveSpec(*doc.parts[0].data, *parts[0].primitive, doc.undo.revision());
     for (size_t i = 1; i < parts.size(); ++i) {
         if (parts[i].link >= 0) { // shares an earlier Part's mesh (Parts load in order: index i is i here too)
             const int at = doc.addLink(parts[i].link, parts[i].name, parts[i].transform);
@@ -1385,6 +1390,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.data->activeLayer = validLayer(parts[i].activeLayer, s.data->mesh);
         s.data->bridgeName = parts[i].bridgeName;
         s.data->qremeshGuides = std::move(parts[i].qremeshGuides);
+        if (parts[i].primitive) setPrimitiveSpec(*s.data, *parts[i].primitive, s.data->undo.revision());
     }
     // Folders (#96): a Part pointing at a folder that isn't there is simply outside any folder.
     if (const Json& folders = manifest["part_folders"]; folders.isArray() && folders.size() <= kMaxProjectParts) {

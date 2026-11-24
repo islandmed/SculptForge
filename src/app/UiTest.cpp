@@ -130,6 +130,7 @@
 //                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
 //                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
+//                            primitive_fresh (1 while the active Part is still the primitive Append made: its settings show), primitive_segments, open_edges (boundary edges; 0 = closed),
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
 //                            boolean_preview (triangles of the Boolean result the view shows in place of its Parts, 0
@@ -441,6 +442,8 @@
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
+#include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
 #include "core/Primitives.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
@@ -1504,6 +1507,14 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "linked_parts") return double(app_.doc_.linkCount(app_.doc_.activePart)); // (#94: 1 = not linked)
     if (name == "part_moved") return app_.doc_.activePartInfo().moved() ? 1.0 : 0.0;
+    // Primitive settings (core/PrimitiveKit.h): 1 while the active Part is still exactly the primitive Append made.
+    if (name == "primitive_fresh") return primitiveFresh(app_.doc_, app_.doc_.activePart) ? 1.0 : 0.0;
+    if (name == "primitive_segments") { // (the check first: after undo it finds the settings the mesh matches)
+        primitiveFresh(app_.doc_, app_.doc_.activePart);
+        const PrimitiveState& st = app_.doc_.activePartInfo().data->primitive;
+        return st.any() ? double(st.spec().segments) : -1.0;
+    }
+    if (name == "open_edges") return double(boundaryEdges(app_.doc_.mesh.triangles).size()); // 0 = closed (Solidify)
     if (name == "part_x") return double(app_.doc_.partBounds(app_.doc_.activePart).center().x);
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
@@ -1988,7 +1999,9 @@ double Demo::rememberedNumber(int line, const std::string& text, bool* found) {
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
     // Find the item (give the UI a moment to appear), glide there, press and release.
     const auto clipAt = std::make_shared<ImVec4>(); // the item's panel when the mouse glided there
-    steps_.push_back([this, line, label, clipAt](float t) {
+    const auto last = std::make_shared<ImVec2>(-1.0f, -1.0f); // where the item was a frame ago (-1: not seen yet)
+    const auto moved = std::make_shared<bool>(false);          // logged once: it moved after it was first seen
+    steps_.push_back([this, line, label, clipAt, last, moved](float t) {
         ImVec2 to;
         bool visible = false;
         if (!findItem(label, to, &visible)) {
@@ -2013,6 +2026,22 @@ void Demo::testClick(int line, const std::string& label, int button, bool double
             // Off the screen, or the panel won't scroll: a person couldn't click it either.
             if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
             return t > 1.0f;
+        }
+        // The step before (a run, a click that opened something) may still be moving the layout: a group that appears
+        // in the next frame pushes everything under it down, and a press at the old spot would land on another item
+        // (or off the panel, where the re-follow at press time can't see it). Take the item only once it has stayed
+        // put for a frame; a jump is logged (a real one-frame layout jump a fast click would mis-hit), a layout that
+        // never settles fails. A slow drift (a palette easing open, a hover lift: a pixel or two a frame) is no jump:
+        // the press step follows that, as it always has.
+        if (std::abs(to.x - last->x) > 3.0f || std::abs(to.y - last->y) > 3.0f) {
+            if (last->x >= 0.0f && !*moved) {
+                *moved = true;
+                std::printf("  click \"%s\": the item moved %.0f px down between frames (layout settling after the step before)\n",
+                            label.c_str(), double(to.y - last->y));
+            }
+            *last = to;
+            if (t > 3.0f) fail(line, "\"" + label + "\" kept moving (the layout never settled)");
+            return t > 3.0f;
         }
         findItem(label, to, &visible, clipAt.get());
         mouseMotion(to.x, to.y);
