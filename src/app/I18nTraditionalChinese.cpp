@@ -310,6 +310,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Pressure > Size", "筆壓 > 大小"},
     {"Pressure > Strength", "筆壓 > 強度"},
     {"Front faces only", "僅限正面"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift 平滑顏色；雕刻模式平滑形狀"},
     {"Front faces only is ON", "僅限正面已開啟"},
     {"Turn off", "關閉"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",
@@ -424,6 +425,9 @@ constexpr Entry kTraditionalChinese[] = {
     {"Load Lit Sphere", "載入 Lit Sphere"},
     {"Material picker", "材質選擇器"},
     {"Material swatches", "材質色票"},
+    {"Tick a channel to paint more than colour", "勾選通道以繪製色彩以外的內容"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding roughness and metallic to the texture if it lacks them).", "一次設定筆刷的顏色、粗糙度與金屬度，並使其繪製這些通道（若紋理沒有粗糙度與金屬度則新增至紋理）。"},
+    {"The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > Material Channels lists them too, and is where a channel is taken off again.", "灰顯的通道尚未存在於紋理上：勾選一個以新增並繪製它。工具 > 紋理圖像 > 材質通道 也列出了它們，且可在此處再次移除通道。"},
     // --- Script ---
     {"Console", "主控台"},
     {"Run script file", "執行指令碼檔案"},

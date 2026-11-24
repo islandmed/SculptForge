@@ -310,6 +310,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Pressure > Size", "笔压 > 大小"},
     {"Pressure > Strength", "笔压 > 强度"},
     {"Front faces only", "仅限正面"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift 平滑颜色；雕刻模式平滑形状"},
     {"Front faces only is ON", "仅限正面已开启"},
     {"Turn off", "关闭"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",
@@ -424,6 +425,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Load Lit Sphere", "加载 Lit Sphere"},
     {"Material picker", "材质选择器"},
     {"Material swatches", "材质色板"},
+    {"Tick a channel to paint more than colour", "勾选通道以绘制颜色以外的内容"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding roughness and metallic to the texture if it lacks them).", "一次设置画笔的颜色、粗糙度和金属度，并使其绘制这些通道（如果纹理没有粗糙度和金属度，则添加到纹理中）。"},
+    {"The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > Material Channels lists them too, and is where a channel is taken off again.", "灰显的通道尚未在纹理上：勾选一个以添加并绘制它。工具 > 纹理图像 > 材质通道 也列出了它们，且可以在此处再次移除通道。"},
     // --- Script ---
     {"Console", "控制台"},
     {"Run script file", "运行脚本文件"},

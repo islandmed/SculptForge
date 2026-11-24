@@ -193,7 +193,7 @@
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
 //                            size_ring_preview / size_ring_px (the ring the S / O pop-up shows where it opened, #138),
-//                            front_faces_tag (1 while the brush cursor carries the "Front faces only" tag),
+//                            front_faces_tag (1 while the brush cursor carries the "Front faces only" tag), smooth_borders_tag (the same for "Smooth face group borders only" on a mesh without face groups), smooth_colour_tag (Shift held in Paint mode),
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
@@ -1948,6 +1948,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
+    if (name == "smooth_colour_tag") return app_.smoothColourTagShown_ ? 1.0 : 0.0;
+    if (name == "smooth_borders_tag") return app_.smoothBordersTagShown_ ? 1.0 : 0.0;
     if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
