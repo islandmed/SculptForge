@@ -26,14 +26,14 @@ click "Wire##view.wire"
 expect_value wireframe == 1
 shot wireframe
 
-# Snake Hook pulls a horn out of the sphere, with new triangles all along it.
+# Tendril pulls a horn out of the sphere, with new triangles all along it.
 remember triangles pulled
 click "Tendril##brush.tendril"
 stroke 0.62 0.3 0.95 0.05
 expect_value triangles > $pulled
-shot snake_hook
+shot tendril_pull
 click "Wire##view.wire"
-shot snake_hook_shaded
+shot tendril_pull_shaded
 
 # Undo takes the strokes back exactly, Redo brings them again.
 key ctrl+z

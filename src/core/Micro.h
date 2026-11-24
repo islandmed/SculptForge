@@ -31,15 +31,17 @@
 // corner e + 1: e0 = (k, 0), e1 = (n - k, k), e2 = (0, n - k), k = 0..n.
 //
 // What a scalar displacement can't do: move points sideways. Brushes that slide the surface (Move's sideways
-// part, Snake Hook, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
+// part, Tendril, Nudge, VDM stamps with overhangs) work on real subdivision levels; on a micro level Pinch
 // resamples the heights from where its pull would bring the surface (see microBrushSupport).
 #pragma once
 
 #include "core/Mesh.h"
 #include "core/MicroStore.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -49,6 +51,22 @@
 #include <vector>
 
 namespace sf {
+
+// Front faces only for a grab (Move): the share of its weight a point keeps by how squarely its normal faces the camera
+// (`facing` = -dot(normal, view), 1 = straight at it, 0 = edge on). None from the silhouette on, all from kGrabFrontFull
+// in, smooth between: a hard cut left the surface just inside the silhouette moving at full weight beside surface that
+// stayed, and the drag tore it into a seam (artist-qa 11-23).
+constexpr float kGrabFrontFull = 0.6f, kGrabFrontReach = 0.75f; // (the reach: in brush radii)
+inline float grabFrontWeight(float facing) {
+    const float t = facing <= 0.0f ? 0.0f : facing >= kGrabFrontFull ? 1.0f : facing / kGrabFrontFull;
+    return t * t * (3.0f - 2.0f * t);
+}
+// On a thin part (an ear) the facing flips within a few edges, so the facing alone still jumps from full to none between
+// neighbours. Also: a vertex keeps only the share of its weight that its distance along the surface from the nearest vertex
+// facing away allows (none at it, all from `reach` on, smooth between). Returns, for the vertices of `region` and those
+// round them within `reach`, the weight of every one that keeps less than all (the rest are absent: 1).
+std::unordered_map<uint32_t, float> grabFrontField(const Mesh& mesh, std::span<const uint32_t> region, const glm::vec3& view,
+                                                   float reach);
 
 class BVH;
 class CommandRegistry;
@@ -118,7 +136,12 @@ struct MicroMesh {
     bool allDirty = true;
     bool maskDirty = false; // the mask was added or removed (the renderer's shading changes everywhere)
     bool stroking = false;  // a stroke is running (TierConfig draft normals: the renderer shades less meanwhile)
+    bool grabbing = false;  // the running stroke is a Move (MicroStroke::beginGrab): its shading shows on each frame, never budgeted
+    bool shadeNow = false;  // an edit whose shading must show on the next frame in full (undo, redo, a Move's end; #184)
+    bool strokeEnded = false; // a stroke ended since the renderer last looked: the base its last dabs moved is the stroke's (budgeted)
     bool rescaled = false;  // `step` grew and every value was rescaled (same surface: the renderer re-sends the values only)
+    bool resendLater = false; // a stroke's widen took its frame's budget: the renderer re-sends on the next frame (App, #184)
+    float widenMs = 0.0f;   // what the last widen took
     uint64_t revision = 0;  // bumped by every edit
     // Which level this is (new on Divide / load; kept by copies, which hold the same values): the renderer keeps
     // its GPU copy while the serial stays.
@@ -307,7 +330,11 @@ public:
     // shade() for another level of the same base: `level` instead of base.micro (Focus Detail's coarse grids,
     // render/MicroFocus.h). It needs the base's edge neighbours (edgeNeighbor).
     void shadeLevel(const Mesh& base, const MicroMesh& level, std::span<const uint32_t> dirty, bool all,
-                    std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow = true);
+                    std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow = true,
+                    const Prepare& prepare = {});
+    // Gives back scratch over `maxBytes` (it grows to the largest set ever shaded: a whole-queue Undo on a streamed
+    // 2.6M base kept ~1 GB of edge sums).
+    void trimScratch(size_t maxBytes);
 
 private:
     const MicroMesh* level_ = nullptr; // (shadeLevel)
@@ -344,7 +371,13 @@ public:
     // stroke is heading, for Sharp Crease's pull across it; 0 = none. pxPerUnit: screen pixels per world unit at the
     // dab, for Adaptive Detail tiles' depth (core/MicroTiles.h); 0 = unknown, the radius alone decides)
     // Move: captures the points within the dab (with each mirror's signs), then moves them along their normals.
-    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror);
+    // Widens now when the range is within two of the last dab's additions of full (App: at the start of a frame's
+    // dabs, so the widen's frame holds nothing else, #184). True when it widened.
+    bool widenAhead(MicroMesh& mm);
+    // `frontOnly`: grid points whose surface normal faces away from `view` (into the scene) keep weight 0 and those near the
+    // silhouette fade in (grabFrontWeight, Front faces only).
+    void beginGrab(Mesh& m, const BVH& bvh, const glm::vec3& center, float radius, float focal, const glm::mat3& mirror,
+                   const glm::vec3& view = glm::vec3(0.0f, 0.0f, -1.0f), bool frontOnly = false);
     void grab(Mesh& m, const glm::vec3& delta);
     // Puts every grid point the stroke changed back (the stroke stays open).
     void restore(Mesh& m);
@@ -355,8 +388,19 @@ public:
     // stride of the micro grid) and interpolated in between, so its evaluation cost doesn't grow with the micro
     // level. Off: every grid point (tests compare).
     static constexpr int kBrushSamples = 48;
+    // The brush plane samples coarser than every second grid point only while the brush still covers this many
+    // (tests set it huge: every second point).
+    float planeSamples = 7000.0f;
     bool adaptive = true;
+    // Contact facing (DabParams::contactFacing) for the next dabs: the hint (the picked normal, unit length; zero = off). A dab
+    // finds the contact normal from it on the micro surface under the cursor and weighs each point by its own micro
+    // surface normal against that (facingWeight), and by the falloff along the base surface (a slot in the base: the
+    // far wall fades by the long way round). Adaptive Detail tiles weigh by the base normal there (their points' own
+    // normals are the root grid's plus deltas finer than any fold the brush meets).
+    glm::vec3 facingNormal{0.0f};
+    float facingAngle = 180.0f;
     uint32_t lastStride = 1; // the stride the last dab used
+    uint32_t lastPlaneStride = 1; // ... and its brush plane
     // Timings of the last dabs (ms): finding the triangles + saving undo tiles, the kernel, stitching.
     double findMs = 0, kernelMs = 0, stitchMs = 0;
     uint64_t points = 0; // grid points visited
@@ -379,7 +423,8 @@ private:
     void endTiles(MicroUndo& u, const MicroTiles& tiles);
     bool dabTiles(Mesh& m, BrushType type, const glm::vec3& center, float r, float strength, bool invert, float focal,
                   const glm::vec3& areaNormal, const glm::vec3& areaCenter, const glm::vec3& right, const glm::vec3& up,
-                  const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth);
+                  const BrushAlpha* alpha, const std::function<float(const glm::vec3&)>& texture, int depth,
+                  const std::function<float(uint32_t, const float*, const glm::vec3&, float)>& facing = {});
     std::vector<uint8_t> changed_;        // per candidate of the last dab: the kernel changed its grid
     std::vector<int16_t> snap_;           // Pinch, Crease, Sharp Crease: the grids of this dab's triangles as it found them
     std::vector<uint32_t> snapOf_;        // per base triangle: its grid in snap_ + 1 (0 = none)
@@ -391,6 +436,7 @@ private:
     void stitch(const Mesh& m, MicroMesh& mm, std::span<const uint32_t> tris, const uint8_t* changed = nullptr);
     bool active_ = false;
     float strokeStep_ = 0.0f;
+    float lastAdd_ = 0.0f; // what the last dab could add to the range (widenAhead)
     std::vector<uint32_t> tileOf_;        // per base triangle: its undo tile + 1 (0 = not yet touched)
     std::vector<uint32_t> tiles_;         // the touched base triangles, in order
     std::vector<int16_t> oldDisp_;        // tiles_.size() * samples
@@ -402,6 +448,12 @@ private:
     std::vector<uint32_t> vertStamp_;
     std::vector<uint32_t> corners_;
     float baseEdge_ = 0.0f; // the base's average edge length
+    // Contact facing: the base vertices' distance along the base surface from the dab's centre (keepConnected's flood:
+    // a slot in the base fades by the long way round), valid where floodStamp_ == floodReached_.
+    std::vector<uint32_t> floodVerts_, floodStamp_, floodQueue_;
+    std::vector<float> floodDist_, floodSurface_;
+    uint32_t floodEpoch_ = 0, floodReached_ = 0, floodClosed_ = 0; // (markClosedPieces' stamps, the last dab's)
+    std::vector<uint32_t> floodWide_;
     // Move: per mirror its triangles and, per triangle, weight and direction of its coarse grid points.
     struct GrabMirror {
         glm::mat3 mirror{1.0f};
@@ -443,8 +495,28 @@ struct MicroUndo {
     bool tilesApplied = true; // (as `applied`, for the tiles' journal)
     bool swapWhole = false;
     std::shared_ptr<MicroMesh> whole;
+    // A stroke's journal still being packed on a background thread (MicroStroke::end: #184, ~0.5-1 s of the release
+    // frame on a few million tiles). `tris` and `keys` are final already; settle() waits for the rest and takes it
+    // (swapWith does, so an undo pressed at once is still exact).
+    struct Pack;
+    std::shared_ptr<Pack> pending;
+    void settle();
     void swapWith(Mesh& m);
-    size_t bytes() const;
+    size_t bytes() const; // (while packing: the unpacked size, an upper bound)
+};
+
+// MicroUndo::pending: what the background packing hands over (MicroUndo::settle).
+struct MicroUndo::Pack {
+    std::shared_future<void> done;
+    std::atomic<bool> hurry{false}; // (someone waits: no more pauses for strokes)
+    ~Pack() {
+        hurry = true;
+        if (done.valid()) done.wait(); // (the work writes into this: never freed under it)
+    }
+    bool journal = false;
+    std::vector<uint8_t> packed;
+    std::vector<int16_t> firsts, disp;
+    size_t rawBytes = 0; // the unpacked change (bytes() meanwhile)
 };
 
 // --- Undoable document operations ---

@@ -28,6 +28,7 @@ ui_e2e_cloth_*              cloth
 ui_e2e_extract_*            mesh
 ui_e2e_curves_*             mesh
 ui_e2e_voxel_*              mesh
+ui_e2e_dynamic_*            mesh
 ui_e2e_parts_*              mesh
 ui_e2e_export_*             io
 ui_e2e_prefs_*              io
@@ -271,9 +272,11 @@ test_mesh_check             mesh
 test_mesh_maps              mesh
 test_mesh_preview           mesh
 test_ink                    sculpt
+test_carve_pinch            sculpt
 test_micro                  mesh
 test_micro_history          sculpt
 test_micro_mask_grab        mesh
+test_move_front_faces       mesh
 test_micro_move_folds       mesh
 test_multires*              mesh
 test_part*                  mesh

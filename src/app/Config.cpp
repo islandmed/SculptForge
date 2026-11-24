@@ -128,6 +128,8 @@ Json toJson(const UiPrefs& p) {
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
     j.set("connectedOnly", p.connectedOnly);
     j.set("viewFalloff", p.viewFalloff);
+    j.set("contactFacing", p.contactFacing);
+    j.set("facingAngle", double(p.facingAngle));
     j.set("dyntopoSmoothRemesh", double(p.dyntopoSmoothRemesh));
     j.set("airStrokes", p.airStrokes);
     j.set("slideRotateKey", std::string(p.slideRotateKey == 1 ? "ctrl" : p.slideRotateKey == 2 ? "alt" : p.slideRotateKey == 3 ? "off" : "shift"));
@@ -243,6 +245,8 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.connectedOnly = j["connectedOnly"].asBool(p.connectedOnly);
     p.viewFalloff = j["viewFalloff"].asBool(p.viewFalloff);
+    p.contactFacing = j["contactFacing"].asBool(p.contactFacing);
+    p.facingAngle = std::clamp(float(j["facingAngle"].asNumber(p.facingAngle)), 30.0f, 180.0f);
     p.dyntopoSmoothRemesh = std::clamp(float(j["dyntopoSmoothRemesh"].asNumber(p.dyntopoSmoothRemesh)), 0.0f, 1.0f);
     p.airStrokes = j["airStrokes"].asBool(p.airStrokes);
     if (j["slideRotateKey"].isString()) {

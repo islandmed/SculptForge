@@ -200,6 +200,12 @@ struct UndoRecord {
                facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro && !ink &&
                uvs.empty() && !sets && !uv && creases.empty();
     }
+    // Only a micro level's tiles or a kept stroke's edit: the base mesh (points, faces, mask...) is untouched.
+    bool microOnly() const {
+        return (micro || ink) && positions.empty() && layerOffsets.empty() && mask.empty() && colors.empty() && paintAlpha.empty() &&
+               hidden.empty() && facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part &&
+               uvs.empty() && !sets && !uv && creases.empty();
+    }
     size_t approxBytes() const;
     // approxBytes() without the kept tree: what the byte budget counts, so a tree (a fifth of a 10M triangle mesh
     // step) doesn't push the remesh step it saves a rebuild for out of the history.
@@ -283,6 +289,9 @@ public:
     void clear();
     // Bumped by every push, undo and redo (unsaved-changes tracking).
     uint64_t revision() const { return revision_; }
+    // revision() without the pushes, undos and redos of microOnly() steps: changes when the base mesh may have (#184: a
+    // stroke on a micro level re-counted Merge by Distance over every base point, ~300 ms at its end on 2.6M points).
+    uint64_t baseRevision() const { return revision_ - microRevisions_; }
     // Memory the undo steps hold (UndoRecord::approxBytes), as counted against byteBudget.
     size_t undoBytes() const;
 
@@ -307,7 +316,7 @@ private:
     void enforceBudget();
 
     std::deque<UndoRecord> undo_, redo_;
-    uint64_t revision_ = 0;
+    uint64_t revision_ = 0, microRevisions_ = 0;
     size_t droppedPending_ = 0, droppedTotal_ = 0;
     bool lastStepOver_ = false, overPending_ = false;
 };

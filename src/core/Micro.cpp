@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -63,6 +64,9 @@ void MicroMesh::clearDirty() {
     allDirty = false;
     maskDirty = false;
     rescaled = false;
+    resendLater = false;
+    shadeNow = false;
+    strokeEnded = false;
 }
 
 int MicroMesh::widen(float need) {
@@ -70,6 +74,7 @@ int MicroMesh::widen(float need) {
     int doublings = 2;
     while (need > 32767.0f * step * float(1 << doublings) && doublings < 12) ++doublings;
     const int div = 1 << doublings;
+    const auto start = std::chrono::steady_clock::now();
     poolFor(disp.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) disp[i] = int16_t(int(disp[i]) / div);
     }, 1 << 16);
@@ -80,6 +85,7 @@ int MicroMesh::widen(float need) {
     reach.all = true;
     if (focus) focus->rescale(*this, doublings); // (the tiles not in disp: core/FocusDetail.h)
     if (tiles) tiles->rescale(div); // (Adaptive Detail tiles hold deltas in the same units)
+    widenMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
     ++revision;
     return div;
 }
@@ -993,10 +999,17 @@ void MicroShader::shade(const Mesh& m, std::span<const uint32_t> dirty, bool all
 }
 
 void MicroShader::shadeLevel(const Mesh& base, const MicroMesh& level, std::span<const uint32_t> dirty, bool all,
-                             std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow) {
+                             std::vector<uint32_t>& written, const std::function<uint32_t*(uint32_t tri)>& out, bool grow,
+                             const Prepare& prepare) {
     level_ = &level;
-    shade(base, dirty, all, written, out, {}, grow);
+    shade(base, dirty, all, written, out, prepare, grow);
     level_ = nullptr;
+}
+
+void MicroShader::trimScratch(size_t maxBytes) {
+    if (partial_.capacity() * sizeof(float) > maxBytes) std::vector<float>().swap(partial_);
+    for (std::vector<uint32_t>* v : {&ring_, &ring2_, &seed_, &grown_})
+        if (v->capacity() * sizeof(uint32_t) > maxBytes) std::vector<uint32_t>().swap(*v);
 }
 
 void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool grow, std::vector<uint32_t>& written,
@@ -1164,7 +1177,25 @@ void MicroShader::shadeSet(const Mesh& m, std::span<const uint32_t> dirty, bool 
 // Undo
 // ---------------------------------------------------------------------------
 
+void MicroUndo::settle() {
+    if (!pending) return;
+    pending->hurry = true;
+    pending->done.get(); // (what the packing threw, e.g. out of memory, surfaces here as it did at the release)
+    journal = pending->journal;
+    if (pending.use_count() == 1) { // (a copy of this step still waiting would take it next: it copies)
+        packed = std::move(pending->packed);
+        firsts = std::move(pending->firsts);
+        disp = std::move(pending->disp);
+    } else {
+        packed = pending->packed;
+        firsts = pending->firsts;
+        disp = pending->disp;
+    }
+    pending.reset();
+}
+
 void MicroUndo::swapWith(Mesh& m) {
+    settle();
     if (swapWhole) {
         std::swap(m.micro, whole);
         if (m.micro) {
@@ -1178,6 +1209,7 @@ void MicroUndo::swapWith(Mesh& m) {
     }
     if (!m.micro || !microMatches(m) || m.micro->samples != samples) return;
     MicroMesh& mm = mutableMicro(m);
+    mm.shadeNow = true; // (undo and redo show whole at once, not within a stroke's shading budget)
     if (!tileKeys.empty() && !mm.tiles) {
         mm.tiles = std::make_shared<MicroTiles>();
         mm.tiles->resize(mm.baseTriangles);
@@ -1309,7 +1341,7 @@ void MicroUndo::swapWith(Mesh& m) {
 }
 
 size_t MicroUndo::bytes() const {
-    return tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
+    return (pending ? pending->rawBytes : 0) + tris.size() * sizeof(uint32_t) + keys.size() * sizeof(uint64_t) + packed.size() + firsts.size() * sizeof(int16_t) + disp.size() * sizeof(int16_t) +
            mask.size() + tileKeys.size() * (sizeof(uint64_t) + 1 + sizeof(int16_t)) + tilePacked.size() + (swapWhole && whole ? whole->bytes() : 0);
 }
 

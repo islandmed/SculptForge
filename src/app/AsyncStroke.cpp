@@ -216,13 +216,13 @@ bool App::previewStrokes() const {
 }
 
 bool App::asyncStrokeAllowed() const {
-    // Sculpt strokes of queued dabs only: Move, Snake Hook and the drag strokes work in strokeTo itself; painting,
+    // Sculpt strokes of queued dabs only: Move, Tendril and the drag strokes work in strokeTo itself; painting,
     // masking and dynamic topology (which changes the layout the renderer packs for) stay in the frame loop.
     const bool recipe = strokeRecipe() != nullptr;
     return interactiveStrokes_ && (predictiveStrokes() || backgroundDabs()) && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
            !doc_.sculptor.dyntopo.enabled && previewLod_ < 0 && !faceTakePlaying_ &&
            !doc_.mesh.micro && // (a micro level is sculpted and drawn by core/MicroSculpt and the MicroRenderer)
-           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook)) &&
+           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril)) &&
            strokeType_ != StrokeType::DragRect && strokeType_ != StrokeType::DragDot;
 }
 
@@ -497,8 +497,6 @@ void App::finishStrokeNow() {
     UndoRecord r = doc_.sculptor.endStroke();
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
-    if (r.topology && !r.topology->uvs.empty())
-        status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
     if (const size_t fixed = doc_.sculptor.lastFixedStrokes())
         status_ = fixed == 1 ? "1 editable stroke under this one is now fixed in place"
                              : std::to_string(fixed) + " editable strokes under this one are now fixed in place";
@@ -529,6 +527,8 @@ App::DabSettings App::dabSettings() const {
     st.frontFacesOnly = frontFacesOnly_;
     st.connectedOnly = uiPrefs_.connectedOnly;
     st.viewFalloff = uiPrefs_.viewFalloff;
+    st.contactFacing = uiPrefs_.contactFacing;
+    st.facingAngle = uiPrefs_.facingAngle;
     st.mask = strokeMask_;
     st.paint = strokePaint_;
     st.sculpt = strokeSculpt_;

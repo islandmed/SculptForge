@@ -1,0 +1,13 @@
+# cold
+# The tier's panel in Preferences > Performance (PanelHardwareTier.cpp) at 1440 and 2880 px wide: the tier, what it
+# turns on (Focus Detail's lines only where it streams: core/HardwareTier.cpp tierTurnsOn). CMake sets
+# SF_HW_PROFILE_IN_TESTS=1, SF_NO_CALIBRATION=1 and SF_HW_SIMULATE=high, as for hardware_tier.sfui.
+run new_sphere
+wait 0.5
+click "Got it"
+wait 0.3
+click "Performance tier##perf.tier_chip"
+wait 0.5
+expect_text "What this turns on:"
+expect_text Free memory is watched
+shot panel

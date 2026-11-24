@@ -14,7 +14,7 @@ expect_text Render profile
 expect_text render profile
 # The hardware tier (PanelHardwareTier.cpp): the machine and its tier, what it turns on, Compute and its tasks.
 expect_text What this turns on
-expect_text Focus Detail keeps
+expect_text Free memory is watched
 expect_text Compute
 expect_text Brush solver: CPU
 expect_text CPU only for now

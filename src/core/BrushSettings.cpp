@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSettings.h"
 #include "core/FileReplace.h"
+#include "core/LegacyNames.h"
 #include "core/Precision.h"
 #include "core/Sculpt.h"
 
@@ -148,7 +149,7 @@ BrushToolSettings BrushSettingsStore::shipped(const std::string& key) {
         s.alphaOptions.followStroke = true; // ...turned by the drag, as before the VDM's own Angle options (#136)
     }
     for (BrushType t : {BrushType::Move, BrushType::KelvinGrab, BrushType::KelvinTwist, BrushType::KelvinScale,
-                        BrushType::SnakeHook, BrushType::KelvinSnake})
+                        BrushType::Tendril, BrushType::KelvinSnake})
         if (key == brushSettingsKey(brushName(t))) s.pressureSize = PenPressure::Off;
     return s;
 }
@@ -170,9 +171,10 @@ void BrushSettingsStore::applyJson(const Json& j) {
     if (!brushes.isObject()) return;
     for (const auto& [key, value] : brushes.members()) {
         if (!value.isObject()) continue;
-        BrushToolSettings s = shipped(key); // (files before 0.11.1 have no pen pressure: the brush's default)
+        const std::string stored = key.rfind("builtin:", 0) == 0 ? legacy::modernize(key) : key; // (a built-in brush's old name)
+        BrushToolSettings s = shipped(stored); // (files before 0.11.1 have no pen pressure: the brush's default)
         s.applyJson(value);
-        saved_[key] = s;
+        saved_[stored] = s;
     }
 }
 

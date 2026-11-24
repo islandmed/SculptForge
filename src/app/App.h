@@ -191,7 +191,7 @@ public:
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
-    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge): off in the Classic
+    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
     // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
     bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
     ThumbnailCache& thumbnails() { return thumbs_; }
@@ -460,7 +460,8 @@ private:
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
-        bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
+        bool connectedOnly = false, viewFalloff = false, contactFacing = false; // the falloff options (Brush palette)
+        float facingAngle = 180.0f;
         bool mask = false, paint = false, sculpt = true, visible = true;
         AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Scale / Position jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
@@ -544,12 +545,12 @@ private:
         glm::vec3 color{1.0f};
     } swatchMemo_;
     glm::vec3 grabLast_{0.0f};
-    // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
+    // A grab (Move, Tendril, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
     // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the
     // world and the pen carries on from it (fenix, Discord 11-06: the model flew off as the cap turned).
     // grabScreen_: the pen's last position the grab used; grabScreenOffset_: from it to the grabbed point on screen.
     glm::vec2 grabScreen_{0.0f}, grabScreenOffset_{0.0f};
-    bool grabStroke() const;     // a Move / Snake Hook / KelvinGrab stroke under way
+    bool grabStroke() const;     // a Move / Tendril / KelvinGrab stroke under way
     void regrabAfterViewMove();  // the view moved mid-grab: the grabbed point stays put (grabScreenOffset_)
     // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
     // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
@@ -580,6 +581,7 @@ private:
     glm::vec3 alongNormalTarget(float x, float y) const;
 
     std::string status_;
+    bool textureNoticeShown_ = false; // the "texture not shown on this GPU" status was given for the Part's texture
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
@@ -1016,7 +1018,7 @@ private:
     size_t visibleGroups_ = 0;
     std::array<uint64_t, 6> visibleGroupsKey_{};
     // Stroke types, alphas and the extra brushes (PanelBrushes.cpp).
-    void snakeHookTo(float x, float y);
+    void tendrilTo(float x, float y);
     void dragRectTo(float x, float y, bool commit = false); // commit: the release's final stamp (the footprint)
     glm::vec3 screenUpVector(float angle) const; // camera up rotated by `angle` around the view axis
     static void SDLCALL onAlphaChosen(void* userdata, const char* const* files, int filter);
@@ -2174,6 +2176,7 @@ private:
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
+    float infoFontPx_ = 0.0f; // the title strip's info readout font size as drawn (UI tests: info_font_px)
     std::vector<std::pair<float, float>> barSpans_; // the top bar's widgets, x from-to, last frame (UI tests: no overlaps)
     std::vector<std::pair<float, float>> timelineSpans_; // the timeline header's pieces, x from-to (UI tests: no overlaps)
     // Parts (PanelParts.cpp): the panel, and Alt+click in the viewport to select one.
@@ -2988,7 +2991,7 @@ private:
     Uint64 lastFrameKeyNs_ = 0;
     void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
-    void openFocusDetail(const std::string& path);
+    bool openFocusDetail(const std::string& path); // false: refused (status_ says why)
     void updateFocusDetail(float heightPx = 0.0f); // (0: the canvas's)
     glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
     float focusBrushRadius_ = 0.0f;
@@ -3087,6 +3090,7 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    bool alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const; // an alpha a custom brush brought with it
     void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
     void recipePenPressure(BrushToolSettings& s) const; // the active recipe's own pen pressure (#122) into `s`
     void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)

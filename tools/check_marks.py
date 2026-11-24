@@ -24,6 +24,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TRADEMARKS = "docs/legal/trademarks.md"
 SKIP_PREFIXES = ("third_party/",)  # vendored code, as its authors wrote it
+# Files that may spell a borrowed brush name (the borrowed block of docs/legal/trademarks.md) because Blender's own API
+# does: its brush identifier in the add-on's key table, the keymap reader and the keymap export that test it. The trademark
+# patterns apply to them as everywhere.
+BORROWED_ALLOWED = (
+    "addons/blender/sculptforge_bridge/classic_keys.py",
+    "src/app/BlenderKeymap.cpp",
+    "tests/data/blender_keymap_export.py",
+)
 SEPARATOR = r"(?:[ \t]+|[-_.])"  # what a space in a pattern stands for
 # Binary files of SculptForge's own formats, read as their printable strings (zip archives are read whatever the name).
 OWN_BINARY = (".sfproj", ".sfbrush", ".sfmaterial", ".sfpack", ".sfmacro", ".bridge", ".z", ".bin", ".json")
@@ -31,7 +39,7 @@ MIN_STRING = 4  # shortest printable run read from a binary file
 SKIPPED = 77  # exit code when git can't list the files (ctest SKIP_RETURN_CODE: reported as skipped, not passed)
 
 
-def load_marks(text=None):
+def load_marks(text=None, borrowed=True):
     """The patterns between <!-- marks:begin --> and <!-- marks:end --> (and labels:begin / labels:end, and the
     whole-labels block: words refused only as an entire UI string or bold guide term) in docs/legal/trademarks.md."""
     if text is None:
@@ -43,6 +51,9 @@ def load_marks(text=None):
             lines = [line.strip() for line in block.splitlines() if line.strip()]
             # A mark's space also stands for - _ . or several spaces; a label's stays a space (ids like draw_size).
             marks += [m.replace(" ", SEPARATOR) for m in lines] if name == "marks" else lines
+    if borrowed and "<!-- borrowed:begin -->" in text:  # brush names borrowed from other apps (Blender interop allowed)
+        block = text.split("<!-- borrowed:begin -->", 1)[1].split("<!-- borrowed:end -->", 1)[0]
+        marks += [m.strip().replace(" ", SEPARATOR) for m in block.splitlines() if m.strip()]
     if "<!-- whole-labels:begin -->" in text:  # competitor palette words refused only as a whole label, case as written
         block = text.split("<!-- whole-labels:begin -->", 1)[1].split("<!-- whole-labels:end -->", 1)[0]
         words = "|".join(line.strip() for line in block.splitlines() if line.strip())
@@ -172,13 +183,15 @@ def marks_in(text, mark_re=None):
 
 def scan(mark_re):
     errors = []
+    interop_re = load_marks(borrowed=False)
     for path in tracked_files():
         if path == TRADEMARKS:
             continue
-        if has_mark(path, mark_re):
+        file_re = interop_re if path in BORROWED_ALLOWED else mark_re
+        if has_mark(path, file_re):
             errors.append(f"{path}: the file name has a mark")
         for where, text in read_texts(path):
-            for n, snippet in problems_in(text, mark_re):
+            for n, snippet in problems_in(text, file_re):
                 errors.append(f"{where}:{n}: {snippet[:160]}")
     return errors
 
@@ -247,6 +260,11 @@ def self_test():
         assert not mark_re.search(f"{w.lower()} the mesh, {w} it, \"{w} more\", {w.lower()}_count"), w
     assert not mark_re.search("Make Symmetric, Rebuild Lower Levels, Remove Below, Add Level, Fill Holes, smt_, sdiv_levels, "
                               "close_holes, subdiv_delete_lower, Level 2 / 4, Target Quads, Keep Hard Edges, geometry.smt")
+    # a borrowed brush name (split here because this file is scanned too): refused, in every spelling, except in Blender interop files
+    for a, b in (("snake", "hook"), ("Snake", " Hook"), ("SNAKE", "_HOOK"), ("snake", "-hook")):
+        assert mark_re.search(a + b), a + b
+        assert not load_marks(borrowed=False).search(a + b), a + b
+    assert not mark_re.search("Tendril, hooked, snakes, a hook for the snake")
     assert problems_in("a\n" + words[0][0] + " b\nc", mark_re) == [(2, words[0][0] + " b")]
     assert problems_in('x\n  "press Store "\n  "Config keeps it"', mark_re) == [(2, '"press Store "')]
     assert load_marks("x <!-- marks:begin -->\n  ab?c\n<!-- marks:end -->").search("AC")

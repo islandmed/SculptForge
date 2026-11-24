@@ -241,6 +241,8 @@ in vec3 vViewPos[];
 #endif
 flat in int vPrimBase[];
 uniform samplerBuffer uUvs; // RG32F, 3 corners per drawn triangle
+uniform sampler2D uUvs2D;   // the same, as rows of uUvWidth texels, when the GPU's texture buffers are too small for the mesh
+uniform int uUvWidth;       // 0: uUvs
 #ifdef NORMALMAP
 uniform samplerBuffer uTangents; // RGBA32F, 3 corners per drawn triangle
 uniform mat4 uView;
@@ -270,7 +272,8 @@ void main() {
 #ifdef PAINT
         o.vPaint = vPaint[i];
 #endif
-        o.vUv = texelFetch(uUvs, prim * 3 + i).xy;
+        int corner = prim * 3 + i;
+        o.vUv = uUvWidth == 0 ? texelFetch(uUvs, corner).xy : texelFetch(uUvs2D, ivec2(corner % uUvWidth, corner / uUvWidth), 0).xy;
 #ifdef NORMALMAP
         vec4 t = texelFetch(uTangents, prim * 3 + i);
         o.vTangent = vec4(mat3(uView) * (uNormalFix * t.xyz), t.w);
@@ -1305,6 +1308,8 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     gl::Uniform1i(at("uGroupIds"), 1);
     gl::Uniform1i(at("uLitSphereTex"), 2);
     gl::Uniform1i(at("uUvs"), 3);
+    gl::Uniform1i(at("uUvs2D"), 12);
+    p.uvWidth = at("uUvWidth");
     gl::Uniform1i(at("uPaintTex"), 4);
     gl::Uniform1i(at("uNormalTex"), 5);
     gl::Uniform1i(at("uTangents"), 6);
@@ -1416,6 +1421,7 @@ Renderer::MeshSlot& Renderer::slot(uint32_t id) {
     gl::GenTextures(1, &s.primTexture);
     gl::GenBuffers(1, &s.uvData);
     gl::GenTextures(1, &s.uvTexture);
+    gl::GenTextures(1, &s.uvTexture2D);
     gl::GenVertexArrays(1, &s.proxyVao);
     gl::GenBuffers(1, &s.proxyBuffer);
     for (GLuint vao : {s.vao, s.lineVao, s.proxyVao}) {
@@ -1448,6 +1454,7 @@ void Renderer::freeSlot(MeshSlot& s) {
     gl::DeleteTextures(1, &s.groupTexture);
     gl::DeleteTextures(1, &s.primTexture);
     gl::DeleteTextures(1, &s.uvTexture);
+    gl::DeleteTextures(1, &s.uvTexture2D);
     if (s.paintTexture) gl::DeleteTextures(1, &s.paintTexture);
     if (s.normalTexture) gl::DeleteTextures(1, &s.normalTexture);
     for (GLuint* t : {&s.ormTexture, &s.matNormalTexture, &s.emissiveTexture})
@@ -1466,9 +1473,10 @@ void Renderer::freeSlot(MeshSlot& s) {
     }
     s.micro.reset();
     if (s.patchVao) {
-        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
+        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData, &s.patchUvData})
             gl::DeleteBuffers(1, b);
         gl::DeleteTextures(1, &s.patchGroupTexture);
+        gl::DeleteTextures(1, &s.patchUvTexture);
         gl::DeleteVertexArrays(1, &s.patchVao);
         gl::DeleteVertexArrays(1, &s.patchLineVao);
     }
@@ -1489,11 +1497,33 @@ size_t Renderer::microPendingCoarse() const {
     return total;
 }
 
+size_t Renderer::microWidenDeferrals() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->widenDeferrals();
+    return total;
+}
+
+size_t Renderer::microPendingPages() const {
+    size_t total = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.micro) total += s.micro->pendingPages();
+    return total;
+}
+
 size_t Renderer::microTilePages() const {
     size_t total = 0;
     for (const MeshSlot& s : slots_)
         if (s.micro && s.micro->tilePages()) total += s.micro->tilePages()->pages();
     return total;
+}
+
+bool Renderer::microShadingWantsFrame() const { // (the Parts drawn last sync only: a hidden one's waits until it's shown)
+    for (const MeshSlot& s : slots_)
+        if (s.micro && s.micro->pendingShading() &&
+            std::any_of(drawList_.begin(), drawList_.end(), [&](const DrawItem& d) { return d.id == s.id; }))
+            return true;
+    return false;
 }
 
 bool Renderer::microTilePagesWantFrame() const {
@@ -2112,6 +2142,21 @@ void Renderer::uploadIndices(MeshSlot& s, const Mesh& mesh) {
     gl::BindVertexArray(0);
 }
 
+// A GL error after one of the calls a mesh upload makes, named once per call and code (Mali-G72, 11-22: a textured mesh
+// drew nothing and the log had only "GL error 0x0501 after drawing the view", from no call in particular).
+static void noteUploadError(const char* what) {
+    static unsigned seen = 0;
+    for (int i = 0; i < 16; ++i) {
+        const GLenum e = gl::GetError();
+        if (e == GL_NO_ERROR) return;
+        const unsigned bit = 1u << (e & 15u);
+        if (!(seen & bit)) {
+            seen |= bit;
+            SDL_Log("GL error 0x%04x after %s (logged once per code)", unsigned(e), what);
+        }
+    }
+}
+
 // The index buffer (unless `indicesDone`), the first drawn triangle of each cluster, and the face group id and
 // UVs of every drawn triangle in draw order (looked up by that plus gl_PrimitiveID). The wireframe's edges and
 // motion proxies are rebuilt on next need.
@@ -2151,7 +2196,20 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
 
     // The drawn triangles in draw order (the clusters' order), for the per-triangle data.
     const GLint maxTexels = gl::maxTextureBufferTexels();
-    const bool textured = wantUvs && mesh.hasUvs() && drawn * 3 <= size_t(std::max(maxTexels, 0));
+    // UVs go in a texture buffer; past the GPU's limit for those (Mali: 65536 texels) in a 2D texture, rows of uvWidth.
+    const bool uvsExist = wantUvs && mesh.hasUvs();
+    const bool uvInBuffer = uvsExist && drawn * 3 <= size_t(std::max(maxTexels, 0));
+    int uvWidth = 0;
+    if (uvsExist && !uvInBuffer) {
+        GLint maxSize = 0;
+        gl::GetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+        const int w = std::min(maxSize, 4096);
+        if (w >= 2048 && !gl::testTinyGpu() && drawn * 3 <= size_t(w) * size_t(maxSize)) uvWidth = w;
+    }
+    const bool textured = uvInBuffer || uvWidth > 0;
+    s.uvsWanted = wantUvs;
+    s.uvsLost = uvsExist && !textured;
+    if (s.uvsLost) SDL_Log("Texture not shown: %zu triangles need %zu UV texels, past this GPU's limits (texture buffer %d texels)", drawn, drawn * 3, maxTexels);
     std::vector<uint32_t> drawnTris(groups || textured ? drawn : 0);
     if (!drawnTris.empty()) poolFor(nc, [&](size_t c0, size_t c1) {
         for (size_t c = c0; c < c1; ++c) {
@@ -2201,18 +2259,39 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
             for (size_t i = b; i < e; ++i) std::copy_n(mesh.uvs.data() + size_t(drawnTris[i]) * 3, 3, visibleUvs_.data() + i * 3);
         }, 1 << 16);
         const std::vector<glm::vec2>& uvs = visibleUvs_;
-        gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData);
-        gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(uvs.size() * sizeof(glm::vec2)), uvs.data(), GL_STATIC_DRAW);
-        gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
-        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.uvData);
-        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
-        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-        s.bytes[7] = uvs.size() * sizeof(glm::vec2);
+        if (uvWidth > 0) {
+            const size_t height = (uvs.size() + size_t(uvWidth) - 1) / size_t(uvWidth);
+            visibleUvs_.resize(height * size_t(uvWidth)); // (the last row's unused texels)
+            gl::BindTexture(GL_TEXTURE_2D, s.uvTexture2D);
+            gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RG32F), uvWidth, GLsizei(height), 0, GL_RG, GL_FLOAT, uvs.data());
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_NEAREST));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_NEAREST));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+            gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+            gl::BindTexture(GL_TEXTURE_2D, 0);
+            gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData); // (the buffer texture keeps nothing: it is not sampled)
+            gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW);
+            gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+            noteUploadError("the UV texture upload");
+            s.bytes[7] = uvs.size() * sizeof(glm::vec2);
+        } else {
+            gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData);
+            gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(uvs.size() * sizeof(glm::vec2)), uvs.data(), GL_STATIC_DRAW);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
+            gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.uvData);
+            gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+            gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+            noteUploadError("the UV texture buffer");
+            s.bytes[7] = uvs.size() * sizeof(glm::vec2);
+        }
+        s.uvWidth = uvWidth;
     } else if (s.hasUvs) {
         gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData);
         gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW);
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
     }
+    if (!textured) s.uvWidth = 0;
     s.hasUvs = textured;
     s.linesValid = false;
     s.proxyStale.assign(nc, 1);
@@ -2426,6 +2505,7 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         for (MeshSlot::Patch& p : s.patches) p.stale = true;
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
     const bool groups = mesh.facegroups.size() == nt && nt > 0;
+    const bool uvs = mesh.uvs.size() == size_t(nt) * 3 && nt > 0;
     for (MeshSlot::Patch& p : s.patches) {
         if (!p.stale) continue;
         if (++patchStampValue_ == 0) {
@@ -2435,6 +2515,7 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         p.verts.clear();
         p.local.clear();
         p.groups.clear();
+        p.uvs.clear();
         auto add = [&](uint32_t t) {
             if (t >= nt || (hidden && mesh.hidden[t])) return;
             const glm::uvec3& tri = mesh.triangles[t];
@@ -2448,6 +2529,7 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                 p.local.push_back(uint16_t(std::min<uint32_t>(patchLocal_[v], 0xFFFF)));
             }
             if (groups) p.groups.push_back(mesh.facegroups[t]);
+            if (uvs) p.uvs.insert(p.uvs.end(), mesh.uvs.begin() + std::ptrdiff_t(t) * 3, mesh.uvs.begin() + std::ptrdiff_t(t) * 3 + 3);
         };
         if (p.key < kTailPatch) {
             for (uint32_t i = 0; i < s.order.clusterTriangles(p.key); ++i) add(s.order.triangle(p.key, i));
@@ -2470,9 +2552,10 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
     if (!s.patchVao) {
         gl::GenVertexArrays(1, &s.patchVao);
         gl::GenVertexArrays(1, &s.patchLineVao);
-        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
+        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData, &s.patchUvData})
             gl::GenBuffers(1, b);
         gl::GenTextures(1, &s.patchGroupTexture);
+        gl::GenTextures(1, &s.patchUvTexture);
         for (GLuint vao : {s.patchVao, s.patchLineVao}) {
             gl::BindVertexArray(vao);
             gl::BindBuffer(GL_ARRAY_BUFFER, s.patchVertices);
@@ -2503,16 +2586,19 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         alloc(GL_ARRAY_BUFFER, s.patchColors, parts * kPatchVertices * sizeof(uint32_t));
         alloc(GL_ARRAY_BUFFER, s.patchMask, parts * kPatchVertices);
         alloc(GL_TEXTURE_BUFFER, s.patchGroupData, parts * kPatchTriangles * sizeof(uint32_t));
+        alloc(GL_TEXTURE_BUFFER, s.patchUvData, parts * kPatchTriangles * 3 * sizeof(glm::vec2));
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.patchGroupTexture);
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, s.patchGroupData);
+        gl::BindTexture(GL_TEXTURE_BUFFER, s.patchUvTexture);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.patchUvData);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindVertexArray(s.patchVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchTriangles * 3 * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(s.patchLineVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchLineIndices * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(0);
-        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4) + kPatchLineIndices * 2);
+        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4 + 3 * sizeof(glm::vec2)) + kPatchLineIndices * 2);
         for (MeshSlot::Patch& p : s.patches) p.uploaded = false;
         all = true;
     }
@@ -2592,9 +2678,15 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                                   GLsizeiptr(p.groups.size() * sizeof(uint32_t)), p.groups.data());
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
+            if (!p.uvs.empty()) { // (into the shadow; sent after the loop in runs of neighbouring parts: a call per patch is slow)
+                if (s.patchUvShadow.size() < s.patchParts * kPatchTriangles * 3) s.patchUvShadow.resize(s.patchParts * kPatchTriangles * 3);
+                std::copy(p.uvs.begin(), p.uvs.end(), s.patchUvShadow.begin() + std::ptrdiff_t(p.part) * kPatchTriangles * 3);
+                s.patchUvParts.push_back(p.part);
+            }
             if (p.stale) {
                 std::vector<uint16_t>().swap(p.local);
                 std::vector<uint32_t>().swap(p.groups);
+                std::vector<glm::vec2>().swap(p.uvs);
             }
             p.stale = false;
             p.uploaded = true;
@@ -2630,6 +2722,20 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
             gl::BindBuffer(GL_ARRAY_BUFFER, s.patchMask);
             gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(p.part) * kPatchVertices), GLsizeiptr(n), packedMask.data());
         }
+    }
+    if (!s.patchUvParts.empty()) {
+        std::sort(s.patchUvParts.begin(), s.patchUvParts.end());
+        gl::BindBuffer(GL_TEXTURE_BUFFER, s.patchUvData);
+        for (size_t i = 0; i < s.patchUvParts.size();) {
+            size_t j = i + 1;
+            while (j < s.patchUvParts.size() && s.patchUvParts[j] <= s.patchUvParts[j - 1] + 1) ++j; // (or the same part again)
+            const size_t first = size_t(s.patchUvParts[i]) * kPatchTriangles * 3, last = (size_t(s.patchUvParts[j - 1]) + 1) * kPatchTriangles * 3;
+            gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(first * sizeof(glm::vec2)), GLsizeiptr((last - first) * sizeof(glm::vec2)),
+                              s.patchUvShadow.data() + first);
+            i = j;
+        }
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        s.patchUvParts.clear();
     }
     gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     s.patchGrid = s.grid;
@@ -2688,7 +2794,12 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // A stroke that remeshes (dynamic topology: only it fills changedTriangles) is under way on this mesh.
     if (!stroking_) s.remeshing = false;
     else if (!mesh.changedTriangles.empty()) s.remeshing = true;
-    bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs);
+    // A Part with UVs patches too (the patches carry their triangles' UVs), unless the UVs are in a 2D texture, a
+    // normal map or the material's tangents (PBR) need per-triangle data of the layout.
+    const size_t patchPartsWanted = std::max<size_t>({s.patches.size() + 1, s.patchParts * 2, 8}); // (the patch UV buffer is a texture buffer too)
+    const bool patchUvs = s.hasUvs && s.uvWidth == 0 && !normalMap && !pbr && mesh.uvs.size() == mesh.triangleCount() * 3 &&
+                          patchPartsWanted * kPatchTriangles * 3 <= size_t(std::max(gl::maxTextureBufferTexels(), 0));
+    bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs && !patchUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
         for (MeshSlot::Patch& p : s.patches) p.stale = true; // (groups or hidden triangles changed)
@@ -2788,7 +2899,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
             s.bytes[0] = s.bytes[1] = 0;
         }
     }
-    if (!full && (mesh.facesDirty || wantUvs != s.hasUvs || overlayChanged)) uploadFaces(s, mesh, wantUvs);
+    if (!full && (mesh.facesDirty || wantUvs != s.uvsWanted || overlayChanged)) uploadFaces(s, mesh, wantUvs);
     if (wireframe && !s.linesValid && !s.outOfMemory) buildLines(s, mesh);
     // Small meshes draw in full while the view moves too (their proxy would save little).
     constexpr size_t kProxyMinTriangles = size_t(1) << 18;
@@ -2979,6 +3090,11 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh, bool pbr) {
 // Tangents (MikkTSpace, per mesh corner) into the slot's texture buffer, in draw order (the clusters' order,
 // without hidden triangles), like the UVs.
 void Renderer::uploadTangents(MeshSlot& s, const std::vector<glm::vec4>& all) {
+    if (s.drawnOrder.size() * 3 > size_t(std::max(gl::maxTextureBufferTexels(), 0))) { // (past a small GPU's buffer limit: no normal map shading)
+        s.hasTangents = false;
+        s.tangentsStale = false;
+        return;
+    }
     if (!s.tangentData) gl::GenBuffers(1, &s.tangentData);
     if (!s.tangentTexture) gl::GenTextures(1, &s.tangentTexture);
     std::vector<glm::vec4> tans(s.drawnOrder.size() * 3);
@@ -3130,6 +3246,18 @@ void Renderer::setPbrUniforms(const MeshProgram& p, const RenderSettings& settin
     gl::Uniform1f(p.pbrCavity, std::clamp(settings.pbrCavity, 0.0f, 1.0f));
     gl::UniformMatrix3fv(p.viewToEnv, 1, GL_FALSE, glm::value_ptr(frameViewToEnv_));
     gl::Uniform3fv(p.sh, 9, glm::value_ptr(envSh_.c[0]));
+}
+
+int Renderer::textureUvWidth(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.uvWidth;
+    return 0;
+}
+
+bool Renderer::textureNotShown(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.uvsLost;
+    return false;
 }
 
 GLuint Renderer::paintTexture(uint32_t id) const {
@@ -4247,6 +4375,9 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     if (textured || normalMapped) {
         gl::ActiveTexture(GL_TEXTURE3);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
+        gl::ActiveTexture(GL_TEXTURE0 + 12);
+        gl::BindTexture(GL_TEXTURE_2D, s.uvWidth > 0 ? s.uvTexture2D : 0);
+        gl::Uniform1i(p->uvWidth, s.uvWidth);
         gl::ActiveTexture(GL_TEXTURE4);
         gl::BindTexture(GL_TEXTURE_2D, textured ? s.paintTexture : 0);
     }
@@ -4402,9 +4533,16 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (perTriangle) {
             gl::ActiveTexture(GL_TEXTURE1);
             gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
+            gl::ActiveTexture(GL_TEXTURE3); // (the patches' triangles have their UVs in their own buffer)
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasUvs ? s.patchUvTexture : 0);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
+        if (perTriangle) {
+            gl::ActiveTexture(GL_TEXTURE3);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
+            gl::ActiveTexture(GL_TEXTURE0);
+        }
         gl::BindVertexArray(s.vao);
     }
     if (coarse && !coarseClusters_.empty()) { // the spike's coarse levels: one multi-draw, 32-bit indices

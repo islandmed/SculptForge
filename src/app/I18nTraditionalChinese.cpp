@@ -1799,6 +1799,10 @@ constexpr Entry kTraditionalChinese[] = {
     {"Keep the plane the stroke starts on for the whole stroke.", "整個筆觸都保持筆觸起點的平面。"},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而乾淨的筆尖邊緣並完全壓平，用於硬表面平面。"},
     {"View falloff", "檢視衰減"},
+    {"Contact facing", "接觸面朝向"},
+    {"Facing angle %.0f", "朝向角度 %.0f"},
+    {"The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.",
+     "游標下的表面決定移動的部分：衰減沿著表面測量，因此細槽的對面牆壁或摺痕的另一側保持不動，而游標下的邊緣跟著移動。朝向角度（預設 180）也會降低朝向其他方向的表面：角度一半以內為全強度，超過則無作用。平滑的形體移動方式與未開啟時相同。移動與抓取仍可觸及所有部分。隨偏好設定與專案一併儲存。"},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
      "smooth for the rest of the stroke.",
@@ -3403,11 +3407,10 @@ constexpr Entry kTraditionalChinese[] = {
      "筆刷從表面減去。按住 Alt 可在單一筆畫中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "動態拓樸：筆刷在需要細節處加入三角面，不需要處則移除，讓你拉出角或手指而不會拉伸。「細節」設定三角面的大小；拉"
-     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 會被捨棄（復原可找回"
-     "）。"},
+     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 與繪製的貼圖會保留。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 著色（預設）：所選的材質球或攝影棚燈光，便於雕刻時判讀形體。"},
@@ -4284,6 +4287,8 @@ constexpr Entry kTraditionalChinese[] = {
      "下一步"},
     {"No UVs: Auto UV makes them",
      "沒有 UV：Auto UV 會建立"},
+    {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
+     "此顯示晶片無法在如此高密度的模型上顯示紋理。繪製仍會寫入紋理（可在 UV 檢視中查看或匯出）；降低三角面數即可在模型上看到。"},
     {"No UVs: Tool > Texture Image > Auto UV",
      "沒有 UV：工具 > 紋理影像 > Auto UV"},
     {"No alpha matches \"%s\"",
@@ -5093,6 +5098,8 @@ constexpr Entry kTraditionalChinese[] = {
      "已開啟："},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "這台電腦在基本功能之外還能負擔的東西：更大的 Focus Detail 快取、16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
+    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
+     "這台電腦在基本功能之外還能負擔的東西：16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
     {"What this turns on:",
      "這會開啟："},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",

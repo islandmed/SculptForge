@@ -2039,6 +2039,10 @@ constexpr Entry kSpanish[] = {
     {"Keep the plane the stroke starts on for the whole stroke.", "Mantiene el plano donde empieza el trazo durante todo el trazo."},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "Un borde de punta duro y limpio y un aplanado completo, para planos de superficie dura."},
     {"View falloff", "Ver atenuación"},
+    {"Contact facing", "Orientación de contacto"},
+    {"Facing angle %.0f", "Ángulo de orientación %.0f"},
+    {"The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.",
+     "La superficie bajo el cursor decide qué se mueve: la atenuación se mide a lo largo de la superficie, así que la pared opuesta de una ranura estrecha o el otro lado de un pliegue se quedan como están mientras el borde bajo el cursor sigue al pincel. Ángulo de orientación (180 al principio) también atenúa la superficie que mira hacia otro lado: fuerza completa hasta la mitad del ángulo, ninguna más allá. Las formas suaves se mueven igual que sin la opción. Mover y Agarrar siguen alcanzándolo todo. Se guarda con las preferencias y el proyecto."},
     {"The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth that also "
      "flattens it. Either way, let go of Shift while still pressing a Shift-smooth stroke to switch to the other "
      "smooth for the rest of the stroke.",
@@ -3841,12 +3845,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles restan a la superficie. Mantén Alt para sumar durante un trazo."},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "Topología dinámica: los pinceles añaden triángulos donde necesitan detalle y los quitan donde no, para sacar "
      "cuernos o dedos sin estirar. Detalle fija lo pequeños que son los triángulos; acerca la vista o reduce el "
      "pincel para hacerlos más finos. Necesita una malla sin niveles de subdivisión; los quads bajo el pincel pasan "
-     "a triángulos y las UV se descartan (Deshacer las recupera)."},
+     "a triángulos; las UV y la textura pintada se conservan."},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Sombreado Lit Sphere (por defecto): la esfera de material elegida o las luces de estudio, pensado para leer "
@@ -4726,6 +4730,8 @@ constexpr Entry kSpanish[] = {
      "Siguiente"},
     {"No UVs: Auto UV makes them",
      "Sin UV: Auto UV las crea"},
+    {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
+     "Este chip gráfico no puede mostrar la textura en un modelo tan denso. La pintura sigue yendo a la textura (verla en la vista UV o exportarla); reduce el número de triángulos para verla en el modelo."},
     {"No UVs: Tool > Texture Image > Auto UV",
      "Sin UV: Herramienta > Imagen de textura > Auto UV"},
     {"No alpha matches \"%s\"",
@@ -5579,6 +5585,8 @@ constexpr Entry kSpanish[] = {
      "Activado:"},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "Lo que este equipo puede llevar más allá de lo esencial: cachés de Focus Detail más grandes, texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
+    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
+     "Lo que este equipo puede llevar más allá de lo esencial: texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
     {"What this turns on:",
      "Qué activa:"},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",

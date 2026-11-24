@@ -406,6 +406,8 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
     if (name == "environment") return double(renderSettings_.environment);
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
+    if (name == "texture_uv_width") return double(renderer_.textureUvWidth(doc_.meshKey(doc_.activePart)));
+    if (name == "texture_not_shown") return renderer_.textureNotShown(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.meshKey(doc_.activePart)));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);
     if (name == "roughness_painted") {

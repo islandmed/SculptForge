@@ -145,6 +145,9 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
+//                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
+//                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
 //                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
@@ -739,6 +742,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
     if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
+    if (name == "micro_widen_deferrals") return double(app_.renderer_.microWidenDeferrals()); // (a stroke's range widen shown a frame late)
+    if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
+    if (name == "micro_pending_shading") return double(app_.renderer_.microPendingShading()); // (without Focus Detail: pending + stale patches)
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
@@ -900,6 +906,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
+    if (name == "contact_facing") return app_.uiPrefs_.contactFacing ? 1.0 : 0.0;
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
     if (name == "invert_twist") return app_.uiPrefs_.invertTwist ? 1.0 : 0.0;
@@ -1464,6 +1471,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return n;
     }
     if (name == "brush_looks") return double(app_.thumbs_.looksRequested()); // alpha looks the brush thumbnails were asked for (#208)
+    if (name == "brush_builtin_looks") return double(app_.thumbs_.builtinLooksRequested()); // (built-in brushes that show an alpha)
     if (name == "thumbnails_regenerated") return double(app_.thumbs_.regenerated());
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
@@ -1567,6 +1575,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
     if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
     if (name == "glyphs_missing") return double(glyphs::missingLastFrame()); // drawn as "?" in the last frame
+    if (name == "info_font_px") return double(app_.infoFontPx_); // the title strip's Verts / Tris / Part readout (12 px, or 15 for CJK)
     if (name == "glyphs_merged") return double(glyphs::mergedCount());       // typed characters taken from other fonts
     if (name == "font_atlas_kpx") { // the font atlas texture, thousands of pixels (its size: memory, upload time)
         const ImFontAtlas* a = ImGui::GetIO().Fonts;
