@@ -8,11 +8,11 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step: Delete
   and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the same
   registry. **Span** joins two edge loops or two face selections with new faces: two open borders get a band of quads
-  (Segments adds rings across, Twist turns the pairing, Flip for a piece wound inside out), faces on two sides are
+  (Segments adds rings across, Twist turns the pairing, Reverse for a piece wound inside out), faces on two sides are
   removed and their openings joined (a tunnel through a block, a handle between two shells), and one whole border loop is
   closed across its width. Borders of different lengths pair by distance along each, with the odd triangles spread
   evenly; the band is a face group of its own and stays selected afterwards. Commands: `poly_mode`, `poly_select`,
-  `poly_op` (`op=span segments=2 twist=0 flip=false`), and `transform selection=true`. Nothing changes for
+  `poly_op` (`op=span segments=2 twist=0 reverse=false`), and `transform selection=true`. Nothing changes for
   sculpting: the mode is off until you turn it on. Members' top wish (#225 and the ideas threads).
 member_request: true
 testers:

@@ -711,7 +711,7 @@ bool polySpan(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
     SpanOptions o;
     o.segments = int(std::lround(argNumber(in.args, "segments", 1)));
     o.twist = int(std::lround(argNumber(in.args, "twist", 0)));
-    o.flip = argBool(in.args, "flip", false);
+    o.flip = argBool(in.args, "reverse", false);
     o.finish = false; // (the registry rebuilds topology and normals)
     out.mesh = in.mesh;
     SpanResult r;
@@ -749,12 +749,12 @@ void registerPolySpanOp(PolyOpRegistry& reg) {
     op.preview = true;
     op.params = {{"segments", "Segments", 1.0, 32.0, 1.0, "Rings of faces across the gap"},
                  {"twist", "Twist", -8.0, 8.0, 0.0, "Turns the pairing of two loops by this many vertices"}};
-    PolyOpParam flip;
-    flip.name = "flip";
-    flip.label = "Flip";
-    flip.help = "Pair the second border the other way round (for a piece that is wound inside out)";
-    flip.isBool = true;
-    op.params.push_back(flip);
+    PolyOpParam reverse; // ("Reverse", not "Flip": the Flip op's button sits in the same panel)
+    reverse.name = "reverse";
+    reverse.label = "Reverse";
+    reverse.help = "Pair the second border the other way round (for a piece that is wound inside out)";
+    reverse.isBool = true;
+    op.params.push_back(reverse);
     op.run = polySpan;
     reg.add(std::move(op));
 }
