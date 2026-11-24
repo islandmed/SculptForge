@@ -1104,6 +1104,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The fonts load only the Lucide icons src/ uses (src/app/IconsUsed.h, generated): a new ICON_LC_* needs the script run.
     add_test(NAME icons_used COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/icons_used.py --check)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
+    # Every shader the renderer compiles is valid GLSL ES 3.20 too (the Android renderer; desktop Mesa accepts what a phone's driver
+    # rejects), and each program's stages link: glslangValidator on the sources with the ES header GL.cpp puts on them. Skipped
+    # (exit 77) where glslangValidator isn't installed; CI installs glslang-tools.
+    add_test(NAME gles_shaders COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_gles_shaders.py)
+    set_tests_properties(gles_shaders PROPERTIES SKIP_RETURN_CODE 77)
     # assets/branding/sculptforge.icns: every slot decodes at its size, 16/32 px as RGB + mask, never PNG (#156).
     add_test(NAME icns COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py)
     add_test(NAME icns_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py --self-test)
