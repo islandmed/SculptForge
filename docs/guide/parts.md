@@ -90,7 +90,8 @@ The new Part becomes the active one.
 ### Primitive settings
 
 A Part made by **Append** keeps the settings it was built from, shown as a **Primitive** group under the Parts buttons
-for as long as the Part is still exactly that mesh:
+for as long as the Part is still exactly that mesh (in the Classic layout the group is a newer row: turn on
+**Edit > Preferences > Interface > Show newer menu rows** to see it):
 
 | Setting | What it does |
 |---|---|
@@ -331,7 +332,8 @@ is never saved.
 **Solidify**, under Make Shell in **Tool > Parts > Extract**, gives a flat, single-sided Part real thickness, in place:
 a copy of the surface pushed along the normals becomes the back, and a rim of quads joins the two along every open
 edge, so the result is one closed mesh. Use it on a **Plane**, or on a shell made with **Make Shell** at **Thickness** 0:
-extract the flat surface first and fit it, then give it its thickness.
+extract the flat surface first and fit it, then give it its thickness. In the Classic layout the Solidify rows show with
+**Edit > Preferences > Interface > Show newer menu rows**.
 
 | Setting | What it does |
 |---|---|

@@ -665,7 +665,7 @@ layout saves itself.
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (strict order)** | Off | Classic layout: strict alphabetical palette bar instead of File and Edit first, Help last |
-| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge and Tool > Scatter (added after 0.13.0); a feature you have set up keeps its row either way |
+| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge, Tool > Scatter, Tool > Parts > Primitive and Tool > Parts > Extract > Solidify (added after 0.13.0); a feature you have set up keeps its row either way |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
 | **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |

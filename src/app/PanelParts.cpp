@@ -868,9 +868,10 @@ void App::drawPartsContents() {
 }
 
 // Primitive settings (core/PrimitiveKit.h): shown while the active Part is still exactly the primitive Append made.
-// A slider applies when let go (one undo step each); the presets switch every setting at once.
+// A slider applies when let go (one undo step each); the presets switch every setting at once. Rows added after 0.13.0:
+// in the Classic layout only with Preferences > Interface > Show newer menu rows (Classic keeps its old rows unless asked).
 void App::drawPrimitiveSection() {
-    if (!primitiveFresh(doc_, doc_.activePart)) return;
+    if (!newerMenuRows() || !primitiveFresh(doc_, doc_.activePart)) return;
     const PrimitiveSpec& spec = doc_.activePartInfo().data->primitive.spec();
     const uint64_t key = (uint64_t(doc_.activePartInfo().id) << 40) ^ doc_.undo.revision();
     if (key != primEditKey_) {

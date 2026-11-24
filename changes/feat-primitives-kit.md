@@ -11,13 +11,14 @@ added: **Primitive settings** (Tool > Parts): a Part from **Append** (Sphere, Cu
   keeps them. Saved in projects. Appended primitives are unchanged by default; the **Low-poly (Polygon mode)** switch at
   the top of the Append menu (a saved preference) gives 12-segment, 1-ring cages with quad caps instead, the clean
   quads polygon modelling starts from. Commands: `part_append` takes `low_poly=`, `segments=`, `rings=`, `caps=`, `quad_caps=`,
-  `radius=`, `radius2=`, `height=`; `part_primitive` changes them later. Requested by members.
+  `radius=`, `radius2=`, `height=`; `part_primitive` changes them later. In the Classic layout the Primitive group shows
+  with **Preferences > Interface > Show newer menu rows** (Classic keeps its old rows unless asked). Requested by members.
 added: **Solidify** (Tool > Parts > Extract, beside Make Shell): gives a flat, single-sided Part thickness in place: a
   copy of the surface pushed along the normals becomes the back, a rim of quads joins the two along every open edge, and
   the result is one closed mesh. Thickness is a fraction of the Part's size (negative grows in front; Centred puts half
   each way). Face groups, UVs and paint stay on both sides; the rim gets a new face group. Pairs with Extract's
-  Thickness 0: extract the flat surface first, give it thickness later. Command: `solidify thickness= both=`.
-  Requested by members.
+  Thickness 0: extract the flat surface first, give it thickness later. Command: `solidify thickness= both=`. In the
+  Classic layout the rows show with **Preferences > Interface > Show newer menu rows**. Requested by members.
 testers:
   - Any OS: Tool > Parts > Append > tick Low-poly (Polygon mode), Append > Cylinder; a Primitive group appears under the Parts buttons, the ends are a grid of quads with no centre pole (wireframe W). Drag Segments and Rings; the cylinder rebuilds, Ctrl+Z steps back through the settings. Untick Quad caps for fans; click Axis Z: it lies along Z.
   - Any OS: with the switch off, Append > Cylinder looks exactly as before (dense); click Low-poly in the Primitive group to get the cage, Dense to go back.
