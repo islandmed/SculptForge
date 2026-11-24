@@ -88,6 +88,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <map>
@@ -1668,6 +1669,15 @@ private:
     bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
     void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
     SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
+    // Hold-to-navigate keys (Preferences > Navigation, NavBindings.h): the key down now that is bound to Hold to orbit /
+    // pan / zoom, and which move (0 orbit, 1 pan, 2 zoom; -1 none). Any press on the canvas while it is held is that
+    // camera drag (navMoveForPress); the drag goes on to the button's release, as Hold Space does.
+    void navHoldKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks it (dispatchEvent, as quickRemeshKey)
+    int navMoveForPress(Uint8 button) const; // the move a press starts: a held key's, or a custom drag gesture's; -1 none
+    int navConflictCount() const;            // the panel's warnings (UI tests: nav_conflicts)
+    void resetNavigationBindings();          // Preferences > Navigation > Navigation defaults
+    SDL_Keycode navHoldKey_ = SDLK_UNKNOWN;
+    int navHoldMove_ = -1;
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
     std::set<std::pair<uint32_t, int>> remeshSkipNoted_; // (Part id, reason) already told why a remesh was skipped
@@ -2715,6 +2725,8 @@ private:
     friend class PythonScripting;
     friend class CommandPalette;
     friend void config::drawHotkeysSection(App&);
+    friend void config::drawNavigationSection(App&);
+    friend void config::drawShortcutCell(App&, const Action&, float, const char*);
     friend void config::drawLibraryBrowserSection(App&);
     void initUiConfig(bool deterministic); // reads ui.json before fonts are built (UI scale)
     void initActions();                    // the default actions and shortcuts, then every command as cmd.*
@@ -3455,6 +3467,10 @@ private:
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure
     void drawTabletSection();         // Preferences > Tablet
+    // One pen mapping row (the eraser or a side button), shared by Preferences > Tablet and > Navigation (Tablet.cpp).
+    void drawPenActionRow(const char* label, PenAction& value, std::initializer_list<PenAction> choices, const char* help,
+                          const char* path, float width);
+    void drawPenButtonRow(int button, const char* path, float width); // side button 0 lower, 1 upper, 2 third
     void detectPenName();
     void tabletDeviceEvent(const SDL_Event& e); // a tablet plugged in or out while running (TabletHotplug)
     void tabletNote(TabletHotplug::Note note, const std::string& name);

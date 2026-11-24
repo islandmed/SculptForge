@@ -1450,6 +1450,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
     sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
+    # Preferences > Navigation: hold keys, drag gestures, pen buttons, warnings (tests/ui/nav_bindings.sfui), at the review sizes.
+    sculptforge_ui_test(nav_bindings_1440 nav_bindings --size 1440x900)
+    sculptforge_ui_test(nav_bindings_2880 nav_bindings --size 2880x1800)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
     sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
     sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)

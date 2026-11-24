@@ -248,6 +248,9 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 ## Mouse and pen gestures
 
+Hold keys and drag gestures of your own for orbit, pan and zoom are set in **Edit > Preferences > Navigation**
+(see [Navigation bindings](navigation.md#navigation-bindings)); the table below shows the defaults.
+
 | Action | Gesture |
 |---|---|
 | Sculpt | Left-drag on the model |

@@ -8,6 +8,7 @@
 #pragma once
 
 #include "app/LookSchemes.h"
+#include "app/NavBindings.h"
 #include "app/Theme.h"
 #include "core/Json.h"
 #include "core/ModifierBrush.h"
@@ -59,6 +60,7 @@ struct UiPrefs {
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu (#22)
     ModifierBrushes modifierBrushes; // the Shift and Ctrl brushes (Shift+click / Ctrl+click a shelf brush)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    NavBindings nav;          // custom drag gestures per camera move (Preferences > Navigation; none by default)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
     // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
     bool emulate3Button = false;
@@ -198,11 +200,17 @@ void fromJson(const Json& j, UiPrefs& prefs);
 const char* orbitLockName(int lock);
 int parseOrbitLock(std::string_view name);
 
+struct Action;
+
 namespace config {
 // Preferences palette sub-palettes (the shell's Preferences palette calls these).
 void drawConfigSection(App& app);    // Customize Shelves, Store / Restore / Save / Import Interface
 void drawInterfaceSection(App& app); // UI scale, Ctrl+hover help, tooltips, sub-palettes, left-handed layout
 void drawHotkeysSection(App& app);   // every action's shortcut, click to reassign
+void drawNavigationSection(App& app); // orbit / pan / zoom: hold keys, drag gestures, pen buttons, the view keys
+// One action's shortcut cell as Hotkeys draws it (the key button, the two-keys button, the reset arrow when changed),
+// in the table column it is called from. `path`: the help footer's menu path.
+void drawShortcutCell(App& app, const Action& a, float s, const char* path);
 void drawLibraryBrowserSection(App& app);  // show at startup, rows, placement, library folder
 // The Classic look's colours as a Palette (for its card; the look itself uses Theme.h's tokens).
 looks::Palette classicPalette();

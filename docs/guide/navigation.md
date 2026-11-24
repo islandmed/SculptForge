@@ -86,6 +86,7 @@ camera.
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
 | Sculpt from the background | Turn on **Edit > Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Edit > Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
+| Hold a key of your own to rotate, pan or zoom | **Edit > Preferences > Navigation**: give **Hold to orbit**, **Hold to pan** and **Hold to zoom** a key each (no key by default). Hold it and drag anywhere on the canvas, with any mouse button or the pen: the view moves and nothing is sculpted. The same panel binds a mouse button plus <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd> to a move, and sets the pen's side buttons |
 
 Zoom drags: drag up to come closer, down to back away. With the Classic sculpting keys (**Edit > Preferences > Input**)
 they go: drag up to zoom out, down to zoom in.
@@ -93,6 +94,27 @@ they go: drag up to zoom out, down to zoom in.
 **Hold Space and drag to move the camera** is off by default, because with the Classic sculpting keys <kbd>Space</kbd> opens the
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
+
+### Navigation bindings
+
+**Edit > Preferences > Navigation** keeps the camera's bindings in one place, for left-handed and tablet users who want
+to navigate from whichever hand rests on the keyboard. Nothing in it is set until you choose it, so every key style keeps
+its own gestures:
+
+- **Hold keys.** Click the key button beside **Orbit**, **Pan** or **Zoom** and press any key (or two keys with the **>>**
+  button, as in Hotkeys). While that key is held, a drag anywhere on the canvas, with any mouse button or the pen's tip,
+  is that camera move: it never sculpts, and the drag goes on until you let the button go, even if you release the key
+  first. A key typed into a text field is never taken. Pressed on its own, the key shows what to do in the status bar.
+- **Drag gestures.** Pick a mouse button (**Left**, **Middle** or **Right**) and turn on <kbd>Ctrl</kbd>, <kbd>Shift</kbd>
+  or <kbd>Alt</kbd> beside it. That exact combination drags the move, before anything the key style does with the button.
+  The left button needs a modifier, because a plain left drag sculpts.
+- **Warnings.** A hold key another action also has shows in the warning colour, and a line under the list says what a
+  gesture takes over (for example, <kbd>Shift</kbd>+middle-drag already pans) or that two moves share one gesture (the
+  first in the list wins). You can keep it: the panel only tells you.
+- **View keys** lists Frame, Reset view and the orbit, pan and zoom step keys with the same key buttons as Hotkeys.
+- **Pen buttons** sets the pen's side buttons as **Edit > Preferences > Tablet** does; **Zoom view** joins Rotate view and Pan view.
+- **Navigation defaults** unbinds the hold keys, clears the gestures, puts the view keys back to the key style's defaults
+  and the pen's buttons back to the Tablet defaults. Other shortcuts stay as they are. Everything saves itself.
 
 **Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of the
 canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a left-drag on the background

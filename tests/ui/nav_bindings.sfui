@@ -1,0 +1,210 @@
+# Preferences > Navigation (requested by members on Discord): hold a key of your choice and drag with any button or the pen
+# to orbit, pan or zoom; a drag gesture (button + Ctrl / Shift / Alt) per move; the pen's side buttons (Zoom view is new);
+# warnings for a gesture the key style already uses or two equal ones; Navigation defaults; everything saved. Nothing is
+# bound by default, so every key style's gestures are as they were. CMake runs it at 1440x900 and 2880x1800 too.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+expect_shortcut view.hold_orbit
+expect_shortcut view.hold_pan
+expect_shortcut view.hold_zoom
+expect_value nav_conflicts == 0
+expect_value nav_drag_pan == 0
+expect_value nav_hold == 0
+
+# The panel: after Hotkeys in the Preferences palette; hold keys unbound, gestures None.
+click "Preferences##palette.preferences"
+click "Navigation##preferences.navigation"
+expect "-##hk.view.hold_pan"
+expect "##navdrag.pan"
+expect "Navigation defaults##nav.defaults"
+hold ctrl
+hover "-##hk.view.hold_pan"
+expect_help "Hold to pan"
+hold none
+shot nav_panel_default
+
+# Bind a hold key as Hotkeys does: click the key button, press the key. J is Radial menu 3's key by default, so the
+# Replace / Cancel box asks first (clear of the button); Replace gives J to Hold to pan.
+click "-##hk.view.hold_pan"
+key j
+expect_value shortcut_conflict_open == 1
+expect_value shortcut_popup_overlaps_anchor == 0
+shot nav_panel_conflict
+click "Replace##shortcut_replace"
+expect_value shortcut_conflict_open == 0
+expect_shortcut view.hold_pan J
+expect_value shortcut_conflicts == 0
+# (the other two the way scripts do, as Preferences > Hotkeys would after the same box)
+set_shortcut view.hold_zoom K
+set_shortcut view.hold_orbit H
+expect_shortcut view.hold_zoom K
+expect_shortcut view.hold_orbit H
+expect_value nav_conflicts == 0
+shot nav_panel_bound
+key escape
+
+# Pressed alone, the key says what to do.
+key j
+expect_status "Hold J and drag anywhere to pan"
+
+# J held: a left drag on the model pans instead of sculpting; right and middle buttons pan too, and no Quick Menu opens.
+camera 0 0
+remember camera_pan pan0
+key_down j
+expect_value nav_hold == 2
+view_drag 0.45 0.5 0.45 0.65
+expect_value camera_pan != $pan0
+expect_value can_undo == 0
+remember camera_pan pan1
+button_drag right 0.45 0.5 0.6 0.5
+expect_value camera_pan != $pan1
+expect_value quickmenu_open == 0
+remember camera_pan pan2
+button_drag middle 0.45 0.5 0.6 0.5
+expect_value camera_pan != $pan2
+key_up j
+expect_value nav_hold == 0
+
+# K held: a drag zooms; H held: a drag turns the view.
+key f
+remember camera_distance d0
+key_down k
+expect_value nav_hold == 3
+view_drag 0.45 0.6 0.45 0.4
+expect_value camera_distance != $d0
+key_up k
+remember camera_yaw yaw0
+key_down h
+expect_value nav_hold == 1
+view_drag 0.45 0.5 0.6 0.5
+expect_value camera_yaw != $yaw0
+key_up h
+expect_value can_undo == 0
+
+# Let go: a drag on the model sculpts again (framed first: the zoom above filled the view with the sphere).
+key f
+stroke 0.3 0.5 0.6 0.5
+expect_value can_undo == 1
+key ctrl+z
+
+# A text field never holds it (typing j in the command palette).
+key f3
+expect_value command_palette_open == 1
+key_down j
+expect_value nav_hold == 0
+key_up j
+key escape
+
+# --- Drag gestures ---
+# Default: Shift+middle-drag pans (the middle button pans; Shift changes nothing).
+key f
+remember camera_pan pan3
+remember camera_distance d1
+hold shift
+button_drag middle 0.45 0.5 0.45 0.65
+hold none
+expect_value camera_pan != $pan3
+expect_value camera_distance == $d1
+
+# Zoom's gesture set to Shift+Middle with the picker: a Shift+middle-drag now zooms and no longer pans.
+click "Preferences##palette.preferences"
+click "##navdrag.zoom"
+click "Middle##navdrag.zoom"
+click "Shift##navmod.zoom"
+expect_value nav_drag_zoom == 2
+# It takes over the middle-drag pan of this key style: one warning.
+expect_value nav_conflicts == 1
+expect_text "takes over"
+shot nav_panel_gesture
+key escape
+key f
+remember camera_pan pan4
+remember camera_distance d2
+hold shift
+button_drag middle 0.45 0.5 0.45 0.65
+hold none
+expect_value camera_distance != $d2
+expect_value camera_pan == $pan4
+expect_value can_undo == 0
+# Without Shift the middle button still pans: the gesture matches its modifiers exactly.
+remember camera_pan pan5
+remember camera_distance d3
+button_drag middle 0.45 0.5 0.45 0.65
+expect_value camera_pan != $pan5
+expect_value camera_distance == $d3
+
+# The same gesture for Pan: both rows warn (Pan comes first and wins); a plain Left for Orbit is never active and warns.
+set_nav_drag pan Shift+Middle
+expect_value nav_conflicts == 2
+set_nav_drag orbit Left
+expect_value nav_conflicts == 3
+click "Preferences##palette.preferences"
+expect_text "is also the drag for"
+expect_text "a plain left drag sculpts"
+shot nav_panel_warnings
+key escape
+remember camera_pan pan6
+remember camera_distance d4
+hold shift
+button_drag middle 0.45 0.5 0.45 0.65
+hold none
+expect_value camera_pan != $pan6
+expect_value camera_distance == $d4
+set_nav_drag pan none
+set_nav_drag orbit none
+expect_value nav_conflicts == 1
+
+# --- Pen: the third side button set to Zoom view drives a zoom while held ---
+click "Preferences##palette.preferences"
+click "##Third button"
+click "Zoom view##Third button"
+key escape
+key f
+camera 0 0
+pen_move 0.4 0.4
+remember camera_distance d5
+pen_button 3 down
+pen_move 0.4 0.6 0.5
+pen_button 3 up
+expect_value camera_distance != $d5
+expect_value can_undo == 0
+
+# --- Saved: the hold keys and the gesture come back after a restart ---
+restart
+expect_shortcut view.hold_pan J
+expect_shortcut view.hold_zoom K
+expect_shortcut view.hold_orbit H
+expect_value nav_drag_zoom == 2
+run new_sphere subdivisions=4
+key f
+remember camera_pan pan7
+key_down j
+view_drag 0.45 0.5 0.45 0.65
+key_up j
+expect_value camera_pan != $pan7
+
+# --- Navigation defaults: hold keys unbound, gestures gone, the third pen button back to Pan view; other keys untouched ---
+set_shortcut view.wireframe Ctrl+Alt+W
+click "Preferences##palette.preferences"
+click "Navigation defaults##nav.defaults"
+expect_shortcut view.hold_pan
+expect_shortcut view.hold_zoom
+expect_shortcut view.hold_orbit
+expect_value nav_drag_zoom == 0
+expect_value nav_conflicts == 0
+expect_shortcut view.wireframe Ctrl+Alt+W
+shot nav_panel_reset
+key escape
+set_shortcut view.wireframe Shift+F
+
+# --- The SculptForge layout has the same panel ---
+run ui_look look=forge layout=sculptforge
+wait 0.2
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+# (the Navigation section is still open: its state is part of the layout and survives the switch)
+expect "-##hk.view.hold_pan"
+expect "##navdrag.pan"
+shot nav_panel_streamlined
+key escape
