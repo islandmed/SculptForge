@@ -58,6 +58,10 @@ void HelpAction(App& app, const char* actionId);
 // classic slider with its label drawn inside the frame ("Size 60"), a quiet fill and a thin neutral bar
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
+// A slider over a value the command stores (not edited in place): shows `stored`, follows the drag, and returns true on
+// the frame it is let go, with the dragged value in *out. A plain `float v = stored; SliderFloat(&v); if
+// (IsItemDeactivatedAfterEdit()) run(v)` commits the OLD value: the release frame has no drag update and v is the stored copy.
+bool SliderOnRelease(const char* id, float stored, float lo, float hi, const char* format, float* out);
 // Widths a control needs to show its whole label (in the interface language), for rows that put a pair side by side
 // only when both fit: a button, a SliderInside showing `value` with `format` (%d reads as a whole number, as
 // tray::SliderInt shows it), a Checkbox.

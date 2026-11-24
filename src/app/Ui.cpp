@@ -878,6 +878,19 @@ float CheckboxWidth(const char* label) {
     return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(tr(label), nullptr, true).x;
 }
 
+bool SliderOnRelease(const char* id, float stored, float lo, float hi, const char* format, float* out) {
+    static ImGuiID heldId = 0; // the slider being dragged and the value it showed last frame
+    static float held = 0.0f;
+    const ImGuiID gid = ImGui::GetID(id);
+    float v = heldId == gid ? held : stored;
+    ImGui::SliderFloat(id, &v, lo, hi, format);
+    if (ImGui::IsItemActive()) heldId = gid, held = v;
+    if (!ImGui::IsItemDeactivatedAfterEdit()) return false;
+    if (heldId == gid) heldId = 0;
+    *out = v;
+    return true;
+}
+
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags) {
     const float w = ImGui::CalcItemWidth(), h = ImGui::GetFrameHeight();
     // Looks with technical numbers draw the label in the monospace font, padded to the same frame height.
