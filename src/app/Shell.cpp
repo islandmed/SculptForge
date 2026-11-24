@@ -2951,9 +2951,9 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
 // Customize mode so they can still be moved or removed.
 bool App::shelfItemShown(int shelf, const std::string& item) const {
     if (layout_.customize) return true;
-    if (item.rfind("control:", 0) == 0) { // a palette's control: not while its palette hides it (measured by drawPinnedControl)
-        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item));
-        return it == pinnedControls_.end() || !it->second.missing;
+    if (item.rfind("control:", 0) == 0) { // a palette's control: not while its palette hides it (measured by drawPinnedControl),
+        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item)); // looked for again twice a second (it takes no room then)
+        return it == pinnedControls_.end() || !it->second.missing || ImGui::GetTime() - it->second.measured > 0.5;
     }
     if (item == "view.splats") return !doc_.splats.empty(); // only when there's a capture
     if (item == "draw.paint_vertex" || item == "draw.paint_texture") return hasTexture(doc_.mesh); // paint target

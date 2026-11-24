@@ -2379,6 +2379,7 @@ private:
     struct PinnedControlPlace {       // where one control sits in its scope's body, measured (PanelMyPanel.cpp drawPinnedControl)
         bool known = false;
         bool missing = false;             // measured, not there: its palette hides it in this state (a shelf then hides it too)
+        double measured = 0.0;            // when (ImGui time): a shelf looks for a missing control again now and then
         float x = 0, y = 0, w = 0, h = 0; // from the body's origin, logical px as laid out at the host's width
         float lineX = 0;                  // where its line starts: a control mid-row is drawn from there, not mid-panel
     };

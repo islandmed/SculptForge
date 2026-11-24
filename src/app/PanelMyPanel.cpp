@@ -125,6 +125,7 @@ bool App::drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int
     if (!place.known) { // the first time (and after it went missing): lay the body out unseen and find the control
         const ImVec2 start = ImGui::GetCursorScreenPos();
         place.missing = true;
+        place.measured = ImGui::GetTime();
         if (ImGui::BeginChild(("##pinned.measure." + entry).c_str(), ImVec2(width, 1.0f), ImGuiChildFlags_None,
                               flags | ImGuiWindowFlags_NoInputs)) {
             const ImVec2 origin = ImGui::GetCursorScreenPos();
