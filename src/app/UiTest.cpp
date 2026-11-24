@@ -145,6 +145,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            view_vs_mark (mean pixel difference to mark_view's view), view_nearer_mark (that, less the same to mark_view other's),
 //                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
 //                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
@@ -478,8 +479,8 @@
 namespace sf {
 
 namespace {
-// mark_view / view_vs_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
-std::vector<uint8_t> gViewMark;
+// mark_view / view_vs_mark / view_nearer_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
+std::vector<uint8_t> gViewMark, gViewMarkOther; // (mark_view, mark_view other)
 bool renderLiveView(App& app, std::vector<uint8_t>& out, const Camera& camera, const RenderSettings& settings, Renderer& renderer) {
     (void)app;
     Camera cam = camera;
@@ -1811,13 +1812,21 @@ double Demo::query(const std::string& name, bool& known) const {
         for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
         return double(sum) / double(std::max<size_t>(1, now.size()));
     }
-    if (name == "view_vs_mark") { // the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255
+    if (name == "view_vs_mark" || name == "view_nearer_mark") {
+        // view_vs_mark: the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255.
+        // view_nearer_mark: how much nearer that is than to `mark_view other`'s (negative: the view is nearer the other). A stroke
+        // running changes the whole shading a little, so the distance to one mark alone can't tell "undone" from "still shown".
         std::vector<uint8_t> now;
         if (gViewMark.empty() || !renderLiveView(app_, now, app_.camera_, app_.renderSettings_, app_.renderer_) || now.size() != gViewMark.size())
             return -1.0;
-        uint64_t sum = 0;
-        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(gViewMark[i])));
-        return double(sum) / double(std::max<size_t>(1, now.size()));
+        const auto distance = [&now](const std::vector<uint8_t>& mark) {
+            uint64_t sum = 0;
+            for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(mark[i])));
+            return double(sum) / double(std::max<size_t>(1, now.size()));
+        };
+        if (name == "view_vs_mark") return distance(gViewMark);
+        if (gViewMarkOther.size() != now.size()) return -1.0;
+        return distance(gViewMarkOther) - distance(gViewMark);
     }
     // Strokes on the stroke thread (interactive_strokes on; AsyncStroke.cpp): the stroke now running places its dabs there,
     // and the last one is still being placed (draining) or the thread is busy.
@@ -4362,9 +4371,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this, on] { app_.interactiveStrokes_ = on; });
         break;
     }
-    case StepVerb::MarkView: { // mark_view: remember the view as the GPU holds it now, for view_vs_mark
-        run([this] {
-            if (!renderLiveView(app_, gViewMark, app_.camera_, app_.renderSettings_, app_.renderer_)) gViewMark.clear();
+    case StepVerb::MarkView: { // mark_view [other]: remember the view as the GPU holds it now, for view_vs_mark (other: view_nearer_mark)
+        const bool other = w.size() > 1 && w[1] == "other";
+        run([this, other] {
+            std::vector<uint8_t>& mark = other ? gViewMarkOther : gViewMark;
+            if (!renderLiveView(app_, mark, app_.camera_, app_.renderSettings_, app_.renderer_)) mark.clear();
         });
         break;
     }
