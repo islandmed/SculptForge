@@ -138,6 +138,7 @@ add_library(sculptforge_core STATIC
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
   src/core/PolySpan.cpp
+  src/core/PolyBevel.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
@@ -1615,6 +1616,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Span (tests/ui/polygon_span.sfui): the same two sizes.
     sculptforge_ui_test(polygon_span_1440 polygon_span --size 1440x900)
     sculptforge_ui_test(polygon_span_2880 polygon_span --size 2880x1800)
+    # Bevel (tests/ui/polygon_bevel.sfui): the op's panel entry, preview and result at 100% and 200%.
+    sculptforge_ui_test(polygon_bevel_1440 polygon_bevel --size 1440x900)
+    sculptforge_ui_test(polygon_bevel_2880 polygon_bevel --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

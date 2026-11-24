@@ -1,5 +1,6 @@
 ---
 whats_new: **Polygon mode** (**Tool > Polygon**): select Points, Edges or Faces of a Part on the model, move them with the Gizmo and run polygon operations on them, each one undo step.
+whats_new: **Bevel** (Polygon mode): round or chamfer selected edges or points with a width, segments and a profile; the width is held back so cuts never cross.
 highlight: Polygon mode: model with points, edges and faces
 added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. Turn a Part into a cage (plain meshes up to
   2 million triangles; Parts with subdivision or Micro levels are told what to do first), pick Points, Edges or Faces and
@@ -18,7 +19,12 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   evenly; the band is a face group of its own and stays selected afterwards. **Edge loop**: new loops of edges across the ring of quads through the selected edge (or
   every ring the selected edges are on), Loops per ring evenly spaced, Position across the quads with a live preview; the
   loop runs round the model or stops at a border, a triangle (split in two) or a quad it already crossed, keeps face groups,
-  UVs, seams, creases, paint and mask, and the new loops stay selected. Commands: `poly_mode`, `poly_select`,
+  UVs, seams, creases, paint and mask, and the new loops stay selected. **Bevel**: selected edges (or the edges of selected faces) become a strip of 1 to 12 faces across, shaped by a
+  profile (flat chamfer, round, square-ish or concave); edges meeting at a vertex join in a mitre or a rounded corner
+  (a box corner becomes a sphere piece), a bevel ending at a face cuts that face's corner round, and two bevels running
+  through a vertex join into one strip. Selected points are cut off instead, flat or as a rounded cap. The width is a
+  share of the Part's size and is held back so no two cuts meet (Limit width). Faces keep their groups, UVs, mask and
+  paint; the bevel faces get a face group of their own. Open and non-manifold edges are left alone and counted. Commands: `poly_mode`, `poly_select`,
   `poly_op`, and `transform selection=true` (`edge_loop` and `edge_select op=ring` do the same from Edges mode for scripts). Nothing changes for sculpting: the mode is off until you turn it on.
   Members' top wish (#225 and the ideas threads).
 member_request: true
@@ -40,6 +46,9 @@ testers:
     three new loops preview as you drag), Edge loop: they are inserted and selected; Ctrl+Z takes them back in one step.
   - Any OS: a cylinder (Tool > Parts > Append), Edges, click a rim edge, Edge loop: the loop runs down the side and splits the
     two cap triangles it reaches, no hole.
+  - Any OS: Polygon mode on a box, Edges, All, Bevel with Width 0.05 and Segments 4: a rounded box with sphere corners and no
+    cracks (Tool > Geometry > Find Problems is clean); Ctrl+Z takes it back in one step. Drag Width with one edge
+    selected: the preview follows; 1 segment is a flat chamfer whose ends cut the neighbouring faces' corners.
 ---
 Foundation branch: the selection model, overlay, gizmo path and ops registry (src/core/PolyMode.h, src/core/PolyOps.h). The
 op branches (poly-extrude, poly-inset, poly-bevel, poly-edge-loop, poly-bridge) register one op each in

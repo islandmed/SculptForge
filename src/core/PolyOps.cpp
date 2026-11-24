@@ -7,6 +7,8 @@
 
 #include "core/PolyEdgeLoop.h"
 
+#include "core/PolyBevel.h"
+
 #include "core/Document.h"
 #include "core/FaceGroups.h"
 #include "core/Mesh.h"
@@ -210,6 +212,7 @@ void registerBuiltinPolyOps(PolyOpRegistry& reg) {
     registerPolyExtrudeOp(reg);
     registerPolySpanOp(reg);
     registerPolyEdgeLoopOp(reg); // edge_loop (core/PolyEdgeLoop.h)
+    registerPolyBevelOp(reg);
 }
 
 Args polyOpArgs(const PolyOp& op, const Args& args) {
