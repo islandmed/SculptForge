@@ -1,0 +1,48 @@
+# Color > Material lists every material channel as soon as the Part paints into a texture (requested by a member, 11-22:
+# loading the texture in Color and then going to Tool > Texture Image to tick the channels felt slow). A greyed row is a
+# channel the texture does not have: its tick adds the channel (the same undoable texture_channels step as Texture Image)
+# and makes the brush paint it; a material swatch adds roughness + metallic at once. Texture Image shows the same ticks.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+run uv_auto resolution=1024
+run texture_create size=1024
+expect_value material_channels == 0
+expect_value brush_channels == 1
+
+# Every channel is there before any is on, with the hint under them.
+click "Color##palette.color"
+expect "Vertex Paint & Materials/Roughness"
+expect "Vertex Paint & Materials/Metallic"
+expect "Vertex Paint & Materials/Normal"
+expect "Vertex Paint & Materials/Opacity"
+expect_text "Tick a channel"
+wait 0.3
+shot entries-before
+
+# One tick: the channel is on the texture (one undo step) and the brush paints it; its value controls appear.
+click "Vertex Paint & Materials/Roughness"
+expect_value material_channels == 1
+expect_value brush_channels == 3
+expect "Vertex Paint & Materials/##value"
+expect_no_text "Tick a channel"
+wait 0.3
+shot entries-after
+key ctrl+z
+expect_value material_channels == 0
+expect_text "Tick a channel"
+
+# A material swatch adds roughness and metallic together.
+click "Vertex Paint & Materials/##matswatch.Gold"
+expect_value material_channels == 2
+expect_value brush_channels == 7
+
+# Ctrl-hover help on a greyed row says what the tick does.
+hold ctrl
+hover "Vertex Paint & Materials/Normal"
+expect_help "add"
+hold none
+
+# Texture Image agrees: its Material Channels block is there for the same texture (ticks off again live there).
+key escape
+click "Texture Image##tool.texture"
+expect_text "Channel memory"
