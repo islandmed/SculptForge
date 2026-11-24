@@ -9,6 +9,8 @@
 //                            Tests only: no setting or environment reaches it.
 //   gl_limits copies=0|1|auto partial buffer updates as GPU copies (1) or BufferSubData (0) whatever the driver; auto: as the
 //                            driver needs (gl::copyUploads: copies on OpenGL over D3D12). Tests only, as texels=.
+//   gl_limits reject_textured=1 the first textured draw of a Part counts as a driver error (Renderer::drawSlot): the Part draws
+//                            without its texture and the status says so. Tests only, as texels=; 0 turns it off.
 //   render_cell NAME mode=lit|pbr|flat|wire|groups [min=F|max=F] [size=PX] [splats=1]   (groups: Lit Sphere with Show Face Groups)
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
@@ -46,11 +48,14 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             if (w[i].rfind("texels=", 0) == 0) {
                 const unsigned long texels = std::strtoul(w[i].c_str() + 7, nullptr, 10);
                 run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
+            } else if (w[i] == "reject_textured=0" || w[i] == "reject_textured=1") {
+                const bool reject = w[i] == "reject_textured=1";
+                run([reject] { gl::setTestRejectTextured(reject); });
             } else if (w[i] == "copies=0" || w[i] == "copies=1" || w[i] == "copies=auto") {
                 const int copies = w[i] == "copies=auto" ? -1 : w[i] == "copies=1" ? 1 : 0;
                 run([copies] { gl::setTestCopyUploads(copies); });
             } else {
-                error = "'gl_limits': unknown argument '" + w[i] + "' (texels=N, copies=0|1|auto)";
+                error = "'gl_limits': unknown argument '" + w[i] + "' (texels=N, copies=0|1|auto, reject_textured=0|1)";
                 return false;
             }
         }

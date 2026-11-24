@@ -117,4 +117,10 @@ if [ -n "$failed" ]; then
 else
   tail -300 "$out/ctest.log" > "$out/output.txt"
 fi
+# A failing UI script's replay (monkey / mode matrix: replay-*.sfui) and FAIL-*.png go with the artifact: without them a
+# runner-only failure (11-24: ui_monkey seed 4 green on every laptop run) leaves nothing to replay. A few files, not the shots.
+mkdir -p "$out/ui-fails"
+find build/ui-shots -type f \( -name 'replay-*.sfui' -o -name 'FAIL-*.png' \) 2>/dev/null | head -40 | while read -r f; do
+  cp "$f" "$out/ui-fails/$(basename "$(dirname "$f")")-$(basename "$f")"
+done
 finish
