@@ -6,6 +6,8 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.14] - 2026-11-24
+
 ### Added
 - **Scatter** (Tool > Scatter, the `scatter` command): copies of a built-in shape or another Part over the active Part
   or only its masked area. Count, random size range, random turn and tilt, follow the surface or stay upright, lie
@@ -57,12 +59,9 @@ All notable changes to SculptForge are listed here. The format follows
   now stops short of the wall straight down its own path, so the sheet is thinned, never torn through. On the wing in
   the test session the largest point moved differently from before is 0.03 on a 2.8-long wing."
 
-## [0.13.14] - 2026-11-23
-
-### Fixed
-- Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get
-  UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in
-  place and Undo restores the UVs exactly.
+### Known issues
+- Sculpting with Dynamic on a painted Part can still erase its texture; workaround: turn Dynamic off
+  on painted Parts or save first. The fix ships in 0.13.15.
 
 ## [0.13.13] - 2026-11-23
 
