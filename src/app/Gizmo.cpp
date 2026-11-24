@@ -1153,7 +1153,7 @@ void App::drawGizmo() {
 }
 
 void App::drawGizmoPanel() {
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * uiScale_, c.y + c.h - 12.0f * uiScale_), ImGuiCond_FirstUseEver,
                             ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSize(ImVec2(270.0f * uiScale_, 0.0f), ImGuiCond_Always);

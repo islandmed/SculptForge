@@ -506,6 +506,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
+    src/app/SplitView.cpp
     src/app/PanelFaceGroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
@@ -1320,6 +1321,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(split_view_1440 split_view --size 1440x900) # View > Split view: both panes, the divider, the chips
+    sculptforge_ui_test(split_view_2880 split_view --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface

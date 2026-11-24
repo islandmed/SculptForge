@@ -1080,7 +1080,7 @@ void App::selectInsertSetItem(int index) {
 void App::drawInsertSetPicker() {
     if (!insertSetActive()) return;
     const float s = uiScale_, tile = 72.0f * s;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     // Bottom left of the canvas: clear of the timeline strip and the view figure at the top.
     ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * s, c.y + c.h - 12.0f * s), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(tile * 2.5f, 0), ImVec2(tile * 5.6f, c.h * 0.7f));

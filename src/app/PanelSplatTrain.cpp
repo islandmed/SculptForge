@@ -373,7 +373,7 @@ void App::drawSplatTrainSection() {
 void App::drawSplatTrainOverlay() {
     if (!splatTrain_) return;
     SplatTrainUi& s = *splatTrain_;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float scale = uiScale_;
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |

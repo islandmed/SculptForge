@@ -140,6 +140,14 @@ struct UiPrefs {
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     int viewResolution = 100;   // the 3D view's resolution, % of the window's (#80): 100, 75 or 50
+    // View > Split view (#171; SplitView.cpp): a second live view of the scene. 0 off, 1 beside (left | right), 2 below
+    // (top / bottom). splitLens: each pane's direction, [0] the left / top pane, [1] the right / bottom one: 0 free
+    // (perspective, orbits as any view), 1 front, 2 right, 3 top (orthographic, the direction stays put; pan and zoom
+    // work). splitRatio: the first pane's share of the canvas (drag the divider). Off by default: nothing changes
+    // until it is turned on.
+    int splitView = 0;
+    int splitLens[2] = {0, 1};
+    float splitRatio = 0.5f;
     // Preferences > Display > Shadows & AO, and next to the PBR controls (render/Occlusion.h): -1 = by the hardware
     // tier (on from the Standard tier up on desktop GL, off on the Essential tier and GL ES), 0 off, 1 on. They shade
     // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.

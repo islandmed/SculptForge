@@ -87,6 +87,17 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
     return j["look"].isObject() || j["layout"].isString();
 }
 
+// Split view lenses in ui.json (UiPrefs::splitLens): words, so a hand edit reads.
+const char* splitLensName(int lens) {
+    static const char* const names[4] = {"free", "front", "right", "top"};
+    return names[std::clamp(lens, 0, 3)];
+}
+int splitLensFromName(const std::string& name, int fallback) {
+    for (int i = 0; i < 4; ++i)
+        if (name == splitLensName(i)) return i;
+    return fallback;
+}
+
 Json toJson(const UiPrefs& p) {
     Json j = Json::object();
     j.set("popupInfo", p.popupInfo);
@@ -150,6 +161,10 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("viewResolution", double(p.viewResolution));
+    j.set("splitView", std::string(p.splitView == 1 ? "beside" : p.splitView == 2 ? "below" : "off"));
+    j.set("splitLensFirst", std::string(splitLensName(p.splitLens[0])));
+    j.set("splitLensSecond", std::string(splitLensName(p.splitLens[1])));
+    j.set("splitRatio", double(p.splitRatio));
     j.set("viewAo", double(p.viewAo));
     j.set("viewShadows", double(p.viewShadows));
     j.set("aoStrength", double(p.aoStrength));
@@ -283,6 +298,13 @@ void fromJson(const Json& j, UiPrefs& p) {
         const int r = int(j["viewResolution"].asNumber(p.viewResolution));
         p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
     }
+    if (j["splitView"].isString()) {
+        const std::string s = j["splitView"].asString();
+        p.splitView = s == "beside" ? 1 : s == "below" ? 2 : 0;
+    }
+    if (j["splitLensFirst"].isString()) p.splitLens[0] = splitLensFromName(j["splitLensFirst"].asString(), p.splitLens[0]);
+    if (j["splitLensSecond"].isString()) p.splitLens[1] = splitLensFromName(j["splitLensSecond"].asString(), p.splitLens[1]);
+    p.splitRatio = std::clamp(float(j["splitRatio"].asNumber(p.splitRatio)), 0.2f, 0.8f);
     p.viewAo = std::clamp(int(j["viewAo"].asNumber(p.viewAo)), -1, 1);
     p.viewShadows = std::clamp(int(j["viewShadows"].asNumber(p.viewShadows)), -1, 1);
     p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
@@ -1505,7 +1527,7 @@ bool App::hintShown(const char* id) const {
 
 void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float top) {
     if (!hintShown(id)) return;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, top), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.72f);
@@ -1544,7 +1566,7 @@ void App::drawViewportToast() {
         viewportToast_.clear();
         return;
     }
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 8.0f * s), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.85f);
@@ -1613,7 +1635,7 @@ void App::consoleEcho(const std::string& name, const Args& args, const CommandRe
     console_.seenStatus(status_);
 }
 
-CanvasRect App::paletteArea() const { return canvasRect(); } // top centre of the canvas
+CanvasRect App::paletteArea() const { return wholeCanvasRect(); } // top centre of the canvas
 
 CanvasRect App::consoleRect() const {
     // The shell reserves this strip between the canvas and the bottom shelf (ShellGeometry::console);

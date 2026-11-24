@@ -1053,7 +1053,7 @@ void App::drawUvEditor() {
         if (!s.gpu.init(s.gpuError)) SDL_Log("UV Editor: %s", s.gpuError.c_str());
     }
     u.refresh();
-    const CanvasRect cr = canvasRect();
+    const CanvasRect cr = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w * 0.34f, cr.y + 6 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(cr.w * 0.66f - 6 * scale, cr.h - 12 * scale), ImGuiCond_FirstUseEver);
     // Never bigger than the canvas (a small window at a big UI scale), and pulled back inside the screen.

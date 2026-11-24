@@ -376,6 +376,12 @@ private:
     Renderer renderer_;
     RenderSettings renderSettings_;
     Camera camera_;
+    // Split view (SplitView.cpp, #171): the camera of the pane the pointer is not in, and that pane's auto-ortho flag.
+    // The pointer's pane is always camera_ / canvasRect(): moving into the other pane swaps the two.
+    Camera otherCamera_;
+    bool otherAutoOrtho_ = false;
+    int splitActive_ = 0; // the pane camera_ belongs to while the view is split: 0 = left / top, 1 = right / bottom
+    bool splitOtherReady_ = false; // otherCamera_ set up (a start with the split on waits for a scene to frame)
 
     // Brush settings
     BrushType brush_ = BrushType::Standard;
@@ -2278,8 +2284,26 @@ private:
     } memShown_;
     void sampleMemoryShown();
 public:
-    // The part of the window the 3D view uses (logical px); the whole window while the UI is hidden.
+    // The part of the window the 3D view uses (logical px); the whole window while the UI is hidden. With the view
+    // split (SplitView.cpp): the pointer's pane, which every ray, pick, orbit and frame goes by; wholeCanvasRect()
+    // is both panes, for what sits on the canvas as a whole (the timeline strip, banners, panel positions).
     CanvasRect canvasRect() const;
+    CanvasRect wholeCanvasRect() const;
+    // Split view (SplitView.cpp): a second live view of the scene beside or below the first (#171).
+    bool splitOn() const { return uiPrefs_.splitView != 0; }
+    CanvasRect splitPaneRect(int pane) const;      // the pane's rect (the whole canvas when not split)
+    int splitPaneAt(float x, float y) const;        // the pane under a window point, -1 beside the canvas
+    void splitActivate(int pane);                   // the pointer moved into that pane: it is camera_'s now
+    void splitSetMode(int mode);                    // 0 off, 1 beside, 2 below
+    void splitSetLens(int pane, int lens);          // 0 free, 1 front, 2 right, 3 top (UiPrefs::splitLens)
+    void splitSwap();                               // the two panes trade views
+    void splitSync();                               // once a frame before drawing: fixed lenses hold, aspects follow the panes
+    float splitSecondaryResolution() const;         // the other pane's resolution scale this frame (lighter while a stroke runs)
+    void drawSplitViewUi();                         // the divider (drag it) and each pane's direction chip
+    void drawSplitViewSection();                    // the View palette's rows (Palettes.cpp calls it)
+    void registerSplitViewActions();                // view.split and friends (Input.cpp calls it)
+    void drawSceneViews(int fbW, int fbH, int samples); // the frame's 3D view(s): every pane, the pointer's last (App.cpp's loop)
+    void drawSceneCapture(int w, int h);                // the same into a capture target (UI test shots, recordings)
     // The part of the canvas no band covers (the open Library, the Sculpt Timeline strip), as fractions of the
     // canvas from its top left (x0, y0, x1, y1): what framing fits the model into.
     glm::vec4 freeCanvasArea() const;
@@ -2394,7 +2418,8 @@ private:
     Camera partCamera() const { return camera_.inSpaceOf(doc_.activePartInfo().transform); }
     void partRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const;
     float canvasHeight() const { return canvasRect().h; }
-    Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas in framebuffer pixels
+    Renderer::Viewport canvasViewport(int fbWidth, int fbHeight) const; // the canvas (the pointer's pane) in framebuffer pixels
+    Renderer::Viewport canvasViewportOf(const CanvasRect& c, int fbWidth, int fbHeight) const;
     void drawCanvasFrame();
     // Right-shelf Move/Zoom/Rotate; width 0: the standard 44 px (times the UI scale).
     bool canvasNavButton(const char* id, const char* icon, const char* label, int mode, float width = 0.0f,
