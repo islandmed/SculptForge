@@ -168,7 +168,7 @@ TEST(pinching_recipes_keep_the_mirror_seam_clean) {
 // holds a groove only so deep: dug on past that, the walls' rows overlapped in a sawtooth. Now the dig and the pinch fade out at about
 // a brush radius under the rim: the groove stops deepening, and ten laps fold (almost) nothing, lifted or not, mirrored or not, with
 // Contact facing on or off.
-TEST(crease_line_ten_laps_keep_a_clean_groove) {
+TEST(crease_line_ten_laps_clean_groove_invariant) {
     BrushRecipe crease;
     for (const BrushRecipe& r : builtinBrushRecipes())
         if (r.name == "Crease Line") crease = r;
